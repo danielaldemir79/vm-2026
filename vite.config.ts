@@ -51,8 +51,8 @@ export default defineConfig({
         description:
           'Följ fotbolls-VM 2026 tillsammans: matcher, tabeller, slutspelsträd och tips.',
         lang: 'sv',
-        theme_color: '#0b1220',
-        background_color: '#0b1220',
+        theme_color: '#091310',
+        background_color: '#091310',
         display: 'standalone',
         start_url: '/',
         scope: '/',
