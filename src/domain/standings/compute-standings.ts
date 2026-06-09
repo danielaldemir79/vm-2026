@@ -1,9 +1,17 @@
-// Härledd state: beräkna en grupptabell från en lista matchresultat.
+// Härledd state: beräkna en GRUPPtabell från en lista matchresultat.
 //
 // REN funktion, inga sido-effekter, inget I/O. Detta är arkitekturens ryggrad
 // (SPEC §6): tabellen LAGRAS aldrig, den härleds av denna funktion från
 // Match-resultaten, så det finns en enda sanning. Hela funktionen är därför
 // hårt enhetstestad (compute-standings.test.ts).
+//
+// AVGRÄNSNING (gruppmatcher ONLY): funktionen beräknar uttryckligen en
+// GRUPPtabell, så den räknar BARA in gruppspelsmatcher (stage === 'group' OCH
+// satt groupId). Slutspelsmatcher (round-of-32 ... final) ignoreras helt, även
+// om deras lag råkar finnas i `teamIds`. Annars skulle en blandad matchlista
+// (en call-site som skickar in både grupp- och slutspelsmatcher) förorena
+// grupptabellen med slutspelsresultat. En gruppmatch UTAN groupId ignoreras
+// också (data-defekt: en gruppmatch ska alltid ha en grupp, se Match-typen).
 //
 // ============================================================================
 // FIFA-tiebreak-ordning (VM 2026, gissas ALDRIG, källa nedan)
@@ -64,14 +72,33 @@ function emptyStanding(teamId: string): GroupStanding {
 }
 
 /**
- * En match räknas in i tabellen bara om den är färdigspelad (har ett resultat)
- * OCH båda lagen är kända. En match utan resultat (kommande/pågående) bidrar
- * inte, så en ofullständig grupp ger korrekta delsummor (edge-fall).
+ * En match räknas in i GRUPPtabellen bara om ALLA dessa gäller:
+ *   - den är en gruppspelsmatch (stage === 'group') med satt groupId,
+ *   - den är färdigspelad (har ett resultat),
+ *   - båda lagen är kända.
+ *
+ * Slutspelsmatcher (round-of-32 ... final) ignoreras helt, även om båda lagen
+ * råkar finnas i `teamIds`: funktionen beräknar en grupptabell och får aldrig
+ * förorenas av slutspelsresultat om en call-site skickar in en blandad lista
+ * (dataintegritet, se filhuvudet). En gruppmatch utan groupId är en data-defekt
+ * (Match-typen säger att gruppmatcher har en grupp) och hoppas också över.
+ * En match utan resultat (kommande/pågående) bidrar inte, så en ofullständig
+ * grupp ger korrekta delsummor (edge-fall).
  */
-function isCounted(
-  match: Match
-): match is Match & { result: MatchResult; homeTeamId: string; awayTeamId: string } {
-  return match.result !== null && match.homeTeamId !== null && match.awayTeamId !== null;
+function isCounted(match: Match): match is Match & {
+  stage: 'group';
+  groupId: NonNullable<Match['groupId']>;
+  result: MatchResult;
+  homeTeamId: string;
+  awayTeamId: string;
+} {
+  return (
+    match.stage === 'group' &&
+    match.groupId !== null &&
+    match.result !== null &&
+    match.homeTeamId !== null &&
+    match.awayTeamId !== null
+  );
 }
 
 /** Uppdatera ett lags statistik med ett enskilt matchresultat (sett från lagets sida). */
@@ -148,7 +175,7 @@ function headToHeadStats(
  * Returnerar < 0 om `a` ska rankas före `b`, > 0 om efter, 0 om de inte kan
  * skiljas av de DETERMINISTISKA kriterierna (1-6). Inbördes-kriterierna (2-4)
  * tas in via `h2h`, som redan är beräknad på den aktuella delgruppen av lika
- * lag (se resolveTieGroup).
+ * lag (se sortGroup, som bygger h2h-mapen för delgruppen via headToHeadStats).
  *
  * Sista raden (teamId-jämförelsen) är INTE en FIFA-tiebreak: den ger bara en
  * stabil, förutsägbar ordning när lag står HELT lika efter alla beräkningsbara
@@ -257,9 +284,11 @@ function sortGroup(
  *
  * @param teamIds  Lagen i gruppen (Team.id). Lag utan spelade matcher får en
  *                 noll-rad, så tabellen alltid har en rad per lag i gruppen.
- * @param matches  Matcherna att räkna på. Bara färdigspelade matcher (med
- *                 resultat och kända lag) räknas, övriga ignoreras, så en
- *                 ofullständig grupp ger korrekta delsummor.
+ * @param matches  Matcherna att räkna på. Bara färdigspelade GRUPPmatcher (med
+ *                 satt groupId, resultat och kända lag) räknas, slutspelsmatcher
+ *                 och matcher utan resultat ignoreras, så en blandad eller
+ *                 ofullständig lista ändå ger korrekta grupp-delsummor (se
+ *                 isCounted + filhuvudet).
  * @returns        Lag-rader sorterade enligt FIFA-tiebreak-ordningen (VM 2026),
  *                 bästa laget först, med 1-baserad rank ifylld.
  *

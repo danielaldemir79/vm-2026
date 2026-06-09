@@ -19,9 +19,18 @@ describe('fixtures, form och fält uppfyller domäntyperna', () => {
       expect(team.id.length).toBeGreaterThan(0);
       expect(typeof team.name).toBe('string');
       expect(typeof team.code).toBe('string');
+      // code är FIFA:s trebokstavskod: exakt 3 versaler, inga siffror, även som
+      // platshållare (kontrakts-konsistens, så UI/flagg-formattering byggs mot
+      // rätt form). Vaktar mot drift tillbaka till t.ex. "AA1".
+      expect(team.code).toMatch(/^[A-Z]{3}$/);
       // Gruppen måste vara ett giltigt grupp-id (A till L).
       expect(GROUP_IDS).toContain(team.group);
     }
+  });
+
+  it('lag-koderna är unika (ingen kollision mellan platshållarna)', () => {
+    const codes = fixtureTeams.map((t) => t.code);
+    expect(new Set(codes).size).toBe(codes.length);
   });
 
   it('varje Match har giltig stage, status och resultat-form', () => {
