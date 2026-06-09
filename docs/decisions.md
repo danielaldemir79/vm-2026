@@ -5,6 +5,31 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T3 (Copilot runda 2): `Match` blir en diskriminerad union på `status` (C7+C8)
+
+**Beslut:** `Match` (`src/domain/types.ts`) modelleras som en DISKRIMINERAD UNION på `status`:
+`Match = ScheduledMatch | LiveMatch | FinishedMatch`. Endast `FinishedMatch` bär ett resultat
+(`result: MatchResult`, icke-null); `ScheduledMatch` och `LiveMatch` har `result: null`. Gemensamma
+fält ligger i en intern `MatchBase`. `isCounted` i `computeStandings` narrowar nu på
+`status === 'finished'` (i stället för en fristående `result !== null`-koll), vilket både blir renare
+och binder ihop "räknas in" med matchens faktiska livscykel-läge. Ett typ-test
+(`src/domain/types.test.ts`) vaktar kontraktet: `true satisfies Equal<FinishedMatch['result'],
+MatchResult>` m.fl. failar bygget om typen någonsin luckras upp igen (mutations-verifierat).
+**Varför / vägval:** Copilot flaggade (C7+C8) att JSDoc:en LOVADE en koppling status <-> resultat som
+typen inte tvingade (`result` var `MatchResult | null` oavsett status). De två giltiga vägarna var
+(a) omformulera kommentarerna ärligt som "konvention, inte typgaranti" eller (b) göra unionen så
+kopplingen blir ett TYP-KONTRAKT. Vi valde (b) eftersom detta är fundamentets kärntyp, Daniel valde
+kvalitet före tempo, och ripple-effekten var liten och uteslutande till det bättre: alla befintliga
+Match-literaler (fixtures + tester) följde redan invarianten, och konsumenten `computeStandings` fick
+en strikt RENARE narrowing (status-baserad i stället för null-koll). Resultatet: ogiltiga tillstånd
+(finished utan resultat, scheduled/live med resultat) är nu OREPRESENTERBARA ("illegal states
+unrepresentable"), och konsumenter (UI, computeStandings) läser `result` utan null-check efter en
+`status === 'finished'`-narrowing. Live-matchens `result` hålls medvetet `null` (SPEC §6: "resultat
+null tills inmatat"); en eventuell löpande ställning blir i så fall ett eget, uttryckligt fält, inte
+en uppluckring av detta kontrakt.
+
+---
+
 ## 2026-06-09 , T3 (Copilot runda 1): `computeStandings` räknar BARA gruppmatcher
 
 **Beslut:** `computeStandings` (`src/domain/standings/compute-standings.ts`) räknar in en match i
