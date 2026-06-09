@@ -145,3 +145,22 @@ mot källan i stället för att jaga den. Detta uppfyller källhänvisnings-krav
 Källa: T4 (treeplats-tabellen, `scripts/generate-third-place-table.ts` + `src/domain/bracket/annexe-c-parser.ts`
 + committat `annexe-c-source.txt` -> `src/domain/bracket/third-place-table.ts`, källånkrat av
 `third-place-table-source.test.ts`).
+
+### fargoberoende-framhavning-nar-tva-roller-delar-hue (design, VM 2026)
+
+**Recept:** När en zon ska framhävas men en token-roll den vill använda KAN sammanfalla med en annan
+roll i något tema (i VM 2026: `--vm-accent` === `--vm-success` === #0e7a44 i ljust tema), framhäv med
+FLERA samtidiga signaler som INTE är beroende av att färgerna skiljer sig:
+1. FORM/markör (här en placerings-medalj med ring i `--vm-gold` / fg-ton),
+2. KANT eller list (här `inset box-shadow` mot `--color-accent`),
+3. YT-ton (svag `color-mix(... accent 7% ...)` bakom raden),
+4. AVDELARE/typografi (tjockare gräns vid "snittet", starkare vikt på nyckeltalen).
+Håll texten/siffran i framhävnings-markören på full `--color-fg`-kontrast, låt rollens hue leva i
+bakgrund + kant, så markören är AA oavsett hue-kollision. Behåll en stabil `data-*`-hake (här
+`data-qualified`) + `sr-only`-text så a11y och framtida färgläggning hänger ihop.
+**Varför:** En framhävning som BARA är en färg går sönder (osynlig eller tvetydig) i det tema där två
+roller delar hue, och låser dessutom den andra rollen från att få en egen ton senare. Redundanta,
+färg-oberoende signaler läses i båda teman och låter en senare task färglägga fritt utan att bryta
+designen. Verifiera i webbläsaren att kollisionen är LIVE (läs `getComputedStyle` på `--vm-accent` vs
+`--vm-success`) och att zonen ändå läses. Källa: T5 design-frontend (`src/features/groups/GroupTable.tsx`,
+kvalificeringszonen, T7-pin).

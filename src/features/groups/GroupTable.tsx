@@ -1,18 +1,23 @@
-// En tillgänglig grupptabell för EN grupp (semantisk HTML, T5).
+// En tillgänglig grupptabell för EN grupp (semantisk HTML + premium-visuell design, T5).
 //
-// FOKUS (senior-devs lager): KORREKT, TILLGÄNGLIG tabell-semantik. Riktig
-// <table> med <caption>, en kolumn-header-rad (<th scope="col">) och lagnamnet
-// som rad-header (<th scope="row">), så en skärmläsare läser "Mexiko, spelade 3,
-// vunna 2 ..." i stället för lösryckta siffror. Kolumnerna följer GroupStanding
-// (SPEC §6): Placering, Lag, S (spelade), V, O, F, GM, IM, MS, P. Förkortningarna
-// får title-attribut + en synlig teckenförklaring i vyn (GroupStageView), så de
-// inte är kryptiska. computeStandings har redan sorterat raderna och satt rank.
+// FOKUS (senior-devs lager, OFÖRÄNDRAT): KORREKT, TILLGÄNGLIG tabell-semantik.
+// Riktig <table> med <caption>, en kolumn-header-rad (<th scope="col">) och
+// lagnamnet som rad-header (<th scope="row">), så en skärmläsare läser "Mexiko,
+// spelade 3, vunna 2 ..." i stället för lösryckta siffror. Kolumnerna följer
+// GroupStanding (SPEC §6): Placering, Lag, S (spelade), V, O, F, GM, IM, MS, P.
+// Förkortningarna får title-attribut + en synlig teckenförklaring i vyn
+// (GroupStageView). computeStandings har redan sorterat raderna och satt rank.
 //
-// STYLING är medvetet MINIMAL/STRUKTURELL (token-klasser, inga råa hex). Den
-// premium-visuella designen (layout-finess, responsiv polish, rörelse, framhävd
-// kvalificeringszon) ägs av design-frontend-agenten som kör EFTER denna task.
-// Strukturen är gjord lätt att styla: tydlig semantik + stabila data-attribut
-// (data-qualified) så design kan haka på utan att bygga om markupen.
+// VISUELL DESIGN (design-frontend-agentens lager, ovanpå strukturen): den
+// "arena i kvällsljus"-premiumkänslan. Den lyfter utan att röra a11y-semantiken:
+//   - Kvalificeringszonen (etta + tvåa) markeras FÄRG-OBEROENDE: en placerings-
+//     medalj (rank-disc), en vänsterställd accent-list, en diskret upphöjd
+//     yt-ton och en "går vidare"-avdelare efter tvåan. Detta är medvetet (T7-pin):
+//     i ljust tema är accent === success (samma skogsgrön), så zonen får ALDRIG
+//     bara luta sig mot en accent/success-färg. Form + medalj + list + typografi
+//     bär den, så den läses även när färgerna sammanfaller, och T7 kan sen ge
+//     success en egen ton utan att bryta designen.
+//   - Inga råa hex: allt går via semantiska tokens (color-mix mot --color-*).
 
 import type { GroupStanding, GroupId, Team } from '../../domain/types';
 
@@ -26,6 +31,13 @@ interface ColumnDef {
   title: string;
   /** Plocka ut cellvärdet ur en standings-rad. */
   value: (row: GroupStanding) => number;
+  /**
+   * Visuell vikt. Poäng + målskillnad är de avgörande talen och hålls starka;
+   * gjorda/insläppta mål är stödsiffror och dämpas (visuell komprimering, SPEC
+   * §7), så ögat läser tabellen i rätt ordning utan att en kolumn tas bort
+   * (a11y: alla 8 statistik-kolumner är alltid kvar i DOM).
+   */
+  emphasis?: 'strong' | 'muted';
 }
 
 // Sifferkolumnerna i FIFA-tabellordning. Lag + placering hanteras separat (de är
@@ -35,10 +47,10 @@ const NUMERIC_COLUMNS: readonly ColumnDef[] = [
   { label: 'V', title: 'Vunna', value: (r) => r.won },
   { label: 'O', title: 'Oavgjorda', value: (r) => r.drawn },
   { label: 'F', title: 'Förlorade', value: (r) => r.lost },
-  { label: 'GM', title: 'Gjorda mål', value: (r) => r.goalsFor },
-  { label: 'IM', title: 'Insläppta mål', value: (r) => r.goalsAgainst },
-  { label: 'MS', title: 'Målskillnad', value: (r) => r.goalDifference },
-  { label: 'P', title: 'Poäng', value: (r) => r.points },
+  { label: 'GM', title: 'Gjorda mål', value: (r) => r.goalsFor, emphasis: 'muted' },
+  { label: 'IM', title: 'Insläppta mål', value: (r) => r.goalsAgainst, emphasis: 'muted' },
+  { label: 'MS', title: 'Målskillnad', value: (r) => r.goalDifference, emphasis: 'strong' },
+  { label: 'P', title: 'Poäng', value: (r) => r.points, emphasis: 'strong' },
 ];
 
 export interface GroupTableProps {
@@ -63,6 +75,38 @@ function teamLabel(
 }
 
 /**
+ * Färg-OBEROENDE placerings-medalj för rank-cellen. Etta = guld-medalj
+ * (--vm-gold), tvåa = upphöjd silver-medalj, trea/fyra = neutral. Medaljen är en
+ * av flera signaler för kvalificeringszonen (se fil-headern, T7-pin), inte den
+ * enda. Värdena kommer ur color-mix mot semantiska tokens, inte råa hex.
+ *
+ * KONTRAST (WCAG): siffran i medaljen håller alltid full fg-kontrast (--color-fg
+ * mot ytan), guld-/silver-tonen lever i medaljens BAKGRUND + KANT. Så placeringen
+ * läses skarpt i båda teman utan att luta sig mot en låg guld-på-guld-kontrast.
+ */
+function rankDiscStyle(rank: number): React.CSSProperties {
+  if (rank === 1) {
+    return {
+      backgroundColor: 'color-mix(in srgb, var(--vm-gold) 24%, transparent)',
+      color: 'var(--color-fg)',
+      borderColor: 'color-mix(in srgb, var(--vm-gold) 60%, transparent)',
+    };
+  }
+  if (rank === DIRECT_ADVANCE_RANK) {
+    return {
+      backgroundColor: 'color-mix(in srgb, var(--color-fg) 12%, transparent)',
+      color: 'var(--color-fg)',
+      borderColor: 'color-mix(in srgb, var(--color-fg) 30%, transparent)',
+    };
+  }
+  return {
+    backgroundColor: 'transparent',
+    color: 'var(--color-fg-muted)',
+    borderColor: 'transparent',
+  };
+}
+
+/**
  * En grupptabell. Ren presentation: tar färdigsorterade standings (rank ifylld
  * av computeStandings) och renderar dem tillgängligt. Ingen beräkning här, en
  * sanning bor i härledningen.
@@ -73,24 +117,26 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
       className="w-full border-collapse text-left text-sm"
       data-testid={`group-table-${groupId}`}
     >
-      <caption className="mb-2 font-display text-base font-bold">Grupp {groupId}</caption>
+      <caption className="sr-only">Grupp {groupId}</caption>
       <thead>
-        <tr className="border-b border-border text-fg-muted">
+        <tr className="text-[0.6875rem] uppercase tracking-wide text-fg-muted">
           <th
             scope="col"
-            className="px-2 py-1.5 text-right font-medium"
+            className="w-7 px-0.5 pb-2 text-center font-semibold"
             title="Placering i gruppen"
           >
             #
           </th>
-          <th scope="col" className="px-2 py-1.5 font-medium">
+          <th scope="col" className="px-1.5 pb-2 font-semibold">
             Lag
           </th>
           {NUMERIC_COLUMNS.map((col) => (
             <th
               key={col.label}
               scope="col"
-              className="px-2 py-1.5 text-right font-medium"
+              className={`w-7 px-0.5 pb-2 text-right font-semibold tabular-nums ${
+                col.emphasis === 'muted' ? 'opacity-70' : ''
+              }`}
               title={col.title}
             >
               <abbr title={col.title} className="no-underline">
@@ -103,27 +149,70 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
       <tbody>
         {standings.map((row) => {
           const { name, code } = teamLabel(row.teamId, teamsById);
-          // De direkt kvalificerade (etta + tvåa) markeras med ett DATA-attribut,
-          // inte en färg. Statusfärger är T7:s domän (i ljust tema krockar accent
-          // och success, T7-pinnen), så vi exponerar bara en stabil hake (a11y
-          // via aria-label "kvalificerad") och låter design-frontend måla den.
+          // De direkt kvalificerade (etta + tvåa) markeras FÄRG-OBEROENDE
+          // (se fil-headern, T7-pin): data-qualified-haken finns kvar för
+          // styling/test, men den VISUELLA framhävningen bärs av medalj +
+          // vänster-list + upphöjd yta + "går vidare"-avdelare, inte en
+          // accent/success-färg (som krockar i ljust tema). a11y: oförändrad
+          // sr-only-text "(kvalificerad till slutspel)".
           const qualified = row.rank <= DIRECT_ADVANCE_RANK;
+          // Sista kvalificerade raden får en tydligare under-avdelare ("snittet"
+          // där gruppen delas i går-vidare vs utslagen).
+          const isCutoffRow = row.rank === DIRECT_ADVANCE_RANK;
           return (
             <tr
               key={row.teamId}
-              className="border-b border-border/60 last:border-b-0"
+              className={`group/row border-b border-border/50 transition-colors last:border-b-0 ${
+                isCutoffRow ? 'border-b-2 border-b-border' : ''
+              }`}
               data-qualified={qualified ? 'true' : undefined}
+              // Upphöjd yt-ton + vänster accent-list bara på kvalificerade rader.
+              // color-mix mot tokens, så det följer temat och inte är rå hex.
+              style={
+                qualified
+                  ? {
+                      backgroundColor: 'color-mix(in srgb, var(--color-accent) 7%, transparent)',
+                      boxShadow: 'inset 3px 0 0 0 var(--color-accent)',
+                    }
+                  : undefined
+              }
             >
-              <td className="px-2 py-1.5 text-right tabular-nums text-fg-muted">{row.rank}</td>
-              <th scope="row" className="px-2 py-1.5 font-medium">
-                <span>{name}</span>{' '}
-                <span className="text-xs text-fg-muted" aria-hidden="true">
-                  {code}
+              <td className="px-0.5 py-2 text-center align-middle">
+                <span
+                  className="inline-flex h-[1.375rem] w-[1.375rem] items-center justify-center rounded-pill border text-[0.6875rem] font-bold tabular-nums"
+                  style={rankDiscStyle(row.rank)}
+                >
+                  {row.rank}
+                </span>
+              </td>
+              <th scope="row" className="px-1.5 py-2 align-middle font-medium">
+                {/* min-w-0 låter namnet truncas i stället för att tvinga ut tabellen
+                    i sidled; kod-chippet (aria-hidden, FIFA-landskod) krymper aldrig. */}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="min-w-0 truncate">{name}</span>
+                  <span
+                    className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-semibold tracking-wider text-fg-muted"
+                    style={{
+                      backgroundColor: 'color-mix(in srgb, var(--color-fg) 8%, transparent)',
+                    }}
+                    aria-hidden="true"
+                  >
+                    {code}
+                  </span>
                 </span>
                 {qualified ? <span className="sr-only"> (kvalificerad till slutspel)</span> : null}
               </th>
               {NUMERIC_COLUMNS.map((col) => (
-                <td key={col.label} className="px-2 py-1.5 text-right tabular-nums">
+                <td
+                  key={col.label}
+                  className={`px-0.5 py-2 text-right align-middle tabular-nums ${
+                    col.emphasis === 'strong'
+                      ? 'font-semibold text-fg'
+                      : col.emphasis === 'muted'
+                        ? 'text-fg-muted'
+                        : ''
+                  }`}
+                >
                   {col.value(row)}
                 </td>
               ))}
