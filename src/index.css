@@ -16,12 +16,50 @@ body {
   outline-offset: 2px;
 }
 
+/* Dekorativ rörelse för den dagliga matchvyns hero (T7, design-frontend):
+   - vm-pulse: en lugn andnings-puls på live-nedräkningens "prick", så hero:n
+     KÄNNS levande utan att vara stökig (SPEC §7).
+   - vm-sheen: en långsam ljus-svep över hero-fonden ("arena-ljus" som rör sig).
+   Båda är RENT dekorativa och nollas av reduced-motion-regeln nedan (WCAG
+   2.3.3): pricken blir då en statisk prick, sveptet stannar, ingen distraktion.
+   Layouten påverkas aldrig (ingen CLS): bara opacitet/bakgrundsposition rör sig. */
+@keyframes vm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes vm-sheen {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 140% 0%;
+  }
+}
+
+.vm-live-dot {
+  animation: vm-pulse 2s ease-in-out infinite;
+}
+
+.vm-hero-sheen {
+  background-size: 200% 200%;
+  animation: vm-sheen 14s linear infinite;
+}
+
 /* A11y: rena CSS-transitioner/animationer (tema-toggle-knoppen, knapp-hover m.m.)
    fångas INTE av motion-paketets reducedMotion-grind, den gäller bara JS-driven
    rörelse. Så vi nollställer dekorativa CSS-transitioner globalt när användaren
    bett om minskad rörelse (WCAG 2.3.3). Opacitets-/färg-övergångar är ofarliga
    och behöver inte nollas, men en svepande regel här är enklast och säkrast,
-   och vi behåller ändå smooth scroll-bortkoppling. */
+   och vi behåller ändå smooth scroll-bortkoppling. Hero-pulsen/sveptet (vm-pulse,
+   vm-sheen) fångas av samma regel: de stannar på sitt första, statiska steg. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

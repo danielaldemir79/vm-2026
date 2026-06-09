@@ -31,6 +31,28 @@ verifierad arena-data. **Varför:** Källan bär ännu inte arena/stad (känd lu
 att visa platshållaren vore att presentera en icke-verifierad uppgift som data. Döljs tills riktig
 arena-data finns. Design-frontend finputsar (dölj/dämpa) ovanpå.
 
+**Beslut (design-frontend, premium-lager):** Hero:n byggs som "arena i kvällsljus": en mörk yta med
+två radiella ljus (pitch-grön ur övre hörnet, varm guld ur det nedre) plus ett långsamt rörligt
+ljus-svep (`vm-sheen`) och en pulsande live-prick (`vm-pulse`). Båda CSS-animationerna är RENT
+dekorativa och nollas av den globala reduced-motion-regeln i `index.css` (de snappar till sitt
+statiska första steg), så WCAG 2.3.3 håller utan en egen JS-grind. Nedräkningen renderas som
+upphöjda "tiles" med `tabular-nums` + fast min-bredd, så siffrorna aldrig ger layout-hopp när
+sekunderna tickar (ingen CLS).
+**Varför (featured-signal, T7-pin):** "Dagens match" framhävs FÄRG-OBEROENDE med GULD (chip + kant +
+gradient), aldrig med accent/success, eftersom de två rollerna delar exakt samma skogsgröna hue i
+ljust tema (verifierat live: `--vm-accent` === `--vm-success` === #0e7a44). Guld-chippet är en SOLID
+guld-bricka med mörk ink-text (`#1c1403`), inte guld-text-på-tint: solid + mörk text ger garanterad
+WCAG AA i båda teman (uppmätt 5.03:1 ljust / 10.90:1 mörkt), medan guld-text-på-18%-tint föll under
+AA på den ljusa ytan (2.97:1). Samma färg-oberoende princip som T5:s kvalificeringszon
+(`fargoberoende-framhavning`, patterns.md).
+**Beslut (lag-emblem + TV-badge):** Lag får en deterministisk tvåtons-"flagg-disc" genererad ur
+FIFA-landskoden (`TeamFlag`), inte riktiga flaggbilder. **Varför:** 48 flaggbilder vore ett
+nät-/asset-beroende som hotar LCP/CLS (Core Web Vitals, PRINCIPLES §12), och emoji-flaggor renderas
+inte på Windows. Discen är ren dekoration (aria-hidden); lagnamnet bär a11y. Kan bytas mot riktig
+flagg-data i lag-profil-tasken utan att röra matchkortet. TV-kanalen blir ett kännbart märke
+(`TvBadge`) med kanal-egen ton i kant/bakgrund/prick men TEXTEN på full fg-kontrast (15.10:1 ljust /
+13.23:1 mörkt), så kanalen skummas snabbt och håller AA oavsett kanalfärg.
+
 ---
 
 ## 2026-06-09 , T4b (issue #31): matchtablån genererad ur svensk TV-tablå, värde-låst, arena flaggad
