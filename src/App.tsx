@@ -5,6 +5,7 @@
 // + rörelse-känslan, så premium-kvaliteten KÄNNS live på PR-förhandsvisningen.
 // Fokuserad med flit: tillräckligt för att bevisa fundamentet, inte mer.
 
+import type { ReactNode } from 'react';
 import { Fade, Slide } from './motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
@@ -24,7 +25,7 @@ function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) 
 }
 
 /** Ett innehållskort på en yt-token, samma form återanvänds i showcasen. */
-function Panel({ children }: { children: React.ReactNode }) {
+function Panel({ children }: { children: ReactNode }) {
   return (
     <section className="rounded-card border border-border bg-surface p-5 shadow-[var(--vm-shadow-card)] sm:p-7">
       {children}

@@ -1,3 +1,4 @@
+import type { HTMLAttributes, ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,7 +13,7 @@ const mockUseReducedMotion = vi.fn<() => boolean>();
 vi.mock('motion/react', () => {
   return {
     useReducedMotion: () => mockUseReducedMotion(),
-    MotionConfig: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    MotionConfig: ({ children }: { children: ReactNode }) => <>{children}</>,
     motion: {
       div: ({
         children,
@@ -21,7 +22,7 @@ vi.mock('motion/react', () => {
         transition,
         ...rest
       }: {
-        children?: React.ReactNode;
+        children?: ReactNode;
         initial?: unknown;
         animate?: unknown;
         transition?: unknown;
@@ -31,7 +32,7 @@ vi.mock('motion/react', () => {
           data-initial={JSON.stringify(initial)}
           data-animate={JSON.stringify(animate)}
           data-transition={JSON.stringify(transition)}
-          {...(rest as React.HTMLAttributes<HTMLDivElement>)}
+          {...(rest as HTMLAttributes<HTMLDivElement>)}
         >
           {children}
         </div>

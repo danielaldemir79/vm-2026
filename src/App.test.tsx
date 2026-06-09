@@ -1,14 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from './App.tsx';
-import { ThemeProvider } from './theme';
+import { ThemeProvider, THEME_ATTRIBUTE } from './theme';
 import { MotionProvider } from './motion';
 
 // Nollställ delat tema-tillstånd så default-temat (mörkt) gäller oavsett
 // testordning, annars kan ett tidigare tests sparade tema läcka in via localStorage.
 beforeEach(() => {
   window.localStorage.clear();
-  document.documentElement.removeAttribute('data-theme');
+  document.documentElement.removeAttribute(THEME_ATTRIBUTE);
 });
 
 // Smoke-test för app-skalet: bevisar att foundation-showcasen renderar utan att
