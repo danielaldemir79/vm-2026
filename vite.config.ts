@@ -1,8 +1,34 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { buildThemeInitScript } from './src/theme/theme-init';
+
+// No-flash tema-injektion. Detta är React + Vites motsvarighet till Astros
+// define:vars: i stället för att handkopiera tema-nyckel/attribut/default som
+// magiska strängar in i index.html (vilket tyst skulle driva isär från
+// theme-constants.ts), GENERERAS det blockerande inline-scriptets innehåll från
+// samma konstanter (buildThemeInitScript) och injiceras i <head> här, en sanning.
+//
+// injectTo: 'head-prepend' lägger scriptet FÖRST i <head>, före stylesheet och
+// modul-script, så data-theme sätts på <html> innan CSS:en appliceras och innan
+// första paint (ingen FOUC). Object-formen är robustare än sträng-ersättning av
+// </head> (Vite äger placeringen). Se docs/decisions.md och theme-init.ts.
+function themeNoFlashPlugin(): Plugin {
+  return {
+    name: 'vm-theme-no-flash',
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'script',
+          children: buildThemeInitScript(),
+          injectTo: 'head-prepend',
+        },
+      ];
+    },
+  };
+}
 
 // Vite-konfiguration för VM 2026.
 // PWA-skalet ger en installerbar app (manifest + service worker + ikon).
@@ -11,6 +37,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Tema/design sätts i T2; här läggs bara en neutral platshållar-färgton.
 export default defineConfig({
   plugins: [
+    themeNoFlashPlugin(),
     react(),
     tailwindcss(),
     VitePWA({

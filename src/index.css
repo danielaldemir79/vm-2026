@@ -1,19 +1,17 @@
 @import 'tailwindcss';
+@import './theme/tokens.css';
 
-/* Neutralt platshållar-skal för T1. Tema, färgsystem och typografi byggs i T2,
-   här sätts bara en mörk bakgrund så att den tomma appen ser hel ut. */
-:root {
-  color-scheme: dark;
-}
-
+/* Tema-systemets tokens (tokens.css) äger nu färg/typografi via CSS-variabler
+   som växlar på [data-theme]. T1:s hårdkodade platshållar-bakgrund är ersatt.
+   Design-frontend-agenten authorar de slutgiltiga token-värdena i tokens.css. */
 body {
   margin: 0;
-  background-color: #0b1220;
-  color: #f8fafc;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+}
+
+/* A11y-bas: synlig fokus-ring på tangentbords-fokus (focus-visible), byggd på
+   accent-token så den följer temat. Design kan finjustera utseendet, men
+   fokus-synligheten ska bevaras (WCAG 2.4.7). */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }

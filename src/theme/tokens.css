@@ -1,0 +1,133 @@
+/* =============================================================================
+   DESIGN-TOKENS, KONTRAKT (struktur), INTE slutgiltiga värden.
+   =============================================================================
+
+   ÄGARSKAP (läs detta först):
+   - STRUKTUREN (vilka tokens som finns, deras namn, hur de wire:as in i Tailwind
+     v4 via @theme, och hur teman växlas via [data-theme]) ägs av tema-MOTORN
+     (denna task, T2 senior-dev-del) och ska vara stabil.
+   - VÄRDENA nedan är medvetna PLATSHÅLLARE. Den slutgiltiga premium-paletten,
+     typografi-skalan och känslan AUTHORAS AV DESIGN-FRONTEND-AGENTEN. Den får
+     äga och byta varje värde i denna fil UTAN att röra någon plumbing (provider,
+     init-script, Tailwind-wiring), allt det lever i andra filer.
+
+   Allt designvärde är isolerat HÄR. En sanning per token. SPEC §7: modern,
+   premium, mörkt grundtema med accenter, ren typografi.
+
+   WCAG: kontrast-paren (text mot bakgrund/yta) är strukturerade så att design-
+   agenten kan verifiera AA på sina slutvärden. Platshållarna nedan siktar redan
+   på rimlig kontrast, men AA-verifieringen på de SLUTGILTIGA värdena är design-
+   agentens ansvar (se acceptanskriterierna).
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   1. Tailwind v4 @theme: exponerar tokens som Tailwind-utilities.
+   Varje --color-* / --font-* / --spacing-* / --radius-* blir automatiskt en
+   utility (bg-surface, text-fg, rounded-card, ...). Värdena pekar på de
+   tema-växlande CSS-variablerna i sektion 2, så utilities följer aktivt tema.
+   -------------------------------------------------------------------------- */
+@theme inline {
+  /* Färg-roller (semantiska, inte råa färgnamn, så design kan byta hue fritt) */
+  --color-bg: var(--vm-bg);
+  --color-surface: var(--vm-surface);
+  --color-surface-raised: var(--vm-surface-raised);
+  --color-border: var(--vm-border);
+  --color-fg: var(--vm-fg);
+  --color-fg-muted: var(--vm-fg-muted);
+  --color-accent: var(--vm-accent);
+  --color-accent-fg: var(--vm-accent-fg);
+  --color-success: var(--vm-success);
+  --color-warning: var(--vm-warning);
+  --color-danger: var(--vm-danger);
+
+  /* Typografi: familj + skala (rem-baserad, modulär). Design finjusterar skala. */
+  --font-sans: var(--vm-font-sans);
+  --font-display: var(--vm-font-display);
+
+  /* Radie-skala (mjuka hörn = premium-känsla, SPEC §7) */
+  --radius-sm: var(--vm-radius-sm);
+  --radius-md: var(--vm-radius-md);
+  --radius-lg: var(--vm-radius-lg);
+  --radius-card: var(--vm-radius-card);
+  --radius-pill: var(--vm-radius-pill);
+}
+
+/* -----------------------------------------------------------------------------
+   2. Tema-värden, PLATSHÅLLARE. Design-agenten authorar de slutgiltiga.
+   Roterar på [data-theme] (sätts av inline-scriptet före paint + av providern).
+   :root = mörkt (DEFAULT_THEME, SPEC §7), [data-theme='light'] överskriver.
+   -------------------------------------------------------------------------- */
+:root,
+:root[data-theme='dark'] {
+  /* Färger (PLATSHÅLLARE) */
+  --vm-bg: #0b1220;
+  --vm-surface: #131c2e;
+  --vm-surface-raised: #1c2840;
+  --vm-border: #2a374f;
+  --vm-fg: #f8fafc;
+  --vm-fg-muted: #9aa7bd;
+  --vm-accent: #38bdf8;
+  --vm-accent-fg: #04121f;
+  --vm-success: #34d399;
+  --vm-warning: #fbbf24;
+  --vm-danger: #f87171;
+}
+
+:root[data-theme='light'] {
+  /* Färger (PLATSHÅLLARE) */
+  --vm-bg: #f4f6fb;
+  --vm-surface: #ffffff;
+  --vm-surface-raised: #ffffff;
+  --vm-border: #d6dce8;
+  --vm-fg: #0f172a;
+  --vm-fg-muted: #51607a;
+  --vm-accent: #0369a1;
+  --vm-accent-fg: #ffffff;
+  --vm-success: #047857;
+  --vm-warning: #b45309;
+  --vm-danger: #b91c1c;
+}
+
+/* -----------------------------------------------------------------------------
+   3. Tema-oberoende tokens (PLATSHÅLLARE för skalor). Design finjusterar.
+   Dessa skiftar inte med temat, så de bor utanför [data-theme]-blocken.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Typografi-familjer (PLATSHÅLLARE, design väljer slutligt typsnitt) */
+  --vm-font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --vm-font-display: var(--vm-font-sans);
+
+  /* Radie-skala (PLATSHÅLLARE) */
+  --vm-radius-sm: 0.25rem;
+  --vm-radius-md: 0.5rem;
+  --vm-radius-lg: 0.75rem;
+  --vm-radius-card: 1rem;
+  --vm-radius-pill: 9999px;
+
+  /* color-scheme synkas så att webbläsarens egna kontroller (scrollbars,
+     formulär) matchar temat. Sätts om i light-blocket nedan. */
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* -----------------------------------------------------------------------------
+   4. Bas-applicering: koppla body till tokens så hela appen ärver tema-färger.
+   Smooth färg-övergång vid temabyte, men endast när användaren INTE bett om
+   reducerad rörelse (a11y, prefers-reduced-motion respekteras även i CSS).
+   -------------------------------------------------------------------------- */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body {
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+}
