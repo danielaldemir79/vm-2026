@@ -64,6 +64,17 @@ describe('GoalCelebrationOverlay, aktivt firande', () => {
     expect(screen.getByText('Mål!')).toBeInTheDocument();
   });
 
+  // C2: overlayns EGEN rot bär aria-hidden (defense-in-depth), så "Mål!" aldrig
+  // läses av en skärmläsare, även om lagret renderas fristående. firstChild =
+  // den yttre overlay-lådan komponenten renderar.
+  it('döljer hela overlayn för skärmläsare via aria-hidden på egen rot', () => {
+    const { container } = render(<GoalCelebrationOverlay celebration={celebration()} />);
+    const root = container.firstChild as HTMLElement;
+    expect(root).toHaveAttribute('aria-hidden', 'true');
+    // pointer-events-none ligger kvar (overlay fångar aldrig klick).
+    expect(root.className).toContain('pointer-events-none');
+  });
+
   it('skalar antalet konfetti med totalGoals (fler mål = fler bitar)', () => {
     const { container, rerender } = render(
       <GoalCelebrationOverlay celebration={celebration({ key: 'm1#1', totalGoals: 1 })} />

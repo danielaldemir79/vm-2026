@@ -90,13 +90,15 @@ export function ResultsProvider({ children, env = import.meta.env }: ResultsProv
     const current = matchesRef.current;
     const target = current.find((m) => m.id === matchId);
     if (!target) {
-      // Okänd match = programmeringsfel; rapportera fail loud, uppdatera inget.
+      // Okänd match = programmeringsfel, inte en inmatnings-validering. Egen kod
+      // 'unknown-match' UTAN field: semantiskt är det varken en status-övergång
+      // eller bundet till ett enskilt fält, så ingen input markeras felaktigt
+      // ogiltig. Fail loud, uppdatera inget (PRINCIPLES §8).
       return {
         ok: false,
         errors: [
           {
-            code: 'invalid-status-transition',
-            field: 'status',
+            code: 'unknown-match',
             message: `Matchen "${matchId}" finns inte i listan.`,
           },
         ],

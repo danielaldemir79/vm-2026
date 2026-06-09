@@ -32,5 +32,6 @@ export type {
   ResultValidation,
   ResultValidationError,
   ResultValidationCode,
+  ResultValidationField,
 } from './validate-result';
 export { applyMatchResult } from './apply-match-result';

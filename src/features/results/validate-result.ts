@@ -29,13 +29,23 @@ export type ResultValidationCode =
   | 'away-negative'
   | 'finished-without-result'
   | 'result-without-finished'
-  | 'invalid-status-transition';
+  | 'invalid-status-transition'
+  // Anropad för en match som inte finns i listan (programmeringsfel, inte en
+  // inmatnings-validering). Egen kod så den inte maskeras som en status-övergång.
+  | 'unknown-match';
+
+/** Vilka inmatningsfält ett fel kan bindas till (för aria-koppling i formuläret). */
+export type ResultValidationField = 'home' | 'away' | 'status' | 'result';
 
 /** Ett enskilt valideringsfel: en kod (stabil) + ett användarvänligt meddelande. */
 export interface ResultValidationError {
   code: ResultValidationCode;
-  /** Vilket fält felet sitter på, så formuläret kan koppla det till rätt input (aria). */
-  field: 'home' | 'away' | 'status' | 'result';
+  /**
+   * Vilket fält felet sitter på, så formuläret kan koppla det till rätt input
+   * (aria). Utelämnas för fel som INTE hör till ett enskilt fält (t.ex. okänd
+   * match), så formuläret inte felaktigt markerar en input som ogiltig.
+   */
+  field?: ResultValidationField;
   /** Begripligt svenskt meddelande (visas i UI:t). */
   message: string;
 }
