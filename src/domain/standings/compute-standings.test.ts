@@ -266,8 +266,10 @@ describe('computeStandings, fel-vägar: ogiltiga/ofullständiga matcher ignorera
   });
 
   it('gruppmatch UTAN groupId (data-defekt) ignoreras', () => {
-    // En gruppmatch ska alltid ha en grupp (Match-typen). En grupp-stage-match
-    // med null groupId är en data-defekt och hoppas över, hellre det än att
+    // Att en gruppmatch har en grupp är ett DATAKONTRAKT från datakällan, inte
+    // en typgaranti: Match.groupId är `GroupId | null` oavsett stage, så typen
+    // tillåter en grupp-stage-match med null groupId. computeStandings filtrerar
+    // därför defensivt och hoppar över en sådan data-defekt, hellre det än att
     // tyst räkna in en match vi inte kan placera i rätt grupp.
     const teams = ['SWE', 'BRA'];
     const orphan: Match = {
