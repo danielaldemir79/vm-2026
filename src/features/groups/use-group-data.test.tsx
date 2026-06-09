@@ -1,6 +1,8 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import type { ReactNode } from 'react';
 import { useGroupData } from './use-group-data';
+import { ResultsProvider } from '../results/ResultsProvider';
 import type { Match } from '../../domain/types';
 
 function fixturesEnv(): ImportMetaEnv {
@@ -12,6 +14,16 @@ function liveEnv(): ImportMetaEnv {
     VITE_SUPABASE_URL: 'https://x.supabase.co',
     VITE_SUPABASE_ANON_KEY: 'anon-key',
   } as ImportMetaEnv;
+}
+
+// useGroupData är nu en KONSUMENT av den delade results-storen (T6), så testet
+// wrappar i ResultsProvider. Env-injektionen flyttade till providern (den äger
+// seedningen), så vyn/hooken tar inga argument längre. En wrapper-fabrik ger en
+// STABIL provider per test (samma princip som T5: undvik ny referens per render).
+function wrapperFor(env: ImportMetaEnv) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <ResultsProvider env={env}>{children}</ResultsProvider>;
+  };
 }
 
 // En färdigspelad gruppmatch (kort, typkorrekt).
@@ -38,11 +50,7 @@ function fin(
 
 describe('useGroupData, laddning och härledning', () => {
   it('går från loading till ready och härleder 12 tabeller ur fixtures', async () => {
-    // En STABIL env-referens per test: useGroupData har useEffect(..., [env]),
-    // så ett inline-objekt i renderHook-callbacken skulle ge en ny referens vid
-    // varje render och kunna trigga om effekten/laddningen (flaky). Skapa en gång.
-    const env = fixturesEnv();
-    const { result } = renderHook(() => useGroupData(env));
+    const { result } = renderHook(() => useGroupData(), { wrapper: wrapperFor(fixturesEnv()) });
 
     // Initialt laddande, och kontraktet: tables är tomt tills status === 'ready'.
     expect(result.current.status).toBe('loading');
@@ -61,8 +69,7 @@ describe('useGroupData, laddning och härledning', () => {
 
 describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i state ändras', () => {
   it('en ny matchlista via setMatches ger en omräknad tabell (härledd state)', async () => {
-    const env = fixturesEnv(); // stabil referens (se kommentar i första testet)
-    const { result } = renderHook(() => useGroupData(env));
+    const { result } = renderHook(() => useGroupData(), { wrapper: wrapperFor(fixturesEnv()) });
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     // Innan: läs grupp A-tabellen och ettans poäng ur fixtures-resultaten.
@@ -92,8 +99,7 @@ describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i stat
   });
 
   it('tömd matchlista ger nollställda tabeller (alla lag 0 spelade)', async () => {
-    const env = fixturesEnv(); // stabil referens (se kommentar i första testet)
-    const { result } = renderHook(() => useGroupData(env));
+    const { result } = renderHook(() => useGroupData(), { wrapper: wrapperFor(fixturesEnv()) });
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     act(() => {
@@ -111,8 +117,7 @@ describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i stat
 
 describe('useGroupData, fel-väg (fail loud)', () => {
   it('hamnar i error med ett meddelande när datakällan kastar (live-stub före T14)', async () => {
-    const env = liveEnv(); // stabil referens (se kommentar i första testet)
-    const { result } = renderHook(() => useGroupData(env));
+    const { result } = renderHook(() => useGroupData(), { wrapper: wrapperFor(liveEnv()) });
 
     await waitFor(() => {
       expect(result.current.status).toBe('error');
@@ -125,24 +130,41 @@ describe('useGroupData, fel-väg (fail loud)', () => {
 });
 
 describe('useGroupData, kontrakt: tables är tomt utom vid ready (ingen stale data)', () => {
+  // Liten probe som projicerar hookens kontrakt i DOM:en så vi kan byta env på
+  // PROVIDERN (env bor där nu, T6) via rerender, vilket renderHook:s wrapper inte
+  // tillåter (wrappern får bara children, inte initialProps).
+  function Probe() {
+    const { status, tables } = useGroupData();
+    return (
+      <output data-testid="probe" data-status={status}>
+        {tables.length}
+      </output>
+    );
+  }
+
   it('vid env-byte från ready till en felande källa läcker INTE de gamla tabellerna', async () => {
-    // Ladda fixtures till ready: nu finns 12 fyllda tabeller i state.
-    const fixtures = fixturesEnv();
-    const live = liveEnv();
-    const { result, rerender } = renderHook(({ env }) => useGroupData(env), {
-      initialProps: { env: fixtures },
-    });
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    expect(result.current.tables).toHaveLength(12); // gammal data ligger nu i state
+    // Ladda fixtures till ready: nu finns 12 fyllda tabeller i storen.
+    const { rerender } = render(
+      <ResultsProvider env={fixturesEnv()}>
+        <Probe />
+      </ResultsProvider>
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    expect(screen.getByTestId('probe')).toHaveTextContent('12'); // gammal data i storen
 
     // Byt env -> ny laddning startar (live-stubben kastar före T14). Kontraktet
     // säger att tables ska vara [] så fort status !== 'ready', annars skulle de
     // gamla fixtures-tabellerna läcka in i loading/error-läget (C8, kontraktsbrott).
-    rerender({ env: live });
-    await waitFor(() => expect(result.current.status).toBe('error'));
-    expect(result.current.tables).toHaveLength(0);
-    expect(result.current.tables).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ groupId: 'A' })])
+    rerender(
+      <ResultsProvider env={liveEnv()}>
+        <Probe />
+      </ResultsProvider>
     );
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'error')
+    );
+    expect(screen.getByTestId('probe')).toHaveTextContent('0');
   });
 });
