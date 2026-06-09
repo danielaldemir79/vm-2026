@@ -453,6 +453,76 @@ describe('computeStandings, tiebreak: lika poäng löses i FIFA-ordning', () => 
   });
 });
 
+describe('computeStandings, FIFA artikel 13 STEG 2: RE-ITERATION på kvar-lika delmängd', () => {
+  // F1-beslutet (T4): FIFA:s officiella ordalydelse (Regulations FWC26, Article
+  // 13, steg 2) KRÄVER att inbördes-kriterierna (a-c) RÄKNAS OM på enbart den
+  // kvar-lika delmängden när det första inbördes-passet separerar NÅGRA men inte
+  // alla lag: "criteria a) to c) above are applied to the matches between the
+  // REMAINING teams only". T3 lämnade detta som en KISS-avgränsning; T4 imple-
+  // menterar det. Källa + beslut: docs/decisions.md.
+  it('räknar om inbördes på den kvar-lika delmängden och ändrar ordningen', () => {
+    // Konstruktion (alla fyra lika på poäng = 3p via idel oavgjorda, alla med
+    // total MS 0). Hittad via uttömmande sökning (se commit-meddelandet):
+    //   A 0-0 B, A 0-0 C, A 2-2 D, B 1-1 C, B 1-1 D, C 1-1 D
+    //
+    // FÖRSTA inbördes-passet (alla 4): alla matcher oavgjorda -> lika inbördes
+    // poäng och MS. Inbördes GJORDA MÅL: A=2, B=2, C=2, D=4 -> D separeras till
+    // toppen, A/B/C kvar lika (alla 2 inbördes-mål).
+    //
+    // RE-ITERATION på {A,B,C}: nu räknas BARA A-B (0-0), A-C (0-0), B-C (1-1).
+    // Inbördes gjorda mål i delmängden: A=0, B=1, C=1 -> A FÄRRE -> A sjunker
+    // till sist; B och C lika -> stabil fallback B före C.
+    //   MED re-iteration:  D, B, C, A
+    //   UTAN re-iteration: D, A, B, C  (A skulle felaktigt ligga tvåa)
+    // Att A hamnar SIST i stället för tvåa är just re-iterationens effekt.
+    const teams = ['A', 'B', 'C', 'D'];
+    const matches = [
+      groupMatch('A', 'B', 0, 0),
+      groupMatch('A', 'C', 0, 0),
+      groupMatch('A', 'D', 2, 2),
+      groupMatch('B', 'C', 1, 1),
+      groupMatch('B', 'D', 1, 1),
+      groupMatch('C', 'D', 1, 1),
+    ];
+
+    const table = computeStandings(teams, matches);
+
+    // Förutsättning: alla fyra lika på poäng och total MS (annars testar vi inte
+    // re-iterationen utan ett tidigare kriterium).
+    for (const r of table) {
+      expect(r.points).toBe(3);
+      expect(r.goalDifference).toBe(0);
+    }
+    // Kärn-assertionen: re-iterationen trycker ner A till sist (vore A tvåa utan
+    // re-iteration). Detta BEVISAR att steg 2-omräkningen sker.
+    expect(table.map((r) => r.teamId)).toEqual(['D', 'B', 'C', 'A']);
+  });
+
+  it('re-itererar i flera nivåer utan att fastna (terminerar på strikt mindre delmängd)', () => {
+    // En djupare kedja: ett lag separeras i varje pass. Vi verifierar bara att
+    // funktionen terminerar och ger en total ordning av rätt längd (ingen
+    // oändlig rekursion), kärn-ordningen täcks av testet ovan.
+    const teams = ['A', 'B', 'C', 'D'];
+    const matches = [
+      groupMatch('A', 'B', 0, 0),
+      groupMatch('A', 'C', 0, 0),
+      groupMatch('A', 'D', 3, 3),
+      groupMatch('B', 'C', 2, 2),
+      groupMatch('B', 'D', 1, 1),
+      groupMatch('C', 'D', 1, 1),
+    ];
+
+    const table = computeStandings(teams, matches);
+
+    expect(table).toHaveLength(4);
+    expect(new Set(table.map((r) => r.teamId)).size).toBe(4);
+    // Alla lika på poäng/MS, så ordningen avgörs helt av inbördes-iterationen.
+    for (const r of table) {
+      expect(r.points).toBe(3);
+    }
+  });
+});
+
 describe('computeStandings, determinism och renhet', () => {
   it('är ren: muterar inte input-matcherna', () => {
     const teams = ['SWE', 'BRA'];
