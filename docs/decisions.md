@@ -5,6 +5,38 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T5 (issue #5): Gruppspelsvyn = härledd state ovanpå computeStandings, fixtures-källan bär verifierad data
+
+**Beslut (datakoppling):** Gruppspelsvyn (`src/features/groups/`) LAGRAR ingen tabell. En ren funktion
+`deriveGroupTables(groups, matches)` mappar de 12 grupperna och kör den hårt testade `computeStandings`
+(T3 + T4) per grupp. Hooken `useGroupData` håller MATCHERNA i React-state och härleder tabellerna via
+`useMemo([groups, matches])`, så "live" blir trivialt: när matchlistan ändras (T6:s resultatinmatning
+anropar `setMatches`) räknas tabellerna om automatiskt. `GroupTable` är ren presentation (tar färdig-
+sorterade standings, renderar tillgänglig `<table>`), `GroupStageView` mappar grupperna + hanterar
+loading/error/empty. Inmatnings-UI:t är T6 (utanför scope), `setMatches`-seamen exponeras bara.
+**Varför:** SPEC §6:s "härledd state" hela vägen ut i UI:t, en sanning (matchresultaten), ingen
+dubbellagring som kan driva isär. computeStandings återanvänds i stället för att räkna om tabeller i
+komponenten (DRY). Härledningen ligger i en React-fri modul så den är enhetstestbar fristående.
+
+**Beslut (datakälla):** `src/data/fixtures.ts` bär nu den VERIFIERADE VM 2026-lag-/gruppdatan
+(`WC2026_TEAMS` / `WC2026_GROUPS` från T4, alla 12 grupper A-L) i stället för de tidigare 2 påhittade
+platshållar-grupperna. MATCHERNA är fortfarande demo-resultat (ett urval gruppmatcher), den riktiga
+matchplanen (avsparkstider, arenor, svenska TV-kanaler) är fortsatt en egen öppen data-punkt (issue #31),
+gissas inte.
+**Varför:** Gruppspelsvyn ska visa alla 12 riktiga grupper, och `getDataSource()` (fixtures-grenen) är
+den etablerade seamen som tänds live oförändrat i T14. Att låta fixtures-källan bära den riktiga lag-/
+gruppdatan ger 12 grupper genom hela kedjan med EN sanning (lag/grupper bor i `src/data/wc2026`,
+re-exporteras under fixtures-namnen), i stället för att vyn skulle kringgå datakällan och importera
+WC2026-datan direkt (vilket vore en parallell väg som inte motsvarar live-grenen). Följer lärdomen
+"fixtures följer källans verkliga form" (samma `DataSource`-kontrakt oavsett källa).
+
+**Beslut (T7-pin respekterad):** Kvalificeringszonen (etta + tvåa går vidare) markeras med ett
+`data-qualified`-attribut + dold skärmläsar-text, INTE med en statusfärg. T7 äger success-tonen (i
+ljust tema krockar accent och success på #0e7a44), så T5 bakar inte in en färg-krock, bara en stabil
+hake som design-frontend målar.
+
+---
+
 ## 2026-06-09 , T4 (Copilot runda 1, C5): FIFA-tiebreak head-to-head är FAIL-LOUD vid invariant-brott
 
 **Beslut:** `compareHeadToHead` (`src/domain/standings/compute-standings.ts`) KASTAR nu ett tydligt
