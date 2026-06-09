@@ -80,7 +80,13 @@ export type MatchStage =
   | 'third-place'
   | 'final';
 
-/** Matchens livscykel. Resultat finns bara på en spelad (finished) match. */
+/**
+ * Matchens livscykel. Kopplingen status <-> resultat är inte bara en konvention
+ * utan ett TYP-KONTRAKT: `Match` är en diskriminerad union på `status` (se
+ * nedan), så en 'finished'-match GARANTERAT bär ett resultat och en
+ * 'scheduled'/'live'-match garanterat inte gör det. Ogiltiga tillstånd
+ * (finished utan resultat, scheduled med resultat) är därmed orepresenterbara.
+ */
 export type MatchStatus = 'scheduled' | 'live' | 'finished';
 
 /**
@@ -105,13 +111,14 @@ export interface MatchResult {
 }
 
 /**
- * En match. `groupId` är satt för gruppspelsmatcher (stage === 'group'), null
- * för slutspelsmatcher. `result` är null tills resultatet matats in (en match
- * utan resultat har status 'scheduled' eller 'live'). Lag refereras via id, så
- * en match kan existera innan slutspelslaget är känt (homeTeamId/awayTeamId
- * kan vara null i slutspel innan seedningen i T4 fyllt dem).
+ * De fält en match bär oavsett livscykel-läge. `groupId` är satt för
+ * gruppspelsmatcher (stage === 'group'), null för slutspelsmatcher. Lag
+ * refereras via id, så en match kan existera innan slutspelslaget är känt
+ * (homeTeamId/awayTeamId kan vara null i slutspel innan seedningen i T4 fyllt
+ * dem). Statusen och resultatet ligger INTE här utan på varianterna nedan, som
+ * kopplar dem till varandra.
  */
-export interface Match {
+interface MatchBase {
   id: string;
   stage: MatchStage;
   /** Grupp för gruppspelsmatcher, null i slutspel. */
@@ -128,10 +135,41 @@ export interface Match {
   tvChannel?: string;
   /** Kort kuriosa-rad för matchen (valfri). */
   trivia?: string;
-  /** Resultatet, null tills inmatat. */
-  result: MatchResult | null;
-  status: MatchStatus;
 }
+
+/** En kommande match: inte spelad än, alltså inget resultat (SPEC §6). */
+export interface ScheduledMatch extends MatchBase {
+  status: 'scheduled';
+  result: null;
+}
+
+/**
+ * En pågående match. Resultat matas in när matchen är klar (SPEC §6, "resultat
+ * null tills inmatat"), så även en live-match bär `null` här tills den slår om
+ * till 'finished'. (Vill vi senare visa en löpande ställning blir det ett eget,
+ * uttryckligt fält, inte en uppluckring av detta kontrakt.)
+ */
+export interface LiveMatch extends MatchBase {
+  status: 'live';
+  result: null;
+}
+
+/** En färdigspelad match: bär ALLTID ett resultat (icke-null), per typgaranti. */
+export interface FinishedMatch extends MatchBase {
+  status: 'finished';
+  result: MatchResult;
+}
+
+/**
+ * En match, modellerad som en DISKRIMINERAD UNION på `status`. Det är typen
+ * (inte en konvention) som garanterar kopplingen status <-> resultat: bara en
+ * 'finished'-match har ett `result` (icke-null), och en 'scheduled'/'live'-match
+ * har alltid `result: null`. Konsumenter narrowar därför säkert på `status`
+ * (t.ex. `if (match.status === 'finished')` ger `match.result: MatchResult` utan
+ * null-check), och ogiltiga tillstånd (finished utan resultat, scheduled med
+ * resultat) går inte ens att uttrycka. Se issue #3 och Copilot-fynd C7/C8.
+ */
+export type Match = ScheduledMatch | LiveMatch | FinishedMatch;
 
 /**
  * En lag-rad i en härledd grupptabell. ALLA fält är beräknade av

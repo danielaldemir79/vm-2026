@@ -44,7 +44,7 @@
 // INTE en FIFA-tiebreak, bara en deterministisk stabilitetsgaranti, och är
 // kommenterad som sådan vid jämförelse-funktionen.
 
-import type { GroupStanding, Match, MatchResult } from '../types';
+import type { FinishedMatch, GroupStanding, Match } from '../types';
 
 /** Poäng per utfall enligt fotbollens standard (3-1-0). */
 const POINTS_WIN = 3;
@@ -74,7 +74,7 @@ function emptyStanding(teamId: string): GroupStanding {
 /**
  * En match räknas in i GRUPPtabellen bara om ALLA dessa gäller:
  *   - den är en gruppspelsmatch (stage === 'group') med satt groupId,
- *   - den är färdigspelad (har ett resultat),
+ *   - den är färdigspelad (status === 'finished'),
  *   - båda lagen är kända.
  *
  * Slutspelsmatcher (round-of-32 ... final) ignoreras helt, även om båda lagen
@@ -82,20 +82,25 @@ function emptyStanding(teamId: string): GroupStanding {
  * förorenas av slutspelsresultat om en call-site skickar in en blandad lista
  * (dataintegritet, se filhuvudet). En gruppmatch utan groupId är en data-defekt
  * (Match-typen säger att gruppmatcher har en grupp) och hoppas också över.
- * En match utan resultat (kommande/pågående) bidrar inte, så en ofullständig
- * grupp ger korrekta delsummor (edge-fall).
+ * En match som inte är färdigspelad (kommande/pågående) bidrar inte, så en
+ * ofullständig grupp ger korrekta delsummor (edge-fall).
+ *
+ * Vi narrowar på `status === 'finished'`, inte på `result !== null`: tack vare
+ * att Match är en diskriminerad union på status räcker status-kollen för att TS
+ * ska veta att `result` är icke-null (FinishedMatch.result: MatchResult). Det
+ * binder ihop "räknas in" med matchens faktiska livscykel-läge i stället för en
+ * fristående null-koll (Copilot C7/C8).
  */
-function isCounted(match: Match): match is Match & {
+function isCounted(match: Match): match is FinishedMatch & {
   stage: 'group';
   groupId: NonNullable<Match['groupId']>;
-  result: MatchResult;
   homeTeamId: string;
   awayTeamId: string;
 } {
   return (
     match.stage === 'group' &&
     match.groupId !== null &&
-    match.result !== null &&
+    match.status === 'finished' &&
     match.homeTeamId !== null &&
     match.awayTeamId !== null
   );
@@ -130,8 +135,7 @@ function applyResult(row: GroupStanding, scored: number, conceded: number): void
  */
 function headToHeadStats(
   tiedTeamIds: readonly string[],
-  countedMatches: readonly (Match & {
-    result: MatchResult;
+  countedMatches: readonly (FinishedMatch & {
     homeTeamId: string;
     awayTeamId: string;
   })[]
@@ -243,8 +247,7 @@ function compareByFifaOrder(
  */
 function sortGroup(
   rows: GroupStanding[],
-  countedMatches: readonly (Match & {
-    result: MatchResult;
+  countedMatches: readonly (FinishedMatch & {
     homeTeamId: string;
     awayTeamId: string;
   })[]

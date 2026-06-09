@@ -150,6 +150,29 @@ describe('computeStandings, fel-vägar: ogiltiga/ofullständiga matcher ignorera
     expect(row(table, 'BRA').played).toBe(0);
   });
 
+  it('pågående (live) gruppmatch räknas inte in (status != finished)', () => {
+    // En live-match är inte färdigspelad, så den ska inte bidra till tabellen
+    // även om båda lagen och gruppen är kända. isCounted narrowar på
+    // status === 'finished', inte på en fristående null-koll.
+    const teams = ['SWE', 'BRA'];
+    const live: Match = {
+      id: 'pagaende',
+      stage: 'group',
+      groupId: 'A',
+      homeTeamId: 'SWE',
+      awayTeamId: 'BRA',
+      kickoff: '2026-06-15T18:00:00Z',
+      venue: 'Testarena',
+      result: null,
+      status: 'live',
+    };
+
+    const table = computeStandings(teams, [live]);
+
+    expect(row(table, 'SWE').played).toBe(0);
+    expect(row(table, 'BRA').played).toBe(0);
+  });
+
   it('match med okänt lag (utanför teamIds) hoppas över utan att krascha', () => {
     const teams = ['SWE', 'BRA'];
     // FRA är inte med i gruppen, matchen ska inte påverka tabellen.
