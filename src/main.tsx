@@ -1,6 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { ThemeProvider } from './theme';
+import { MotionProvider } from './motion';
 import './index.css';
 
 // Service worker-registreringen injiceras automatiskt av vite-plugin-pwa
@@ -15,6 +17,10 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <MotionProvider>
+        <App />
+      </MotionProvider>
+    </ThemeProvider>
   </StrictMode>
 );
