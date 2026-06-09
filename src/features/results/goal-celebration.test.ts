@@ -74,4 +74,26 @@ describe('useGoalCelebration, edge-fall + a11y', () => {
     act(() => result.current.celebrateGoal('m1', 4));
     expect(result.current.celebration).toBeNull();
   });
+
+  it('släcker ett PÅGÅENDE firande DIREKT när "minska rörelse" slår på mitt under (C11)', () => {
+    // Rörelse tillåten vid start: ett firande tänds som vanligt.
+    mockUseReducedMotion.mockReturnValue(false);
+    const { result, rerender } = renderHook(() => useGoalCelebration());
+    act(() => result.current.celebrateGoal('m1', 3));
+    expect(result.current.celebration).not.toBeNull();
+
+    // Användaren slår på "minska rörelse" MEDAN firandet lyser (utan att vänta
+    // ut auto-avklingningen). Overlayn får inte stå kvar: firandet ska bli null
+    // direkt, inte först när timeouten gått ut (WCAG 2.3.3).
+    mockUseReducedMotion.mockReturnValue(true);
+    act(() => rerender());
+    expect(result.current.celebration).toBeNull();
+
+    // Den pending timeouten ska vara rensad, inte bara state nollat: att spola
+    // fram tiden får inte väcka ett nytt firande eller röra state på nytt.
+    act(() => {
+      vi.advanceTimersByTime(2200);
+    });
+    expect(result.current.celebration).toBeNull();
+  });
 });

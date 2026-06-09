@@ -83,6 +83,8 @@ export function useGoalCelebration(): GoalCelebrationApi {
       if (shouldReduceMotion) {
         return;
       }
+      // (Notera: ett firande som redan PÅGÅR släcks av effekten nedan om
+      // preferensen slår om mitt under det, inte bara nya firanden hoppas.)
       // Ett mållöst resultat (0-0) firas inte: det är inget MÅL att fira. Den
       // funktionella inmatningen påverkas inte, bara firande-ytan hoppas.
       if (totalGoals <= 0) {
@@ -98,6 +100,20 @@ export function useGoalCelebration(): GoalCelebrationApi {
     },
     [shouldReduceMotion, clearPending]
   );
+
+  // A11y-grinden gäller även MITT under ett pågående firande (C11): slår
+  // användaren på "minska rörelse" medan en overlay lyser, släck den DIREKT
+  // (rensa state + pending timeout) i stället för att låta den stå kvar tills
+  // auto-avklingningen. celebrateGoal vaktar bara NYA firanden, denna effekt
+  // vaktar det redan tända, så preferensen respekteras vid varje tidpunkt
+  // (WCAG 2.3.3). Att alltid rensa pending timeout här är säkert: vid
+  // shouldReduceMotion === false finns inget firande att tappa (timeouten sätts
+  // bara när rörelse är tillåten), och vi sätter aldrig en ny timeout härifrån.
+  useEffect(() => {
+    if (shouldReduceMotion) {
+      dismiss();
+    }
+  }, [shouldReduceMotion, dismiss]);
 
   // Städa eventuell pågående timeout vid unmount (ingen state-set efter unmount).
   useEffect(() => clearPending, [clearPending]);

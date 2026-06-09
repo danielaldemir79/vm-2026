@@ -115,7 +115,20 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
         <ul className="m-0 flex list-none flex-col gap-3 p-0">
           {editable.map((match) => (
             <li key={match.id}>
+              {/* key inkluderar matchens status + mål, inte bara match.id (C10):
+                  ResultEntryForm seedar sin lokala useState EN gång vid mount.
+                  Ändras matchen externt i storen (samma match.id => samma React-
+                  instans), t.ex. en framtida realtids-uppdatering (T18), re-seedar
+                  formuläret aldrig och UI:t kan visa gamla mål/status. En key som
+                  ändras med status + mål re-mountar formuläret så det re-seedar
+                  mot den nya matchen. Målen härleds via `match.result?` (null på
+                  scheduled/live, MatchResult på finished i Match-unionen), så
+                  uttrycket är säkert oavsett union-variant.
+                  Default nu (T6): inga externa uppdateringar finns, så inget
+                  pågående edit clobbras; T18 (realtid) kan senare förfina
+                  konflikt-hanteringen (extern uppdatering vs lokal edit). */}
               <ResultEntryForm
+                key={`${match.id}-${match.status}-${match.result?.homeGoals ?? ''}-${match.result?.awayGoals ?? ''}`}
                 match={match}
                 teamsById={teamsById}
                 onSubmit={submitResult}
