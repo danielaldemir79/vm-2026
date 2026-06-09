@@ -21,20 +21,32 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // DEFAULT_THEME, vilket är rätt deterministiska startläge för tester.
   const [theme, setThemeState] = useState<Theme>(() => readThemeFromDocument(document));
 
-  // Spegla state -> DOM + persistens. Körs vid varje temaändring. Vid första
-  // körningen är DOM redan rätt (inline-scriptet), så detta är idempotent.
+  // Spegla AKTIVT tema -> DOM vid varje ändring. DOM-spegling är idempotent och
+  // ren synk (vid mount är DOM redan rätt via inline-scriptet), så den hör hemma
+  // i effekten. Persistens gör vi MEDVETET inte här: en mount/sync ska INTE
+  // skriva till localStorage. Annars sparas ett system-resolverat tema utan att
+  // användaren valt något, och då tar inline-scriptet alltid sparat-grenen och
+  // appen slutar följa OS-temat live. Persistens = bara explicit val, se nedan.
   useEffect(() => {
     applyThemeToDocument(document, theme);
-    persistTheme(window.localStorage, theme);
   }, [theme]);
 
+  // setTheme/toggleTheme är de ENDA vägarna ett uttryckligt val sker, så det är
+  // här (och bara här) vi persisterar. Persistens sker EN gång, UTANFÖR
+  // setState-updatern: under StrictMode körs updater-funktioner dubbelt och
+  // persist får inte hänga i den vägen. setTheme får sitt nästa-värde explicit.
+  // toggleTheme beror på `theme` så den ser aktivt värde (ingen stale closure)
+  // och kan räkna ut + persistera nästa tema deterministiskt före setState.
   const setTheme = useCallback((next: Theme) => {
+    persistTheme(window.localStorage, next);
     setThemeState(next);
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setThemeState((current) => nextTheme(current));
-  }, []);
+    const next = nextTheme(theme);
+    persistTheme(window.localStorage, next);
+    setThemeState(next);
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>

@@ -52,21 +52,34 @@ describe('ThemeProvider, växling och persistens', () => {
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
 
-  it('setTheme sätter ett specifikt tema och persistar det', () => {
+  it('setTheme sätter ett specifikt tema OCH speglar till <html> + localStorage', () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
 
     act(() => result.current.setTheme('light'));
 
     expect(result.current.theme).toBe('light');
+    expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
 
-  it('persistar redan vid mount så valet överlever en omladdning', () => {
+  it('persistar INTE vid mount utan interaktion (appen följer systemet, sparar inget)', () => {
+    // Inline-scriptet har satt 'light' (system-resolverat), men användaren har
+    // inte valt något. Mount/sync får då INTE skriva till localStorage, annars
+    // tar inline-scriptet alltid sparat-grenen och OS-temat slutar gälla live.
     applyThemeToDocument(document, 'light');
     renderHook(() => useTheme(), { wrapper });
 
-    // useEffect kör efter render och skriver aktivt tema till storage.
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+  });
+
+  it('speglar aktivt tema till <html> vid mount utan att persistera (DOM-spegling intakt)', () => {
+    // DOM-spegling (applyThemeToDocument) ska fortsätta vid varje ändring,
+    // inklusive den initiala synken, det är BARA persistensen som flyttats ut.
+    applyThemeToDocument(document, 'light');
+    renderHook(() => useTheme(), { wrapper });
+
+    expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
   });
 });
 
