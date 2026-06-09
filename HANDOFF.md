@@ -98,7 +98,8 @@ commit. `main` @ `c896cfb`. Arbetsträd rent, pushat till origin.
 - `docs/SPEC.md` + `CLAUDE.md` + `docs/decisions.md` + `docs/patterns.md` uppdaterade/skapade,
   committat `ed524aa` på develop, pushat.
 - Stack låst: React + Vite + TS, Tailwind + Framer Motion, vite-plugin-pwa, Supabase.
-  Hosting: Cloudflare Pages (produktion från main, förhandsvisning från develop/PR).
+  Hosting: Cloudflare Pages (produktion från develop, live på vm-2026.pages.dev, förhandsvisning
+  per PR; main reserverad för framtida releaser, rättat 2026-06-09 i T3, se docs/decisions.md).
 - Board (GitHub Projects #2, https://github.com/users/danielaldemir79/projects/2): 26 tasks
   (issue #1-#26), 4 faser, kolumner Backlog -> Ready -> In Progress -> In Review -> Done.
   **T1 (#1) i Ready**, resten Backlog. Etiketter: phase-0/1/2/3, critical (#4), high-risk (#14).

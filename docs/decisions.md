@@ -5,6 +5,20 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T3: Cloudflare-produktionsgren = `develop` (kopplingen aktiverad)
+
+**Beslut:** Cloudflare Pages är NU kopplat till repot och produktionsgrenen är **`develop`**, inte
+`main`. Appen är live på vm-2026.pages.dev och byggs/deployas från `develop`-linjen. `main`
+reserveras för framtida formella releaser och är inte kopplad som produktion än.
+**Varför:** Daniel bekräftade kopplingen denna session. Under aktiv utveckling delas appen från
+`develop` (den samlade nästa-versionen), så det är den grenen som ska vara den skarpa publika URL:en.
+Att vänta med en `main`-baserad produktion tills det finns formella releaser undviker en tom/inaktuell
+huvud-adress. Detta KORRIGERAR tidigare dokumentation (deploy.md, inception- och T1-besluten nedan,
+samt SPEC §3 och CLAUDE.md) som sa "produktion = `main`", det var en plan innan kopplingen gjordes.
+En sanning per fakta: alla de raderna är nu uppdaterade till `develop` så ingen doc-drift kvarstår.
+
+---
+
 ## 2026-06-09 , T3: FIFA-tiebreak-ordning för gruppspelstabellen (VM 2026)
 
 **Beslut:** Tabellberäkningen (`src/domain/standings/compute-standings.ts`) rangordnar lag enligt
@@ -102,8 +116,9 @@ vite-plugin-pwa, Supabase (Postgres + Auth + Realtime + RLS).
 **Varför:** Matchar SPEC:ens WOW-/levande-mål (Framer Motion för rörelse), PWA = dela via länk
 utan App Store, Supabase ger delad sanning + realtid + auth på gratisnivå utan egen backend-server.
 
-**Beslut:** Hosting = **Cloudflare Pages** (inte Vercel). Produktion deployas från `main`,
-förhandsvisning från `develop` och PR-brancher.
+**Beslut:** Hosting = **Cloudflare Pages** (inte Vercel). (Produktionsgrenen sattes till `develop`
+när kopplingen aktiverades 2026-06-09, se T3-beslutet överst, denna inception-rad planerade
+ursprungligen `main`.)
 **Varför:** Daniels val i inception. Gratis, globalt edge-nätverk, billigare vid stor skala.
 Avvägning mot Vercel: Vercel har något smidigare PR-förhandsvisningar, men skillnaden är liten
 för en vän-app och Cloudflares edge + prissättning vägde över.

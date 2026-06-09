@@ -28,17 +28,20 @@ kvalitetskollen (build, test, lint), det deployar ingenting.
    | Build output directory | `dist`            |
    | Node version           | 22 (eller senare) |
 
-4. **Produktionsgren:** `main`. Det som ligger på `main` blir den "skarpa" appen på huvud-adressen.
+4. **Produktionsgren:** `develop`. Det som ligger på `develop` blir den "skarpa" appen på
+   huvud-adressen (vm-2026.pages.dev). `main` reserveras för framtida formella releaser, appen
+   delas under utvecklingen från `develop`-linjen.
 5. **Förhandsvisningar (previews):** Cloudflare bygger automatiskt en egen förhandsvisnings-adress
-   för `develop` och för varje pull request. Så du kan se en ändring live INNAN den når `main`.
+   för varje pull request. Så du kan se en ändring live INNAN den når `develop`.
    (Standard är att alla icke-produktionsgrenar får preview, det räcker, ingen extra inställning.)
 
 Det är allt. Efter det bygger Cloudflare en ny version varje gång något pushas, helt självt.
 
 ## Branch-modell (hur det hänger ihop)
 
-- `main` -> produktion (skarp publik URL). Får bara release-merges.
-- `develop` -> förhandsvisnings-URL (samlad nästa-version).
+- `develop` -> produktion (skarp publik URL, vm-2026.pages.dev). Samlad nästa-version, det är
+  härifrån appen delas under utvecklingen.
+- `main` -> reserverad för framtida formella releaser (inte kopplad som produktion än).
 - PR-grenar (t.ex. `feature/...`) -> egen förhandsvisnings-URL per PR.
 
 ## Inga hemligheter i repot
