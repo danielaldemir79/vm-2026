@@ -8,10 +8,12 @@
 // guld gloria, plus konfetti som regnar i hejarklacks-tonerna. Antalet konfetti
 // skalar med totalGoals (fler mål = större fest), men ett tak håller det smakfullt.
 //
-// A11y och prestanda: hela lagret ligger i ett aria-hidden, pointer-events-none
-// overlay med position: fixed (ingen layout-shift, fångar aldrig klick). Det
-// monteras bara när ett firande är aktivt och rivs av AnimatePresence när kroken
-// nollar tillståndet, så inget animeras i bakgrunden i vila. Konfettin renderas
+// A11y och prestanda: den yttre aria-hidden, pointer-events-none overlay-roten
+// (position: fixed, ingen layout-shift, fångar aldrig klick) renderas ALLTID,
+// men står tom i vila, det undviker mount/unmount-churn på själva overlay-noden.
+// Det är INNEHÅLLET (mål-pop + konfetti) som villkorsrenderas: det monteras bara
+// när ett firande är aktivt och rivs av AnimatePresence när kroken nollar
+// tillståndet, så inget animeras i bakgrunden i vila. Konfettin renderas dessutom
 // bara när rörelse är tillåten (en egen useReducedMotion-grind utöver krokens egen
 // tystnad, dubbel säkerhet), så lagret aldrig självt inför rörelse en användare
 // bett bort.
