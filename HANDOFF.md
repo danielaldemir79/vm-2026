@@ -5,6 +5,72 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-09 , T4b KLAR - PR #34 väntar på autonom merge
+
+**Branch:** `feature/T4b-matchtabla` @ HEAD `69df0f4`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/34 mot `develop` (Closes #31, state: OPEN)
+**Board:** issue #31 i "In Review" (korrekt). Dirigenten stänger issue #31 MANUELLT (`gh issue close 31`) och flyttar kort #31 till Done EFTER merge (auto-close funkar inte mot develop, default-branch ar main).
+
+**Autonomt lage: Daniel ar borta ~1 vecka.** Full fullmakt: dirigenten mergar till develop och beta av hela listan utan att vanta pa Daniel.
+
+**KLART med bevis (SHA + verifiering):**
+- `359eca1` - T4b bygge: gold-source (`tv-schedule-source.txt`) + delad parser (Europe/Stockholm->UTC, tsString single-quote) + genererad `matches.ts` (72 gruppmatcher + 32 slutspelsmatcher M73-M104), varde-last (regenerera-och-diffa + mutationstest)
+- `e5c8e5e` - Copilot C1: ratta kickoffUtc-kommentarer till UTC
+- `d6661f6` - Copilot C2: korskolla slutspels-STAGE mot bracket-structure (mutationstest pa gold-source-niva)
+- `69df0f4` - Copilot C3: ratta parseSchedule-kommentaren till kalltext-ordning (HEAD)
+- Verifiering (dirigenten): **291 tester grona (30 filer)**, build/lint/format rent, inga secrets
+- Alla 6/6 acceptanskriterier bockade i issue #31 (journalisten 2026-06-09)
+- Lokal panel: 1 runda (REN, inga blockerare). Copilot: 4 rundor (1->1->2->0 fynd), alla 4 tradar losta
+
+**STORT POSITIVT FYND:** TV-tablan (oberoende kalla) stammer EXAKT mot T4:s `bracket-structure.ts` pa alla 32 slutspelsmatcher + 72 gruppmatcher, 0 avvikelser. Tva oberoende kallor bekraftar FIFA-motorn.
+
+**PINNADE punkter (bar framat):**
+- **F1/penalties (T6->T9, agare senior-developer):** reducern tar inte med `MatchResult.penalties`. Inerst i T6 (gruppspel saknar straff). Nar slutspelsinmatning (T9) byggs: hantera penalties. Acceptanstest: redigera finished slutspelsmatch med straff, penalties bevaras.
+- **T7-pin:** ljust tema, accent == success (#0e7a44). T7 ska ge success en distinkt AA-klarande ton.
+- **T14-pin:** Supabase/auth/RLS, inga secrets i repo. Live-klienten fail-loud-stub, T14 tander den.
+- **T14 extra (RLS):** anon-rollen matchar authenticated-rollen. RLS maste restriktera per auth.uid()+rum nar T14 byggs. Supabase-projekt kmzhyblzxangpxydufve.
+- **Supabase provisionerat:** projekt kmzhyblzxangpxydufve, anon-auth PA, Cloudflare-env satt av Daniel, MCP ansluten. T14 kan byggas live.
+- **#35 (arena/stad):** pa boarden i Backlog. `Match.venue` = synlig platshallare tills #35 fyller den. Arena fran T4b ar medvetet ej gissad.
+
+**"Behover Daniel"-ko (han ar borta):**
+- Push-notiser-setup (T22): kraver Apple/Google Developer-konton, Daniel maste godkanna.
+- Captcha (T14 valfri): av som default, ingen akut atgard.
+- Arena-kalla (#35): krav ar verifierad per-match-kalla (FIFA official), ingen kalla i T4b-scopet.
+
+**EXAKT nasta steg (autonomt):**
+1. Dirigenten mergar PR #34 mot `develop` (`gh pr merge 34 --merge --repo danielaldemir79/vm-2026`).
+2. Dirigenten stanger issue #31 manuellt (`gh issue close 31`).
+3. Dirigenten flyttar kort #31 till Done pa boarden.
+4. **Nasta task: #7 (T7, Daglig matchvy + hero + nedrakning + datumnavigering)** - nu har den riktig matchdata (tider/kanaler) fran T4b. Frontend-task (senior-dev + design-frontend). T7-pin (success-ton AA-ton).
+5. Darefter T8-T13 (Fas 1), sen T14 (Supabase live, provisionerat), sen Fas 2-3.
+
+**FORTSATTNINGS-PROMPT (autonom session):**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`. Daniel ar borta ~1 vecka och har gett dirigenten full fullmakt att merga och beta av hela task-listan autonomt.
+>
+> Om PR #34 (T4b, feature/T4b-matchtabla) ANNU INTE mergad:
+> Merga den mot develop: `gh pr merge 34 --merge --repo danielaldemir79/vm-2026`.
+> Stang sedan issue #31 manuellt (`gh issue close 31`) - auto-close funkar inte mot develop nar default-branch ar main.
+> Flytta kort #31 till Done pa boarden.
+>
+> Om PR #34 REDAN mergad:
+> T1-T6 + T4b ar alla klara och mergade. Plocka nasta task fran boarden.
+> **Nasta task: #7 (T7, Daglig matchvy + hero + nedrakning + datumnavigering)** - nu har T7 riktig matchdata (tider + kanaler) fran T4b. Frontend-task (senior-dev + design-frontend). T7-pin galler: accent == success (#0e7a44) i ljust tema, ge success en distinkt AA-klarande ton.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+>
+> Darefter (i ordning, autonomt): T8, T9 (F1/penalties-pin!), T10, T11, T12, T13 - alla Fas 1.
+> Sedan T14 (Supabase live - projekt kmzhyblzxangpxydufve, anon-auth PA, dokumentera beslut i docs/decisions.md, RLS: restriktera per auth.uid()+rum).
+> Darefter Fas 2 (T15-T20), Fas 3 (T21-T26).
+>
+> Bar framat (alla tasks):
+> - **F1/penalties-pin (T9):** reducern hanterar inte penalties. T9 fixar.
+> - **T7-pin:** ljust tema, accent == success-gron (#0e7a44). T7 ger success en distinkt AA-ton.
+> - **T14-pin:** Supabase/auth/RLS, inga secrets i repo. RLS maste restriktera per auth.uid()+rum.
+> - **Supabase:** projekt kmzhyblzxangpxydufve, anon-auth PA, Cloudflare-env satt, MCP ansluten.
+> - **#35 (arena/stad, Backlog):** venue = platshallare, fyll nar verifierad per-match-kalla finns.
+> - **"Behover Daniel"-ko:** push-notiser (T22), captcha (T14 valfri, av), arena-kalla (#35). Notifiera Daniel vid hemkomst.
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T6 KLAR - PR #33 väntar på autonom merge
 
 **Branch:** `feature/T6-resultatinmatning` @ HEAD `d449e00`

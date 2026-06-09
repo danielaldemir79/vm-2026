@@ -153,6 +153,34 @@ Källa: T4 (treeplats-tabellen, `scripts/generate-third-place-table.ts` + `src/d
 + committat `annexe-c-source.txt` -> `src/domain/bracket/third-place-table.ts`, källankrat av
 `third-place-table-source.test.ts`).
 
+**Andra användningen (T4b, #31, matchtablån):** samma recept tillämpat på VM 2026:s matchplan
+(`src/data/wc2026/tv-schedule-source.txt` -> `match-schedule-parser.ts` -> `matches.ts`, källankrat
+av `match-schedule-source.test.ts` med mutationstest). Två lärdomar värda att lyfta för återanvändning:
+- **Emittera i projektets Prettier-stil direkt** (här single-quote-strängar via en liten `tsString`-
+  hjälpare, inte `JSON.stringify` som ger double quotes). Annars blir den genererade filen `format:check`-
+  röd ELLER så normaliserar `prettier --write` den och driver isär från generatorns output, vilket bryter
+  regenerera-och-diffa-låset. Emit + Prettier måste ge samma bytes.
+- **Mutationstestet kan vara enkelt** när källan har många oberoende värden: byt ETT värde (här första
+  "(TV4)" -> "(SVT)") och bevisa att diffen failar. Det räcker som bevis att låset fångar fel; det
+  behövs ingen behörighets-bevarande swap som i Annexe C (där den strukturella valideringen var stark).
+
+### svensk-vaggklocka-till-utc-via-iana-zon-inte-hardkodad-offset (VM 2026)
+
+**Recept (lagra ett lokalt klockslag som rätt UTC-instant, off-by-one-säkert):**
+1. Källans tid är en LOKAL väggklocka (här Europe/Stockholm). `Match.kickoff` lagras i UTC, UI:t
+   formaterar tillbaka. Härled offset:en ur IANA-zonen vid själva instanten via
+   `Intl.DateTimeFormat(..., { timeZoneName: 'longOffset' })` (ger "GMT+02:00"), INTE en hårdkodad +2.
+2. Bygg väggklockan som om den vore UTC (`Date.UTC(...)`), dra av offset:en, och korrigera ett steg om
+   instanten hamnar på andra sidan en DST-gräns än startgissningen (`zonedWallTimeToUtcIso`).
+3. Testa explicit ett MIDNATTS-fall: "00:00 lokal tid" ska ge UTC-instanten DAGEN INNAN (+2-zon), och
+   en rundtur tillbaka till lokal tid ska ge samma kalenderdatum/klockslag som källan. Testa även ett
+   vinterdatum (+1) för att bevisa att offset:en härleds, inte hårdkodas.
+
+**Varför:** Känd fälla `utc-datum-anvant-som-lokalt-datum`: `toISOString()`/UTC rakt av på ett lokalt
+klockslag ger off-by-one kring midnatt. IANA-härledning är korrekt även om datan korsar en DST-gräns.
+Återanvänds av daglig matchvy (T-serien) som visar avsparkstid i svensk tid. Källa: T4b
+(`src/data/wc2026/match-schedule-parser.ts`, `zonedWallTimeToUtcIso`).
+
 ### inmatning-mot-delad-store-som-haerledd-state-uppdaterar (React, VM 2026)
 
 **Recept (ett inmatnings-UI uppdaterar härledda vyer via EN delad sanning):**

@@ -96,12 +96,14 @@ describe('ResultEntryView + GroupStageView, inmatning uppdaterar tabellen (en sa
       expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
     });
 
-    // Hitta inmatnings-formuläret för m-a-1 (Mexiko mot Sydafrika i fixtures).
-    const form = document.querySelector('form[data-match-id="m-a-1"]') as HTMLFormElement | null;
+    // Hitta inmatnings-formuläret för g-A-1 (Mexiko mot Sydafrika, gruppens första
+    // match i den riktiga matchplanen T4b). Den är scheduled (inget resultat än),
+    // så detta är en FÖRSTA inmatning, inte en redigering.
+    const form = document.querySelector('form[data-match-id="g-A-1"]') as HTMLFormElement | null;
     expect(form).not.toBeNull();
     const scoped = within(form as HTMLFormElement);
 
-    // Ändra resultatet till Sydafrika 0-5 och spara.
+    // Mata in resultatet Sydafrika 0-5 och spara.
     fireEvent.change(scoped.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '0' } });
     fireEvent.change(scoped.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '5' } });
     fireEvent.change(scoped.getByLabelText(/Status/), { target: { value: 'finished' } });
