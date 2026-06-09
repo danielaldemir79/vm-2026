@@ -21,7 +21,7 @@ import {
 import { WC2026_MATCHES } from './matches';
 import { WC2026_TEAMS } from './teams';
 import { BRACKET_MATCHES } from '../../domain/bracket/bracket-structure';
-import type { BracketSource } from '../../domain/types';
+import type { BracketSource, MatchStage } from '../../domain/types';
 
 // ============================================================================
 // KÄLLÅNKRING + KORSKOLL av VM 2026:s matchplan (T4b, #31, SPEC §5/§8).
@@ -160,12 +160,20 @@ describe('Matchplanen: KORSKOLL av slutspelet mot FIFA:s spelschema (bracket-str
     }
   }
 
-  // Bygg det förväntade positions-paret per matchnummer ur bracket-structure.ts.
+  // Bygg det förväntade positions-paret OCH den förväntade FIFA-rundan (stage)
+  // per matchnummer ur bracket-structure.ts (den OBEROENDE sanningskällan för
+  // slutspels-strukturen). Stagen läses direkt ur BracketMatch.stage, alltså
+  // härleds den INTE ur matchnummer-intervall i testet, utan jämförs mot FIFA-
+  // motorns egen rund-tilldelning per match (M73-M88 = round-of-32, M89-M96 =
+  // round-of-16, M97-M100 = quarter-final, M101-M102 = semi-final, M103 =
+  // third-place, M104 = final, enligt ROUND_OF_32 ... FINAL i bracket-structure).
   const expectedByNumber = new Map<number, string>();
+  const expectedStageByNumber = new Map<number, MatchStage>();
   for (const bm of BRACKET_MATCHES) {
     const n = Number(bm.id.replace('M', ''));
     const pair = [encodeSource(bm.home), encodeSource(bm.away)].sort().join(' | ');
     expectedByNumber.set(n, pair);
+    expectedStageByNumber.set(n, bm.stage);
   }
 
   // Parsa slutspels-källorna ur tablån.
@@ -192,6 +200,47 @@ describe('Matchplanen: KORSKOLL av slutspelet mot FIFA:s spelschema (bracket-str
       const actual = [p.home.raw, p.away.raw].sort().join(' | ');
       expect(actual, `M${p.matchNumber}`).toBe(expected);
     }
+  });
+
+  it('varje slutspelsmatchs FIFA-runda (stage) stämmer mot bracket-structure.ts', () => {
+    // VARFÖR detta utöver positions-källorna: tablåns `stage` sätts av vilken
+    // SEKTIONS-RUBRIK raden står under (SEXTONDELSFINALER ... FINAL), oberoende av
+    // positions-källorna på raden. Positions-kollet ovan låser BARA paret, inte
+    // rundan. En rad som hamnat under FEL rubrik i gold-source (eller en sektions-
+    // rubrik som tappats/dubblerats) kan därför ge rätt positions-par men FEL stage
+    // och ändå passera positions-kollet. Det vore exakt det kända lärdoms-mönstret
+    // "uttömmande-test-vaktar-svagare-invariant-än-källan-fastställer": positions-
+    // invarianten är svagare än vad FIFA-källan faktiskt fastställer (par + runda).
+    // Här pinnar vi rundan mot bracket-structure.ts (den oberoende sanningskällan),
+    // så en stage-felplacering BRYTER bygget i stället för att passera tyst.
+    for (const p of parsedKnockout) {
+      const expectedStage = expectedStageByNumber.get(p.matchNumber);
+      expect(expectedStage, `M${p.matchNumber} saknas i bracket-structure.ts`).toBeDefined();
+      expect(p.stage, `M${p.matchNumber} fel FIFA-runda`).toBe(expectedStage);
+    }
+  });
+
+  it('NEGATIVT DELTEST: en stage-felplacering i källan fångas nu (svagare invariant stängd)', () => {
+    // Bevis att stage-kollet biter (mutationstest i samma anda som kanal-
+    // mutationen ovan): vi tar M89 (FIFA round-of-16) och förväxlar dess stage
+    // till 'round-of-32', precis som om dess rad i gold-source hamnat under
+    // SEXTONDELSFINALER-rubriken i stället för ÅTTONDELSFINALER. Positions-paret
+    // (W74 vs W77) är HELT oförändrat, så det rena positions-kollet ovan hade
+    // passerat tyst, det är just den svagare invarianten. Stage-kollet ska
+    // däremot upptäcka den felplacerade rundan.
+    const target = parsedKnockout.find((p) => p.matchNumber === 89);
+    expect(target, 'M89 ska finnas i tablån').toBeDefined();
+
+    const misfiled: typeof target = { ...target!, stage: 'round-of-32' };
+    // Positions-paret är intakt (det gamla, svagare kollet skulle inte märka något):
+    const pair = [misfiled!.home.raw, misfiled!.away.raw].sort().join(' | ');
+    expect(pair, 'positions-paret ska vara oförändrat av en ren stage-förväxling').toBe(
+      expectedByNumber.get(89)
+    );
+    // Men stage-kollet fångar den felplacerade rundan (det som annars passerat tyst):
+    const expectedStage = expectedStageByNumber.get(89);
+    expect(expectedStage).toBe('round-of-16');
+    expect(misfiled!.stage).not.toBe(expectedStage);
   });
 
   it('slutspelsmatcher bär INGA lag än (seedas av T4/T9) men har FIFA-matchnummer-id', () => {
