@@ -1,0 +1,236 @@
+// Gruppspelsvyn: alla 12 grupper (A-L) med live-tabeller (T5, issue #5).
+//
+// Ansvar: ladda data via useGroupData och rendera en GroupTable per grupp, plus
+// hantera ICKE-happy-path: laddning, fel (fail loud) och tom data. Tabellerna är
+// LIVE, useGroupData härleder dem reaktivt ur matchstate (en resultatinmatning i
+// T6 räknar om dem). Resultat-INMATNINGEN är T6, inte här, vyn visar den härledda
+// tabellen.
+//
+// VISUELL DESIGN (design-frontend-agentens lager): "arena i kvällsljus"-premium.
+// Varje grupp blir ett kort med en stark bokstavs-badge i kort-headern, mjuk
+// elevation och ett responsivt rutnät (1 kol mobil -> 2 -> 3 -> 4 ultrawide).
+// Korten glider in med en stagger (rörelse-primitiverna, reducerad rörelse
+// respekteras). Laddning/fel/tom-tillstånd har en egen premium-ton. All färg
+// går via semantiska tokens (inga råa hex).
+
+import { useMemo } from 'react';
+import { GROUP_IDS } from '../../domain/types';
+import type { GroupTable as GroupTableData, Team } from '../../domain/types';
+import { Fade, Slide, transitions } from '../../motion';
+import { useGroupData } from './use-group-data';
+import { GroupTable } from './GroupTable';
+
+/**
+ * Teckenförklaring för kolumn-förkortningarna, så de inte är kryptiska (a11y).
+ * En sanning: härleds inte ur GroupTable för att hålla komponenterna frikopplade,
+ * men håll dessa i synk med NUMERIC_COLUMNS där (få och stabila förkortningar).
+ */
+const ABBREVIATIONS: ReadonlyArray<{ short: string; long: string }> = [
+  { short: 'S', long: 'spelade' },
+  { short: 'V', long: 'vunna' },
+  { short: 'O', long: 'oavgjorda' },
+  { short: 'F', long: 'förlorade' },
+  { short: 'GM', long: 'gjorda mål' },
+  { short: 'IM', long: 'insläppta mål' },
+  { short: 'MS', long: 'målskillnad' },
+  { short: 'P', long: 'poäng' },
+];
+
+/** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista, inte per tabell). */
+function indexTeams(teams: readonly Team[]): Map<string, Team> {
+  return new Map(teams.map((t) => [t.id, t]));
+}
+
+/**
+ * Ett grupp-kort: en stark bokstavs-badge i kort-headern + grupptabellen.
+ * Hover-lyft och mjuk elevation ger premium-känslan; korten staplar på mobil och
+ * fyller rutnätet på stora skärmar. Tabellens a11y-semantik bärs av GroupTable.
+ */
+function GroupCard({
+  table,
+  teamsById,
+  index,
+}: {
+  table: GroupTableData;
+  teamsById: ReadonlyMap<string, Team>;
+  index: number;
+}) {
+  // Stagger: varje kort glider in en aning efter det förra. Delay-taket håller
+  // den sista gruppen från att kännas trög; reducerad rörelse nollar resan i
+  // Slide-primitiven (bara opacitet kvar), så detta är a11y-säkert.
+  const delay = Math.min(index * 0.04, 0.4);
+
+  return (
+    <Slide direction="up" transition={{ ...transitions.smooth, delay }} className="h-full">
+      <article className="group/card flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)] transition-shadow duration-300 hover:shadow-[var(--vm-shadow-raised)]">
+        {/* Kort-header: bokstavs-badge + label. Den dekorativa gröna glorian ger
+            arena-ljus-känslan, tema-trogen via --vm-glow-accent. */}
+        <div
+          className="relative flex items-center gap-3 border-b border-border px-4 py-3"
+          style={{
+            backgroundImage:
+              'radial-gradient(120% 140% at 0% 0%, rgb(var(--vm-glow-accent) / 0.12), transparent 60%)',
+          }}
+        >
+          <span
+            aria-hidden="true"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md font-display text-lg font-bold leading-none text-accent-fg shadow-sm"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            {table.groupId}
+          </span>
+          <span className="flex flex-col leading-tight">
+            <span className="font-display text-base font-bold">Grupp {table.groupId}</span>
+            <span className="text-[0.6875rem] uppercase tracking-wide text-fg-muted">
+              4 lag · 2 vidare
+            </span>
+          </span>
+        </div>
+
+        {/* Tabellen. overflow-x-auto fångar ev. överflöd på riktigt smala skärmar
+            utan att klippa innehåll (a11y: inget göms, alla kolumner kvar). */}
+        <div className="overflow-x-auto px-3 py-2">
+          <GroupTable groupId={table.groupId} standings={table.standings} teamsById={teamsById} />
+        </div>
+      </article>
+    </Slide>
+  );
+}
+
+/**
+ * Ett enskilt skelett-kort under laddning. Samma kort-form som de riktiga, så
+ * layouten inte hoppar när datan landar (ingen layout-shift, CLS). aria-hidden:
+ * skärmläsare får statusbeskedet via role="status"-raden i stället, inte tomma
+ * platshållar-block.
+ */
+function SkeletonCard() {
+  return (
+    <div
+      aria-hidden="true"
+      className="flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)]"
+    >
+      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <span className="h-9 w-9 animate-pulse rounded-md bg-border" />
+        <span className="h-4 w-24 animate-pulse rounded-pill bg-border" />
+      </div>
+      <div className="flex flex-col gap-2 px-4 py-4">
+        {[0, 1, 2, 3].map((r) => (
+          <span key={r} className="h-6 w-full animate-pulse rounded-pill bg-border/70" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export interface GroupStageViewProps {
+  /** Injicerbar miljö (testbarhet), default = den riktiga via useGroupData. */
+  env?: ImportMetaEnv;
+}
+
+export function GroupStageView({ env }: GroupStageViewProps) {
+  const { status, tables, teams, mode, error } = useGroupData(env);
+  const teamsById = useMemo(() => indexTeams(teams), [teams]);
+
+  return (
+    <section aria-labelledby="gruppspel-rubrik" className="flex flex-col gap-6">
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 id="gruppspel-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+            Gruppspelet
+          </h2>
+          {mode === 'fixtures' ? (
+            <span
+              className="rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-fg-muted"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--vm-gold) 45%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--vm-gold) 12%, transparent)',
+                color: 'var(--vm-gold)',
+              }}
+            >
+              Demo-data
+            </span>
+          ) : null}
+        </div>
+        <p className="max-w-2xl text-sm text-fg-muted">
+          De 12 grupperna A till L. Tabellerna räknas om automatiskt när resultat ändras, etta och
+          tvåa går vidare direkt.
+          {mode === 'fixtures'
+            ? ' Resultaten är ett smakprov tills den riktiga matchplanen kopplas in.'
+            : ''}
+        </p>
+        {/* Teckenförklaring så förkortningarna i tabellerna inte är kryptiska. */}
+        <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
+          {ABBREVIATIONS.map((a) => (
+            <div key={a.short} className="flex gap-1">
+              <dt className="font-semibold">{a.short}</dt>
+              <dd>{a.long}</dd>
+            </div>
+          ))}
+        </dl>
+        {/* Förklaring av kvalificeringszonens visuella markör (färg-oberoende, T7-pin). */}
+        <p className="flex items-center gap-2 text-xs text-fg-muted">
+          <span
+            aria-hidden="true"
+            className="inline-block h-4 w-1.5 rounded-pill"
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          />
+          Markerade rader (etta och tvåa) går vidare till slutspelet.
+        </p>
+      </header>
+
+      {status === 'loading' ? (
+        <>
+          {/* role="status" så skärmläsare annonserar laddningen (aria-live: polite). */}
+          <p role="status" className="text-sm text-fg-muted">
+            Laddar gruppspelet ...
+          </p>
+          {/* Skelett-kort i samma rutnät OCH samma antal som det förväntade
+              gruppantalet (GROUP_IDS.length, en sanning ur domänmodellen), så
+              ready-läget renderar lika många kort och inget under vyn (typografi-
+              panel, footer) skjuts ned när datan landar (ingen layout-shift, CLS).
+              Härleds ur GROUP_IDS, aldrig en magisk siffra, så det inte kan glida
+              isär från det verkliga gruppantalet. */}
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {GROUP_IDS.map((groupId) => (
+              <SkeletonCard key={groupId} />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {status === 'error' ? (
+        // role="alert" så felet annonseras direkt (fail loud, inte tyst tom vy).
+        <Fade>
+          <p
+            role="alert"
+            className="flex items-start gap-3 rounded-card border px-4 py-3 text-sm"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--color-danger) 50%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
+              color: 'var(--color-danger)',
+            }}
+          >
+            <span aria-hidden="true" className="mt-0.5 text-base leading-none">
+              !
+            </span>
+            <span>Kunde inte ladda gruppspelet: {error}</span>
+          </p>
+        </Fade>
+      ) : null}
+
+      {status === 'ready' && tables.length === 0 ? (
+        <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
+          Inga grupper att visa än.
+        </p>
+      ) : null}
+
+      {status === 'ready' && tables.length > 0 ? (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {tables.map((table, i) => (
+            <GroupCard key={table.groupId} table={table} teamsById={teamsById} index={i} />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
