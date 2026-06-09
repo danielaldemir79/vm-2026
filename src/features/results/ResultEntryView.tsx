@@ -64,6 +64,9 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
   return (
     <section aria-labelledby="resultatinmatning-rubrik" className="flex flex-col gap-5">
       <header className="flex flex-col gap-2">
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+          Resultat
+        </p>
         <h2 id="resultatinmatning-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
           Mata in resultat
         </h2>
