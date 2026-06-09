@@ -59,26 +59,27 @@ describe('GroupStageView, renderar gruppspelet', () => {
     });
   });
 
-  it('visar att tabellerna är härledda live (S/V/O/F/GM/IM/MS/P i grupp A)', async () => {
+  it('renderar de HÄRLEDDA tabellcellerna (S/V/O/F/GM/IM/MS/P i grupp A)', async () => {
     renderView(fixturesEnv());
     await waitFor(() => {
       expect(screen.getByRole('table', { name: /Grupp A/i })).toBeInTheDocument();
     });
 
-    // Grupp A har demo-resultat (mex-rsa 2-0, kor-cze 1-1), så Mexiko ska ha
-    // spelat 1 och ha 3 poäng. Vi verifierar den HÄRLEDDA statistiken i Mexikos
-    // egen rad (rad-scopat, inte en global text-match), så testet failar om
-    // tabellhärledningen eller cell-renderingen är fel, inte bara om namnet finns.
+    // Den riktiga matchplanen (T4b) är ospelad (alla matcher scheduled, VM har
+    // inte börjat 2026-06-09), så varje lags HÄRLEDDA statistik ska vara noll.
+    // Det är ett giltigt och viktigt UI-läge: tabellerna renderas nollställda och
+    // fylls när resultat matas in. Vi verifierar Mexikos rad rad-scopat (inte en
+    // global text-match), så ett fel i cell-renderingen/härledningen fångas. Den
+    // LIVE omräkningen vid inmatning bevisas av ResultEntryView/results-store-testen.
     const mexRow = screen.getByRole('rowheader', { name: /Mexiko/ }).closest('tr');
     expect(mexRow).not.toBeNull();
 
     // Cellerna i raden i kolumnordning: [Placering, S, V, O, F, GM, IM, MS, P]
-    // (lagnamnet är en rowheader, inte en cell). Vi assertar S (spelade) och P
-    // (poäng) på sina exakta positioner, så ett fel i härledningen fångas.
+    // (lagnamnet är en rowheader, inte en cell).
     const cells = within(mexRow as HTMLElement).getAllByRole('cell');
     const COLUMN_INDEX = { played: 1, points: 8 } as const;
-    expect(cells[COLUMN_INDEX.played]).toHaveTextContent('1'); // S: spelade 1
-    expect(cells[COLUMN_INDEX.points]).toHaveTextContent('3'); // P: 3 poäng
+    expect(cells[COLUMN_INDEX.played]).toHaveTextContent('0'); // S: 0 spelade än
+    expect(cells[COLUMN_INDEX.points]).toHaveTextContent('0'); // P: 0 poäng än
   });
 });
 

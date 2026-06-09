@@ -5,6 +5,50 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T4b (issue #31): matchtablån genererad ur svensk TV-tablå, värde-låst, arena flaggad
+
+**Beslut (data + arkitektur):** Hela VM 2026:s matchplan (72 gruppmatcher + 32 slutspelsmatcher
+M73-M104) är nu typad `Match`-data (`src/data/wc2026/matches.ts`), GENERERAD ur en committad
+svensk TV-tablå (`src/data/wc2026/tv-schedule-source.txt`, Daniel 2026-06-09) via en ren parser
+(`src/data/wc2026/match-schedule-parser.ts`, delad av generator + test) och VÄRDE-LÅST mot källan
+i CI (`match-schedule-source.test.ts`: regenerera-och-diffa + mutationstest). Samma mönster som
+T4:s Annexe C-tabell (se `docs/patterns.md`). `fixtures.ts` bär nu denna riktiga matchplan i
+stället för de tidigare demo-resultaten, så hela appen demonstreras mot den verkliga planen redan
+i fixtures-läge. Gruppmatcher har kända lag (homeTeamId/awayTeamId + groupId A-L), slutspelsmatcher
+har `homeTeamId/awayTeamId = null` (lagen seedas av T4/T9) men bär FIFA:s matchnummer-id ("M73"..)
+så matchtablå och slutspelsträd refererar SAMMA match. Alla matcher är `scheduled` (resultat null),
+vilket är det sanna läget (VM har inte börjat).
+**Varför GENERERAD + värde-låst:** 104 matcher med tider/kanaler/positions-källor är för felkänsligt
+att handknappa och svårt att review:a. Genom att parsa ur ett committat utdrag och kräva värde-likhet
+blir datan spårbar, regenererbar och låst till källans faktiska värden (uppfyller källhänvisnings-
+kravet HARD för gissningskänslig data). Mutationstestet bevisar att låset fångar ett bytt värde.
+
+**Beslut (tid = svensk tid, lagras UTC, DST-härledd):** Tablåns klockslag är SVENSK tid
+(Europe/Stockholm). `Match.kickoff` lagras i UTC (kontraktet), så parsern konverterar svensk
+väggklocka -> UTC genom att HÄRLEDA offset:en ur IANA-zonen Europe/Stockholm vid instanten (inte
+en hårdkodad +2). Hela fönstret 11 juni-19 juli 2026 är CEST (+2), men härledningen är korrekt även
+om en framtida tablå korsar en DST-gräns.
+**Varför:** Känd fälla (`utc-datum-anvant-som-lokalt-datum`): "00:00 söndag 14 juni" svensk tid är
+`2026-06-13T22:00:00Z` (ett annat KALENDERDATUM i UTC). Att lagra "14 juni 00:00" rakt av som UTC
+vore off-by-one kring midnatt. Ett test verifierar just denna midnatts-match (g-C-1 Brasilien vs
+Marocko) inklusive rundturen tillbaka till svensk tid (14 juni 00:00).
+
+**Beslut (KORSKOLL = oberoende verifiering av FIFA-motorn):** Varje lag i tablån korskollas mot
+`teams.ts` (FIFA-lottningen) och varje slutspels-matchnummer + positions-källa (t.ex. "1E vs
+3ABCDF (74)") mot `bracket-structure.ts` (FIFA Article 12). Resultat: FULL ÖVERENSSTÄMMELSE, en
+oberoende svensk TV-källa bekräftar T4:s FIFA-motor exakt (alla 32 slutspelsmatcher, inkl. bästa-
+trea-behörighetslistorna). En avvikelse skulle BRYTA bygget, inte gissas bort.
+
+**Beslut (arena-lucka, gissas ALDRIG):** Källan bär tid + svensk TV-kanal men INTE arena/stad.
+Arenorna kunde inte verifieras per match ur en strukturerad källa vid byggtillfället (Wikipedias
+plaintext-extrakt ger inte per-match-arena tillförlitligt). `Match.venue` är obligatoriskt, så det
+sätts till en UTTRYCKLIG platshållare "Arena ej verifierad (egen data-punkt)" i stället för en
+gissad arena (PRINCIPLES: gissa aldrig, synligt i stället för tyst). Matchen är ändå värdefull med
+tid + kanal. Arenorna fylls när en verifierad per-match-arenakälla finns (egen, fortsatt öppen
+data-punkt). Källa: Svensk TV-tablå (Daniel), ur SPEC §8 (svenskafans, fotbollskanalen).
+
+---
+
 ## 2026-06-09 , T6 (issue #6): målfirande-overlayn (design-frontends visuella lager)
 
 **Beslut:** Det visuella målfirandet är en egen overlay-komponent (`GoalCelebrationOverlay`) som

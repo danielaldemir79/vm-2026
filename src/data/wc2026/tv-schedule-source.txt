@@ -1,0 +1,88 @@
+VM 2026, svensk TV-tablå, rått textutdrag (gold source för matchgenerering).
+====================================================================
+Detta är den OFÖRÄNDRADE TV-tablån som src/data/wc2026/match-schedule-parser.ts
+parsar (via scripts/generate-matches.ts) till matches.ts. Committad så att
+matchdatan kan REGENERERAS och diffas mot källan i CI
+(match-schedule-source.test.ts), och så att en människa kan spot-checka raderna
+mot källan.
+
+KÄLLA (gissas ALDRIG): Svensk TV-tablå tillhandahållen av Daniel 2026-06-09,
+  sammanställd ur SPEC §8:s svenska sändningskällor:
+  - Spelschema: https://www.svenskafans.com/fotboll/evenemang/vm/spelschema
+  - TV-tider och kanaler: https://www.fotbollskanalen.se/artiklar/vm-2026/
+    fotbolls-vm-2026-spelschema-tv-tider-avsparkstider-och-grupper--allt-om-sverige-i-vm-i-fotboll
+  AUKTORITATIV för avsparkstid + svensk TV-kanal (SVT/TV4).
+
+TID: alla klockslag är SVENSK TID (Europe/Stockholm). Hela turneringsfönstret
+  (11 juni - 19 juli 2026) ligger i sommartid (CEST, UTC+2), ingen DST-övergång
+  inträffar i fönstret. Parsern härleder ändå UTC ur IANA-zonen Europe/Stockholm
+  (inte en hårdkodad +2), så ett midnatts-klockslag svensk tid lagras som rätt
+  UTC-instant (t.ex. "00:00 söndag 14 juni" -> 2026-06-13T22:00:00Z), och UI:t
+  formaterar tillbaka till svensk tid. Detta undviker off-by-one kring dygnsgränsen.
+
+ARENA-LUCKA (känd, gissas ALDRIG): denna källa bär TID + KANAL men INTE arena/stad.
+  Arenorna kunde inte verifieras per match ur en strukturerad källa vid byggtillfället,
+  så venue sätts till en uttrycklig "ej verifierad"-platshållare (ingen gissad arena).
+  Matchen är ändå värdefull med tid + kanal; arenorna fylls när en verifierad
+  per-match-arenakälla finns (egen data-punkt). Se docs/decisions.md (T4b).
+
+KORSKOLL (oberoende verifiering): varje lag i tablån finns i teams.ts (FIFA-lottningen),
+  och slutspels-matchnumren (73-104) med positions-källor (t.ex. "1E vs 3ABCDF (74)")
+  stämmer EXAKT mot bracket-structure.ts (FIFA Article 12). Tablån är alltså en
+  oberoende andra källa som bekräftar T4:s FIFA-motor. Verifierat i
+  match-schedule-source.test.ts.
+
+PARSNING: generatorn hoppar fram till raden "TV-TIDER" och läser dagsrader därefter.
+  Varje dagsrad börjar med en svensk veckodag + datum, följt av en eller flera
+  matchposter "HH:MM Lag vs Lag (KANAL)" separerade med ';'. Slutspelsrader bär
+  dessutom ett matchnummer i parentes "(NN)" och positions-namn (1A/2B/3ABCDF/W73/RU101).
+  Denna preambel ligger före "TV-TIDER" och ignoreras.
+====================================================================
+
+TV-TIDER (Daniel, svensk tid, SVT/TV4):
+Torsdag 11 juni: 21:00 Mexiko vs Sydafrika (TV4)
+Fredag 12 juni: 04:00 Sydkorea vs Tjeckien (TV4); 21:00 Kanada vs Bosnien och Hercegovina (SVT)
+Lördag 13 juni: 03:00 USA vs Paraguay (TV4); 21:00 Qatar vs Schweiz (TV4)
+Söndag 14 juni: 00:00 Brasilien vs Marocko (SVT); 03:00 Haiti vs Skottland (SVT); 06:00 Australien vs Turkiet (TV4); 19:00 Tyskland vs Curacao (TV4); 22:00 Nederländerna vs Japan (TV4)
+Måndag 15 juni: 01:00 Elfenbenskusten vs Ecuador (TV4); 04:00 Sverige vs Tunisien (SVT); 18:00 Spanien vs Kap Verde (SVT); 21:00 Belgien vs Egypten (SVT)
+Tisdag 16 juni: 00:00 Saudiarabien vs Uruguay (TV4); 03:00 Iran vs Nya Zeeland (TV4); 21:00 Frankrike vs Senegal (SVT)
+Onsdag 17 juni: 00:00 Irak vs Norge (TV4); 03:00 Argentina vs Algeriet (TV4); 06:00 Österrike vs Jordanien (TV4); 19:00 Portugal vs Kongo-Kinshasa (TV4); 22:00 England vs Kroatien (TV4)
+Torsdag 18 juni: 01:00 Ghana vs Panama (TV4); 04:00 Uzbekistan vs Colombia (TV4); 18:00 Tjeckien vs Sydafrika (TV4); 21:00 Schweiz vs Bosnien och Hercegovina (TV4)
+Fredag 19 juni: 00:00 Kanada vs Qatar (TV4); 03:00 Mexiko vs Sydkorea (TV4); 21:00 USA vs Australien (SVT)
+Lördag 20 juni: 00:00 Skottland vs Marocko (SVT); 03:00 Brasilien vs Haiti (TV4); 06:00 Turkiet vs Paraguay (TV4); 19:00 Nederländerna vs Sverige (TV4); 22:00 Tyskland vs Elfenbenskusten (TV4)
+Söndag 21 juni: 02:00 Ecuador vs Curacao (TV4); 06:00 Tunisien vs Japan (SVT); 18:00 Spanien vs Saudiarabien (TV4); 21:00 Belgien vs Iran (TV4)
+Måndag 22 juni: 00:00 Uruguay vs Kap Verde (TV4); 03:00 Nya Zeeland vs Egypten (TV4); 19:00 Argentina vs Österrike (SVT); 23:00 Frankrike vs Irak (SVT)
+Tisdag 23 juni: 02:00 Norge vs Senegal (SVT); 05:00 Jordanien vs Algeriet (TV4); 19:00 Portugal vs Uzbekistan (SVT); 22:00 England vs Ghana (SVT)
+Onsdag 24 juni: 01:00 Panama vs Kroatien (TV4); 04:00 Colombia vs Kongo-Kinshasa (TV4); 21:00 Schweiz vs Kanada (TV4); 21:00 Bosnien och Hercegovina vs Qatar (TV4)
+Torsdag 25 juni: 00:00 Marocko vs Haiti (TV4); 00:00 Skottland vs Brasilien (TV4); 03:00 Sydafrika vs Sydkorea (SVT); 03:00 Tjeckien vs Mexiko (SVT); 22:00 Curacao vs Elfenbenskusten (SVT); 22:00 Ecuador vs Tyskland (SVT)
+Fredag 26 juni: 01:00 Tunisien vs Nederländerna (SVT); 01:00 Japan vs Sverige (SVT); 04:00 Turkiet vs USA (TV4); 04:00 Paraguay vs Australien (TV4); 21:00 Norge vs Frankrike (TV4); 21:00 Senegal vs Irak (TV4)
+Lördag 27 juni: 02:00 Kap Verde vs Saudiarabien (TV4); 02:00 Uruguay vs Spanien (TV4); 05:00 Nya Zeeland vs Belgien (TV4); 05:00 Egypten vs Iran (TV4); 23:00 Panama vs England (SVT); 23:00 Kroatien vs Ghana (SVT)
+Söndag 28 juni: 01:30 Kongo-Kinshasa vs Uzbekistan (TV4); 01:30 Colombia vs Portugal (TV4); 04:00 Algeriet vs Österrike (TV4); 04:00 Jordanien vs Argentina (TV4)
+
+SEXTONDELSFINALER (Round of 32, matchnummer i parentes):
+Sön 28 juni 21:00 2A vs 2B (73) TV4
+Mån 29 juni: 19:00 1C vs 2F (76) TV4; 22:30 1E vs 3ABCDF (74) SVT
+Tis 30 juni: 03:00 1F vs 2C (75) SVT; 19:00 2E vs 2I (78) TV4; 23:00 1I vs 3CDFGH (77) TV4
+Ons 01 juli: 03:00 1A vs 3CEFHI (79) TV4; 18:00 1L vs 3EHIJK (80) SVT; 22:00 1G vs 3AEHIJ (82) TV4
+Tor 02 juli: 02:00 1D vs 3BEFIJ (81) TV4; 21:00 1H vs 2J (84) SVT
+Fre 03 juli: 01:00 2K vs 2L (83) TV4; 05:00 1B vs 3EFGIJ (85) TV4; 20:00 2D vs 2G (88) TV4
+Lör 04 juli: 00:00 1J vs 2H (86) SVT; 03:30 1K vs 3DEIJL (87) SVT
+
+ÅTTONDELSFINALER (Round of 16):
+Lör 04 juli: 19:00 W73 vs W75 (90) TV4; 23:00 W74 vs W77 (89) SVT
+Sön 05 juli: 22:00 W76 vs W78 (91) TV4
+Mån 06 juli: 02:00 W79 vs W80 (92) SVT; 21:00 W83 vs W84 (93) TV4
+Tis 07 juli: 02:00 W81 vs W82 (94) TV4; 18:00 W86 vs W88 (95) TV4; 22:00 W85 vs W87 (96) SVT
+
+KVARTSFINALER:
+Tor 09 juli 22:00 W89 vs W90 (97) TV4
+Fre 10 juli 21:00 W93 vs W94 (98) SVT
+Lör 11 juli 23:00 W91 vs W92 (99) TV4
+Sön 12 juli 03:00 W95 vs W96 (100) SVT
+
+SEMIFINALER:
+Tis 14 juli 21:00 W97 vs W98 (101) SVT
+Ons 15 juli 21:00 W99 vs W100 (102) TV4
+
+BRONSMATCH: Lör 18 juli 23:00 RU101 vs RU102 (103) SVT
+FINAL: Sön 19 juli 21:00 W101 vs W102 (104) TV4
