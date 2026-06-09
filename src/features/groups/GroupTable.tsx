@@ -19,6 +19,7 @@
 //     success en egen ton utan att bryta designen.
 //   - Inga råa hex: allt går via semantiska tokens (color-mix mot --color-*).
 
+import type { CSSProperties } from 'react';
 import type { GroupStanding, GroupId, Team } from '../../domain/types';
 
 /** Hur många lag som går vidare DIREKT från gruppen (etta + tvåa, SPEC §5). */
@@ -84,7 +85,7 @@ function teamLabel(
  * mot ytan), guld-/silver-tonen lever i medaljens BAKGRUND + KANT. Så placeringen
  * läses skarpt i båda teman utan att luta sig mot en låg guld-på-guld-kontrast.
  */
-function rankDiscStyle(rank: number): React.CSSProperties {
+function rankDiscStyle(rank: number): CSSProperties {
   if (rank === 1) {
     return {
       backgroundColor: 'color-mix(in srgb, var(--vm-gold) 24%, transparent)',
