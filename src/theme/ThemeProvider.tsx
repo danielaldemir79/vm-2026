@@ -9,7 +9,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ThemeContext } from './theme-context';
 import type { Theme } from './theme-constants';
-import { applyThemeToDocument, nextTheme, persistTheme, readThemeFromDocument } from './theme-core';
+import {
+  applyThemeToDocument,
+  getLocalStorage,
+  nextTheme,
+  persistTheme,
+  readThemeFromDocument,
+} from './theme-core';
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -37,14 +43,20 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // persist får inte hänga i den vägen. setTheme får sitt nästa-värde explicit.
   // toggleTheme beror på `theme` så den ser aktivt värde (ingen stale closure)
   // och kan räkna ut + persistera nästa tema deterministiskt före setState.
+  //
+  // Storage hämtas via getLocalStorage(), som skyddar SJÄLVA åtkomsten till
+  // window.localStorage (kastar SecurityError i blockerat läge/sandbox). Temat
+  // ska ALLTID växla (state + DOM) även när lagringen inte kan nås, bara
+  // persistensen hoppas över. Skulle vi evaluera window.localStorage direkt
+  // som argument skulle tema-bytet krascha innan persistTheme ens körde.
   const setTheme = useCallback((next: Theme) => {
-    persistTheme(window.localStorage, next);
+    persistTheme(getLocalStorage(), next);
     setThemeState(next);
   }, []);
 
   const toggleTheme = useCallback(() => {
     const next = nextTheme(theme);
-    persistTheme(window.localStorage, next);
+    persistTheme(getLocalStorage(), next);
     setThemeState(next);
   }, [theme]);
 

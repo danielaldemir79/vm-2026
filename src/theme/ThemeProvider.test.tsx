@@ -1,5 +1,5 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from './ThemeProvider';
 import { useTheme } from './useTheme';
@@ -80,6 +80,60 @@ describe('ThemeProvider, växling och persistens', () => {
 
     expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('ThemeProvider, blockerad/onåbar localStorage (robusthet, fynd H+I)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Simulera miljöer där SJÄLVA åtkomsten till window.localStorage kastar
+  // (Safari med blockerade cookies, sandboxade iframes, vissa privacy-lägen).
+  // Före fixen kraschade tema-bytet på argument-uttrycket window.localStorage
+  // innan persistTheme ens kördes; nu går åtkomsten via getLocalStorage som
+  // fångar felet, så temat ska ALLTID växla och bara persistensen utebli.
+  function makeStorageAccessThrow() {
+    return vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    });
+  }
+
+  it('toggleTheme växlar temat (state + DOM) UTAN att kasta när storage-åtkomsten kastar', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    applyThemeToDocument(document, 'dark');
+    const storageSpy = makeStorageAccessThrow();
+
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.theme).toBe('dark');
+
+    // Får INTE kasta, trots att window.localStorage-åtkomsten kastar.
+    expect(() => act(() => result.current.toggleTheme())).not.toThrow();
+
+    // Temat har ändå växlat: state OCH DOM-attributet uppdaterat.
+    expect(result.current.theme).toBe('light');
+    expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
+
+    // Fail loud: en varning loggades (persistensen hoppades, men syns).
+    expect(warn).toHaveBeenCalled();
+
+    storageSpy.mockRestore();
+  });
+
+  it('setTheme sätter temat (state + DOM) UTAN att kasta när storage-åtkomsten kastar', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    applyThemeToDocument(document, 'dark');
+    const storageSpy = makeStorageAccessThrow();
+
+    const { result } = renderHook(() => useTheme(), { wrapper });
+
+    expect(() => act(() => result.current.setTheme('light'))).not.toThrow();
+
+    expect(result.current.theme).toBe('light');
+    expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe('light');
+    expect(warn).toHaveBeenCalled();
+
+    storageSpy.mockRestore();
   });
 });
 
