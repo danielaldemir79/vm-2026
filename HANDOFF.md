@@ -5,6 +5,46 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-09 , T3 KLAR - PR #29 väntar pa Daniels merge
+
+**Branch:** `feature/T3-datalager` @ HEAD `489995d`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/29 mot `develop` (Closes #3, state: OPEN)
+**Board:** issue #3 i "In Review" (korrekt, dirigenten flyttar till Done EFTER Daniels merge).
+**Copilot-loop:** 4 rundor (6 -> 2 -> 2 -> 0 fynd), PR ren.
+
+**KLART med bevis (SHA + verifiering):**
+- `bf78607` - Domänmodell, fixtures-forst, env-gate, tabellberäkning med FIFA-tiebreakers
+- `4ebabe4` - FIFA-tiebreak-beslut dokumenterat + fixtures-monstret i docs/patterns.md
+- `7fd8bd1` - Cloudflare-produktionsgren-rättning (main -> develop) i deploy.md/decisions.md/SPEC.md/CLAUDE.md
+- `b83c43b` - Copilot runda 1: C1 group-filter, C2 regressionstester, C3/C4 3-bokstavskoder, C5 memoiserad live-promise, C6 docstring
+- `3d6a264` - Copilot runda 2: C7+C8 Match diskriminerad union, FinishedMatch bär icke-null result
+- `489995d` - Copilot runda 3: C9+C10 groupId-for-gruppmatch som datakontrakt, ej typgaranti
+- Verifiering (oberoende, dirigenten pa `489995d`): **111 tester grona (10 filer)**, build gront, lint rent, format rent, inga secrets
+- FIFA-tiebreak-ordning källverifierad mot 2 oberoende källor (ESPN + aggregat): VM 2026 har inbördes möte FORE total målskillnad, koden gor ratt
+- 5/5 acceptanskriterier bockade i issue #3 (av journalisten 2026-06-09)
+
+**PINNADE punkter (bars framåt):**
+- **F1 (T4, critical):** tabellberäkningen re-itererar INTE inbördes-tabellen för en kvar-lika delmasngd (3+ lag lika, nagra men inte alla separeras). Medveten KISS-avgransning i T3, dokumenterad. **T4 ska aktivt besluta om full FIFA-iteration behovs och, om ja, skriva ett test som konstruerar kvar-lika-delmasngd och bevisar re-iterationen.** Agare: senior-dev i T4. (Kalla: `compute-standings.ts` ~rad 209-215.)
+- **T7-pin:** ljust tema, accent == success-gron (#0e7a44). T7 ska ge success en distinkt AA-klarande ton.
+- **T14 hog-risk:** Supabase/auth/RLS, inga secrets i repo. Live-Supabase-klienten ar en medveten fail-loud-stub, T14 tander den.
+- **Cloudflare KOPPLAT:** produktion = `develop`, live pa vm-2026.pages.dev. T1:s Cloudflare-pin ar STANGD.
+
+**FORTSATTNINGS-PROMPT:**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`. T3 ar klar (las `HANDOFF.md`).
+>
+> Om PR #29 ANNU INTE mergad: Daniel mergar den manuellt mot `develop`. Dirigenten
+> uppdaterar board-kortet (#3) till Done efter merge.
+>
+> Om PR #29 REDAN mergad: plocka nasta task.
+> **T4 (#4, critical - FIFA-data)** ar nasta, beror pa T3. Label `critical` -> bredare review-panel.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+> Bar in dessa pinnar i T4:
+> - **F1-pinnen:** besluta om full FIFA-re-iteration (kvar-lika-delmasngd) behovs och lagg i sa fall ett test som bevisar det. Alls aldrig gissa treeplats-masngd ur tabell, det kor via FIFA:s fastlagda tabell (SPEC §5/§8).
+> - **Treeplats-seedning aldrig gissa:** tabell-driven, uttommande tester, kallor i SPEC §8.
+> - T7-pin, T14-pin lever vidare.
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T2 KLAR - PR #28 väntar på Daniels merge
 
 **Branch:** `feature/T2-design-temasystem` @ HEAD `89c38c8`
