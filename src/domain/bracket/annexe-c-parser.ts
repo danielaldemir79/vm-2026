@@ -33,7 +33,18 @@ export type ParsedRows = Record<number, string[]>;
  * Parsa Annexe C-källtexten till rader (rad-id -> 8 grupp-bokstäver).
  * Hoppar fram till tabellhuvudet och läser dataraderna därefter; rader som inte
  * matchar radmönstret (tomrader, sidbrytningar, "Annexes"-marginaltext) ignoreras.
+ *
+ * FAIL-LOUD på duplicerat rad-id (samma fail-loud-mönster som setOnce, men på
+ * objektet i stället för en Map, se set-once.ts / winnerGoesTo / TABLE_INDEX):
+ * parsern är en del av källånkrings-trust-kedjan (FIFA PDF -> committat utdrag
+ * -> generator -> tabell). Förekommer samma rad-id två gånger i indata (trasig/
+ * duplicerad extraktion) skulle en tyst `rows[idx] = ...`-överskrivning behålla
+ * BARA den senare raden, och felet rapporterades då indirekt av validate() som
+ * en "saknad rad"/"fel antal" i stället för att peka på den VERKLIGA orsaken,
+ * det duplicerade rad-id:t. Vi kastar i stället direkt vid källan.
+ *
  * @throws Om tabellhuvudet inte hittas (fel fil / trasig extraktion, fail loud).
+ * @throws Om samma rad-id förekommer mer än en gång (duplicerad källextraktion).
  */
 export function parseAnnexeC(text: string): ParsedRows {
   const lines = text.split(/\r?\n/);
@@ -50,7 +61,15 @@ export function parseAnnexeC(text: string): ParsedRows {
       .trim()
       .split(/\s+/)
       .map((code) => code[1]);
-    if (groups.length === 8) rows[idx] = groups;
+    if (groups.length !== 8) continue;
+    if (Object.prototype.hasOwnProperty.call(rows, idx)) {
+      throw new Error(
+        `Duplicerat rad-id ${idx} i Annexe C-källan: raden förekommer mer än en gång. ` +
+          `Detta tyder på en trasig/duplicerad källextraktion, varje rad-id (1-495) ` +
+          `ska finnas exakt en gång.`
+      );
+    }
+    rows[idx] = groups;
   }
   return rows;
 }
