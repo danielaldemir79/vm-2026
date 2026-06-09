@@ -259,3 +259,58 @@ färg-oberoende signaler läses i båda teman och låter en senare task färglä
 designen. Verifiera i webbläsaren att kollisionen är LIVE (läs `getComputedStyle` på `--vm-accent` vs
 `--vm-success`) och att zonen ändå läses. Källa: T5 design-frontend (`src/features/groups/GroupTable.tsx`,
 kvalificeringszonen, T7-pin).
+
+**Andra användningen (T7, daglig matchvy):** samma princip för "Dagens match"-framhävningen, men en
+viktig SKÄRPNING värd att lyfta: **solid fyllning + mörk text slår färg-på-tint** för ett litet
+text-märke. Ett "DAGENS MATCH"-chip med GULD-TEXT på en 18% guld-tint föll under AA på den ljusa ytan
+(uppmätt 2.97:1), medan SAMMA chip som en SOLID guld-bricka (`background: var(--vm-gold)`) med mörk
+ink-text (`#1c1403`) gav garanterad AA i båda teman (5.03:1 ljust / 10.90:1 mörkt), eftersom guld är
+ljus/mellanljus i båda temana. Regel: när en framhävnings-roll ska bära LITEN TEXT, gör den till en
+solid bricka med kontrast-säker text, lägg inte rollens hue i texten mot en svag tint. Verifiera
+alltid den uträknade kontrasten i webbläsaren (composita tint:ens alfa mot ytan bakom, annars räknar
+du fel ratio). Källa: T7 design-frontend (`src/features/daily/MatchCard.tsx`, featured-varianten).
+
+### premium-hero-med-reduced-motion-saker-css-dekor-och-no-cls-nedrakning (design, VM 2026)
+
+**Recept (en levande "WOW"-hero som inte bryter a11y eller Core Web Vitals):**
+1. STÄMNING via lager-gradienter på EN yta: en mörk grundyta + två radiella ljus (här pitch-grön ur
+   ena hörnet, varm guld ur det andra) via `radial-gradient(... rgb(var(--vm-glow-accent) / 0.16) ...)`
+   och `color-mix(... var(--vm-gold) ...)`. Allt via tema-token-RGB-delar (`--vm-glow-accent`) /
+   `color-mix`, aldrig rå hex, så stämningen följer temat.
+2. RÖRELSE som dekoration, INTE som JS: ett långsamt ljus-svep (`@keyframes` som flyttar
+   `background-position`) på en `aria-hidden`-overlay + en pulsande "live"-prick (`@keyframes` på
+   opacity/scale). Lägg keyframes i `index.css`. De fångas AUTOMATISKT av den globala
+   `@media (prefers-reduced-motion: reduce)`-regeln (som nollar `animation-duration`/`iteration-count`),
+   så de snappar till sitt statiska första steg utan en egen JS-grind. Verifiera LIVE genom att
+   emulera reduced-motion och läsa `getComputedStyle(...).animationDuration` (ska bli ~0.01ms).
+3. NEDRÄKNING utan layout-hopp (CLS=0): rendera siffror med `tabular-nums` OCH en fast `min-width` per
+   enhet (en "tile"), så bredden aldrig ändras när 9 -> 10 eller sekunder tickar. Den rena
+   tick-logiken (computeCountdown) ligger kvar i hooken; design rör bara presentationen.
+4. RESPONSIVT: hero:n är `flex-col` på mobil (nedräkning över featured-kortet), `lg:flex-row` på
+   bred skärm. Verifiera att inget barn är bredare än viewporten på 360px (mät `scrollWidth` vs
+   `clientWidth` på `documentElement`, och leta efter element vars `getBoundingClientRect().right`
+   sticker ut).
+
+**Varför:** "Levande" får aldrig betyda "rörig för den som valt minska rörelse" eller "hoppig LCP/CLS".
+Genom att uttrycka dekor-rörelsen som CSS-keyframes ärver den den globala reduced-motion-grinden gratis
+(en sanning, inget dubbelt skydd att hålla i synk), och `tabular-nums` + fast tile-bredd gör en
+sekund-tickande nedräkning till en nollkostnad för CLS. Återanvänds av kommande hero/levande vyer
+(slutspelsträd, topplista). Källa: T7 design-frontend (`src/features/daily/DailyMatchesView.tsx` +
+`vm-pulse`/`vm-sheen` i `src/index.css`).
+
+### lag-identitet-utan-asset-beroende-och-kanal-badge-med-fg-kontrast (design, VM 2026)
+
+**Recept (visuell identitet på matchkort utan att offra prestanda eller a11y):**
+1. LAG-EMBLEM utan nätverk: generera en deterministisk tvåtons-disc ur lagets FIFA-landskod
+   (en liten FNV-hash -> två hue-grader ~140 grader isär, HSL med MÅTTLIG mättnad/ljushet ~34-42% L).
+   Inga flaggbilder (48 nät-hämtningar = LCP/CLS-risk) och inga emoji-flaggor (renderas inte på
+   Windows). Cappa ljusheten så vit text på discen håller AA (42% L -> >= ~5:1 även på den ljusaste
+   hue:n). Discen är `aria-hidden` (ren dekoration); lagnamnet bär a11y. Bytbar mot riktig flagg-data
+   senare utan att röra kortet.
+2. KANAL-BADGE som skummas: ge kanalen ett eget märke (prick + namn) med kanalens egen ton i
+   BAKGRUND + KANT + PRICK, men håll TEXTEN på `var(--color-fg)` (uppmätt 15.10:1 ljust / 13.23:1
+   mörkt), så badgen läses skarpt oavsett kanalfärg. Okänd kanal faller tillbaka på en neutral fg-ton.
+**Varför:** Ett matchkort utan lag-identitet blir en textrad; en deterministisk disc ger varje lag en
+igenkännbar signatur till noll prestanda-kostnad. Kanal-tonen i bakgrund/kant (inte i texten) ger
+kanal-igenkänning utan att riskera en låg färg-på-färg-kontrast. Källa: T7 design-frontend
+(`src/features/daily/TeamFlag.tsx` + `TvBadge.tsx`).

@@ -30,15 +30,34 @@ function indexTeams(teams: readonly Team[]): Map<string, Team> {
   return new Map(teams.map((t) => [t.id, t]));
 }
 
-/** En enskild nedräknings-enhet (t.ex. "02" + "tim"). tabular-nums = ingen hopp. */
+/**
+ * En enskild nedräknings-enhet som en upphöjd "tile" (t.ex. "02" + "tim").
+ * tabular-nums + fast bredd = siffran hoppar aldrig i sidled (ingen CLS när
+ * sekunderna tickar). Tilen bär en svag yt-ton så enheterna känns som en rad
+ * fysiska brickor, en premium-detalj för startskärmens hjärta.
+ */
 function CountdownUnit({ value, label }: { value: number; label: string }) {
   return (
-    <div className="flex flex-col items-center">
-      <span className="font-display text-2xl font-bold tabular-nums leading-none sm:text-3xl">
+    <div className="flex flex-col items-center gap-1">
+      <span
+        className="inline-flex min-w-[2.25rem] items-center justify-center rounded-md border border-border px-2 py-1.5 font-display text-2xl font-bold tabular-nums leading-none sm:min-w-[2.75rem] sm:text-4xl"
+        style={{
+          backgroundColor: 'color-mix(in srgb, var(--color-fg) 6%, var(--color-surface-raised))',
+        }}
+      >
         {String(value).padStart(2, '0')}
       </span>
-      <span className="mt-1 text-[0.625rem] uppercase tracking-wide text-fg-muted">{label}</span>
+      <span className="text-[0.625rem] uppercase tracking-[0.15em] text-fg-muted">{label}</span>
     </div>
+  );
+}
+
+/** En dekorativ separator-prick mellan nedräknings-tilarna. aria-hidden. */
+function CountdownSeparator() {
+  return (
+    <span aria-hidden="true" className="-mt-3 self-center text-2xl font-bold text-fg-muted">
+      :
+    </span>
   );
 }
 
@@ -67,10 +86,18 @@ function Countdown({
   const away = teamDisplayName(match.awayTeamId, teamsById);
 
   return (
-    <div data-countdown="live" className="flex flex-col gap-3">
-      <p className="text-sm text-fg-muted">
-        Nästa avspark: <span className="font-semibold text-fg">{home}</span> mot{' '}
-        <span className="font-semibold text-fg">{away}</span> ({stageLabel(match)})
+    <div data-countdown="live" className="flex flex-col gap-4">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-muted">
+        {/* Pulsande "live"-prick: hero:n känns levande. CSS-pulsen (vm-live-dot)
+            stannar vid reducerad rörelse (index.css), så ingen distraktion. */}
+        <span
+          aria-hidden="true"
+          className="vm-live-dot inline-block h-2 w-2 rounded-pill bg-accent"
+        />
+        <span>
+          Nästa avspark: <span className="font-semibold text-fg">{home}</span> mot{' '}
+          <span className="font-semibold text-fg">{away}</span> ({stageLabel(match)})
+        </span>
       </p>
       {/* aria-live polite: tiden uppdateras varje sekund i DOM:en, men vi ger
           också en sammanfattande aria-label så skärmläsaren kan läsa hela
@@ -78,20 +105,14 @@ function Countdown({
       <div
         aria-live="polite"
         aria-label={`Tid till avspark: ${remaining.days} dagar, ${remaining.hours} timmar, ${remaining.minutes} minuter, ${remaining.seconds} sekunder`}
-        className="flex items-end gap-3"
+        className="flex items-start gap-2 sm:gap-3"
       >
         <CountdownUnit value={remaining.days} label="dgr" />
-        <span aria-hidden="true" className="pb-2 text-xl font-bold text-fg-muted">
-          :
-        </span>
+        <CountdownSeparator />
         <CountdownUnit value={remaining.hours} label="tim" />
-        <span aria-hidden="true" className="pb-2 text-xl font-bold text-fg-muted">
-          :
-        </span>
+        <CountdownSeparator />
         <CountdownUnit value={remaining.minutes} label="min" />
-        <span aria-hidden="true" className="pb-2 text-xl font-bold text-fg-muted">
-          :
-        </span>
+        <CountdownSeparator />
         <CountdownUnit value={remaining.seconds} label="sek" />
       </div>
     </div>
@@ -177,28 +198,46 @@ export function DailyMatchesView() {
 
       {status === 'ready' && days.length > 0 ? (
         <>
-          {/* Hero: "Match of the day" + live-nedräkning. Nedräkningen pekar mot
-              turneringens NÄSTA avspark (inte nödvändigtvis vald dag), hero-kortet
-              mot den valda dagens framträdande match. */}
+          {/* Hero: "Match of the day" + live-nedräkning, startskärmens hjärta.
+              Konceptet är "arena i kvällsljus" (SPEC §7): en djup, mörk fond med
+              ett pitch-grönt ljus som tänds ur hörnen, plus ett långsamt rörligt
+              ljus-svep (aria-hidden, stannar vid reducerad rörelse). Nedräkningen
+              pekar mot turneringens NÄSTA avspark (inte nödvändigtvis vald dag),
+              hero-kortet mot den valda dagens framträdande match. */}
           <Slide direction="up">
             <div
               data-daily-hero=""
-              className="relative overflow-hidden rounded-card border border-border bg-surface-raised p-5 shadow-[var(--vm-shadow-raised)] sm:p-7"
+              className="relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
               style={{
+                backgroundColor: 'var(--color-surface-raised)',
                 backgroundImage:
-                  'radial-gradient(120% 140% at 0% 0%, rgb(var(--vm-glow-accent) / 0.12), transparent 60%)',
+                  'radial-gradient(110% 120% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 55%), radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--vm-gold) 12%, transparent), transparent 55%)',
               }}
             >
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-col gap-2">
-                  <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-                    Nedräkning
+              {/* Rörligt ljus-svep: ett brett, mjukt sken som långsamt drar över
+                  fonden (arena-strålkastare). Rent dekorativt, aria-hidden, och
+                  vm-hero-sheen stannar vid reducerad rörelse (index.css). */}
+              <div
+                aria-hidden="true"
+                className="vm-hero-sheen pointer-events-none absolute inset-0 -z-10 opacity-70"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(105deg, transparent 30%, rgb(var(--vm-glow-accent) / 0.10) 50%, transparent 70%)',
+                }}
+              />
+
+              <div className="flex flex-col gap-7 p-5 sm:p-7 lg:flex-row lg:items-stretch lg:gap-10 lg:p-8">
+                {/* Vänster: nedräkningen, hero:ns drama. */}
+                <div className="flex flex-col justify-center gap-3 lg:flex-1">
+                  <p className="flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                    Nedräkning till avspark
                   </p>
                   <Countdown countdown={countdown} teamsById={teamsById} />
                 </div>
+
                 {matchOfTheDay ? (
-                  <div className="lg:max-w-sm lg:flex-1">
-                    <p className="mb-2 font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
+                  <div className="flex flex-col gap-2 lg:max-w-sm lg:flex-1">
+                    <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
                       Dagens match
                     </p>
                     <MatchCard match={matchOfTheDay} teamsById={teamsById} highlight />
@@ -210,16 +249,33 @@ export function DailyMatchesView() {
 
           {/* Datumnavigering: föregående/nästa speldag + dagens rubrik. Riktiga
               <button>:ar med disabled vid kant (a11y/tangentbord). Rubriken är
-              ett aria-live region så bläddring annonseras. */}
-          <nav aria-label="Datumnavigering" className="flex items-center justify-between gap-3">
+              ett aria-live region så bläddring annonseras. Knapparna får en
+              hover-lyft (accent-kant) så de känns tryckbara, och pilen + dagen
+              staplas så en lång svensk dag-etikett aldrig tränger ut layouten. */}
+          <nav
+            aria-label="Datumnavigering"
+            className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface px-2 py-2 shadow-[var(--vm-shadow-card)] sm:gap-3 sm:px-3"
+          >
             <button
               type="button"
               onClick={goPrev}
               disabled={!canGoPrev}
-              className="rounded-pill border border-border bg-surface px-4 py-2 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={
+                canGoPrev
+                  ? `Föregående speldag, ${formatDayShort(days[selectedIndex - 1].dateKey)}`
+                  : 'Föregående speldag'
+              }
+              className="group flex items-center gap-1.5 rounded-pill px-3 py-2 text-sm font-semibold transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             >
-              <span aria-hidden="true">‹ </span>
-              {canGoPrev ? formatDayShort(days[selectedIndex - 1].dateKey) : 'Tidigare'}
+              <span
+                aria-hidden="true"
+                className="text-base leading-none text-fg-muted transition-colors group-hover:text-accent group-disabled:text-fg-muted"
+              >
+                ‹
+              </span>
+              <span aria-hidden="true" className="hidden sm:inline">
+                {canGoPrev ? formatDayShort(days[selectedIndex - 1].dateKey) : 'Tidigare'}
+              </span>
             </button>
 
             <p
@@ -233,16 +289,33 @@ export function DailyMatchesView() {
               type="button"
               onClick={goNext}
               disabled={!canGoNext}
-              className="rounded-pill border border-border bg-surface px-4 py-2 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label={
+                canGoNext
+                  ? `Nästa speldag, ${formatDayShort(days[selectedIndex + 1].dateKey)}`
+                  : 'Nästa speldag'
+              }
+              className="group flex items-center gap-1.5 rounded-pill px-3 py-2 text-sm font-semibold transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
             >
-              {canGoNext ? formatDayShort(days[selectedIndex + 1].dateKey) : 'Senare'}
-              <span aria-hidden="true"> ›</span>
+              <span aria-hidden="true" className="hidden sm:inline">
+                {canGoNext ? formatDayShort(days[selectedIndex + 1].dateKey) : 'Senare'}
+              </span>
+              <span
+                aria-hidden="true"
+                className="text-base leading-none text-fg-muted transition-colors group-hover:text-accent group-disabled:text-fg-muted"
+              >
+                ›
+              </span>
             </button>
           </nav>
 
           {/* Dagens matchlista. En tom dag ska inte hända här (days innehåller bara
               dagar MED matcher), men vi gardera ändå för en framtida källa och
-              pekar mot nästa speldag i stället för en blank yta. */}
+              pekar mot nästa speldag i stället för en blank yta.
+
+              Match-of-the-day FRAMHÄVS inte igen i listan: hero:n kröner den redan
+              ovanför, så ett andra identiskt featured-kort vore en visuell dubblett.
+              I listan visas den som ett vanligt kort (kortet bär dock alltid sin
+              egen a11y-sammanfattning, så inget tappas för skärmläsare). */}
           {selectedDay && selectedDay.matches.length > 0 ? (
             <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
               {selectedDay.matches.map((match, i) => (
@@ -252,20 +325,33 @@ export function DailyMatchesView() {
                     transition={{ ...transitions.smooth, delay: Math.min(i * 0.04, 0.32) }}
                     className="h-full"
                   >
-                    <MatchCard
-                      match={match}
-                      teamsById={teamsById}
-                      highlight={matchOfTheDay?.id === match.id}
-                    />
+                    <MatchCard match={match} teamsById={teamsById} />
                   </Slide>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
-              Inga matcher den här dagen.
-              {canGoNext ? ' Bläddra framåt till nästa speldag.' : ''}
-            </p>
+            // Tom dag (vanligt FÖRE turneringsstarten 11 juni): ingen blank yta,
+            // utan en lugn, prydlig "vilodag"-panel som pekar vidare mot nästa
+            // speldag i stället. Nedräkningen i hero:n bär själva väntan.
+            <div className="flex flex-col items-center gap-3 rounded-card border border-dashed border-border bg-surface px-6 py-12 text-center">
+              <span
+                aria-hidden="true"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-pill border border-border text-lg text-fg-muted"
+                style={{
+                  backgroundColor:
+                    'color-mix(in srgb, rgb(var(--vm-glow-accent)) 8%, var(--color-surface-raised))',
+                }}
+              >
+                ⚽
+              </span>
+              <p className="font-display text-base font-bold">Ingen match den här dagen</p>
+              <p className="max-w-sm text-sm text-fg-muted">
+                {canGoNext
+                  ? 'En vilodag i mästerskapet. Bläddra framåt till nästa speldag, eller följ nedräkningen ovan.'
+                  : 'Följ nedräkningen ovan till nästa avspark.'}
+              </p>
+            </div>
           )}
         </>
       ) : null}
