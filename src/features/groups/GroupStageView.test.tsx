@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GroupStageView } from './GroupStageView';
 
@@ -55,11 +55,19 @@ describe('GroupStageView, renderar gruppspelet', () => {
     });
 
     // Grupp A har demo-resultat (mex-rsa 2-0, kor-cze 1-1), så Mexiko ska ha
-    // spelat 1 och ha 3 poäng. Bevisar att tabellen härletts ur matcherna, inte
-    // bara renderat tomma rader.
+    // spelat 1 och ha 3 poäng. Vi verifierar den HÄRLEDDA statistiken i Mexikos
+    // egen rad (rad-scopat, inte en global text-match), så testet failar om
+    // tabellhärledningen eller cell-renderingen är fel, inte bara om namnet finns.
     const mexRow = screen.getByRole('rowheader', { name: /Mexiko/ }).closest('tr');
     expect(mexRow).not.toBeNull();
-    expect(mexRow).toHaveTextContent('Mexiko');
+
+    // Cellerna i raden i kolumnordning: [Placering, S, V, O, F, GM, IM, MS, P]
+    // (lagnamnet är en rowheader, inte en cell). Vi assertar S (spelade) och P
+    // (poäng) på sina exakta positioner, så ett fel i härledningen fångas.
+    const cells = within(mexRow as HTMLElement).getAllByRole('cell');
+    const COLUMN_INDEX = { played: 1, points: 8 } as const;
+    expect(cells[COLUMN_INDEX.played]).toHaveTextContent('1'); // S: spelade 1
+    expect(cells[COLUMN_INDEX.points]).toHaveTextContent('3'); // P: 3 poäng
   });
 });
 

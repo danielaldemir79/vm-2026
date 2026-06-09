@@ -14,6 +14,7 @@
 // går via semantiska tokens (inga råa hex).
 
 import { useMemo } from 'react';
+import { GROUP_IDS } from '../../domain/types';
 import type { GroupTable as GroupTableData, Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { useGroupData } from './use-group-data';
@@ -183,10 +184,15 @@ export function GroupStageView({ env }: GroupStageViewProps) {
           <p role="status" className="text-sm text-fg-muted">
             Laddar gruppspelet ...
           </p>
-          {/* Skelett-kort i samma rutnät, så layouten inte hoppar när datan landar. */}
+          {/* Skelett-kort i samma rutnät OCH samma antal som det förväntade
+              gruppantalet (GROUP_IDS.length, en sanning ur domänmodellen), så
+              ready-läget renderar lika många kort och inget under vyn (typografi-
+              panel, footer) skjuts ned när datan landar (ingen layout-shift, CLS).
+              Härleds ur GROUP_IDS, aldrig en magisk siffra, så det inte kan glida
+              isär från det verkliga gruppantalet. */}
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <SkeletonCard key={i} />
+            {GROUP_IDS.map((groupId) => (
+              <SkeletonCard key={groupId} />
             ))}
           </div>
         </>
