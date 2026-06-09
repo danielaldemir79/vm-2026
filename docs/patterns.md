@@ -153,6 +153,66 @@ Källa: T4 (treeplats-tabellen, `scripts/generate-third-place-table.ts` + `src/d
 + committat `annexe-c-source.txt` -> `src/domain/bracket/third-place-table.ts`, källånkrat av
 `third-place-table-source.test.ts`).
 
+### inmatning-mot-delad-store-som-haerledd-state-uppdaterar (React, VM 2026)
+
+**Recept (ett inmatnings-UI uppdaterar härledda vyer via EN delad sanning):**
+
+1. LYFT den RÅA SANNINGEN (här matchlistan) till en DELAD store via React-context
+   (`src/features/results/`: `results-context.ts` = kontrakt + context + `useResultsStore`-hook,
+   `ResultsProvider.tsx` = seedning + state + mutatorer). Inte lokal vy-state, annars kan bara EN vy
+   ändra den. Providern SEEDAR via `getDataSource(env)` (fixtures-först-seamen, samma env-gate), håller
+   sanningen i `useState`, och fail-loud:ar seed-fel (status 'error' + meddelande, inte tyst tom).
+2. Alla härledda vyer LÄSER samma store och härleder sitt (T5:s `useGroupData` blev en tunn konsument:
+   `useResultsStore()` + `useMemo(deriveGroupTables, [status, groups, matches])`, gatad på `ready`).
+   Lagra ALDRIG den härledda formen, härled den, så en inmatning -> ny matchlista -> alla vyer räknar
+   om automatiskt (en sanning, ingen dubbellagring).
+3. EXPONERA skriv-seam på storen: ett HÖGNIVÅ `submitResult(id, entry)` (validerar + optimistisk
+   uppdatering, för UI:t) OCH ett LÅGNIVÅ `setMatches` (för T18:s realtid + tester). T14 (persistens)
+   byter `submitResult`-implementationen mot en server-skrivning, T18 prenumererar och anropar
+   `setMatches`, allt på SAMMA seam utan att röra konsumenterna.
+4. `useResultsStore` KASTAR utan provider (fail loud): en konsument utan provider är ett wiring-fel,
+   inte ett tillstånd att maskera med tom data. (Testa: `renderHook(useResultsStore)` utan wrapper kastar.)
+5. submitResult validerar mot matchens NUVARANDE status via en `matchesRef` (uppdaterad i en effekt),
+   INTE som sido-effekt inne i en state-uppdaterare (det är inte garanterat synkront, ett anti-mönster).
+   Reffen uppdateras direkt vid en lyckad skrivning så två snabba submit i följd båda ser senaste listan.
+6. VALIDERING i en REN modul (`validate-result.ts`) som returnerar `{ ok: true } | { ok: false; errors }`
+   (kastar INTE): så ALLA fel visas samtidigt och kopplas till fält via aria. Den rena reducern
+   (`apply-match-result.ts`) validerar IGEN (skyddsnät) och kastar vid ogiltig data, så ett brutet
+   flöde aldrig korrumperar sanningen. Sätt `noValidate` på formen så DIN validering (svenska meddelanden
+   + aria) är sanningen, inte native constraint-bubblor (de blockerar submit innan din validering kör).
+7. Test-täckning: validering (icke-negativa heltal: -1/1.5/NaN/Infinity, status<->resultat-kontraktet,
+   uttömmande status-övergångar), reducern (ny array-referens, oförändrade element behåller referens,
+   status-backning nollar resultat, fail-loud på okänt id/ogiltig data), storen (seedning, fail-loud
+   utan provider, submitResult lämnar listan orörd vid fel), OCH det viktigaste: ett INTEGRATIONSTEST
+   som monterar inmatnings-vy + härledd vy under SAMMA provider och bevisar att ett sparat resultat
+   ändrar den härledda tabellen (rad-scopat via `rowheader` + `within(row).getAllByRole('cell')`,
+   stabilt kolumnindex, samma teknik som T5).
+
+**Varför:** SPEC §6:s härledda state med ett SKRIV-lager: inmatningen är den enda mutationen, allt annat
+(tabeller, snart slutspelsträd) är rena funktioner av matchlistan, så "live" blir gratis och korrekt
+utan en andra kopia. Den delade storen är den minsta lösningen som låter flera vyer dela en sanning utan
+prop-drilling, och designar in T14/T18 på samma seam. Generaliserar T5:s "härledd-state-vy" med en delad
+källa + valideringsgrind. Källa: T6 (`src/features/results/`).
+
+### maalfirande-krok-som-seam-design-aeger-visuellt (React + motion, VM 2026)
+
+**Recept (en effekt-/glädje-animation där FUNKTION och VISUELL polish ägs av olika lager):**
+1. Lägg NÄR + a11y + timing i en KROK (`useGoalCelebration`): den avgör triggern (här: match blir
+   finished med minst ett mål), hoppar firandet vid `useReducedMotion()` (WCAG 2.3.3, ingen overlay tänds),
+   auto-avklingar via en timeout (rensad vid nytt firande/unmount), och ger ett UNIKT `key` per firande
+   (matchId + en räknare) så det visuella lagret re-mountar och spelar om även för samma match.
+2. Exponera ett `renderCelebration`-RENDER-PROP (aria-hidden slot) på vyn där DESIGN-FRONTEND lägger den
+   visuella premium-animationen (konfetti/mål-pop, bygger på T2:s motion-primitiver). Default = inget
+   visuellt lager, så vyn är funktionellt komplett utan det (firandet är ren glädje-yta).
+3. Test: mocka `motion/react`s `useReducedMotion` (samma mönster som motion-primitives-testet), använd
+   `vi.useFakeTimers` för auto-avklingen, och asserta: tänds vid mål, unikt key per firande, avklingar
+   efter sin varaktighet, dismiss stänger, INGET firande vid 0-0 och INGET vid reducerad rörelse.
+
+**Varför:** Frikopplar "när det firas + tillgänglighet" (senior-dev, deterministiskt + testbart) från
+"hur det ser ut" (design-frontend), så animationen kan göras premium utan att röra trigger/timing/a11y.
+Render-propet är seamen mellan lagren. Källa: T6 (`src/features/results/goal-celebration.ts` +
+`ResultEntryView.tsx`).
+
 ### fargoberoende-framhavning-nar-tva-roller-delar-hue (design, VM 2026)
 
 **Recept:** När en zon ska framhävas men en token-roll den vill använda KAN sammanfalla med en annan

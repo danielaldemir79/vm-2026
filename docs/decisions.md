@@ -5,6 +5,49 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T6 (issue #6): matchresultat-state LYFT till en delad ResultsProvider (en sanning)
+
+**Beslut (kärn-arkitektur):** Matchlistan, den enda sanningen som tabeller (och senare slutspelsträd)
+härleds ur (SPEC §6), bor nu i en DELAD `ResultsProvider` (React-context, `src/features/results/`),
+inte längre i gruppspelsvyns lokala state. Både resultatinmatnings-UI:t (`ResultEntryView`) och
+gruppspelsvyn (`GroupStageView` via `useGroupData`) LÄSER samma store, så en inmatning -> storen
+uppdaterar matcherna -> alla härledda vyer räknar om automatiskt. `useGroupData` är därmed en TUNN
+KONSUMENT (äger bara tabell-härledningen); env-injektionen (fixtures/live-seedning) flyttade från
+hooken till providern. Storens skriv-seam är `submitResult(matchId, entry)` (validerar + optimistisk
+uppdatering) och lågnivå `setMatches` (T18:s realtid + tester). GroupData-kontraktet utåt
+(status/tables/teams/mode/error/setMatches) är OFÖRÄNDRAT, så T5:s vy + tester står still.
+**Varför:** Före T6 kände bara gruppspelsvyn till matcherna (lokal state), så en separat inmatnings-vy
+hade inte kunnat uppdatera tabellerna utan att dubbellagra eller lyfta tillstånd via prop-drilling
+genom hela appen. En delad store är den minsta lösningen (KISS) som ger EN sanning utan dubbellagring,
+och designar in T14 (persistens, byt mutator-implementation mot Supabase-skrivning) och T18 (realtid,
+prenumeration som anropar setMatches) på SAMMA seam utan omskrivning av konsumenterna. Behåller
+fixtures-först (storen seedar via getDataSource, samma env-gate). Bygger vidare på T5-mönstret
+"härledd-state-vy", nu med sanningen lyft en nivå.
+
+**Beslut (validering = fail loud men användarvänligt):** Inmatningen valideras av en REN modul
+(`validate-result.ts`) som returnerar `{ ok: true } | { ok: false; errors }` (inte kastar), så ALLA
+fel kan visas samtidigt och kopplas till sina fält via `aria-describedby`/`aria-invalid`. Regler:
+icke-negativa HELTAL (avvisar -1, 1.5, NaN, Infinity), status <-> resultat-kontraktet (finished KRÄVER
+bägge mål, scheduled/live får INTE bära resultat, speglar Match-unionen), och status-övergångar via en
+explicit tabell. Formuläret sätter `noValidate` så vår validering (med begripliga svenska meddelanden +
+aria) är sanningen i stället för native constraint-bubblor (inkonsekventa, mindre tillgängliga, och de
+skulle BLOCKERA submit innan vår validering kör). `applyMatchResult` (ren reducer) validerar IGEN som
+skyddsnät och kastar vid ogiltig data, så ett brutet programflöde aldrig korrumperar den enda sanningen.
+**Varför:** Fail loud (PRINCIPLES §8) utan att straffa användaren: en kastande validering döljer flera
+fel och tvingar try/catch; ett diskriminerat returvärde ger bättre UX + a11y och samma data till både
+formulär och store-mutator.
+
+**Beslut (målfirande-KROK som seam, design-frontend äger det visuella):** Firandet ligger i en krok
+`useGoalCelebration` som äger NÄR (en match blir finished med minst ett mål) + a11y (vid reducerad
+rörelse tänds INGET firande, WCAG 2.3.3) + timing (auto-avklingar) + unikt key per firande (re-mount).
+`ResultEntryView` exponerar ett `renderCelebration`-render-prop (aria-hidden slot) där design-frontend
+lägger den visuella premium-animationen (bygger på T2:s motion-primitiver). Funktionellt fungerar
+inmatningen helt utan firandet (ren glädje-yta).
+**Varför:** Frikopplar "när" (senior-dev: funktionellt + a11y) från "hur det ser ut" (design-frontend),
+så animationen kan byggas premium utan att röra inmatnings-logik/timing/tillgänglighet.
+
+---
+
 ## 2026-06-09 , T5: useGroupData härleder tables BARA i ready-läget (kontrakt mot stale data)
 
 **Beslut:** `useGroupData` släpper igenom `deriveGroupTables(...)` enbart när `status === 'ready'`,
