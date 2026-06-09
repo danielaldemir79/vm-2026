@@ -5,6 +5,37 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T5 design-frontend: premium gruppspels-design, kvalificeringszon färg-oberoende
+
+**Beslut (kvalificeringszon, T7-pin):** Etta + tvåa (går vidare) framhävs med FYRA samtidiga,
+FÄRG-OBEROENDE signaler i stället för en statusfärg: (1) en placerings-MEDALJ i rank-cellen, guld-ring
+(`--vm-gold`) på ettan, silver-ring (fg-ton) på tvåan, (2) en vänsterställd ACCENT-LIST (`inset box-shadow`
+mot `--color-accent`), (3) en diskret UPPHÖJD yt-ton (`accent 7%` color-mix) bakom raden, och (4) en
+tjockare AVDELARE under tvåan ("snittet" mot utslagna). Medaljens SIFFRA håller alltid full `--color-fg`-
+kontrast, guld-/silver-tonen lever bara i medaljens bakgrund + kant.
+**Varför:** I LJUST tema är `--vm-accent` === `--vm-success` (båda #0e7a44, verifierat live i webbläsaren),
+så zonen får aldrig luta sig mot en accent/success-färg, den skulle bli osynlig och bryta när T7 ger
+success en egen ton. Form + medalj + list + typografi bär zonen oberoende av färg, och T7 kan sen färglägga
+fritt utan att röra denna design. `data-qualified`-haken från senior-dev återanvänds oförändrad.
+
+**Beslut (layout):** Varje grupp blir ett KORT (bokstavs-badge i kort-headern med tema-trogen arena-glow,
+mjuk elevation, hover-lyft) i ett responsivt rutnät: 1 kol mobil, 2 (`sm`), 3 (`lg`), 4 (`2xl`/ultrawide).
+Tabellen behåller ALLA 10 kolumner i DOM i alla bredder (a11y), men numerisk padding + rank-disc + lagnamn
+är komprimerade så de 10 kolumnerna FÅR PLATS utan horisontell scroll ända ner till 360px (uppmätt
+`intraCardScroll: 0`). GM/IM dämpas visuellt, MS/P hålls starka (visuell komprimering, SPEC §7).
+**Varför:** Premium-känsla + responsivt över hela spannet utan att gömma kolumner (att gömma via
+`display:none` tar bort dem ur a11y-trädet på riktiga enheter). Komprimering, inte borttagning.
+
+**Beslut (tokens + rörelse):** All färg går via semantiska tokens (`color-mix` mot `--color-*` / `--vm-*`),
+inga råa hex. Korten glider in med en STAGGER via `Slide`-primitiven (delay `i*0.04`, tak 0.4s);
+reducerad rörelse nollas i primitiven. Laddning visar SKELETT-kort i samma rutnät (ingen layout-shift),
+fel visar en token-färgad `role="alert"`. Caption är `sr-only` (tabellens tillgängliga namn behålls), den
+synliga grupp-rubriken bärs av kort-headern.
+**Varför:** En sanning för färg/rörelse (designsystemet), CLS undviks, a11y-semantiken från senior-dev
+är orörd (200 tester + tabell-roller/scope intakta).
+
+---
+
 ## 2026-06-09 , T5 (issue #5): Gruppspelsvyn = härledd state ovanpå computeStandings, fixtures-källan bär verifierad data
 
 **Beslut (datakoppling):** Gruppspelsvyn (`src/features/groups/`) LAGRAR ingen tabell. En ren funktion
