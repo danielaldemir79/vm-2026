@@ -12,10 +12,16 @@
 //   "Combinations for eight best third-placed teams", sid. 80-97.
 //   https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
 //
-// KÖR: `node scripts/generate-third-place-table.ts [<käll-textfil>]`
+// KÖR: `npm run gen:third-place-table [-- <käll-textfil>]`
 //   Utan argument används det committade utdraget (annexe-c-source.txt).
 //   Käll-textfilen är resultatet av `pdftotext -layout FWC2026_regulations_EN.pdf`.
-//   Node 24+ kör .ts direkt (native type stripping); ingen byggsteg behövs.
+//   Scriptet kör via `vite-node` (följer med projektets toolchain, inget extra
+//   beroende) så det körs oförändrat på projektets Node-version, CI kör Node 22
+//   (.github/workflows/ci.yml) som INTE har Node 24:s native .ts-type-stripping.
+//   Detta skript körs inte i CI/build, tabellen är committad och VERIFIERAS av
+//   src/domain/bracket/third-place-table-source.test.ts (regenerera-och-diffa
+//   via Vites `?raw`, körs på Node 22). Scriptet är bara contributors väg att
+//   återskapa tabellen efter en käll-ändring.
 //
 // Parsnings-/emit-logiken bor i src/domain/bracket/annexe-c-parser.ts (EN sanning,
 // delad med testet). Detta skript är bara CLI:n: läs fil, bygg, skriv.

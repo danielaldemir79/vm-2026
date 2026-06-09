@@ -5,6 +5,32 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T4 (Copilot runda 1, C5): FIFA-tiebreak head-to-head är FAIL-LOUD vid invariant-brott
+
+**Beslut:** `compareHeadToHead` (`src/domain/standings/compute-standings.ts`) KASTAR nu ett tydligt
+invariant-fel om ett av de jämförda lagen saknar en rad i inbördes-mini-tabellen (`h2h`), i stället för
+att tyst returnera 0 ("lika"). Anroparen `resolveTiedGroup` bygger alltid `h2h` via `headToHeadStats`
+över EXAKT de lag som finns i `tied` och jämför bara lag UR `tied`, så en saknad rad kan bara uppstå vid
+ett programmeringsfel, aldrig på den normala vägen. Funktionen + typen `H2HStats` exporteras enbart för
+test, eftersom invariant-vägen per konstruktion inte kan nås via det publika `computeStandings`-API:t och
+därför måste verifieras genom ett direktanrop med en avsiktligt ofullständig map.
+**Varför (Copilot C5, korrekthet):** En tyst `return 0` på ett invariant-brott MASKERAR buggen och kan ge
+fel ordning i en KRITISK tiebreak, just den fel-klass SPEC §5 säger aldrig får gissas. Fail loud
+(PRINCIPLES §8) gör att felet syns vid källan i stället för att tyst förvanska slutspels-seedningen. Den
+LEGITIMA vägen (båda lagen har en rad, a-c skiljer dem inte -> returnerar 0) är oförändrad och täcks av ett
+test, så fail-loud slår bara på ett äkta invariant-brott.
+**Källa:** Regulations for the FIFA World Cup 26 (May 2026), Article 13 (inbördes-kriterierna a-c), sid.
+26-27. https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
+
+**Not (C3, dev-ergonomi):** Generatorn `scripts/generate-third-place-table.ts` körs nu via
+`npm run gen:third-place-table` (drar `vite-node`, som redan följer med toolchainen via vitest, inget nytt
+beroende). Tidigare antog scriptet Node 24:s native `.ts`-type-stripping, men projektets CI kör Node 22
+(`.github/workflows/ci.yml`), så en contributor på Node 22 kunde inte återköra generatorn. Källånkrings-
+testet (`third-place-table-source.test.ts`) verifierar tabellen via Vites `?raw` och körs oförändrat på
+Node 22, så låset är opåverkat, detta gäller bara contributors regenererings-väg.
+
+---
+
 ## 2026-06-09 , T4 (review F1+F2): Annexe C-tabellen LÅST mot committat FIFA-källutdrag (regenerera-och-diffa)
 
 **Beslut:** Den genererade Annexe C-tabellen (`src/domain/bracket/third-place-table.ts`, 495 rader)
@@ -15,8 +41,8 @@ kräver VÄRDE-likhet med den committade `.ts`-filen (fail loud vid minsta skill
 så CRLF/LF inte ger falskt fel). Trust-kedjan: FIFA PDF -> committat utdrag (spot-checkbart mot PDF,
 sid. 80-97) -> generator -> tabell (bevisat lika av testet). Parsnings-/emit-logiken flyttades till en
 typad modul `src/domain/bracket/annexe-c-parser.ts` som BÅDE generatorn och testet importerar (EN sanning,
-ingen duplicerad parser). Generatorn är nu `scripts/generate-third-place-table.ts` (körs `node`-direkt via
-Node 24:s type-stripping) och defaultar till det committade utdraget.
+ingen duplicerad parser). Generatorn är nu `scripts/generate-third-place-table.ts` (körs via
+`npm run gen:third-place-table`, se C3-noten nedan) och defaultar till det committade utdraget.
 **Varför (review-fynd F1, dataintegritet):** Det "uttömmande" 495-testet vaktade bara STRUKTURELLA
 invarianter (behörighet + kollisionsfrihet), en SVAGARE invariant än FIFA fastställer. Varje av de 495
 kombinationerna har 3-214 behörighets-giltiga, kollisionsfria tilldelningar, men FIFA fastställer EXAKT EN.

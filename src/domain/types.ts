@@ -226,8 +226,10 @@ export type BracketSource =
   // Bästa-trea: vilken trea som hamnar här avgörs av FIFA:s förbestämda
   // tredjeplats-tabell (Annexe C) utifrån VILKA grupper de kvalificerade treorna
   // kom från (SPEC §5). Seedningen görs av seedThirdPlaces (T4); slot:en bär de
-  // 5 grupper vars trea KAN hamna här (FIFA Article 12.6).
-  | { kind: 'best-third'; eligibleGroups: GroupId[] }
+  // 5 grupper vars trea KAN hamna här (FIFA Article 12.6). `readonly`: detta är
+  // en STATISK källhänvisad behörighetslista (Article 12.6) som aldrig får
+  // muteras efter konstruktion, readonly gör oavsiktlig mutation till ett typfel.
+  | { kind: 'best-third'; eligibleGroups: readonly GroupId[] }
   // Lag kommer från vinnaren av en tidigare slutspelsmatch (åttondel och framåt).
   | { kind: 'match-winner'; matchId: string }
   // Lag kommer från förloraren av en tidigare match (bronsmatchen, M103).
