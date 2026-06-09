@@ -77,13 +77,33 @@ describe('inline-scriptets resolve-regel matchar resolveInitialTheme', () => {
     }
   );
 
-  it('faller till DEFAULT_THEME om localStorage kastar (privat läge)', () => {
+  it('faller till DEFAULT_THEME om localStorage kastar (privat läge), matchar resolveInitialTheme(stored, null)', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blockerad storage');
     });
     document.documentElement.removeAttribute(THEME_ATTRIBUTE);
     // Exekvera samma genererade script-text som i index.html, se runInitScript.
     new Function(buildThemeInitScript())();
-    expect(document.documentElement.getAttribute(THEME_ATTRIBUTE)).toBe(DEFAULT_THEME);
+    const fromScript = document.documentElement.getAttribute(THEME_ATTRIBUTE);
+    expect(fromScript).toBe(DEFAULT_THEME);
+    // Speglingen håller: scriptets catch-gren ger samma svar som resolvern när
+    // system-preferensen inte kan läsas (null = "ej läsbart").
+    expect(fromScript).toBe(resolveInitialTheme(null, null));
+  });
+
+  it('faller till DEFAULT_THEME om matchMedia saknas/kastar, matchar resolveInitialTheme(stored, null)', () => {
+    // Inget sparat val, så scriptet hade gått vidare till matchMedia, men den
+    // kastar (motsvarar miljö utan matchMedia). Scriptets catch ska då sätta
+    // DEFAULT_THEME, exakt det resolvern returnerar för systemPrefersDark = null.
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
+    vi.spyOn(window, 'matchMedia').mockImplementation(() => {
+      throw new Error('matchMedia saknas');
+    });
+    document.documentElement.removeAttribute(THEME_ATTRIBUTE);
+    // Exekvera samma genererade script-text som i index.html, se runInitScript.
+    new Function(buildThemeInitScript())();
+    const fromScript = document.documentElement.getAttribute(THEME_ATTRIBUTE);
+    expect(fromScript).toBe(DEFAULT_THEME);
+    expect(fromScript).toBe(resolveInitialTheme(null, null));
   });
 });

@@ -16,7 +16,7 @@ import {
  * Prioritet:
  *   1. Användarens sparade, giltiga val (explicit vilja vinner alltid).
  *   2. System-preferensen (prefers-color-scheme) om inget sparat finns.
- *   3. DEFAULT_THEME som sista utväg.
+ *   3. DEFAULT_THEME som sista utväg, när system-preferensen inte kan läsas.
  *
  * Notera: ett sparat värde som INTE är ett giltigt Theme (korrupt/föråldrat)
  * behandlas som "inget val", inte som ett fel som ska krascha appen, men det
@@ -25,11 +25,21 @@ import {
  * mot en tyst maskerande fallback, vi gissar inte att korrupt data är "dark".
  *
  * @param stored          Råvärdet ur localStorage (eller null om inget/ej läsbart).
- * @param systemPrefersDark  Resultatet av matchMedia('(prefers-color-scheme: dark)').
+ * @param systemPrefersDark  Resultatet av matchMedia('(prefers-color-scheme: dark)'):
+ *   true/false om preferensen kunde läsas, null om matchMedia saknas/kastar. null
+ *   speglar inline-scriptets catch-gren (theme-init.ts) och faller till DEFAULT_THEME,
+ *   så den rena funktionen och no-flash-scriptet ger samma svar i alla lägen.
  */
-export function resolveInitialTheme(stored: string | null, systemPrefersDark: boolean): Theme {
+export function resolveInitialTheme(
+  stored: string | null,
+  systemPrefersDark: boolean | null
+): Theme {
   if (isTheme(stored)) {
     return stored;
+  }
+  // System-preferensen kan inte läsas (matchMedia saknas/kastar): sista utväg.
+  if (systemPrefersDark === null) {
+    return DEFAULT_THEME;
   }
   return systemPrefersDark ? 'dark' : 'light';
 }

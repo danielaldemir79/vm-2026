@@ -46,13 +46,16 @@ export function Slide({
 }: SlideProps) {
   const shouldReduceMotion = useReducedMotion();
 
-  // Vid reducerad rörelse: ingen förskjutning, bara opacitet.
+  // Vid reducerad rörelse: ingen förskjutning, bara opacitet. Detta gäller BÅDE
+  // start- och slut-målet: hade animate hårdkodat x/y=0 skulle transform-props
+  // appliceras ändå och bryta a11y-kontraktet (bara tona in, aldrig resa).
   const from = shouldReduceMotion ? {} : offsetFor(direction, offset);
+  const to = shouldReduceMotion ? { opacity: 1 } : { opacity: 1, x: 0, y: 0 };
 
   return (
     <motion.div
       initial={initial ?? { opacity: 0, ...from }}
-      animate={animate ?? { opacity: 1, x: 0, y: 0 }}
+      animate={animate ?? to}
       exit={exit ?? { opacity: 0, ...from }}
       transition={transition ?? transitions.smooth}
       {...rest}

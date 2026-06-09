@@ -55,6 +55,11 @@ function initialOf(testId: string): Record<string, unknown> {
   return JSON.parse(raw ?? '{}') as Record<string, unknown>;
 }
 
+function animateOf(testId: string): Record<string, unknown> {
+  const raw = screen.getByTestId(testId).getAttribute('data-animate');
+  return JSON.parse(raw ?? '{}') as Record<string, unknown>;
+}
+
 describe('rörelse-primitiver, render', () => {
   it('Fade renderar sina barn', () => {
     mockUseReducedMotion.mockReturnValue(false);
@@ -94,6 +99,16 @@ describe('Slide, prefers-reduced-motion', () => {
     expect(initial.y).not.toBe(0);
   });
 
+  it('reser tillbaka till x/y=0 i animate-målet NÄR rörelse är tillåten', () => {
+    mockUseReducedMotion.mockReturnValue(false);
+    render(<Slide data-testid="slide">x</Slide>);
+    const animate = animateOf('slide');
+    // Med rörelse tillåten ska målet nollställa transform: tona in OCH resa hem.
+    expect(animate.opacity).toBe(1);
+    expect(animate.x).toBe(0);
+    expect(animate.y).toBe(0);
+  });
+
   it('glider INTE (ingen transform, bara opacitet) NÄR användaren bett om reducerad rörelse', () => {
     mockUseReducedMotion.mockReturnValue(true);
     render(<Slide data-testid="slide">x</Slide>);
@@ -102,6 +117,17 @@ describe('Slide, prefers-reduced-motion', () => {
     expect(initial).toHaveProperty('opacity');
     expect(initial.x).toBeUndefined();
     expect(initial.y).toBeUndefined();
+  });
+
+  it('animate-målet utelämnar x/y (bara opacitet) NÄR användaren bett om reducerad rörelse', () => {
+    mockUseReducedMotion.mockReturnValue(true);
+    render(<Slide data-testid="slide">x</Slide>);
+    const animate = animateOf('slide');
+    // Kärnan i fyndet: animate fick tidigare alltid x/y=0 och applicerade
+    // transform även i reduced-motion-läge. Nu ska målet bara vara opacitet.
+    expect(animate.opacity).toBe(1);
+    expect(animate.x).toBeUndefined();
+    expect(animate.y).toBeUndefined();
   });
 
   it('respekterar riktning (left ger x-förskjutning) när rörelse är tillåten', () => {

@@ -34,6 +34,18 @@ describe('resolveInitialTheme, tema-prioritet', () => {
     expect(DEFAULT_THEME).toBe('dark');
     expect(resolveInitialTheme(null, true)).toBe('dark');
   });
+
+  it('faller till DEFAULT_THEME NÄR system-preferensen ej kan läsas (matchMedia saknas/kastar)', () => {
+    // systemPrefersDark === null => sista utvägen. Detta gör DEFAULT_THEME-grenen
+    // nåbar och matchar inline-scriptets catch-gren (theme-init.ts).
+    expect(resolveInitialTheme(null, null)).toBe(DEFAULT_THEME);
+  });
+
+  it('sparat val vinner ÄVEN när system-preferensen ej kan läsas (null)', () => {
+    // Explicit sparat val ska aldrig tappas bara för att matchMedia inte går att läsa.
+    expect(resolveInitialTheme('light', null)).toBe('light');
+    expect(resolveInitialTheme('dark', null)).toBe('dark');
+  });
 });
 
 describe('applyThemeToDocument / readThemeFromDocument', () => {
