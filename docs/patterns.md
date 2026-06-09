@@ -79,23 +79,34 @@ konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
 **Recept (stor, regel-kritisk datatabell utan handknapp och utan gissning):**
 
 1. Hämta den AUKTORITATIVA källan (t.ex. FIFA:s regelverks-PDF) och extrahera ren text
-   (`pdftotext -layout fil.pdf out.txt`).
-2. Skriv ett **generator-skript** (`scripts/generate-<tabell>.mjs`) som PARSAR tabellen ur texten
-   med en strikt regex (matcha radens form exakt, ignorera sidbrytnings-/rubrik-brus).
-3. **VALIDERA i generatorn före emit** och vägra skriva vid fel (fail loud, `process.exit(1)`):
+   (`pdftotext -layout fil.pdf out.txt`). **COMMITTA det råa textutdraget** (den relevanta sektionen)
+   som en fil i repot, med en preambel som bär källans URL + avsnitt/sida + extraktionskommando, så
+   en människa kan spot-checka utdraget mot källan och CI kan regenerera ur det.
+2. Lägg parsnings-/validerings-/emit-logiken i en **typad, ren modul** (sträng in, sträng ut, inga
+   IO-beroenden) som BÅDE generator-skriptet OCH källånkrings-testet importerar (EN sanning, ingen
+   duplicerad parser). Generator-skriptet (`scripts/generate-<tabell>.ts`, körs `node`-direkt på Node 24+)
+   är en tunn CLI ovanpå modulen: läs committat utdrag, bygg, skriv. Parsa med strikt regex (matcha radens
+   form exakt, ignorera sidbrytnings-/rubrik-brus).
+3. **VALIDERA före emit** och faila högt vid fel (kasta i modulen / `process.exit(1)` i CLI:n):
    rätt antal rader, varje rad välformad, inga dubbletter, hela domänen täckt (t.ex. alla C(n,k)
    kombinationer). Hellre stopp än fel data.
 4. Emitta en **GENERERAD .ts-fil** med ett filhuvud som (a) säger "redigera inte för hand, se
    generatorn", (b) **källhänvisar inline** (källans namn + avsnitt/sida + URL), (c) förklarar
-   kolumn-/rad-semantiken. Committa BÅDE generatorn (härledningen) och .ts-filen (det koden importerar).
-5. Skriv ett **integritetstest** för den genererade filen som bevakar fullständigheten vid bygget
-   (samma invarianter som generatorns validering + ett par källhänvisade spot-checks mot kända rader).
+   kolumn-/rad-semantiken. Committa generatorn, den rena modulen, det råa utdraget OCH .ts-filen.
+5. **KÄLLÅNKRA tabellen, inte bara strukturen.** Skriv ett test som REGENERERAR tabellen ur det committade
+   utdraget och kräver VÄRDE-likhet med den committade .ts-filen (radslut-normaliserat, fail loud vid minsta
+   skillnad). Strukturella invarianter (form, fullständighet, behörighet) räcker INTE: om källan är en-till-en
+   men dina invarianter är en-till-många passerar ett transkriptions-/parsnings-fel mitt i tabellen tyst (se
+   lärdomen `uttommande-test-vaktar-svagare-invariant-an-kallan-faststaller`). Lägg dessutom ett
+   **mutationstest** som byter ett värde på en mittrad och bevisar att källånkringen FAILAR (annars vet du
+   inte att låset funkar). Behåll gärna det strukturella integritetstestet som snabb extra grind.
 6. Bygg konsumenten (motorn) på ett förbyggt O(1)-index över tabellen och **fail loud** om en giltig
    nyckel ändå saknas (skulle bara hända vid trasig tabell, som testet utesluter).
 
 **Varför:** En stor regel-tabell (här FIFA:s Annexe C, 495 rader) är för felkänslig att skriva för
-hand och omöjlig att review:a snabbt. Genom att generera ur källan med en validerande generator blir
-datan spårbar, regenererbar och självkontrollerande, och reviewern kan BEKRÄFTA den mot källan i
-stället för att jaga den. Detta uppfyller källhänvisnings-kravet (HARD) för gissningskänslig data.
-Källa: T4 (treeplats-tabellen, `scripts/generate-third-place-table.mjs` ->
-`src/domain/bracket/third-place-table.ts`).
+hand och omöjlig att review:a snabbt. Genom att generera ur ett COMMITTAT källutdrag och kräva värde-likhet
+i CI blir datan spårbar, regenererbar och låst till källans faktiska värden, och reviewern kan BEKRÄFTA den
+mot källan i stället för att jaga den. Detta uppfyller källhänvisnings-kravet (HARD) för gissningskänslig data.
+Källa: T4 (treeplats-tabellen, `scripts/generate-third-place-table.ts` + `src/domain/bracket/annexe-c-parser.ts`
++ committat `annexe-c-source.txt` -> `src/domain/bracket/third-place-table.ts`, källånkrat av
+`third-place-table-source.test.ts`).
