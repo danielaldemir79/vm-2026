@@ -5,6 +5,58 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-09 , T5 KLAR - PR #32 väntar på Daniels merge
+
+**Branch:** `feature/T5-gruppspelsvy` @ HEAD `ea8e363`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/32 mot `develop` (Closes #5, state: OPEN)
+**Board:** issue #5 i "In Review" (korrekt). Dirigenten stänger issue #5 MANUELLT (`gh issue close 5`) och flyttar kort #5 till Done EFTER Daniels merge (auto-close funkar inte mot develop när default-branch är main).
+
+**KLART med bevis (SHA + verifiering):**
+- `23f50ff` - Fixtures kopplad till verifierad T4-data (12 grupper, 48 lag)
+- `fb39d84` - Gruppspelsvy: `derive-group-tables.ts`, `use-group-data.ts`, `GroupTable`, `GroupStageView` (12 grupper, härledd state, setMatches-seam för T6)
+- `6b9a8a3` - Besluts-logg + mönster för härledd-state-vy (`docs/decisions.md`, `docs/patterns.md`)
+- `58ac246` - Premium-UI: "arena i kvällsljus"-kort, responsivt rutnät 1/2/3/4 kol, stagger, skelett, FÄRG-OBEROENDE kvalificeringszon (T7-pin respekterad)
+- `d20f3a8` - Copilot R1: C1 explicit CSSProperties-import, C2 test-settle-robusthet (C3 avvisad)
+- `88fdfe8` - Copilot R2: C8 tables-kontrakt (härleds bara i ready), C4-C7 stabil env-ref i test
+- `ea8e363` - Copilot R3: C9 skelett-antal = gruppantalet (ingen CLS), C10 rad-scopad S/P-cell-assertion
+- Verifiering (dirigenten, oberoende): **201 tester gröna (22 filer)**, build/lint/format rent, inga secrets
+- Alla 5/5 acceptanskriterier bockade i issue #5
+- T7-pin verifierad live (accent==success i ljust tema, kvalificeringszon FÄRG-OBEROENDE)
+- Responsivt verifierat 360-1920px, ingen CLS/overflow
+
+**Copilot-loop:** 3 rundor (3 -> 5 -> 2 -> 0 fynd). Alla 10 trådar lösta.
+
+**PINNADE punkter (bär framåt):**
+- **F1-pin (T5, ägare senior-developer):** `ABBREVIATIONS` i `GroupStageView.tsx` är hand-synkad dubblett av `NUMERIC_COLUMNS` i `GroupTable.tsx` utan synk-vakt. Medvetet pinnad (DRY rule-of-three, 2:a förekomsten). Åtgärd vid 3:e användning eller kolumnändring: härled legenden ur GroupTables exporterade kolumn-metadata, eller ett test som assertar legend ↔ columnheader-texter.
+- **T7-pin:** i ljust tema är accent==success (#0e7a44). T7 ska ge success en distinkt AA-klarande ton, inte samma som accent. T5:s kvalificeringszon är färg-oberoende och bryter inte.
+- **T14-pin:** Supabase/auth/RLS, inga secrets i repo. Live-klienten fail-loud-stub, T14 tänder den.
+- **#31 (matchtablå):** 72 gruppmatcher, tider, arenor + svenska TV-kanaler. Kräver bekräftad svensk TV-källa (kan behöva Daniel). Backlog.
+
+**EXAKT nästa steg:**
+1. Daniel mergar PR #32 mot `develop`.
+2. Dirigenten kör `gh issue close 5` manuellt (auto-close funkar inte mot develop).
+3. Dirigenten flyttar kort #5 till Done på boarden.
+4. Nästa byggbara task: **T6 (#6, Resultatinmatning)** - beror på T3+T4+T5. Kopplar in på `useGroupData.setMatches`-seamen (redan testad i T5). Alternativt **T31 (#31, Matchtablå)** om Daniel bekräftar svensk TV-källa.
+
+**FORTSÄTTNINGS-PROMPT:**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. T5 är klar (läs `HANDOFF.md`).
+>
+> Om PR #32 ÄNNU INTE mergad: Daniel mergar den manuellt mot `develop`. Dirigenten stänger sedan issue #5 MANUELLT (`gh issue close 5`) - auto-close funkar inte mot develop när default-branch är main - och flyttar kort #5 till Done på boarden.
+>
+> Om PR #32 REDAN mergad: plocka nästa task.
+> T1, T2, T3, T4, T5 är alla klara och merge:ade. Nästa byggbara Fas 1-task:
+> - **T6 (#6, Resultatinmatning)** - beror på T3+T4+T5, direkt byggbar. Kopplar in på `useGroupData.setMatches`-seamen (redan testad). REKOMMENDATION: starta T6 i en FÄRSK `/agent-kit`-session (en task per session är default-kadensen, håller kvaliteten hög).
+> - **T31 (#31, Matchtablå)** - byggbar, kräver bekräftad svensk TV-källa - fråga Daniel om den finns redo.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+>
+> Bär framåt:
+> - **F1-pin (T5):** `ABBREVIATIONS` i GroupStageView är hand-synkad dubblett av `NUMERIC_COLUMNS` i GroupTable utan synk-vakt. Åtgärd vid 3:e användning eller kolumnändring.
+> - **T7-pin:** ljust tema, accent == success-grön (#0e7a44). T7 ska ge success en distinkt AA-ton.
+> - **T14-pin:** Supabase/auth/RLS, inga secrets i repo.
+> - **#31:** kräver bekräftad svensk TV-källa (fråga Daniel).
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T4 KLAR - PR #30 väntar på Daniels merge
 
 **Branch:** `feature/T4-kritisk-data` @ HEAD `921a3f4`
