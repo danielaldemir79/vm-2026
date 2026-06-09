@@ -5,6 +5,34 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T7 (issue #7): daglig matchvy, dag-gruppering i svensk tid + dagens-match-regel
+
+**Beslut (tidszon):** Den dagliga matchvyn grupperar och visar matcher per SVENSK kalenderdag
+(Europe/Stockholm), trots att `Match.kickoff` lagras i UTC. Dag-nyckeln härleds via `Intl`
+(`localDateKey`, `groupMatchesByDay`), inte genom att klippa datumdelen ur UTC-ISO-strängen.
+**Varför:** Direkt UTC-datum vore en off-by-one kring midnatt (känd fälla i senior-developers
+lessons): en match 2026-06-13T22:00Z är 00:00 svensk tid 2026-06-14 och hör till den svenska
+dagen 06-14, inte UTC-dagen 06-13. Samma svenska tidszon som tablå-källan uttrycktes i (parserns
+`SOURCE_TIMEZONE`). Allt som VISAS (tid, dag-rubrik) formateras tillbaka till svensk tid via Intl.
+
+**Beslut ("Match of the day"):** Dagens framträdande match väljs deterministiskt som dagens
+TIDIGASTE avspark (lägst kickoff, tie-break på match-id). Live-nedräkningen i hero:n räknar mot
+turneringens NÄSTA kommande avspark över ALLA matcher (inte bara vald dag).
+**Varför:** Rankning (FIFA-ranking) kräver lag-profil-data som är T10 (out of scope här), och för
+slutspel är lagen ännu okända (homeTeamId/awayTeamId null). "Dagens första avspark" är data vi har
+för varje match och en naturlig hero. Regeln kan skärpas i T10 när rankning finns, på ett
+dokumenterat sätt. Nedräknings-beräkningen är en REN funktion (`computeCountdown(matches, now)`),
+UI-tickandet (sekund-timer) är skilt från logiken så slut-tillståndet (efter finalen, ingen
+kommande match) och exakt-vid-avspark hanteras explicit och testbart.
+
+**Beslut (arena-platshållare, #35):** Matchkortet DÖLJER `venue` när den är "ej verifierad"-
+platshållaren (`isVenuePlaceholder`, mönster-baserad detektion), i stället för att visa den som
+verifierad arena-data. **Varför:** Källan bär ännu inte arena/stad (känd lucka, gissas aldrig);
+att visa platshållaren vore att presentera en icke-verifierad uppgift som data. Döljs tills riktig
+arena-data finns. Design-frontend finputsar (dölj/dämpa) ovanpå.
+
+---
+
 ## 2026-06-09 , T4b (issue #31): matchtablån genererad ur svensk TV-tablå, värde-låst, arena flaggad
 
 **Beslut (data + arkitektur):** Hela VM 2026:s matchplan (72 gruppmatcher + 32 slutspelsmatcher
