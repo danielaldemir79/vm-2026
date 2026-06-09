@@ -269,8 +269,11 @@ function resolveTeamId(name: string): string {
 }
 
 /**
- * Parsa hela TV-tablån till en ordnad lista av matcher (gruppmatcher i tablå-
- * ordning, sedan slutspelsmatcher i matchnummer-ordning ur källan).
+ * Parsa hela TV-tablån till en lista av matcher i KÄLLTEXT-ordning (gruppmatcher
+ * i tablå-ordning, sedan slutspelsmatcher i den ordning de står i källan, INTE
+ * matchnummer-ordning: en enskild källrad kan lista t.ex. (76) före (74)).
+ * Konsumenterna (buildMatches/buildMatchesFile, vyer) slår upp på matchnummer och
+ * är ordnings-oberoende, så ingen sortering behövs.
  *
  * FAIL-LOUD vid varje oväntad rad-form, okänt lagnamn, okänd månad/kanal, så ett
  * extraktions-/transkriptions-fel syns i bygget i stället för att tyst tappa en
