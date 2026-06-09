@@ -38,10 +38,15 @@ function fin(
 
 describe('useGroupData, laddning och härledning', () => {
   it('går från loading till ready och härleder 12 tabeller ur fixtures', async () => {
-    const { result } = renderHook(() => useGroupData(fixturesEnv()));
+    // En STABIL env-referens per test: useGroupData har useEffect(..., [env]),
+    // så ett inline-objekt i renderHook-callbacken skulle ge en ny referens vid
+    // varje render och kunna trigga om effekten/laddningen (flaky). Skapa en gång.
+    const env = fixturesEnv();
+    const { result } = renderHook(() => useGroupData(env));
 
-    // Initialt laddande.
+    // Initialt laddande, och kontraktet: tables är tomt tills status === 'ready'.
     expect(result.current.status).toBe('loading');
+    expect(result.current.tables).toHaveLength(0);
 
     await waitFor(() => {
       expect(result.current.status).toBe('ready');
@@ -56,7 +61,8 @@ describe('useGroupData, laddning och härledning', () => {
 
 describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i state ändras', () => {
   it('en ny matchlista via setMatches ger en omräknad tabell (härledd state)', async () => {
-    const { result } = renderHook(() => useGroupData(fixturesEnv()));
+    const env = fixturesEnv(); // stabil referens (se kommentar i första testet)
+    const { result } = renderHook(() => useGroupData(env));
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     // Innan: läs grupp A-tabellen och ettans poäng ur fixtures-resultaten.
@@ -86,7 +92,8 @@ describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i stat
   });
 
   it('tömd matchlista ger nollställda tabeller (alla lag 0 spelade)', async () => {
-    const { result } = renderHook(() => useGroupData(fixturesEnv()));
+    const env = fixturesEnv(); // stabil referens (se kommentar i första testet)
+    const { result } = renderHook(() => useGroupData(env));
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     act(() => {
@@ -104,13 +111,38 @@ describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i stat
 
 describe('useGroupData, fel-väg (fail loud)', () => {
   it('hamnar i error med ett meddelande när datakällan kastar (live-stub före T14)', async () => {
-    const { result } = renderHook(() => useGroupData(liveEnv()));
+    const env = liveEnv(); // stabil referens (se kommentar i första testet)
+    const { result } = renderHook(() => useGroupData(env));
 
     await waitFor(() => {
       expect(result.current.status).toBe('error');
     });
 
     expect(result.current.error).toMatch(/inte byggd än \(T14\)/);
+    // Kontraktet: tables är tomt när status === 'error', ingen stale data läcker.
     expect(result.current.tables).toHaveLength(0);
+  });
+});
+
+describe('useGroupData, kontrakt: tables är tomt utom vid ready (ingen stale data)', () => {
+  it('vid env-byte från ready till en felande källa läcker INTE de gamla tabellerna', async () => {
+    // Ladda fixtures till ready: nu finns 12 fyllda tabeller i state.
+    const fixtures = fixturesEnv();
+    const live = liveEnv();
+    const { result, rerender } = renderHook(({ env }) => useGroupData(env), {
+      initialProps: { env: fixtures },
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.tables).toHaveLength(12); // gammal data ligger nu i state
+
+    // Byt env -> ny laddning startar (live-stubben kastar före T14). Kontraktet
+    // säger att tables ska vara [] så fort status !== 'ready', annars skulle de
+    // gamla fixtures-tabellerna läcka in i loading/error-läget (C8, kontraktsbrott).
+    rerender({ env: live });
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.tables).toHaveLength(0);
+    expect(result.current.tables).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ groupId: 'A' })])
+    );
   });
 });
