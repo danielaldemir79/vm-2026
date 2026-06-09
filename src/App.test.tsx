@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from './App.tsx';
 import { ThemeProvider, THEME_ATTRIBUTE } from './theme';
@@ -26,13 +26,19 @@ function renderApp() {
 }
 
 // App monterar nu gruppspelsvyn (T5), som gör en async datahämtning. Vänta in
-// att den settlat innan testet avslutas, annars sker ett state-update efter
-// testet (act-varning + risk för flaky). Gruppspels-rubriken signalerar att
-// vyn renderat klart.
+// att den SETTLAT innan testet avslutas, annars sker ett state-update efter
+// testet (act-varning + risk för flaky).
+//
+// VARFÖR loading-indikatorn och inte rubriken: "Gruppspelet"-rubriken renderas
+// redan i loading-läget, så att vänta på den bevisar inte att useGroupData
+// hunnit byta state. Settled = laddnings-indikatorn (role="status") har
+// FÖRSVUNNIT, dvs hooken har gått till ready eller error. role="status" är
+// unik för loading-läget (error använder role="alert", ready ingen status),
+// så ingen name-filtrering behövs. waitForElementToBeRemoved väntar just på
+// den övergången, och kräver att elementet finns vid anropet (det gör det:
+// useGroupData startar i 'loading').
 async function waitForAppSettled() {
-  await waitFor(() => {
-    expect(screen.getByRole('heading', { level: 2, name: /Gruppspelet/i })).toBeInTheDocument();
-  });
+  await waitForElementToBeRemoved(() => screen.queryByRole('status'));
 }
 
 describe('App-skalet', () => {
