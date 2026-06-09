@@ -8,7 +8,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { ThemeProvider } from '../theme';
+import { ThemeProvider, THEME_ATTRIBUTE } from '../theme';
 import { ThemeToggle } from './ThemeToggle';
 
 // Nollställ delat globalt tillstånd mellan tester: providern persistar valet i
@@ -16,7 +16,7 @@ import { ThemeToggle } from './ThemeToggle';
 // tidigare test läcka in och göra DEFAULT_THEME-antagandet falskt.
 beforeEach(() => {
   window.localStorage.clear();
-  document.documentElement.removeAttribute('data-theme');
+  document.documentElement.removeAttribute(THEME_ATTRIBUTE);
 });
 
 function renderToggle() {
@@ -52,7 +52,7 @@ describe('ThemeToggle', () => {
     // och motorn har speglat valet till data-theme på <html>.
     expect(button).toHaveAttribute('aria-pressed', 'true');
     expect(button).toHaveAccessibleName('Byt till mörkt läge');
-    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    expect(document.documentElement).toHaveAttribute(THEME_ATTRIBUTE, 'light');
   });
 
   it('växlar tillbaka till mörkt vid ett andra klick (idempotent toggle)', () => {
@@ -63,6 +63,6 @@ describe('ThemeToggle', () => {
     fireEvent.click(button);
 
     expect(button).toHaveAttribute('aria-pressed', 'false');
-    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(document.documentElement).toHaveAttribute(THEME_ATTRIBUTE, 'dark');
   });
 });

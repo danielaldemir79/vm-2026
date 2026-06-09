@@ -2,7 +2,9 @@
 // Visar de semantiska färg-rollerna live så Daniel KÄNNER paletten i båda
 // teman på PR-förhandsvisningen. Varje swatch namnger sin token.
 
+import { useReducedMotion } from 'motion/react';
 import { Spring } from '../../motion';
+import { springs, transitions } from '../../motion/motion-presets';
 
 interface Swatch {
   /** Tailwind-bakgrunds-utility kopplad till en token. */
@@ -25,19 +27,31 @@ const SWATCHES: readonly Swatch[] = [
 ];
 
 export function SwatchGrid() {
+  // Härled bas-transitionen via samma reduced-motion-väg som Spring-primitiven
+  // i stället för att hårdkoda en spring (som skulle kringgå a11y-vägen och
+  // duplicera presets). En sanning för spring-/tween-värdena bor i motion-presets.
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {SWATCHES.map((s, i) => (
-        <li key={s.label}>
-          <Spring transition={{ type: 'spring', stiffness: 320, damping: 24, delay: i * 0.04 }}>
-            <div
-              className={`flex h-20 flex-col justify-end rounded-lg border border-border p-3 ${s.bg} ${s.text}`}
-            >
-              <span className="text-sm font-medium">{s.label}</span>
-            </div>
-          </Spring>
-        </li>
-      ))}
+      {SWATCHES.map((s, i) => {
+        // Stagger: varje swatch poppar in en aning efter den förra.
+        const transition = {
+          ...(shouldReduceMotion ? transitions.smooth : springs.gentle),
+          delay: i * 0.04,
+        };
+        return (
+          <li key={s.label}>
+            <Spring transition={transition}>
+              <div
+                className={`flex h-20 flex-col justify-end rounded-lg border border-border p-3 ${s.bg} ${s.text}`}
+              >
+                <span className="text-sm font-medium">{s.label}</span>
+              </div>
+            </Spring>
+          </li>
+        );
+      })}
     </ul>
   );
 }
