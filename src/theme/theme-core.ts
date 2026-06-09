@@ -64,14 +64,46 @@ export function readThemeFromDocument(doc: Document): Theme {
 }
 
 /**
+ * Hämta webbläsarens localStorage på ett SÄKERT sätt.
+ *
+ * Varför: i vissa lägen (Safari med blockerade cookies, sandboxade iframes,
+ * en del privacy-lägen) kastar redan ÅTKOMSTEN till `window.localStorage` ett
+ * SecurityError, alltså innan något läses/skrivs. Den åtkomsten måste därför
+ * ske inuti en try/catch, annars kraschar anroparen (t.ex. ett tema-byte)
+ * redan på argument-uttrycket innan persist-/läs-funktionen ens körs.
+ *
+ * Samma fail-loud-men-inte-fatalt-mönster som persistTheme/readStoredTheme:
+ * vi maskerar inte felet, vi loggar en varning och returnerar null så att
+ * anroparen kan fortsätta utan persistens.
+ *
+ * @returns Storage om den kan nås, annars null (blockerad/sandbox).
+ */
+export function getLocalStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch (error) {
+    console.warn('Kunde inte komma åt localStorage (blockerad/sandbox):', error);
+    return null;
+  }
+}
+
+/**
  * Persistera användarens val. Skriv-fel (t.ex. privat läge där localStorage
  * kastar, eller full kvot) sväljs INTE tyst på ett sätt som döljer en bugg:
  * de loggas som varning och returnerar false så anroparen vet att det inte
  * sparades. Appen ska fortsätta fungera utan persistens, men felet syns.
  *
+ * Tar emot `Storage | null` så att en blockerad/onåbar storage (null från
+ * getLocalStorage) hanteras här i stället för att tvinga varje anropare att
+ * gren-kolla. Är storage null hoppas persistensen tyst över, det är inte ett
+ * nytt fel utan redan loggat av getLocalStorage vid åtkomstförsöket.
+ *
  * @returns true om värdet skrevs, annars false.
  */
-export function persistTheme(storage: Storage, theme: Theme): boolean {
+export function persistTheme(storage: Storage | null, theme: Theme): boolean {
+  if (storage === null) {
+    return false;
+  }
   try {
     storage.setItem(THEME_STORAGE_KEY, theme);
     return true;

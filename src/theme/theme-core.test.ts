@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_THEME, THEME_ATTRIBUTE, THEME_STORAGE_KEY } from './theme-constants';
 import {
   applyThemeToDocument,
+  getLocalStorage,
   nextTheme,
   persistTheme,
   readStoredTheme,
@@ -106,6 +107,39 @@ describe('persistTheme, fel-vägar (fail loud, inte tyst)', () => {
     // varning loggas, så buggen syns i stället för att maskeras.
     expect(persistTheme(storage, 'dark')).toBe(false);
     expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('returnerar false UTAN att kasta när storage är null (onåbar/blockerad)', () => {
+    // getLocalStorage ger null i blockerat läge. persistTheme ska då hoppa
+    // persistensen tyst här (felet är redan loggat vid åtkomstförsöket) i
+    // stället för att kasta på storage.setItem och spräcka tema-bytet.
+    expect(persistTheme(null, 'dark')).toBe(false);
+  });
+});
+
+describe('getLocalStorage, säker åtkomst till webbläsar-lagring', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returnerar Storage-objektet när window.localStorage kan nås', () => {
+    // I jsdom-testmiljön är localStorage normalt åtkomlig.
+    expect(getLocalStorage()).toBe(window.localStorage);
+  });
+
+  it('returnerar null OCH varnar när SJÄLVA åtkomsten kastar (Safari blockerad / sandbox)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Simulera SecurityError redan vid åtkomsten till window.localStorage,
+    // inte bara vid setItem/getItem. Det är just den vägen som kraschade
+    // tema-bytet innan fixen.
+    const spy = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    });
+
+    expect(getLocalStorage()).toBeNull();
+    expect(warn).toHaveBeenCalledOnce();
+
+    spy.mockRestore();
   });
 });
 
