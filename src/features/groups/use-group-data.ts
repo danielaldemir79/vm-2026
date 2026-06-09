@@ -97,7 +97,16 @@ export function useGroupData(env: ImportMetaEnv = import.meta.env): GroupData {
 
   // Härled tabellerna reaktivt: räknas om bara när grupper eller matcher ändras.
   // Det är "live"-mekaniken, en setMatches (T6) triggar en ny härledning.
-  const tables = useMemo(() => deriveGroupTables(groups, matches), [groups, matches]);
+  //
+  // VARFÖR gata på status: GroupData-kontraktet säger att tables är tomt tills
+  // status === 'ready'. Vid ett env-byte (eller initial laddning) ligger gamla
+  // groups/matches kvar i state tills den nya hämtningen settlar, och en oavkortad
+  // härledning skulle då exponera STALE tabeller medan status är loading/error
+  // (kontraktsbrott). Så vi släpper bara igenom härledningen i ready-läget; annars [].
+  const tables = useMemo(
+    () => (status === 'ready' ? deriveGroupTables(groups, matches) : []),
+    [status, groups, matches]
+  );
 
   return { status, tables, teams, mode, error, setMatches };
 }

@@ -5,6 +5,19 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T5: useGroupData härleder tables BARA i ready-läget (kontrakt mot stale data)
+
+**Beslut:** `useGroupData` släpper igenom `deriveGroupTables(...)` enbart när `status === 'ready'`,
+annars `tables: []` (status med i useMemo-beroendena). GroupData-kontraktet ("tables tomt tills ready")
+är därmed en hård invariant, inte bara ett happy-path-beteende.
+**Varför:** `groups`/`matches` ligger kvar i state under en ny laddning (t.ex. env-byte fixtures->live).
+En oavkortad härledning skulle då exponera GAMLA tabeller medan `status` är `loading`/`error` (stale data,
+kontraktsbrott). Att gata på status låter den reaktiva live-omräkningen (setMatches) leva orörd i ready-läget,
+men ingen stale tabell läcker i övergångar. Bevisat av ett env-byte-test (ready -> felande källa -> tables []).
+Källa: Copilot-fynd C8, runda 2.
+
+---
+
 ## 2026-06-09 , T5 design-frontend: premium gruppspels-design, kvalificeringszon färg-oberoende
 
 **Beslut (kvalificeringszon, T7-pin):** Etta + tvåa (går vidare) framhävs med FYRA samtidiga,

@@ -83,9 +83,12 @@ konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
    räknar inte om logiken själv (DRY). Muterar aldrig sina argument, så den kan köras om vid varje ändring.
 2. En hook (`use-*-data.ts`) laddar EN gång via den etablerade datakällan (`getDataSource(env)`,
    fixtures-seamen), håller de RÅA FAKTA (matcher) i `useState`, och HÄRLEDER den visade formen via
-   `useMemo([domändata, råa-fakta])`. Lagra ALDRIG den härledda formen i state, det vore dubbellagring som
-   kan driva isär. Exponera en `setFakta`-sättare så nästa task (inmatning) kopplar in sig, "live" = en
-   `setFakta` triggar en ny memo-härledning automatiskt.
+   `useMemo([status, domändata, råa-fakta])`. Lagra ALDRIG den härledda formen i state, det vore
+   dubbellagring som kan driva isär. GATA härledningen på `status === 'ready'` (annars `[]`): de råa fakta
+   ligger kvar i state under en ny laddning (t.ex. env-byte), och en oavkortad härledning skulle exponera
+   STALE form medan status är loading/error (kontraktsbrott, se decisions.md C8). Exponera en `setFakta`-
+   sättare så nästa task (inmatning) kopplar in sig, "live" = en `setFakta` triggar en ny memo-härledning
+   automatiskt i ready-läget.
 3. Modellera laddningstillståndet EXPLICIT (`'loading' | 'ready' | 'error'`), inte bara `data | null`.
    Fel FAIL-LOUD:ar (`role="alert"`), inte en tyst tom vy (PRINCIPLES §8). Vanligast: live-stubben kastar
    före T14, vyn ska visa det.
@@ -97,9 +100,13 @@ konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
    visuell styling till design-frontend, men gör strukturen lätt att styla: stabil semantik + data-attribut
    (t.ex. `data-qualified`) i stället för inbakade statusfärger (respektera T7-pinnen: accent/success-krock).
 6. Test-täckning: vyn renderar rätt antal element (12 grupper), tillgänglig struktur (roller/landmärken),
-   den REAKTIVA omräkningen (sätt nya fakta via sättaren -> assertera ny härledd form), och fel-vägen
-   (datakällan kastar -> `role="alert"`, inga tabeller). Wrappa async-settle i `waitFor` så inget
-   state-update sker efter testet (act-varning).
+   den REAKTIVA omräkningen (sätt nya fakta via sättaren -> assertera ny härledd form), fel-vägen
+   (datakällan kastar -> `role="alert"`, inga tabeller), OCH kontrakts-invarianten "härledd form tom utom
+   vid ready" (assertera `[]` i loading-läget + ett env-byte ready->felande källa som bevisar att den gamla
+   formen INTE läcker). Skapa env-objektet EN gång per test (stabil referens): hooken har `useEffect([env])`,
+   så ett inline-objekt i renderHook-callbacken ger en ny referens vid varje render och kan trigga om
+   laddningen (flaky/loopande test). Wrappa async-settle i `waitFor` så inget state-update sker efter testet
+   (act-varning).
 
 **Varför:** SPEC §6:s härledda state hela vägen ut i UI:t. En sanning (de råa fakta), den visade formen
 är en ren funktion av dem, så "live" blir gratis och korrekt utan en andra kopia. Hooken äger I/O +
