@@ -3,8 +3,7 @@
 // teman på PR-förhandsvisningen. Varje swatch namnger sin token.
 
 import { useReducedMotion } from 'motion/react';
-import { Spring } from '../../motion';
-import { springs, transitions } from '../../motion/motion-presets';
+import { Spring, springs, transitions } from '../../motion';
 
 interface Swatch {
   /** Tailwind-bakgrunds-utility kopplad till en token. */
