@@ -37,7 +37,8 @@ SEMANTISKA roll-namn (`--color-bg/surface/accent/...`) som pekar på tema-växla
 variabler, roterade på `[data-theme]`. Isolera ALLA värden i EN fil (`src/theme/tokens.css`).
 **Varför:** Strukturen (kontraktet) ägs av motorn och är stabil; värdena (palett, typografi)
 authoras av design-agenten utan att röra plumbing (provider/init/wiring). Roll-namn (inte råa
-färger) låter design byta hue/skala fritt. Markera platshållar-värden tydligt i fil-kommentar.
+färger) låter design byta hue/skala fritt. I VM 2026 är `tokens.css`-värdena de slutgiltiga
+premium-värdena, authorade av design-frontend-agenten i T2.
 
 ### reduced-motion-i-tva-lager (motion/framer)
 

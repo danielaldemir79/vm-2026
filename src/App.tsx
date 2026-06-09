@@ -69,8 +69,8 @@ export default function App() {
             </span>
             <Wordmark as="h1" className="text-5xl leading-none sm:text-7xl" />
             <p className="max-w-xl text-balance text-lg text-fg-muted sm:text-xl">
-              Följ mästerskapet tillsammans. Matcher, tabeller och ett slutspelsträd som lever ,
-              plus tips-ligan med kompisarna. Allt i en app du delar med en länk.
+              Följ mästerskapet tillsammans. Matcher, tabeller och ett slutspelsträd som lever, plus
+              tips-ligan med kompisarna. Allt i en app du delar med en länk.
             </p>
             <div className="flex flex-wrap gap-3">
               <span className="rounded-pill bg-accent px-5 py-2.5 font-display text-sm font-semibold text-accent-fg shadow-md">
@@ -91,7 +91,7 @@ export default function App() {
               <SectionHeading eyebrow="Designfundament" title="Paletten" />
               <p className="mb-5 text-sm text-fg-muted">
                 Arena i kvällsljus: djup grönsvart fond, elektrisk gräsplan-grön och pokal-guld.
-                Växla tema uppe till höger , färgerna följer med.
+                Växla tema uppe till höger, färgerna följer med.
               </p>
               <SwatchGrid />
             </Panel>
@@ -101,7 +101,7 @@ export default function App() {
             <Panel>
               <SectionHeading eyebrow="Levande känsla" title="Rörelsen" />
               <p className="mb-5 text-sm text-fg-muted">
-                Mjuka, självsäkra övergångar (respekterar alltid "minska rörelse"). Ett smakprov ,
+                Mjuka, självsäkra övergångar (respekterar alltid "minska rörelse"). Ett smakprov,
                 inte den riktiga matchvyn.
               </p>
               <MotionDemo />
@@ -117,7 +117,7 @@ export default function App() {
               <p className="font-display text-4xl font-bold sm:text-5xl">Slutspelsträdet växer</p>
               <p className="max-w-2xl text-fg-muted">
                 Rubriker i Space Grotesk (självhostad, lätt), brödtext i systemstacken för snabb
-                laddning. En distinkt, sportig ton , inte den generiska look:en.
+                laddning. En distinkt, sportig ton, inte den generiska look:en.
               </p>
             </div>
           </Panel>

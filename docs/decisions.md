@@ -26,7 +26,8 @@ semantiska roll-namn (`--color-bg/surface/accent/...`) som pekar på tema-växla
 (premium-palett, typografi, känsla) authoras av design-frontend-agenten. Genom att isolera
 värdena i en fil kan design äga dem utan att röra plumbingen (provider, init-script, wiring).
 Semantiska roll-namn (inte råa färger) låter design byta hue/skala fritt utan att bryta
-konsumenter. Värdena som ligger där nu är medvetna PLATSHÅLLARE.
+konsumenter. Värdena i `tokens.css` är de slutgiltiga premium-värdena (palett, typografi,
+känsla), authorade av design-frontend-agenten i T2.
 
 **Beslut:** Rörelse-primitiver (`Fade`/`Slide`/`Spring`) byggs som tunna wrappers över
 `motion`-paketets `motion.div`. Reducerad rörelse hanteras i två lager: `MotionProvider`
