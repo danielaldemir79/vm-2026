@@ -1,4 +1,4 @@
-// GENERERAD FIL, redigera inte för hand. Se scripts/generate-third-place-table.mjs.
+// GENERERAD FIL, redigera inte för hand. Se scripts/generate-third-place-table.ts.
 //
 // FIFA:s Annexe C-tabell: de 495 kombinationerna av de 8 bästa treorna och
 // vilken trea (3X) som möter vilken gruppvinnare i sextondelsfinalerna.
