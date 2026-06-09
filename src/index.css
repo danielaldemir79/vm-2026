@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+/* Neutralt platshållar-skal för T1. Tema, färgsystem och typografi byggs i T2,
+   här sätts bara en mörk bakgrund så att den tomma appen ser hel ut. */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: #0b1220;
+  color: #f8fafc;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
