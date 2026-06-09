@@ -61,8 +61,20 @@ function createFixtureDataSource(): DataSource {
  * är installerat, fixtures-bygget förblir rent.
  */
 function createLiveDataSource(env: ImportMetaEnv): DataSource {
-  // Lat init: skapa klienten först vid första anropet, inte vid modul-laddning.
-  const loadClient = () => import('./supabase-client').then((m) => m.createSupabaseDataSource(env));
+  // Lat SINGLETON: skapa klienten högst EN gång per gate-instans. Den dynamiska
+  // importen cachas av modulsystemet, men fabriken (createSupabaseDataSource)
+  // kördes tidigare vid varje anrop, vilket skulle bygga flera klienter i T14.
+  // Vi memoiserar därför PROMISEN: första anropet startar init, resten
+  // återanvänder samma promise. Fail-loud bevaras: en rejected init-promise
+  // förblir rejected (cachat), så ett trasigt live-läge smäller varje gång i
+  // stället för att tyst maskeras.
+  let clientPromise: Promise<DataSource> | null = null;
+  const loadClient = (): Promise<DataSource> => {
+    if (clientPromise === null) {
+      clientPromise = import('./supabase-client').then((m) => m.createSupabaseDataSource(env));
+    }
+    return clientPromise;
+  };
   return {
     getTeams: () => loadClient().then((ds) => ds.getTeams()),
     getGroups: () => loadClient().then((ds) => ds.getGroups()),

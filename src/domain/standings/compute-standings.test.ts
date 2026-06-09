@@ -181,6 +181,89 @@ describe('computeStandings, fel-vägar: ogiltiga/ofullständiga matcher ignorera
 
     expect(row(table, 'SWE').played).toBe(0);
   });
+
+  it('färdigspelad slutspelsmatch med BÅDA lag kända förorenar INTE grupptabellen', () => {
+    // Den viktigare regressionen (dataintegritet): en avgjord slutspelsmatch
+    // mellan två lag som BÅDA finns i teamIds (och alltså har en grupp-rad) får
+    // aldrig räknas in i grupptabellen. computeStandings beräknar uttryckligen
+    // en GRUPPtabell, så stage-filtret måste hålla även när lagen är kända.
+    const teams = ['SWE', 'BRA'];
+    const knockout: Match = {
+      id: 'r16',
+      stage: 'round-of-16',
+      groupId: null,
+      homeTeamId: 'SWE',
+      awayTeamId: 'BRA',
+      kickoff: '2026-07-02T18:00:00Z',
+      venue: 'Testarena',
+      result: { homeGoals: 3, awayGoals: 0 },
+      status: 'finished',
+    };
+
+    const table = computeStandings(teams, [knockout]);
+
+    // Ingen av lagen ska ha spelat eller fått poäng/mål från slutspelsmatchen.
+    for (const teamId of teams) {
+      expect(row(table, teamId).played).toBe(0);
+      expect(row(table, teamId).points).toBe(0);
+      expect(row(table, teamId).goalsFor).toBe(0);
+      expect(row(table, teamId).goalsAgainst).toBe(0);
+    }
+  });
+
+  it('blandad lista: bara gruppmatchen räknas, slutspelsmatchen ignoreras', () => {
+    // Bevisar att en call-site som skickar in BÅDE grupp- och slutspelsmatcher
+    // bara får gruppmatchen räknad. Slutspelsmatchen mellan samma lag ska inte
+    // dubbel-räknas in i tabellen.
+    const teams = ['SWE', 'BRA'];
+    const matches: Match[] = [
+      groupMatch('SWE', 'BRA', 2, 1), // gruppmatch: ska räknas
+      {
+        id: 'final',
+        stage: 'final',
+        groupId: null,
+        homeTeamId: 'SWE',
+        awayTeamId: 'BRA',
+        kickoff: '2026-07-19T18:00:00Z',
+        venue: 'Testarena',
+        result: { homeGoals: 5, awayGoals: 5 }, // slutspel: ska INTE räknas
+        status: 'finished',
+      },
+    ];
+
+    const table = computeStandings(teams, matches);
+
+    // Bara gruppmatchen (2-1): SWE 1 spelad, 3p, GM 2; BRA 1 spelad, 0p, GM 1.
+    expect(row(table, 'SWE').played).toBe(1);
+    expect(row(table, 'SWE').points).toBe(3);
+    expect(row(table, 'SWE').goalsFor).toBe(2);
+    expect(row(table, 'BRA').played).toBe(1);
+    expect(row(table, 'BRA').points).toBe(0);
+    expect(row(table, 'BRA').goalsFor).toBe(1);
+  });
+
+  it('gruppmatch UTAN groupId (data-defekt) ignoreras', () => {
+    // En gruppmatch ska alltid ha en grupp (Match-typen). En grupp-stage-match
+    // med null groupId är en data-defekt och hoppas över, hellre det än att
+    // tyst räkna in en match vi inte kan placera i rätt grupp.
+    const teams = ['SWE', 'BRA'];
+    const orphan: Match = {
+      id: 'orphan',
+      stage: 'group',
+      groupId: null, // saknas: data-defekt
+      homeTeamId: 'SWE',
+      awayTeamId: 'BRA',
+      kickoff: '2026-06-15T18:00:00Z',
+      venue: 'Testarena',
+      result: { homeGoals: 4, awayGoals: 0 },
+      status: 'finished',
+    };
+
+    const table = computeStandings(teams, [orphan]);
+
+    expect(row(table, 'SWE').played).toBe(0);
+    expect(row(table, 'BRA').played).toBe(0);
+  });
 });
 
 describe('computeStandings, tiebreak: lika poäng löses i FIFA-ordning', () => {

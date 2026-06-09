@@ -18,17 +18,23 @@ import type { Group, Match, Team } from '../domain/types';
 // form. Fler grupper tillför ingen ny typ-yta, bara mer platshållar-data, så vi
 // håller det litet (KISS) tills riktig data kommer i T4.
 
+// OBS koderna: Team.code är FIFA:s TREBOKSTAVS-landskod (t.ex. "BRA"). Även
+// som platshållare måste fixtures följa det kontraktet (3 BOKSTÄVER, inga
+// siffror), annars riskerar UI/flagg-formattering att byggas mot en form som
+// bara funkar för fixtures. Koderna nedan är påhittade men giltiga och unika
+// 3-bokstavskoder; den riktiga datan fylls i T4 (lärdom: fixtures följer
+// källans kontrakt).
 export const fixtureTeams: Team[] = [
   // Grupp A (platshållar-lag).
-  { id: 'team-a1', name: 'Lag A1', code: 'AA1', group: 'A', fifaRanking: 5 },
-  { id: 'team-a2', name: 'Lag A2', code: 'AA2', group: 'A', fifaRanking: 18 },
-  { id: 'team-a3', name: 'Lag A3', code: 'AA3', group: 'A', fifaRanking: 32 },
-  { id: 'team-a4', name: 'Lag A4', code: 'AA4', group: 'A', fifaRanking: 47 },
+  { id: 'team-a1', name: 'Lag A1', code: 'AAA', group: 'A', fifaRanking: 5 },
+  { id: 'team-a2', name: 'Lag A2', code: 'AAB', group: 'A', fifaRanking: 18 },
+  { id: 'team-a3', name: 'Lag A3', code: 'AAC', group: 'A', fifaRanking: 32 },
+  { id: 'team-a4', name: 'Lag A4', code: 'AAD', group: 'A', fifaRanking: 47 },
   // Grupp B (platshållar-lag).
-  { id: 'team-b1', name: 'Lag B1', code: 'BB1', group: 'B', fifaRanking: 2 },
-  { id: 'team-b2', name: 'Lag B2', code: 'BB2', group: 'B', fifaRanking: 21 },
-  { id: 'team-b3', name: 'Lag B3', code: 'BB3', group: 'B', fifaRanking: 29 },
-  { id: 'team-b4', name: 'Lag B4', code: 'BB4', group: 'B', fifaRanking: 55 },
+  { id: 'team-b1', name: 'Lag B1', code: 'BBA', group: 'B', fifaRanking: 2 },
+  { id: 'team-b2', name: 'Lag B2', code: 'BBB', group: 'B', fifaRanking: 21 },
+  { id: 'team-b3', name: 'Lag B3', code: 'BBC', group: 'B', fifaRanking: 29 },
+  { id: 'team-b4', name: 'Lag B4', code: 'BBD', group: 'B', fifaRanking: 55 },
 ];
 
 export const fixtureGroups: Group[] = [

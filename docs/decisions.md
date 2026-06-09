@@ -5,6 +5,20 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T3 (Copilot runda 1): `computeStandings` räknar BARA gruppmatcher
+
+**Beslut:** `computeStandings` (`src/domain/standings/compute-standings.ts`) räknar in en match i
+grupptabellen bara om den är en gruppspelsmatch (`stage === 'group'` OCH satt `groupId`), utöver de
+tidigare kraven (resultat finns, båda lag kända). Slutspelsmatcher ignoreras helt, även när deras
+lag finns i `teamIds`. En gruppmatch utan `groupId` (data-defekt) hoppas också över.
+**Varför:** Funktionen beräknar uttryckligen en GRUPPtabell. Tidigare räknade `isCounted` in alla
+matcher med resultat + kända lag oavsett stage, så en blandad matchlista (en call-site som skickar
+in både grupp- och slutspelsmatcher) hade kunnat förorena grupptabellen med slutspelsresultat,
+ett dataintegritets-hål i kärnan av SPEC §5. Avgränsningen gör tabellen robust mot hur call-sites
+filtrerar och flyttar inte ansvaret för stage-filtrering uppåt. Flaggad av Copilot (C1).
+
+---
+
 ## 2026-06-09 , T3: Cloudflare-produktionsgren = `develop` (kopplingen aktiverad)
 
 **Beslut:** Cloudflare Pages är NU kopplat till repot och produktionsgrenen är **`develop`**, inte

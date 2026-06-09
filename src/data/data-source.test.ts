@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getDataSource, getDataSourceMode, isSupabaseConfigured } from './data-source';
 import { createSupabaseDataSource } from './supabase-client';
+import * as supabaseClient from './supabase-client';
 import { fixtureMatches, fixtureTeams } from './fixtures';
+
+/** Giltig Supabase-env för att tända live-grenen i test. */
+const liveEnv = {
+  VITE_SUPABASE_URL: 'https://x.supabase.co',
+  VITE_SUPABASE_ANON_KEY: 'anon-key',
+};
 
 // Bygg ett ImportMetaEnv-objekt för test. Vi injicerar env i funktionerna i
 // stället för att mocka import.meta.env globalt, det gör gaten ren att testa.
@@ -113,6 +120,19 @@ describe('getDataSource, live-läge (env finns)', () => {
     // Stubben ska KASTA (inte returnera tom array) så ett för tidigt live-läge
     // upptäcks, inte maskeras som ett giltigt tomt svar.
     await expect(ds.getTeams()).rejects.toThrow(/inte byggd än \(T14\)/);
+  });
+
+  it('memoiserar live-klienten: fabriken körs HÖGST en gång per gate-instans', async () => {
+    // C5: createLiveDataSource byggde tidigare en ny klient vid varje getTeams/
+    // getGroups/getMatches. Nu memoiseras promisen, så fabriken körs en gång.
+    const factory = vi.spyOn(supabaseClient, 'createSupabaseDataSource');
+
+    const ds = getDataSource(liveEnv as ImportMetaEnv);
+
+    // Flera anrop på samma instans (de fail loud:ar, men init ska bara ske en gång).
+    await Promise.allSettled([ds.getTeams(), ds.getGroups(), ds.getMatches(), ds.getTeams()]);
+
+    expect(factory).toHaveBeenCalledTimes(1);
   });
 });
 
