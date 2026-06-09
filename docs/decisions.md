@@ -5,6 +5,27 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T6 (issue #6): målfirande-overlayn (design-frontends visuella lager)
+
+**Beslut:** Det visuella målfirandet är en egen overlay-komponent (`GoalCelebrationOverlay`) som
+kopplas in via `ResultEntryView`s `renderCelebration`-render-prop. Den ritar en "arena i kvällsljus"-
+explosion: en mål-pop-bricka ("Mål!" med boll-glyf) som fjäder-poppar fram i en grön/guld radial-
+gloria, plus konfetti i hejarklacks-tonerna (accent-grön, pokal-guld, success, fg). Konfetti-antalet
+skalar med matchens totala mål (`CONFETTI_PER_GOAL` = 14 per mål) men kapas vid `CONFETTI_MAX` = 70.
+Komponenten NAMNGES `GoalCelebrationOverlay` (inte `GoalCelebration`) för att inte krocka med krokens
+publika TYP `GoalCelebration` (firande-tillståndet) i feature-barrelen, en värde- och en typ-export
+kunde annars inte samexistera under samma namn.
+**Varför:** Render-prop-seamen håller "hur det ser ut" (detta lager) helt skilt från "när + a11y"
+(krokens deterministiska, reduced-motion-tysta trigger). Overlayn är `aria-hidden` + `pointer-events-
+none` + `position: fixed` (ren glädje-yta: ingen dubblerad info, fångar aldrig klick, ger ingen
+layout-shift). Den monteras bara när ett firande är aktivt och rivs via `AnimatePresence` när kroken
+nollar tillståndet, så inget animeras i vila (Core Web Vitals). Konfettin har dessutom en EGEN
+`useReducedMotion`-grind utöver krokens tystnad (dubbelt skydd, WCAG 2.3.3): vid "minska rörelse"
+ritas ingen regnande konfetti. Konfetti-fältet förberäknas deterministiskt ur firande-nyckeln (seeded
+PRNG, inte `Math.random`) så bitarna inte teleporterar vid en re-render mitt i animationen.
+
+---
+
 ## 2026-06-09 , T6 (issue #6): matchresultat-state LYFT till en delad ResultsProvider (en sanning)
 
 **Beslut (kärn-arkitektur):** Matchlistan, den enda sanningen som tabeller (och senare slutspelsträd)

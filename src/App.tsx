@@ -12,7 +12,7 @@ import { Wordmark } from './components/Wordmark';
 import { SwatchGrid } from './components/foundation/SwatchGrid';
 import { MotionDemo } from './components/foundation/MotionDemo';
 import { GroupStageView } from './features/groups';
-import { ResultEntryView, ResultsProvider } from './features/results';
+import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -125,7 +125,14 @@ export default function App() {
 
           <Slide direction="up">
             <Panel>
-              <ResultEntryView />
+              {/* Design-frontends premium-firande kopplas in via render-proppen.
+                  Kroken (i vyn) styr trigger/timing/reduced-motion, overlayn ritar
+                  bara explosionen, en ren glädje-yta. */}
+              <ResultEntryView
+                renderCelebration={(celebration) => (
+                  <GoalCelebrationOverlay celebration={celebration} />
+                )}
+              />
             </Panel>
           </Slide>
         </ResultsProvider>
