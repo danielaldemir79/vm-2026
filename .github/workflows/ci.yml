@@ -1,0 +1,44 @@
+# Kvalitetsgrind för VM 2026: kör på varje PR mot develop.
+# Den DEPLOYAR inte. Cloudflare Pages bygger och deployar via sin egen
+# git-integration (se docs/deploy.md), därför behövs INGA secrets här.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop]
+
+# Avbryt en tidigare körning på samma PR när nya commits pushas.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Build, test och lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hämta koden
+        uses: actions/checkout@v4
+
+      - name: Sätt upp Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # npm ci ger en ren, reproducerbar installation låst till package-lock.
+      - name: Installera beroenden
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Formatkontroll (Prettier)
+        run: npm run format:check
+
+      - name: Tester (Vitest)
+        run: npm test
+
+      # Build sist: bekräftar att en installerbar PWA går att producera.
+      - name: Build (Vite + PWA)
+        run: npm run build
