@@ -22,33 +22,55 @@
 // ============================================================================
 // Lag i en grupp rangordnas enligt FIFA:s regler för VM 2026 (artikel 13). VM
 // 2026 ÄNDRADE ordningen mot tidigare mästerskap: inbördes möte (head-to-head)
-// kommer FÖRE total målskillnad, inte efter. Ordningen är:
+// kommer FÖRE total målskillnad, inte efter. FIFA:s artikel 13 är uppdelad i
+// STEG (verbatim ur regelverket):
 //
-//   1. Poäng (alla gruppmatcher)
-//   2. Inbördes poäng        ] enbart matcher MELLAN de lag som står lika
-//   3. Inbördes målskillnad   ] (head-to-head delgrupp)
-//   4. Inbördes gjorda mål   ]
-//   5. Total målskillnad (alla gruppmatcher)
-//   6. Totalt gjorda mål (alla gruppmatcher)
-//   7. Fair play-poäng (disciplin/kort)        <- EJ implementerad, se nedan
-//   8. FIFA-ranking / lottning                  <- EJ implementerad, se nedan
+//   Steg 1 (på de lag som står lika på poäng):
+//     a) inbördes poäng        ] enbart matcher MELLAN de lika lagen
+//     b) inbördes målskillnad   ] (head-to-head mini-tabell)
+//     c) inbördes gjorda mål   ]
+//   Steg 2 (RE-ITERATION + fallback):
+//     - "If, after having applied criteria a) to c) above, teams still have an
+//       equal ranking ... criteria a) to c) above are applied to the matches
+//       between the REMAINING teams only." Dvs om a-c separerar NÅGRA men inte
+//       alla, RÄKNAS a-c OM på enbart den kvar-lika delmängdens inbördes-matcher.
+//     - "If no decision can be made through this procedure":
+//         d) total målskillnad (alla gruppmatcher)
+//         e) totalt gjorda mål (alla gruppmatcher)
+//         f) fair play / disciplin (kort)            <- EJ implementerad, se nedan
+//   Steg 3:
+//         g/h) FIFA-ranking                          <- EJ implementerad, se nedan
 //
-// Källa: FIFA:s officiella VM 2026-regler, artikel 13 (bekräftad mot ESPN och
-// FIFA.com 2026-06-09). Se docs/decisions.md för beslutet + varför.
+// Källa: Regulations for the FIFA World Cup 26 (May 2026), Article 13, sid. 26-27
+//   https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
+//   (Korskollad mot ESPN + FIFA.com 2026-06-09.) Se docs/decisions.md.
 //
-// UTANFÖR T3:s SCOPE (implementeras INTE, gissas INTE):
-//   - Kriterium 7 (fair play) kräver kort-/disciplindata som domänmodellen
-//     inte modellerar (Match bär inga kort). Kan inte beräknas deterministiskt
-//     ur matchresultaten.
-//   - Kriterium 8 (lottning) är per definition slumpmässig, inte deterministisk.
-// När alla deterministiska kriterier (1-6) ger exakt lika, kan denna funktion
-// INTE avgöra ordningen FIFA-korrekt. För att ändå vara deterministisk och
-// förutsägbar (samma indata -> samma utdata, aldrig "flaxig" sortering)
-// faller den tillbaka på en STABIL sortering på teamId. Detta är uttryckligen
-// INTE en FIFA-tiebreak, bara en deterministisk stabilitetsgaranti, och är
-// kommenterad som sådan vid jämförelse-funktionen.
+// RE-ITERATIONEN (steg 2, F1-beslutet i T4): T3 lämnade re-iterationen som en
+// medveten KISS-avgränsning. Mot FIFA:s officiella ordalydelse är den OBLIGA-
+// TORISK, så T4 implementerar den (se resolveTiedGroup nedan): när a-c skiljer
+// av några lag räknas a-c om på enbart den kvar-lika delmängden, rekursivt.
+//
+// UTANFÖR SCOPE (implementeras INTE, gissas INTE):
+//   - Kriterium f (fair play) kräver kort-/disciplindata som domänmodellen inte
+//     modellerar (Match bär inga kort). Kan inte beräknas deterministiskt ur
+//     matchresultaten.
+//   - Kriterium g/h (FIFA-ranking) finns inte tillgänglig deterministiskt här.
+// När alla beräkningsbara kriterier (a-e) ger exakt lika, kan funktionen INTE
+// avgöra ordningen FIFA-korrekt. För att ändå vara deterministisk och förut-
+// sägbar (samma indata -> samma utdata, aldrig "flaxig" sortering) faller den
+// tillbaka på en STABIL sortering på teamId. Detta är uttryckligen INTE en
+// FIFA-tiebreak, bara en deterministisk stabilitetsgaranti, kommenterad som sådan.
 
 import type { FinishedMatch, GroupStanding, Match } from '../types';
+
+/**
+ * En räknad gruppmatch: färdigspelad med kända lag (efter isCounted-filtret).
+ * Egen typ-alias så signaturerna nedan blir korta och en sanning.
+ */
+type CountedMatch = FinishedMatch & { homeTeamId: string; awayTeamId: string };
+
+/** Inbördes mini-tabell: teamId -> { poäng, målskillnad, gjorda mål } (a-c). */
+type H2HStats = Map<string, { points: number; goalDifference: number; goalsFor: number }>;
 
 /** Poäng per utfall enligt fotbollens standard (3-1-0). */
 const POINTS_WIN = 3;
@@ -132,23 +154,22 @@ function applyResult(row: GroupStanding, scored: number, conceded: number): void
 }
 
 /**
- * Inbördes-statistik (kriterium 2-4): poäng, målskillnad och gjorda mål, men
+ * Inbördes-statistik (kriterium a-c): poäng, målskillnad och gjorda mål, men
  * BARA räknat på matcher MELLAN lagen i `tiedTeamIds`. Returnerar en map
  * teamId -> { points, goalDifference, goalsFor } för de lagen.
  *
  * Varför en egen delberäkning: inbördes-tabellen är en MINI-tabell över bara
  * de lika lagen, inte hela gruppen. FIFA tittar enbart på resultaten dem
- * emellan. Övriga gruppmatcher ignoreras helt i detta steg.
+ * emellan. Övriga gruppmatcher ignoreras helt i detta steg. Vid steg 2:s
+ * re-iteration anropas funktionen om med en MINDRE `tiedTeamIds` (de kvar-lika),
+ * så mini-tabellen då räknas på enbart den delmängdens inbördes-matcher.
  */
 function headToHeadStats(
   tiedTeamIds: readonly string[],
-  countedMatches: readonly (FinishedMatch & {
-    homeTeamId: string;
-    awayTeamId: string;
-  })[]
-): Map<string, { points: number; goalDifference: number; goalsFor: number }> {
+  countedMatches: readonly CountedMatch[]
+): H2HStats {
   const tied = new Set(tiedTeamIds);
-  const stats = new Map<string, { points: number; goalDifference: number; goalsFor: number }>();
+  const stats: H2HStats = new Map();
   for (const id of tiedTeamIds) {
     stats.set(id, { points: 0, goalDifference: 0, goalsFor: 0 });
   }
@@ -181,83 +202,119 @@ function headToHeadStats(
 }
 
 /**
- * Jämför två lag-rader enligt FIFA-tiebreak-ordningen för VM 2026.
- *
- * Returnerar < 0 om `a` ska rankas före `b`, > 0 om efter, 0 om de inte kan
- * skiljas av de DETERMINISTISKA kriterierna (1-6). Inbördes-kriterierna (2-4)
- * tas in via `h2h`, som redan är beräknad på den aktuella delgruppen av lika
- * lag (se sortGroup, som bygger h2h-mapen för delgruppen via headToHeadStats).
- *
- * Sista raden (teamId-jämförelsen) är INTE en FIFA-tiebreak: den ger bara en
- * stabil, förutsägbar ordning när lag står HELT lika efter alla beräkningsbara
- * kriterier (FIFA skulle här gå vidare till fair play/lottning, vilket är
- * utanför T3:s scope, se filhuvudet). Utan den vore ordningen icke-determinis-
- * tisk mellan körningar, vilket är värre än en tydligt dokumenterad stabilitet.
+ * Jämför två lag på STEG 1:s inbördes-kriterier (a-c) givet en h2h-mini-tabell.
+ * Returnerar < 0 om `a` före `b`, > 0 om efter, 0 om a-c inte skiljer dem.
+ * h2h är beräknad på exakt den delmängd matcher som steget gäller (hela den
+ * lika gruppen i steg 1, eller den kvar-lika delmängden vid re-iteration).
  */
-function compareByFifaOrder(
-  a: GroupStanding,
-  b: GroupStanding,
-  h2h: Map<string, { points: number; goalDifference: number; goalsFor: number }> | null
-): number {
-  // 1. Poäng (alla gruppmatcher).
-  if (a.points !== b.points) {
-    return b.points - a.points;
+function compareHeadToHead(a: GroupStanding, b: GroupStanding, h2h: H2HStats): number {
+  const ha = h2h.get(a.teamId);
+  const hb = h2h.get(b.teamId);
+  if (!ha || !hb) {
+    return 0; // ett lag saknas i mini-tabellen: a-c kan inte skilja dem.
   }
-
-  // 2-4. Inbördes (bara när vi jämför inom en delgrupp av lika lag).
-  if (h2h) {
-    const ha = h2h.get(a.teamId);
-    const hb = h2h.get(b.teamId);
-    if (ha && hb) {
-      if (ha.points !== hb.points) {
-        return hb.points - ha.points; // 2. inbördes poäng
-      }
-      if (ha.goalDifference !== hb.goalDifference) {
-        return hb.goalDifference - ha.goalDifference; // 3. inbördes målskillnad
-      }
-      if (ha.goalsFor !== hb.goalsFor) {
-        return hb.goalsFor - ha.goalsFor; // 4. inbördes gjorda mål
-      }
-    }
+  if (ha.points !== hb.points) {
+    return hb.points - ha.points; // a) inbördes poäng
   }
+  if (ha.goalDifference !== hb.goalDifference) {
+    return hb.goalDifference - ha.goalDifference; // b) inbördes målskillnad
+  }
+  if (ha.goalsFor !== hb.goalsFor) {
+    return hb.goalsFor - ha.goalsFor; // c) inbördes gjorda mål
+  }
+  return 0;
+}
 
-  // 5. Total målskillnad.
+/**
+ * Jämför två lag på de ÖVERGRIPANDE kriterierna (steg 2 d-e) + stabil fallback.
+ * Anropas bara när steg 1 (a-c) och dess re-iteration inte kunnat skilja lagen.
+ *
+ * Sista raden (teamId) är INTE en FIFA-tiebreak: den ger bara en stabil,
+ * förutsägbar ordning när lag står HELT lika efter alla beräkningsbara
+ * kriterier (FIFA skulle här gå vidare till fair play / FIFA-ranking, utanför
+ * scope, se filhuvudet). Utan den vore ordningen icke-deterministisk mellan
+ * körningar, vilket är värre än en tydligt dokumenterad stabilitet.
+ */
+function compareOverall(a: GroupStanding, b: GroupStanding): number {
   if (a.goalDifference !== b.goalDifference) {
-    return b.goalDifference - a.goalDifference;
+    return b.goalDifference - a.goalDifference; // d) total målskillnad
   }
-  // 6. Totalt gjorda mål.
   if (a.goalsFor !== b.goalsFor) {
-    return b.goalsFor - a.goalsFor;
+    return b.goalsFor - a.goalsFor; // e) totalt gjorda mål
   }
-
-  // 7-8 (fair play, lottning) ligger utanför T3:s scope. Stabil fallback på
-  // teamId, INTE en FIFA-tiebreak, bara deterministisk förutsägbarhet.
+  // f (fair play) + g/h (FIFA-ranking) utanför scope. Stabil teamId-fallback.
   return a.teamId < b.teamId ? -1 : a.teamId > b.teamId ? 1 : 0;
 }
 
 /**
- * Sortera en grupp lag enligt FIFA-ordningen och lös inbördes-tiebreak rätt
- * även när 3+ lag står lika.
+ * Lös ordningen inom en mängd lag som står lika på POÄNG, enligt FIFA artikel
+ * 13 steg 1 + steg 2:s RE-ITERATION (F1-beslutet, se filhuvudet).
  *
- * Knepet: FIFA-inbördes (kriterium 2-4) ska bara räknas på matcher MELLAN de
- * lag som faktiskt står lika på poäng. Vi grupperar därför lagen på poäng,
- * och inom varje sådan poäng-delgrupp beräknas en inbördes-tabell över just de
- * lagen och sorteringen sker mot den. Det hanterar både 2-lags- och 3+-lags-
- * tiebreaks korrekt: delgruppen är exakt de lika lagen.
+ * Procedur:
+ *   1. Beräkna inbördes-mini-tabellen (a-c) över matcher MELLAN exakt `tied`.
+ *   2. Sortera `tied` på a-c och dela upp i delmängder som a-c INTE kunde skilja.
+ *   3. För varje delmängd:
+ *        - 1 lag: klart.
+ *        - är delmängden MINDRE än `tied` (a-c separerade några): RE-ITERERA,
+ *          dvs anropa proceduren igen på enbart delmängden (ny mini-tabell över
+ *          den mindre mängdens inbördes-matcher). Detta är FIFA steg 2.
+ *        - är delmängden lika stor som `tied` (a-c skilde INGEN): a-c är uttömt,
+ *          fall till de övergripande kriterierna (d-e) + stabil fallback.
  *
- * Notera: efter inbördes (2-4) faller lika lag vidare till total MS/mål (5-6).
- * Vi räknar inte om inbördes-tabellen för en eventuell mindre kvar-lika under-
- * mängd (FIFA itererar i teorin om), eftersom det kräver upprepad omräkning
- * och i praktiken är extremt sällsynt; total MS/mål + stabil fallback ger ett
- * deterministiskt och rimligt resultat. Detta är en medveten KISS-avgränsning,
- * dokumenterad här så den inte tas för en FIFA-komplett iteration.
+ * Rekursionen terminerar: re-iteration sker bara när delmängden är STRIKT
+ * mindre än `tied`, så storleken minskar varje gång; gör a-c ingen skillnad
+ * faller vi till compareOverall i stället för att rekursera.
+ */
+function resolveTiedGroup(
+  tied: GroupStanding[],
+  countedMatches: readonly CountedMatch[]
+): GroupStanding[] {
+  if (tied.length <= 1) {
+    return tied;
+  }
+
+  const h2h = headToHeadStats(
+    tied.map((r) => r.teamId),
+    countedMatches
+  );
+  const ordered = [...tied].sort((a, b) => compareHeadToHead(a, b, h2h));
+
+  // Dela upp i sammanhängande delmängder som a-c inte kunde skilja (rang lika).
+  const result: GroupStanding[] = [];
+  let i = 0;
+  while (i < ordered.length) {
+    let j = i + 1;
+    while (j < ordered.length && compareHeadToHead(ordered[i], ordered[j], h2h) === 0) {
+      j += 1;
+    }
+    const subset = ordered.slice(i, j);
+    if (subset.length === 1) {
+      result.push(subset[0]);
+    } else if (subset.length < tied.length) {
+      // Steg 2 re-iteration: a-c separerade NÅGRA, räkna om a-c på enbart de
+      // kvar-lika lagens inbördes-matcher (rekursivt, mindre mängd varje gång).
+      result.push(...resolveTiedGroup(subset, countedMatches));
+    } else {
+      // a-c skilde ingen i denna mängd: kriteriet uttömt, fall till d-e + fallback.
+      result.push(...[...subset].sort(compareOverall));
+    }
+    i = j;
+  }
+
+  return result;
+}
+
+/**
+ * Sortera en grupp lag enligt FIFA-ordningen.
+ *
+ * Lagen grupperas först på POÄNG (kriterium före steg 1). Inom varje poäng-
+ * delgrupp löses ordningen av resolveTiedGroup, som kör steg 1 (inbördes a-c)
+ * och steg 2:s re-iteration på kvar-lika delmängder, och faller till de över-
+ * gripande kriterierna (d-e) + stabil teamId-fallback när inbördes är uttömt.
  */
 function sortGroup(
   rows: GroupStanding[],
-  countedMatches: readonly (FinishedMatch & {
-    homeTeamId: string;
-    awayTeamId: string;
-  })[]
+  countedMatches: readonly CountedMatch[]
 ): GroupStanding[] {
   // Gruppera på poäng (delgrupper av potentiellt lika lag).
   const byPoints = new Map<number, GroupStanding[]>();
@@ -275,15 +332,7 @@ function sortGroup(
   const pointValues = [...byPoints.keys()].sort((x, y) => y - x);
   for (const points of pointValues) {
     const bucket = byPoints.get(points)!;
-    if (bucket.length === 1) {
-      sorted.push(bucket[0]);
-      continue;
-    }
-    // 2+ lag lika på poäng: beräkna inbördes-tabell över just dem och sortera.
-    const tiedIds = bucket.map((r) => r.teamId);
-    const h2h = headToHeadStats(tiedIds, countedMatches);
-    bucket.sort((a, b) => compareByFifaOrder(a, b, h2h));
-    sorted.push(...bucket);
+    sorted.push(...resolveTiedGroup(bucket, countedMatches));
   }
 
   return sorted;
