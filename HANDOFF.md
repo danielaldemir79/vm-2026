@@ -5,6 +5,48 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-09 , T2 KLAR - PR #28 väntar på Daniels merge
+
+**Branch:** `feature/T2-design-temasystem` @ HEAD `89c38c8`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/28 mot `develop` (Closes #2, state: OPEN)
+**Board:** issue #2 i "In Review" (korrekt, dirigenten flyttar till Done EFTER Daniels merge).
+
+**KLART med bevis (SHA + verifiering):**
+- `7dd4e96`, `92ac586` - Tema-motor (provider, no-flash tema-init, token-kontrakt, rörelse-primitiver)
+- `953f4cf`, `f616aa3`, `0a31b6c` - Premium-estetik ("arena i kvällsljus"-palett, typografi, toggle, showcase)
+- `94f9eac` - Lokal review F1 (copy-typografi) + F2 (doc-drift) åtgärdade
+- `215e854`, `f5ea324`, `3e224cd`, `9d42a2a` - Copilot-rundor 1-4 åtgärdade
+- `89c38c8` - Robusthetsfiks: localStorage-åtkomst kan kasta, tema-byte kraschar inte längre
+- Lokal verifiering: lint rent, format rent, **66 tester gröna**, build grönt (PWA genererad, no-flash-script injicerat i `<head>`)
+- WCAG AA-kontrast verifierad i båda teman, responsivt verifierat per skärmklass
+- No-flash, tema-toggle (aria-pressed/label, fokus-ring, persistens) verifierat live
+- **0 olösta review-trådar** (5 Copilot-rundor, alla fynd dispositionerade)
+
+**PINNADE punkter (bär framåt till berörda tasks):**
+- **F3-pin (T7):** i ljust tema är accent och success samma forest-grön (#0e7a44); resultat-vyn T7 ska ge success en egen, AA-klarande ton distinkt från accent.
+- **Medvetet avvisat (ej TODO):** inline-scriptets 'dark'/'light'-strängar (theme-init.ts) härleds inte ur THEMES - bundna till matchMedia-query-semantiken, inte en bugg.
+- **Cloudflare (från T1, ägare Daniel):** koppling enligt `docs/deploy.md` kvarstår om inte gjord sedan T1.
+- **GitHub default-branch är `main`:** PR:er måste skapas med `--base develop`.
+
+**FORTSÄTTNINGS-PROMPT:**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. T2 är klar (läs `HANDOFF.md`).
+>
+> Om PR #28 ÄNNU INTE mergad: Daniel mergar den manuellt mot `develop`. Dirigenten
+> uppdaterar board-kortet (#2) till Done efter merge.
+>
+> Om PR #28 REDAN mergad: T1 och T2 är klara. Plocka nästa byggbara task.
+> **T3 (#3, datalager)** är byggbar (beror bara på T1, se issue-bodyn). Kör T3 näst,
+> sen den kritiska **T4 (#4, FIFA-data)** - treeplats-seedning, aldrig gissa.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+>
+> OBS bär framåt hela vägen:
+> - T7-pin: ljust tema, accent == success-grön, ge success en distinkt AA-ton i T7.
+> - T4 kritisk FIFA-data: tabell-driven + uttömmande tester, aldrig gissa treeplats-mappning.
+> - T14 hög-risk: Supabase/auth + RLS + secrets, inga nycklar i repo.
+> - Cloudflare-koppling (ägare Daniel): `docs/deploy.md` om ej gjord.
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T1 KLAR - PR #27 väntar på Daniels merge
 
 **Branch:** `feature/T1-pwa-skelett-cicd` @ HEAD `5b710b2`

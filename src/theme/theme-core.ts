@@ -1,0 +1,136 @@
+// Ren, sido-effekt-fri tema-logik. All beslutslogik (vilket tema som gäller)
+// bor här så den kan enhetstestas utan DOM eller React. Provider och inline-
+// script konsumerar dessa funktioner / samma regel.
+
+import {
+  DEFAULT_THEME,
+  THEME_ATTRIBUTE,
+  THEME_STORAGE_KEY,
+  isTheme,
+  type Theme,
+} from './theme-constants';
+
+/**
+ * Härled vilket tema som ska gälla vid första render.
+ *
+ * Prioritet:
+ *   1. Användarens sparade, giltiga val (explicit vilja vinner alltid).
+ *   2. System-preferensen (prefers-color-scheme) om inget sparat finns.
+ *   3. DEFAULT_THEME som sista utväg, när system-preferensen inte kan läsas.
+ *
+ * Notera: ett sparat värde som INTE är ett giltigt Theme (korrupt/föråldrat)
+ * behandlas som "inget val", inte som ett fel som ska krascha appen, men det
+ * maskeras inte heller till ett tyst defaultvärde som låtsas vara ett aktivt
+ * val: det faller medvetet vidare till system-preferensen. Det är skillnaden
+ * mot en tyst maskerande fallback, vi gissar inte att korrupt data är "dark".
+ *
+ * @param stored          Råvärdet ur localStorage (eller null om inget/ej läsbart).
+ * @param systemPrefersDark  Resultatet av matchMedia('(prefers-color-scheme: dark)'):
+ *   true/false om preferensen kunde läsas, null om matchMedia saknas/kastar. null
+ *   speglar inline-scriptets catch-gren (theme-init.ts) och faller till DEFAULT_THEME,
+ *   så den rena funktionen och no-flash-scriptet ger samma svar i alla lägen.
+ */
+export function resolveInitialTheme(
+  stored: string | null,
+  systemPrefersDark: boolean | null
+): Theme {
+  if (isTheme(stored)) {
+    return stored;
+  }
+  // System-preferensen kan inte läsas (matchMedia saknas/kastar): sista utväg.
+  if (systemPrefersDark === null) {
+    return DEFAULT_THEME;
+  }
+  return systemPrefersDark ? 'dark' : 'light';
+}
+
+/**
+ * Skriv aktivt tema till DOM:en (sätter data-theme på <html>).
+ * Idempotent, säker att kalla vid varje temaändring.
+ */
+export function applyThemeToDocument(doc: Document, theme: Theme): void {
+  doc.documentElement.setAttribute(THEME_ATTRIBUTE, theme);
+}
+
+/**
+ * Läs aktivt tema FRÅN DOM:en. Används av providern för att ta över exakt det
+ * tema inline-scriptet redan satte före first paint, så React inte räknar om
+ * och orsakar en flash. Faller tillbaka på DEFAULT_THEME om attributet saknas
+ * eller är ogiltigt (t.ex. i testmiljö utan inline-scriptet).
+ */
+export function readThemeFromDocument(doc: Document): Theme {
+  const current = doc.documentElement.getAttribute(THEME_ATTRIBUTE);
+  return isTheme(current) ? current : DEFAULT_THEME;
+}
+
+/**
+ * Hämta webbläsarens localStorage på ett SÄKERT sätt.
+ *
+ * Varför: i vissa lägen (Safari med blockerade cookies, sandboxade iframes,
+ * en del privacy-lägen) kastar redan ÅTKOMSTEN till `window.localStorage` ett
+ * SecurityError, alltså innan något läses/skrivs. Den åtkomsten måste därför
+ * ske inuti en try/catch, annars kraschar anroparen (t.ex. ett tema-byte)
+ * redan på argument-uttrycket innan persist-/läs-funktionen ens körs.
+ *
+ * Samma fail-loud-men-inte-fatalt-mönster som persistTheme/readStoredTheme:
+ * vi maskerar inte felet, vi loggar en varning och returnerar null så att
+ * anroparen kan fortsätta utan persistens.
+ *
+ * @returns Storage om den kan nås, annars null (blockerad/sandbox).
+ */
+export function getLocalStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch (error) {
+    console.warn('Kunde inte komma åt localStorage (blockerad/sandbox):', error);
+    return null;
+  }
+}
+
+/**
+ * Persistera användarens val. Skriv-fel (t.ex. privat läge där localStorage
+ * kastar, eller full kvot) sväljs INTE tyst på ett sätt som döljer en bugg:
+ * de loggas som varning och returnerar false så anroparen vet att det inte
+ * sparades. Appen ska fortsätta fungera utan persistens, men felet syns.
+ *
+ * Tar emot `Storage | null` så att en blockerad/onåbar storage (null från
+ * getLocalStorage) hanteras här i stället för att tvinga varje anropare att
+ * gren-kolla. Är storage null hoppas persistensen tyst över, det är inte ett
+ * nytt fel utan redan loggat av getLocalStorage vid åtkomstförsöket.
+ *
+ * @returns true om värdet skrevs, annars false.
+ */
+export function persistTheme(storage: Storage | null, theme: Theme): boolean {
+  if (storage === null) {
+    return false;
+  }
+  try {
+    storage.setItem(THEME_STORAGE_KEY, theme);
+    return true;
+  } catch (error) {
+    // Fail loud (synligt), men inte fatalt: temat funkar för sessionen,
+    // bara persistensen uteblir. Vi maskerar inte felet till "allt gick bra".
+    console.warn(`Kunde inte spara tema-valet (${theme}) i localStorage:`, error);
+    return false;
+  }
+}
+
+/**
+ * Läs sparat tema-råvärde. Läs-fel (sandbox/blockerad storage) ger null, vilket
+ * resolve-logiken tolkar som "inget val" och därmed faller till system/default.
+ * Det är korrekt fallback här (frånvaro av data), inte en maskering av ett
+ * obligatoriskt värde.
+ */
+export function readStoredTheme(storage: Storage): string | null {
+  try {
+    return storage.getItem(THEME_STORAGE_KEY);
+  } catch (error) {
+    console.warn('Kunde inte läsa tema-valet från localStorage:', error);
+    return null;
+  }
+}
+
+/** Växla till motsatt tema. Ren funktion, lätt att testa. */
+export function nextTheme(current: Theme): Theme {
+  return current === 'dark' ? 'light' : 'dark';
+}

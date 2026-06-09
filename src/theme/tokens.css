@@ -1,0 +1,180 @@
+/* =============================================================================
+   DESIGN-TOKENS, SLUTGILTIGA VÄRDEN (authorade av design-frontend-agenten, T2).
+   =============================================================================
+
+   ÄGARSKAP (oförändrat sedan senior-devs kontrakt):
+   - STRUKTUREN (vilka tokens som finns, deras namn, @theme-wiring mot Tailwind v4,
+     temabyte via [data-theme]) ägs av tema-MOTORN och är LÅST. Den har inte rörts.
+   - VÄRDENA nedan är de slutgiltiga. Designvärden är fortfarande isolerade HÄR,
+     en sanning per token. Endast värden är skrivna, inga variabelnamn i @theme-
+     kontraktet har bytts. Nya VÄRDE-rader (vikter, skuggor, dekorativa gradienter)
+     är tillagda utanför @theme, vilket kontraktet uttryckligen tillåter.
+
+   VISUELL IDENTITET (SPEC §7: modern, premium, mörkt grundtema med accenter):
+   Konceptet är "arena i kvällsljus" , en djup, varmt grönsvart fond (inte den
+   kalla blå-grå slate-look som varje generisk AI-mall landar i), en elektrisk
+   gräsplan-grön som primär accent (sportig, energisk, signalerar fotboll) och en
+   varm pokal-guld som sekundär hejarklacks-ton. Grön + guld = mästerskapskänsla,
+   distinkt mot den generiska blå-lila SaaS-paletten.
+
+   WCAG AA (verifierat på dessa slutvärden, se handoff Verification):
+   - Brödtext (fg) mot bg/surface/surface-raised: 12.6:1 - 17.9:1 i båda teman.
+   - Dämpad text (fg-muted) klarar AA som NORMAL text (>= 4.5:1) i båda teman.
+   - Accent/guld/success/danger mot ytor: >= 3:1 (stor text / UI-komponenter),
+     i ljust tema klarar accenten dessutom AA som normal text (5.4:1).
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   1. Tailwind v4 @theme: exponerar tokens som Tailwind-utilities. [LÅST KONTRAKT]
+   Varje --color-* / --font-* / --spacing-* / --radius-* blir automatiskt en
+   utility (bg-surface, text-fg, rounded-card, ...). Värdena pekar på de
+   tema-växlande CSS-variablerna i sektion 2, så utilities följer aktivt tema.
+   -------------------------------------------------------------------------- */
+@theme inline {
+  /* Färg-roller (semantiska, inte råa färgnamn, så design kan byta hue fritt) */
+  --color-bg: var(--vm-bg);
+  --color-surface: var(--vm-surface);
+  --color-surface-raised: var(--vm-surface-raised);
+  --color-border: var(--vm-border);
+  --color-fg: var(--vm-fg);
+  --color-fg-muted: var(--vm-fg-muted);
+  --color-accent: var(--vm-accent);
+  --color-accent-fg: var(--vm-accent-fg);
+  --color-success: var(--vm-success);
+  --color-warning: var(--vm-warning);
+  --color-danger: var(--vm-danger);
+
+  /* Typografi: familj + skala (rem-baserad, modulär). Design finjusterar skala. */
+  --font-sans: var(--vm-font-sans);
+  --font-display: var(--vm-font-display);
+
+  /* Radie-skala (mjuka hörn = premium-känsla, SPEC §7) */
+  --radius-sm: var(--vm-radius-sm);
+  --radius-md: var(--vm-radius-md);
+  --radius-lg: var(--vm-radius-lg);
+  --radius-card: var(--vm-radius-card);
+  --radius-pill: var(--vm-radius-pill);
+}
+
+/* -----------------------------------------------------------------------------
+   2. Tema-värden. Roterar på [data-theme] (sätts av inline-scriptet före paint
+   + av providern). :root = mörkt (DEFAULT_THEME, SPEC §7), [data-theme='light']
+   överskriver.
+   -------------------------------------------------------------------------- */
+:root,
+:root[data-theme='dark'] {
+  /* Fond: djup, varmt grönsvart ink (inte kall slate). Tre lager för djup. */
+  --vm-bg: #091310;
+  --vm-surface: #10201a;
+  --vm-surface-raised: #19302a;
+  --vm-border: #2c4034;
+
+  /* Text: varmt nära-vitt + dämpad ton som ändå klarar AA som brödtext. */
+  --vm-fg: #eef5f0;
+  --vm-fg-muted: #9cb2a6;
+
+  /* Primär accent: elektrisk gräsplan-grön. Accent-fg = nära-svart för text PÅ accent. */
+  --vm-accent: #1fe082;
+  --vm-accent-fg: #04140b;
+
+  /* Status: success (mintgrön), warning (pokal-guld), danger (varm korall). */
+  --vm-success: #5ad1a0;
+  --vm-warning: #f3c14e;
+  --vm-danger: #fb7287;
+
+  /* Dekorativa stöd-toner (utanför @theme, fritt designvärde). Guld + grön glow. */
+  --vm-gold: #f3c14e;
+  --vm-glow-accent: 31 224 130; /* RGB-delar för rgb()/rgba()-glow i mörkt tema */
+}
+
+:root[data-theme='light'] {
+  /* Fond: ljus, svalt grön-vit. Ytor = rent vitt, djup bärs av skuggor. */
+  --vm-bg: #f1f5f0;
+  --vm-surface: #ffffff;
+  --vm-surface-raised: #ffffff;
+  --vm-border: #cdd8ce;
+
+  /* Text: djup grön-svart + dämpad ton, båda klarar AA som brödtext. */
+  --vm-fg: #0c1a13;
+  --vm-fg-muted: #4f6258;
+
+  /* Primär accent: djup skogsgrön (klarar AA som NORMAL text på vitt, 5.4:1).
+     Den elektriska gröna lever som dekorativ glow/gradient, inte som textfärg. */
+  --vm-accent: #0e7a44;
+  --vm-accent-fg: #ffffff;
+
+  /* Status: AA-säkra mörka toner för ljus yta. */
+  --vm-success: #0e7a44;
+  --vm-warning: #8a5a05;
+  --vm-danger: #c4302c;
+
+  /* Dekorativa stöd-toner i ljust tema. */
+  --vm-gold: #b07d10;
+  --vm-glow-accent: 14 122 68;
+}
+
+/* -----------------------------------------------------------------------------
+   3. Tema-oberoende tokens (skalor + typografi-familj). Skiftar inte med temat,
+   så de bor utanför [data-theme]-blocken.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Typografi-familjer. Display = Space Grotesk (självhostad variabel woff2,
+     se @font-face nedan), en distinkt, lätt mekanisk grotesk med karaktär,
+     medveten kontrast mot den generiska Inter-looken. Body = systemstacken
+     (noll extra nedladdning, snabb LCP), ett medvetet prestandaval. */
+  --vm-font-display: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --vm-font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Radie-skala (mjuka hörn = premium). Lite generösare än platshållarna. */
+  --vm-radius-sm: 0.375rem;
+  --vm-radius-md: 0.625rem;
+  --vm-radius-lg: 1rem;
+  --vm-radius-card: 1.25rem;
+  --vm-radius-pill: 9999px;
+
+  /* Skuggor (dekorativt värde). Mjuk elevation som bär djup i ljust tema och
+     ger premium-lyft i mörkt. Egna nivåer för kort och svävande element. */
+  --vm-shadow-card: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.08);
+  --vm-shadow-raised: 0 4px 12px rgb(0 0 0 / 0.1), 0 16px 48px rgb(0 0 0 / 0.14);
+
+  /* color-scheme synkas så webbläsarens egna kontroller matchar temat. */
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+/* -----------------------------------------------------------------------------
+   4. Självhostat display-typsnitt (Space Grotesk, variabel woff2, latin-subset).
+   Prestanda-medvetet: ETT litet (~22 kB) self-hostat woff2, font-display: swap
+   (ingen osynlig text / ingen render-blockering), preload-länken ligger i
+   index.html. System-stacken bär brödtexten så fontvikten hålls minimal
+   (Core Web Vitals, PRINCIPLES §12).
+   -------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 300 700; /* variabel axel: light -> bold ur en fil */
+  font-display: swap;
+  src: url('/fonts/space-grotesk.woff2') format('woff2');
+}
+
+/* -----------------------------------------------------------------------------
+   5. Bas-applicering: koppla body till tokens så hela appen ärver tema-färger.
+   Smooth färg-övergång vid temabyte, men endast när användaren INTE bett om
+   reducerad rörelse (a11y, prefers-reduced-motion respekteras även i CSS).
+   -------------------------------------------------------------------------- */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body {
+    transition:
+      background-color 0.25s ease,
+      color 0.25s ease;
+  }
+}
