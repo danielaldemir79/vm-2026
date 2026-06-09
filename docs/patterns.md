@@ -123,7 +123,7 @@ T5 (`src/features/groups/`: `deriveGroupTables` + `useGroupData` + `GroupTable`/
    som en fil i repot, med en preambel som bär källans URL + avsnitt/sida + extraktionskommando, så
    en människa kan spot-checka utdraget mot källan och CI kan regenerera ur det.
 2. Lägg parsnings-/validerings-/emit-logiken i en **typad, ren modul** (sträng in, sträng ut, inga
-   IO-beroenden) som BÅDE generator-skriptet OCH källånkrings-testet importerar (EN sanning, ingen
+   IO-beroenden) som BÅDE generator-skriptet OCH källankrings-testet importerar (EN sanning, ingen
    duplicerad parser). Generator-skriptet (`scripts/generate-<tabell>.ts`, körs via ett npm-script som
    drar `vite-node`, t.ex. `npm run gen:third-place-table`) är en tunn CLI ovanpå modulen: läs committat
    utdrag, bygg, skriv. `vite-node` följer med projektets toolchain (via vitest) och kör `.ts` direkt på
@@ -140,7 +140,7 @@ T5 (`src/features/groups/`: `deriveGroupTables` + `useGroupData` + `GroupTable`/
    skillnad). Strukturella invarianter (form, fullständighet, behörighet) räcker INTE: om källan är en-till-en
    men dina invarianter är en-till-många passerar ett transkriptions-/parsnings-fel mitt i tabellen tyst (se
    lärdomen `uttommande-test-vaktar-svagare-invariant-an-kallan-faststaller`). Lägg dessutom ett
-   **mutationstest** som byter ett värde på en mittrad och bevisar att källånkringen FAILAR (annars vet du
+   **mutationstest** som byter ett värde på en mittrad och bevisar att källankringen FAILAR (annars vet du
    inte att låset funkar). Behåll gärna det strukturella integritetstestet som snabb extra grind.
 6. Bygg konsumenten (motorn) på ett förbyggt O(1)-index över tabellen och **fail loud** om en giltig
    nyckel ändå saknas (skulle bara hända vid trasig tabell, som testet utesluter).
@@ -150,8 +150,68 @@ hand och omöjlig att review:a snabbt. Genom att generera ur ett COMMITTAT käll
 i CI blir datan spårbar, regenererbar och låst till källans faktiska värden, och reviewern kan BEKRÄFTA den
 mot källan i stället för att jaga den. Detta uppfyller källhänvisnings-kravet (HARD) för gissningskänslig data.
 Källa: T4 (treeplats-tabellen, `scripts/generate-third-place-table.ts` + `src/domain/bracket/annexe-c-parser.ts`
-+ committat `annexe-c-source.txt` -> `src/domain/bracket/third-place-table.ts`, källånkrat av
++ committat `annexe-c-source.txt` -> `src/domain/bracket/third-place-table.ts`, källankrat av
 `third-place-table-source.test.ts`).
+
+### inmatning-mot-delad-store-som-haerledd-state-uppdaterar (React, VM 2026)
+
+**Recept (ett inmatnings-UI uppdaterar härledda vyer via EN delad sanning):**
+
+1. LYFT den RÅA SANNINGEN (här matchlistan) till en DELAD store via React-context
+   (`src/features/results/`: `results-context.ts` = kontrakt + context + `useResultsStore`-hook,
+   `ResultsProvider.tsx` = seedning + state + mutatorer). Inte lokal vy-state, annars kan bara EN vy
+   ändra den. Providern SEEDAR via `getDataSource(env)` (fixtures-först-seamen, samma env-gate), håller
+   sanningen i `useState`, och fail-loud:ar seed-fel (status 'error' + meddelande, inte tyst tom).
+2. Alla härledda vyer LÄSER samma store och härleder sitt (T5:s `useGroupData` blev en tunn konsument:
+   `useResultsStore()` + `useMemo(deriveGroupTables, [status, groups, matches])`, gatad på `ready`).
+   Lagra ALDRIG den härledda formen, härled den, så en inmatning -> ny matchlista -> alla vyer räknar
+   om automatiskt (en sanning, ingen dubbellagring).
+3. EXPONERA skriv-seam på storen: ett HÖGNIVÅ `submitResult(id, entry)` (validerar + optimistisk
+   uppdatering, för UI:t) OCH ett LÅGNIVÅ `setMatches` (för T18:s realtid + tester). T14 (persistens)
+   byter `submitResult`-implementationen mot en server-skrivning, T18 prenumererar och anropar
+   `setMatches`, allt på SAMMA seam utan att röra konsumenterna.
+4. `useResultsStore` KASTAR utan provider (fail loud): en konsument utan provider är ett wiring-fel,
+   inte ett tillstånd att maskera med tom data. (Testa: `renderHook(useResultsStore)` utan wrapper kastar.)
+5. submitResult validerar mot matchens NUVARANDE status via en `matchesRef` (uppdaterad i en effekt),
+   INTE som sido-effekt inne i en state-uppdaterare (det är inte garanterat synkront, ett anti-mönster).
+   Reffen uppdateras direkt vid en lyckad skrivning så två snabba submit i följd båda ser senaste listan.
+6. VALIDERING i en REN modul (`validate-result.ts`) som returnerar `{ ok: true } | { ok: false; errors }`
+   (kastar INTE): så ALLA fel visas samtidigt och kopplas till fält via aria. Den rena reducern
+   (`apply-match-result.ts`) validerar IGEN (skyddsnät) och kastar vid ogiltig data, så ett brutet
+   flöde aldrig korrumperar sanningen. Sätt `noValidate` på formen så DIN validering (svenska meddelanden
+   + aria) är sanningen, inte native constraint-bubblor (de blockerar submit innan din validering kör).
+7. Test-täckning: validering (icke-negativa heltal: -1/1.5/NaN/Infinity, status<->resultat-kontraktet,
+   uttömmande status-övergångar), reducern (ny array-referens, oförändrade element behåller referens,
+   status-backning nollar resultat, fail-loud på okänt id/ogiltig data), storen (seedning, fail-loud
+   utan provider, submitResult lämnar listan orörd vid fel), OCH det viktigaste: ett INTEGRATIONSTEST
+   som monterar inmatnings-vy + härledd vy under SAMMA provider och bevisar att ett sparat resultat
+   ändrar den härledda tabellen (rad-scopat via `rowheader` + `within(row).getAllByRole('cell')`,
+   stabilt kolumnindex, samma teknik som T5).
+
+**Varför:** SPEC §6:s härledda state med ett SKRIV-lager: inmatningen är den enda mutationen, allt annat
+(tabeller, snart slutspelsträd) är rena funktioner av matchlistan, så "live" blir gratis och korrekt
+utan en andra kopia. Den delade storen är den minsta lösningen som låter flera vyer dela en sanning utan
+prop-drilling, och designar in T14/T18 på samma seam. Generaliserar T5:s "härledd-state-vy" med en delad
+källa + valideringsgrind. Källa: T6 (`src/features/results/`).
+
+### maalfirande-krok-som-seam-design-aeger-visuellt (React + motion, VM 2026)
+
+**Recept (en effekt-/glädje-animation där FUNKTION och VISUELL polish ägs av olika lager):**
+1. Lägg NÄR + a11y + timing i en KROK (`useGoalCelebration`): den avgör triggern (här: match blir
+   finished med minst ett mål), hoppar firandet vid `useReducedMotion()` (WCAG 2.3.3, ingen overlay tänds),
+   auto-avklingar via en timeout (rensad vid nytt firande/unmount), och ger ett UNIKT `key` per firande
+   (matchId + en räknare) så det visuella lagret re-mountar och spelar om även för samma match.
+2. Exponera ett `renderCelebration`-RENDER-PROP (aria-hidden slot) på vyn där DESIGN-FRONTEND lägger den
+   visuella premium-animationen (konfetti/mål-pop, bygger på T2:s motion-primitiver). Default = inget
+   visuellt lager, så vyn är funktionellt komplett utan det (firandet är ren glädje-yta).
+3. Test: mocka `motion/react`s `useReducedMotion` (samma mönster som motion-primitives-testet), använd
+   `vi.useFakeTimers` för auto-avklingen, och asserta: tänds vid mål, unikt key per firande, avklingar
+   efter sin varaktighet, dismiss stänger, INGET firande vid 0-0 och INGET vid reducerad rörelse.
+
+**Varför:** Frikopplar "när det firas + tillgänglighet" (senior-dev, deterministiskt + testbart) från
+"hur det ser ut" (design-frontend), så animationen kan göras premium utan att röra trigger/timing/a11y.
+Render-propet är seamen mellan lagren. Källa: T6 (`src/features/results/goal-celebration.ts` +
+`ResultEntryView.tsx`).
 
 ### fargoberoende-framhavning-nar-tva-roller-delar-hue (design, VM 2026)
 

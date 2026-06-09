@@ -5,6 +5,78 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-09 , T6 KLAR - PR #33 väntar på autonom merge
+
+**Branch:** `feature/T6-resultatinmatning` @ HEAD `d449e00`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/33 mot `develop` (Closes #6, state: OPEN)
+**Board:** issue #6 i "In Review" (korrekt). Dirigenten stänger issue #6 MANUELLT (`gh issue close 6`) och flyttar kort #6 till Done EFTER merge (auto-close funkar inte mot develop, default-branch ar main).
+
+**Autonomt lage: Daniel ar borta ~1 vecka.** Han har gett dirigenten full fullmakt att merga till develop och beta av hela task-listan. Vanta inte pa Daniel.
+
+**KLART med bevis (SHA + verifiering):**
+- `6d054d3` - delad results-store (ResultsProvider, results-context), validering + reducer, a11y-formular, optimistisk UI (senior-dev funktionellt, T6)
+- `6aa7e21` - besluts-logg + monster for delad results-store + malfirande-seam (`docs/decisions.md`, `docs/patterns.md`)
+- `775de6b` - premium design: resultatinmatning + malfirande-overlay (GoalCelebrationOverlay, konfetti, reduced-motion-saker krok)
+- `04d17dc` - Copilot R1: a11y + fel-semantik + doc-typo
+- `033f629` - Copilot R2: setMatches-seam race-fri (synkron ref-uppdatering)
+- `e995e0e` - Copilot R3: exhaustive-deps + doc-konsekvens (eslint-plugin-react-hooks v6 flat-config fix)
+- `46bba30` - Copilot R4: type predicate som faktiskt narrowar
+- `d449e00` - Copilot R5: synk + a11y-edge (HEAD)
+- Verifiering (dirigenten, oberoende): **265 tester grona (29 filer)**, build/lint/format rent, inga secrets
+- Alla 6/6 acceptanskriterier bockade i issue #6 (journalisten 2026-06-09)
+- Copilot-loop: 5 rundor (4->1->3->1->2 fynd), ALLA adresserade, 11/11 tradar losta
+- Lokal panel: 1 runda, godkand, inga blockerare
+
+**Viktig lardom inbakad i eslint.config.js:**
+eslint-plugin-react-hooks v6 bytte `configs.recommended` fran objekt till flat-config-array.
+`...config.recommended.rules` spred `...undefined` tyst - reglerna var TYSTA AVSTANGDA.
+Fixat med explicit registrering. "Gron lint" != "regeln passerade". Se `verifiera-att-lint-regel-ar-registrerad-inte-bara-tyst` i playbook.
+
+**PINNADE punkter (bar framat):**
+- **F1 (T6->T9, agare senior-developer):** reducern tar inte med `MatchResult.penalties`. Inert i T6 (gruppspel saknar straffar). Nar slutspelsinmatning (T9) byggs: hantera penalties eller gata bort stage!=group. Acceptanstest: redigera finished slutspelsmatch med straffar, penalties bevaras.
+- **T7-pin:** ljust tema, accent == success (#0e7a44). T7 ska ge success en distinkt AA-klarande ton, inte samma som accent.
+- **T14-pin:** Supabase/auth/RLS, inga secrets i repo. Live-klienten fail-loud-stub, T14 tander den.
+- **T14 extra (RLS):** anon-rollen i Supabase matchar authenticated-rollen. RLS maste restriktera per auth.uid() + rum nar T14 byggs. Se Supabase-projekt kmzhyblzxangpxydufve.
+- **Supabase provisionerat:** projekt kmzhyblzxangpxydufve, anon-auth PA, Cloudflare-env satt av Daniel, MCP ansluten. T14 kan byggas live. Dokumentera i `docs/decisions.md` nar T14 byggs.
+
+**"Behover Daniel"-ko (han ar borta):**
+- Push-notiser-setup (T22): kraver Apple/Google Developer-konton, Daniel maste godkanna.
+- Captcha (T14 valfri): av som default, ingen akut atgard.
+Logga ovan har for hans hemkomst.
+
+**EXAKT nasta steg (autonomt):**
+1. Dirigenten mergar PR #33 mot `develop` (`gh pr merge 33 --merge --repo danielaldemir79/vm-2026`).
+2. Dirigenten stanger issue #6 manuellt (`gh issue close 6`).
+3. Dirigenten flyttar kort #6 till Done pa boarden.
+4. **Nasta task: #31 (T4b, Matchabla)** - fas 1, byggbar. Daniel har gett fullstandig TV-tabla (gruppspel + slutspel, tider + kanaler SVT/TV4). Korskolla mot T4:s lag/grupp-data + slutspelskopplingar (matchnummer 73-104) mot FIFA-motorn.
+5. Darefter T7-T13 (Fas 1), sen T14 + Fas 2 (Supabase live), sen Fas 3.
+
+**FORTSATTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel ar borta ~1 vecka och har gett dirigenten full fullmakt att merga och beta av hela task-listan autonomt.
+>
+> Om PR #33 (T6, feature/T6-resultatinmatning) ANNU INTE mergad:
+> Merga den mot develop: `gh pr merge 33 --merge --repo danielaldemir79/vm-2026`.
+> Stang sedan issue #6 manuellt (`gh issue close 6`) - auto-close funkar inte mot develop nar default-branch ar main.
+> Flytta kort #6 till Done pa boarden.
+>
+> Om PR #33 REDAN mergad:
+> T1-T6 ar alla klara och mergade. Plocka nasta task fran boarden.
+> **Nasta task: #31 (T4b, Matchtabla, fas 1)** - byggbar nu. Daniel har lamnat fullstandig TV-tabla (gruppspel + slutspel, tider + kanaler SVT/TV4/Viaplay). Korskolla mot T4:s lag/grupp-data + FIFA-motorn (matchnummer 73-104 for slutspelet).
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+>
+> Darefter (i ordning, autonomt): T7 (success-token AA-ton, T7-pin!), T8, T9 (F1-pin penalties!), T10, T11, T12, T13 - alla Fas 1.
+> Sedan T14 (Supabase live - projekt kmzhyblzxangpxydufve, anon-auth PA, dokumentera beslut i docs/decisions.md, RLS: restriktera per auth.uid()+rum).
+> Darefter Fas 2 (T15-T20), Fas 3 (T21-T26).
+>
+> Bar framat (alla tasks):
+> - **F1-pin (T9):** reducern hanterar inte penalties. T9 fixar.
+> - **T7-pin:** ljust tema, accent == success-gron (#0e7a44). T7 ger success en distinkt AA-ton.
+> - **T14-pin:** Supabase/auth/RLS, inga secrets i repo. RLS maste restriktera per auth.uid()+rum.
+> - **Supabase:** projekt kmzhyblzxangpxydufve, anon-auth PA, Cloudflare-env satt, MCP ansluten.
+> - **"Behover Daniel"-ko:** push-notiser (T22), captcha (T14 valfri, av). Notifiera Daniel vid hemkomst.
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T5 KLAR - PR #32 väntar på Daniels merge
 
 **Branch:** `feature/T5-gruppspelsvy` @ HEAD `ea8e363`

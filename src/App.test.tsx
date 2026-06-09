@@ -25,20 +25,21 @@ function renderApp() {
   );
 }
 
-// App monterar nu gruppspelsvyn (T5), som gör en async datahämtning. Vänta in
-// att den SETTLAT innan testet avslutas, annars sker ett state-update efter
-// testet (act-varning + risk för flaky).
+// App monterar nu gruppspelsvyn (T5) + resultatinmatningen (T6), som båda läser
+// den delade storens async seedning. Vänta in att den SETTLAT innan testet
+// avslutas, annars sker ett state-update efter testet (act-varning + risk för flaky).
 //
-// VARFÖR loading-indikatorn och inte rubriken: "Gruppspelet"-rubriken renderas
-// redan i loading-läget, så att vänta på den bevisar inte att useGroupData
-// hunnit byta state. Settled = laddnings-indikatorn (role="status") har
-// FÖRSVUNNIT, dvs hooken har gått till ready eller error. role="status" är
-// unik för loading-läget (error använder role="alert", ready ingen status),
-// så ingen name-filtrering behövs. waitForElementToBeRemoved väntar just på
-// den övergången, och kräver att elementet finns vid anropet (det gör det:
-// useGroupData startar i 'loading').
+// VARFÖR loading-indikatorerna och inte rubriken: rubrikerna renderas redan i
+// loading-läget, så att vänta på dem bevisar inte att storen hunnit byta state.
+// Settled = laddnings-indikatorerna (role="status") har FÖRSVUNNIT, dvs storen
+// har gått till ready eller error. Det finns NU två status-element i loading
+// (gruppspel + resultatinmatning), så vi väntar tills BÅDA är borta via
+// queryAllByRole (queryByRole skulle kasta på flera träffar).
 async function waitForAppSettled() {
-  await waitForElementToBeRemoved(() => screen.queryByRole('status'));
+  await waitForElementToBeRemoved(() => {
+    const statuses = screen.queryAllByRole('status');
+    return statuses.length > 0 ? statuses : null;
+  });
 }
 
 describe('App-skalet', () => {

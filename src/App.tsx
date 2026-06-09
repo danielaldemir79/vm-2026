@@ -12,6 +12,7 @@ import { Wordmark } from './components/Wordmark';
 import { SwatchGrid } from './components/foundation/SwatchGrid';
 import { MotionDemo } from './components/foundation/MotionDemo';
 import { GroupStageView } from './features/groups';
+import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -111,13 +112,30 @@ export default function App() {
           </Slide>
         </div>
 
-        {/* Gruppspelsvyn (T5): alla 12 grupper med live-tabeller. Den FUNKTIONELLA
-            + tillgängliga strukturen byggs här; design-frontend ger den premium-
-            visuell polish ovanpå. Slide-in för känslan, samma rörelse-primitiv som
-            resten av showcasen. */}
-        <Slide direction="up">
-          <GroupStageView />
-        </Slide>
+        {/* Gruppspelsvyn (T5) + resultatinmatningen (T6) delar EN ResultsProvider
+            (T6:s delade store): en inmatning i ResultEntryView uppdaterar samma
+            matcher som gruppspelstabellerna härleds ur, så tabellerna räknas om
+            live (härledd state, SPEC §6). Den FUNKTIONELLA + tillgängliga
+            strukturen byggs här; design-frontend ger premium-polish + den
+            visuella målfirande-animationen ovanpå. */}
+        <ResultsProvider>
+          <Slide direction="up">
+            <GroupStageView />
+          </Slide>
+
+          <Slide direction="up">
+            <Panel>
+              {/* Design-frontends premium-firande kopplas in via render-proppen.
+                  Kroken (i vyn) styr trigger/timing/reduced-motion, overlayn ritar
+                  bara explosionen, en ren glädje-yta. */}
+              <ResultEntryView
+                renderCelebration={(celebration) => (
+                  <GoalCelebrationOverlay celebration={celebration} />
+                )}
+              />
+            </Panel>
+          </Slide>
+        </ResultsProvider>
 
         {/* Typografi-prov: visar display- mot brödtext-stacken. */}
         <Slide direction="up">
