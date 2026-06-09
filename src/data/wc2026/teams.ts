@@ -22,6 +22,7 @@
 // trivia, starPlayers, bestPlay) lämnas tomma här, de fylls av lag-profil-tasken.
 
 import type { Group, GroupId, Team } from '../../domain/types';
+import { GROUP_IDS } from '../../domain/types';
 
 /**
  * De 48 lagen, grupperade A-L i lottnings-positionsordning (position 1-4).
@@ -115,8 +116,13 @@ function teamId(code: string): string {
  * Alla 48 lag som en platt, typad lista. Lag-id härleds ur landskoden (stabil
  * nyckel som matcher/tabeller refererar, SPEC §6). group sätts ur indelningen
  * ovan så Team.group och Group.teamIds garanterat stämmer överens (en sanning).
+ *
+ * Gruppordningen härleds EXPLICIT ur den kanoniska `GROUP_IDS` (A-L, enda
+ * sanningen för iteration, se domain/types.ts), inte ur `Object.keys`. Object-
+ * nyckelordning RÅKAR vara insättningsordning men är ett implicit beroende, här
+ * krävs uttrycklig grupp-ordning A-L oavsett hur objektet råkar ligga.
  */
-export const WC2026_TEAMS: Team[] = (Object.keys(TEAMS_BY_GROUP) as GroupId[]).flatMap((group) =>
+export const WC2026_TEAMS: Team[] = GROUP_IDS.flatMap((group) =>
   TEAMS_BY_GROUP[group].map(
     (t): Team => ({
       id: teamId(t.code),
@@ -130,8 +136,9 @@ export const WC2026_TEAMS: Team[] = (Object.keys(TEAMS_BY_GROUP) as GroupId[]).f
 /**
  * De 12 grupperna med sina lag-id i lottnings-positionsordning (position 1-4).
  * Refererar Team.id, inte inbäddade objekt (en sanning per lag, SPEC §6).
+ * Grupp-ordningen härleds explicit ur `GROUP_IDS` (A-L), inte objekt-nyckelordning.
  */
-export const WC2026_GROUPS: Group[] = (Object.keys(TEAMS_BY_GROUP) as GroupId[]).map(
+export const WC2026_GROUPS: Group[] = GROUP_IDS.map(
   (group): Group => ({
     id: group,
     teamIds: TEAMS_BY_GROUP[group].map((t) => teamId(t.code)),

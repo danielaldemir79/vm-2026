@@ -10,6 +10,13 @@ const nodes = buildBracket();
 const byId = new Map(nodes.map((n) => [n.id, n]));
 
 describe('buildBracket: noder och form', () => {
+  it('bygger den verkliga strukturen UTAN att fail-loud-vakten triggar (normal väg intakt)', () => {
+    // C8: winnerGoesTo använder setOnce (kastar vid dubblett-mappning). Den
+    // riktiga BRACKET_MATCHES har exakt en efterföljare per match, så bygget
+    // ska INTE kasta. Vaktens kast-väg täcks av set-once.test.ts.
+    expect(() => buildBracket()).not.toThrow();
+  });
+
   it('skapar två slots (hemma/borta) per slutspelsmatch = 64 noder', () => {
     expect(nodes).toHaveLength(BRACKET_MATCHES.length * 2);
     expect(nodes).toHaveLength(64);

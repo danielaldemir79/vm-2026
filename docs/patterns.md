@@ -84,9 +84,11 @@ konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
    en människa kan spot-checka utdraget mot källan och CI kan regenerera ur det.
 2. Lägg parsnings-/validerings-/emit-logiken i en **typad, ren modul** (sträng in, sträng ut, inga
    IO-beroenden) som BÅDE generator-skriptet OCH källånkrings-testet importerar (EN sanning, ingen
-   duplicerad parser). Generator-skriptet (`scripts/generate-<tabell>.ts`, körs `node`-direkt på Node 24+)
-   är en tunn CLI ovanpå modulen: läs committat utdrag, bygg, skriv. Parsa med strikt regex (matcha radens
-   form exakt, ignorera sidbrytnings-/rubrik-brus).
+   duplicerad parser). Generator-skriptet (`scripts/generate-<tabell>.ts`, körs via ett npm-script som
+   drar `vite-node`, t.ex. `npm run gen:third-place-table`) är en tunn CLI ovanpå modulen: läs committat
+   utdrag, bygg, skriv. `vite-node` följer med projektets toolchain (via vitest) och kör `.ts` direkt på
+   repo:ts Node 22 (CI), så scriptet är återkörbart utan Node 24:s native `.ts`-type-stripping. Parsa med
+   strikt regex (matcha radens form exakt, ignorera sidbrytnings-/rubrik-brus).
 3. **VALIDERA före emit** och faila högt vid fel (kasta i modulen / `process.exit(1)` i CLI:n):
    rätt antal rader, varje rad välformad, inga dubbletter, hela domänen täckt (t.ex. alla C(n,k)
    kombinationer). Hellre stopp än fel data.

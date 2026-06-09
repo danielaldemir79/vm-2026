@@ -20,6 +20,28 @@ describe('VM 2026 lag-/gruppdata: struktur och antal', () => {
     }
   });
 
+  it('grupperna kommer i EXPLICIT A-L-ordning (härledd ur GROUP_IDS, inte objekt-nyckelordning)', () => {
+    // C7: ordningen ska vara den kanoniska GROUP_IDS-ordningen (A,B,...,L), inte
+    // ett implicit beroende på hur TEAMS_BY_GROUP-objektet råkar ligga. Detta är
+    // en ORDNINGS-känslig assertion (ingen sort), så drift mot nyckelordning fångas.
+    expect(WC2026_GROUPS.map((g) => g.id)).toEqual([...GROUP_IDS]);
+  });
+
+  it('lag-listan följer samma A-L-gruppordning (grupp A:s 4 lag först, grupp L:s sist)', () => {
+    // Lagens grupp-fält ska komma i icke-avtagande A-L-ordning: alla A före alla
+    // B osv. Bevisar att WC2026_TEAMS härleds ur GROUP_IDS, inte nyckelordning.
+    const groupSequence = WC2026_TEAMS.map((t) => t.group);
+    const indexOfGroup = (g: (typeof GROUP_IDS)[number]) => GROUP_IDS.indexOf(g);
+    for (let i = 1; i < groupSequence.length; i += 1) {
+      expect(indexOfGroup(groupSequence[i])).toBeGreaterThanOrEqual(
+        indexOfGroup(groupSequence[i - 1])
+      );
+    }
+    // Första laget hör till grupp A, sista till grupp L.
+    expect(groupSequence[0]).toBe('A');
+    expect(groupSequence[groupSequence.length - 1]).toBe('L');
+  });
+
   it('lag-id och landskoder är unika', () => {
     const ids = WC2026_TEAMS.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);

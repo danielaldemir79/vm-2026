@@ -11,6 +11,7 @@
 
 import type { BracketSlot } from '../types';
 import { BRACKET_MATCHES, type BracketMatch } from './bracket-structure';
+import { setOnce } from './set-once';
 
 /**
  * Vilken sida av en match en slot avser. En slutspelsmatch har två slots
@@ -48,12 +49,19 @@ export interface BracketNode extends BracketSlot {
  */
 export function buildBracket(): BracketNode[] {
   // Index: vilken slot tar emot vinnaren av en given match?
+  //
+  // FAIL-LOUD (PRINCIPLES §8): exakt EN slot i hela trädet får mata på en given
+  // match-winner-källa (en match har precis en efterföljare). Om bracket-structure
+  // av misstag refererade samma `match-winner: Mxx` från fler än en slot skulle en
+  // tyst `.set(...)`-överskrivning ge ett "giltigt" men FELKOPPLAT träd, just den
+  // fel-klass kritisk källhänvisad strukturdata aldrig får drabbas av. setOnce
+  // kastar i stället, så ett schemafel syns vid källan i bygget/testet.
   const winnerGoesTo = new Map<string, string>();
   for (const match of BRACKET_MATCHES) {
     for (const side of ['home', 'away'] as const) {
       const source = side === 'home' ? match.home : match.away;
       if (source.kind === 'match-winner') {
-        winnerGoesTo.set(source.matchId, slotId(match.id, side));
+        setOnce(winnerGoesTo, source.matchId, slotId(match.id, side), 'match-winner-källa');
       }
     }
   }

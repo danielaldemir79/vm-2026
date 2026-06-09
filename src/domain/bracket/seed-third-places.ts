@@ -16,6 +16,7 @@
 
 import type { GroupId } from '../types';
 import { GROUP_IDS } from '../types';
+import { setOnce } from './set-once';
 import { THIRD_PLACE_COLUMN_WINNERS, THIRD_PLACE_TABLE } from './third-place-table';
 
 /**
@@ -69,8 +70,11 @@ function buildTableIndex(): Map<string, ThirdPlaceRow> {
   const index = new Map<string, ThirdPlaceRow>();
   for (const row of THIRD_PLACE_TABLE) {
     // En rads 8 värden ÄR exakt de grupper vars trea kvalificerade sig, så
-    // raden är sin egen nyckel (se third-place-table.ts).
-    index.set(groupSetKey(row), row);
+    // raden är sin egen nyckel (se third-place-table.ts). FAIL-LOUD (setOnce):
+    // de 495 grupp-kombinationerna ska vara UNIKA. Om två rader kollapsade till
+    // samma nyckel (en korrupt/feltranskriberad tabell) skulle en tyst
+    // överskrivning ge fel uppslag för en kombination, kastar i stället.
+    setOnce(index, groupSetKey(row), row, 'Annexe C-kombination');
   }
   return index;
 }
