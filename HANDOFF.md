@@ -5,6 +5,59 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-09 , T4 KLAR - PR #30 väntar på Daniels merge
+
+**Branch:** `feature/T4-kritisk-data` @ HEAD `921a3f4`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/30 mot `develop` (Closes #4, state: OPEN)
+**Board:** issue #4 i "In Review" (korrekt, dirigenten stänger issue #4 MANUELLT via `gh issue close 4` och flyttar kort #4 till Done EFTER Daniels merge - auto-close funkar inte mot develop när default-branch är main).
+
+**KLART med bevis (SHA + verifiering):**
+- `33a123d` - Treeplats-/slutspelsmotor (FIFA Annexe C 495-tabell, M73-M104, BracketSlot-graf) + F1 tiebreak-re-iteration
+- `0e988b0` - 48 lag + 12 grupper (lottningen 2025-12-05, källkollad Wikipedia + Sky/OneFootball/UEFA)
+- `3669824` - Källåkring: committat FIFA-källutdrag (`annexe-c-source.txt`) + delad parser + regenerera-och-diffa-test + mutationstest
+- `cf896a5` - Copilot runda 1-fix (C1 readonly, C2 test-assert, C3 vite-node-generator, C5 fail-loud tiebreak)
+- `6ebcfb3` - Copilot runda 2-fix (C6 doc-drift, C7 explicit A-L-ordning, C8 fail-loud `setOnce` på winnerGoesTo + TABLE_INDEX)
+- `921a3f4` - Copilot runda 3-fix (C9 fail-loud dup rad-id i parseAnnexeC)
+- Verifiering (dirigenten, oberoende): **174 tester gröna (18 filer)**, build grönt, lint rent, format rent, inga secrets
+- Dataintegritets-låset bevisat: en mittraden-mutation gör källånkrings-testet RÖTT (strukturella testet förblir grönt - visar gapet)
+- Reviewern jämförde alla 495 källutdrags-rader mot FIFA:s officiella PDF: 0 avvikelser
+- 6/6 acceptanskriterier bockade i issue #4
+
+**F1-pinnen (från T3): STÄNGD**
+FIFA artikel 13 KRÄVER re-iteration av inbördes-kriterierna på kvar-lika delmängd. Implementerad + bevisad med test. T3:s KISS-avgränsning är avgjord och stängd.
+
+**F3-scope-beslut (Daniel godkände 2026-06-09):**
+Den fullständiga matchtablån (72 gruppmatchers tider/arenor + svenska TV-kanaler) flaggades medvetet och flyttades till task **#31** (Backlog, phase-1). Issue #4:s acceptanskriterier uppdaterades till motorn + lag/grupper + F1.
+
+**PINNADE punkter (bär framåt):**
+- **T7-pin:** i ljust tema är accent == success-grön (#0e7a44). T7 ska ge success en distinkt AA-klarande ton, inte samma som accent.
+- **T14-pin:** Supabase/auth/RLS, inga secrets i repo. Live-Supabase-klienten är en medveten fail-loud-stub, T14 tänder den.
+
+**EXAKT nästa steg:**
+1. Daniel mergar PR #30 mot `develop`.
+2. Dirigenten kör `gh issue close 4` manuellt (stänger issue #4; auto-close fungerar inte mot develop).
+3. Dirigenten flyttar kort #4 till Done på boarden.
+4. Nästa byggbara task: **T5 (#5, Gruppspelsvy + live-tabeller)** - beror på T3+T4, båda klara efter merge. Alternativt **T6 (#6, Resultatinmatning)** eller **T31 (#31, Matchtablå)** - kräver svensk TV-källa, Daniel behöver godkänna källa-val.
+
+**FORTSÄTTNINGS-PROMPT:**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. T4 är klar (läs `HANDOFF.md`).
+>
+> Om PR #30 ÄNNU INTE mergad: Daniel mergar den manuellt mot `develop`. Dirigenten stänger sedan issue #4 MANUELLT (`gh issue close 4`) - auto-close funkar inte mot develop när default-branch är main - och flyttar kort #4 till Done på boarden.
+>
+> Om PR #30 REDAN mergad: plocka nästa task.
+> T1, T2, T3, T4 är alla klara och merge:ade. Nästa byggbara Fas 1-tasks:
+> - **T5 (#5, Gruppspelsvy + live-tabeller)** - beror på T3+T4, direkt byggbar.
+> - **T6 (#6, Resultatinmatning)** - beror på T3+T4+T5 (kolla beroenden i issue-bodyn).
+> - **T31 (#31, Matchtablå)** - byggbar efter T4, kräver en bekräftad svensk TV-källa, fråga Daniel om den finns redo.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+>
+> Bär framåt:
+> - **T7-pin:** ljust tema, accent == success-grön (#0e7a44). T7 ska ge success en distinkt AA-klarande ton.
+> - **T14-pin:** Supabase/auth/RLS, inga secrets i repo.
+> - F1-pinnen (tiebreak re-iteration) är STÄNGD - ta INTE med som öppen pinne framåt.
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T3 KLAR - PR #29 väntar på Daniels merge
 
 **Branch:** `feature/T3-datalager` @ HEAD `489995d`
