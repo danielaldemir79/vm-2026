@@ -46,8 +46,18 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
   // Bara matcher med BÅDA lag kända kan matas in (ett slutspels-slot utan
   // framräknat lag har inget att mata in mot än, T4/T9 fyller dem). Filtrera
   // defensivt så formuläret aldrig visar ett "Okänt lag mot Okänt lag".
+  //
+  // Type predicate som FAKTISKT narrowar: efter filtret är båda id:n `string`
+  // (icke-null), inte `string | null`, så konsumenterna slipper en extra null-
+  // koll. Vi intersectar `Match` med just de fält filtret garanterar (samma
+  // mönster som isCounted i compute-standings), i stället för ett `m is Match`
+  // som inte uttrycker någon ny information.
   const editable = useMemo(
-    () => matches.filter((m): m is Match => m.homeTeamId !== null && m.awayTeamId !== null),
+    () =>
+      matches.filter(
+        (m): m is Match & { homeTeamId: string; awayTeamId: string } =>
+          m.homeTeamId !== null && m.awayTeamId !== null
+      ),
     [matches]
   );
 
