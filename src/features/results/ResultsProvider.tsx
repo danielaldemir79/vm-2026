@@ -97,7 +97,10 @@ export function ResultsProvider({ children, env = import.meta.env }: ResultsProv
     return () => {
       cancelled = true;
     };
-  }, [env]);
+    // setMatches är en stabil useCallback (tom dep-array), så den ändrar aldrig
+    // identitet och triggar inte om-körning, den listas för exhaustive-deps-
+    // korrekthet (effekten anropar den vid seed).
+  }, [env, setMatches]);
 
   // Mata in/redigera ETT resultat: validera, och vid ok uppdatera matchlistan
   // optimistiskt (direkt i minnet, vyerna räknar om reaktivt). Vid fel ändras
@@ -138,8 +141,10 @@ export function ResultsProvider({ children, env = import.meta.env }: ResultsProv
   );
 
   const store: ResultsStore = useMemo(
+    // setMatches är en stabil useCallback, tas med för exhaustive-deps-korrekthet
+    // (den ingår i store-objektet) utan att påverka när memon räknas om.
     () => ({ status, matches, teams, groups, mode, error, setMatches, submitResult }),
-    [status, matches, teams, groups, mode, error, submitResult]
+    [status, matches, teams, groups, mode, error, setMatches, submitResult]
   );
 
   return <ResultsStoreContext.Provider value={store}>{children}</ResultsStoreContext.Provider>;
