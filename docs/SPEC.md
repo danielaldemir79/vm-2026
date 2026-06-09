@@ -36,12 +36,13 @@ realtidssynk kan slås på utan omarkitektur.
 gruppchatten. "Lägg till på hemskärm" ger app-ikon och helskärm. Ingen App Store, fungerar
 på iPhone och Android, push-notiser möjliga på installerad PWA.
 
-Teknik-stack (förslag, låses i inception):
+Teknik-stack (låst i inception 2026-06-09, se [`decisions.md`](decisions.md)):
 - **Frontend:** React + Vite + TypeScript.
 - **Styling/känsla:** Tailwind CSS + Framer Motion (animationer = det "levande/trendiga").
 - **PWA:** vite-plugin-pwa (installerbar, offline-skal, manifest, ikon).
 - **Molnbas:** Supabase (Postgres + Auth + Realtime + Row Level Security). Gratisnivån räcker.
-- **Hosting:** Vercel eller Cloudflare Pages (gratis, egen URL, auto-deploy från `main`).
+- **Hosting:** Cloudflare Pages (gratis, egen URL). Auto-deploy: produktion från `main`,
+  förhandsvisning från `develop` och PR-brancher.
 - **Delning:** publik PWA-URL + ev. rumskod/länk för att gå med i tips-ligan.
 
 ## 4. Funktioner (faser)
@@ -95,19 +96,28 @@ Detta är ökänt felkänsligt. Krav:
   officiella lottning. Denna task får ta den tid den behöver och passerar Agent Kits
   fullständighets-/review-grind innan den anses klar.
 
-## 6. Datamodell (utkast, låses i inception)
+## 6. Datamodell (låst i inception 2026-06-09)
 
-Entiteter:
+Kärn-entiteter (tracker):
 - **Team:** namn, landskod/flagga, grupp, FIFA-ranking, kuriosa, stjärnspelare, "bästa speldrag".
 - **Group:** id (A till L), lag, beräknad tabell (poäng, MV, GM, IM, MS).
 - **Match:** id, grupp eller slutspelsrunda, lag-hemma, lag-borta, datum/tid, arena/stad,
   svensk TV-kanal, resultat (null tills inmatat), status.
 - **BracketSlot:** slutspelsposition, källa (gruppvinnare/tvåa/bästa trea enligt FIFA-regel),
   framräknat lag, nästa slot.
-- **User / Player (tips):** identitet, pinnat favoritlag.
-- **Prediction:** användare, match, gissat resultat, poäng.
 
-Tabeller och träd är **härledda** från Match-resultaten (en sanning, beräknas, lagras inte dubbelt).
+Social-entiteter (tips + gamification, Fas 2-3):
+- **User / Player:** identitet, pinnat favoritlag, personlig statistik (träffsäkerhet, bästa call).
+- **Room / League:** rum-id, namn, rumskod, medlemmar (mini-liga = eget rum, egen topplista).
+- **Prediction:** användare, match, gissat resultat, poäng, jokermarkering (dubbel-poäng).
+- **BracketPrediction:** användare, gissat slutspelsträd (vem går vidare per runda) + bonuspoäng.
+- **GroupPrediction:** användare, gissad gruppvinnare/tvåa per grupp + bonuspoäng.
+- **Achievement / Badge:** användare, märkestyp, intjänad-tidpunkt (streaks, "kallade skrällen" m.fl.).
+- **Reaction:** användare, mål (match eller topplista-rad), emoji.
+
+Tabeller, slutspelsträd, poäng och topplistor är **härledda** från Match-resultaten + Predictions
+(en sanning, beräknas av rena funktioner, lagras aldrig dubbelt). Detta är arkitekturens ryggrad
+och det som gör den kritiska FIFA-seedningen (§5) testbar och säker.
 
 ## 7. Visuell identitet
 
@@ -136,14 +146,59 @@ Källor Daniel gett (läses av och verifieras i data-tasken):
 - **Sveriges deltagande är osäkert** (avgörs i playoff mars 2026). Appen byggs lagagnostiskt;
   "favoritlag" är generiskt och pinnas per användare, inte hårdkodat till Sverige.
 - Exakta avsparkstider, arenor och TV-kanaler kan ändras , datalagret görs lätt att uppdatera.
-- Slutgiltigt val av hosting (Vercel vs Cloudflare Pages) låses i inception.
+- Hosting **låst i inception 2026-06-09: Cloudflare Pages** (se [`decisions.md`](decisions.md)).
 
-## 11. Build-ordning (för boarden)
+## 11. Build-ordning (faser)
 
-1. Repo-skelett + PWA-grund + deploy-pipeline (tom app live tidigt).
-2. **Data-task (kritisk):** verifierat schema + grupper + slutspelskopplingar.
-3. Gruppspelsvy + tabeller + resultatinmatning.
-4. Slutspelsträd (dynamiskt , låst , animerat).
-5. Lag-profiler + dags-tema + visuell polish.
-6. Fas 2: auth/rumskod + tips + topplista + realtid.
-7. Fas 3: delbara bildkort, push, "vad krävs", DR-inbäddning.
+Bygget sker i fyra faser. **Den fullständiga, levande task-listan bor på GitHub-boarden**
+(en sanning per fakta), denna sektion ger bara fas-strukturen.
+
+- **Fas 0 , Fundament:** repo-skelett + PWA-grund + CI/CD + tidig deploy, design-/temasystem,
+  datalager (typad domänmodell + fixtures-först + härledd-state-motorn).
+- **Fas 1 , Wow-kärnan (tracker):** kritisk data-task (§5), gruppspel + tabeller +
+  resultatinmatning, daglig matchvy + hero + nedräkning, dags-tema, slutspelsträd, lag-profiler,
+  "vad krävs"-kalkylator, what-if-simulator, Fas 1-deploy + installation + offline.
+- **Fas 2 , Socialt:** Supabase + auth + rumskod, tips-motor, slutspels-/gruppvinnar-tips,
+  topplista + tips-avslöjande, realtid, gamification, mini-ligor.
+- **Fas 3 , Polish & viralitet:** delbara bildkort + länk-preview, push-notiser, personlig
+  statistik, reaktioner, prestanda-/E2E-/a11y-pass, DR-webb-inbäddning.
+
+Ordningen följer beroenden: fundament före kärna, kärna före socialt. Den kritiska data-tasken
+(§5) tidigt, allt annat bygger på dess verifierade data.
+
+## 12. Utökad funktionalitet (inception-tillägg, godkänd 2026-06-09)
+
+Utöver grund-designen ovan godkände Daniel en utökning för att lyfta appen flera steg (max
+kvalitet, lugnt tempo). Dessa features är scope och hör till sina respektive faser:
+
+**Tips blir en riktig VM-pool (Fas 2):**
+- **Slutspels-/bracket-tips:** tippa hela slutspelsträdet (vem går vidare per runda) i förväg,
+  bonuspoäng. Det klassiska som håller intresset uppe hela turneringen.
+- **Gruppvinnar-tips:** gissa gruppettor/tvåor före gruppspelet, bonuspoäng.
+- **Gamification:** streaks, märken ("kallade skrällen", "perfekt omgång"), och en **joker-match**
+  per omgång där poängen dubblas (strategi, inte bara tur).
+- **Mini-ligor:** flera kompisgäng, varje gäng eget rum och egen topplista.
+- **Tips-avslöjande:** efter avspark (deadline-lås) ser alla vad varandra tippade.
+
+**Levande känsla (Fas 1-3):**
+- Målfirande-animationer vid resultatinmatning (Framer Motion).
+- Valbar haptik + ljud på mobil (av som standard, installerad PWA).
+- **"Vad krävs"-kalkylator** (uppflyttad till Fas 1): live-scenarier sista gruppomgången,
+  "om X vinner går Y vidare", de mest spännande minuterna i ett VM.
+- **What-if-simulator:** spela ut hypotetiska resultat och se tabell + slutspelsträd ändras.
+
+**Viralitet (Fas 3):**
+- Delbara bildkort (resultat, tabell, "min bracket", min topplista-placering), DR-branding möjlig.
+- Rik länk-förhandsvisning (Open Graph) när PWA-länken delas i en gruppchatt.
+- Smidig "lägg till på hemskärm"-onboarding + offline-först.
+
+**Teknisk excellens (genomgående):**
+- **Fixtures-först:** all kod byggs mot typad fixtures-data, miljö-gating växlar till live Supabase
+  utan kod-ändring. Låter hela appen byggas och testas innan Supabase-kontot finns.
+- **Härledd state:** tabeller/träd/poäng/topplistor beräknas av rena, hårt testade funktioner
+  från en enda sanning (matchresultat + tips).
+- **CI/CD:** GitHub Actions bygger/testar/lintar varje PR, auto-deploy till Cloudflare Pages.
+- **Prestanda + tillgänglighet:** Core Web Vitals-budget, code-splitting, WCAG, E2E (Playwright).
+
+Reaktioner (lätt socialt, emoji på matcher/topplista) och personlig statistik (din träffsäkerhet
+över tid) hör till Fas 3.

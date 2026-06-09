@@ -15,11 +15,27 @@ Detta repo är **arbetsstycket**. Motorn är Agent Kit (installerat plugin), som
 - Branch-modell: feature-branch per task från `develop`, PR mot `develop`, Daniel mergar manuellt.
   `main` får bara release-merges.
 
-## Teknik (förslag, låses i inception)
+## Teknik (låst i inception 2026-06-09, se docs/decisions.md)
 
 - PWA: React + Vite + TypeScript, Tailwind + Framer Motion, vite-plugin-pwa.
 - Molnbas: Supabase (Postgres + Auth + Realtime + RLS).
-- Hosting: Vercel eller Cloudflare Pages (auto-deploy från `main`).
+- Hosting: Cloudflare Pages. Produktion deployas från `main`, förhandsvisning från `develop` + PR.
+- Arkitektur: härledd state (rena funktioner) + fixtures-först (miljö-gating till live Supabase).
+
+## Verifiering (se Agent Kit docs/verification.md)
+
+Kommandona wire:as upp i T1 (repo-skelett). Från och med då gäller:
+- Build:  `npm run build`
+- Test:   `npm test` (Vitest)
+- Lint:   `npm run lint` (ESLint) + `npm run format:check` (Prettier)
+- Dev:    `npm run dev`
+- E2E:    `npm run test:e2e` (Playwright, införs i T25 / vid behov)
+
+Före T1 finns ingen kod att bygga, det är förväntat.
+
+## Kommunikation (ärvs från Agent Kit docs/governance.md §1)
+
+- Allt till Daniel: enkelt, pedagogiskt, gärna med liknelser. Han lär sig och ska vara med på resan.
 
 ## Kritisk regel: VM 2026-formatet
 
