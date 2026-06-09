@@ -1,6 +1,7 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
+import type { Match } from '../../domain/types';
 import { ResultsProvider } from './ResultsProvider';
 import { useResultsStore } from './results-context';
 import { useGroupData } from '../groups/use-group-data';
@@ -179,6 +180,62 @@ describe('inmatning -> härledd tabell ändras (en sanning, härledd state)', ()
       // rsa vann nu 5-0: 3 poäng, +5 i målskillnad (bevisar omräkningen ur inmatningen).
       expect(rsa.points).toBe(3);
       expect(rsa.goalDifference).toBe(5);
+    });
+  });
+});
+
+// Race-skydd för det seam T14 (persistens) och T18 (realtid) bygger på: en
+// konsument kan anropa setMatches(next) och DIREKT submitResult(...) i samma tick
+// (innan en re-render hunnit synka matchesRef). submitResult MÅSTE då operera mot
+// `next`, inte mot den gamla listan. Testet bevisar invarianten genom att låta
+// `next` innehålla en match som INTE fanns i den seedade fixtures-listan: en stale
+// ref hade gett 'unknown-match' (matchen "fanns inte"), den synkront uppdaterade
+// reffen hittar den och lyckas. (C5, latent race i setMatches-seamen.)
+describe('setMatches -> submitResult i samma tick (race-fri seam för T14/T18)', () => {
+  it('submitResult ser listan från setMatches(next) utan att vänta på re-render', async () => {
+    const { result } = renderHook(() => useResultsStore(), { wrapper: wrapperFor(fixturesEnv()) });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const groupB = result.current.groups.find((g) => g.id === 'B')!;
+    // En match-id som garanterat INTE finns i de seedade fixtures-matcherna.
+    const raceId = 'race-only-in-next';
+    const next: Match[] = [
+      {
+        id: raceId,
+        stage: 'group',
+        groupId: 'B',
+        homeTeamId: groupB.teamIds[0],
+        awayTeamId: groupB.teamIds[1],
+        kickoff: '2026-06-13T19:00:00Z',
+        venue: 'Racearena',
+        result: null,
+        status: 'scheduled',
+      },
+    ];
+
+    let validation: ReturnType<typeof result.current.submitResult> = { ok: true };
+    act(() => {
+      // SAMMA tick, ingen re-render emellan: setMatches följt direkt av submitResult
+      // mot en match som bara finns i `next`. Greppar storen via result.current
+      // EN gång före anropen (samma referenser till de stabila mutatorerna).
+      const store = result.current;
+      store.setMatches(next);
+      validation = store.submitResult(raceId, {
+        homeGoals: 2,
+        awayGoals: 1,
+        status: 'finished',
+      });
+    });
+
+    // Med stale ref hade detta blivit ok:false / 'unknown-match'. Race-fritt: ok.
+    expect(validation.ok).toBe(true);
+
+    // Och state-vägen (reaktiviteten) triggade fortfarande: matchen finns i storen
+    // med det inmatade, färdiga resultatet.
+    await waitFor(() => {
+      const stored = result.current.matches.find((m) => m.id === raceId);
+      expect(stored?.status).toBe('finished');
+      expect(stored?.result).toEqual({ homeGoals: 2, awayGoals: 1 });
     });
   });
 });
