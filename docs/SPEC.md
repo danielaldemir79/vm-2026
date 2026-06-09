@@ -41,8 +41,9 @@ Teknik-stack (låst i inception 2026-06-09, se [`decisions.md`](decisions.md)):
 - **Styling/känsla:** Tailwind CSS + Framer Motion (animationer = det "levande/trendiga").
 - **PWA:** vite-plugin-pwa (installerbar, offline-skal, manifest, ikon).
 - **Molnbas:** Supabase (Postgres + Auth + Realtime + Row Level Security). Gratisnivån räcker.
-- **Hosting:** Cloudflare Pages (gratis, egen URL). Auto-deploy: produktion från `main`,
-  förhandsvisning från `develop` och PR-brancher.
+- **Hosting:** Cloudflare Pages (gratis, egen URL). Auto-deploy: produktion från `develop` (live
+  på vm-2026.pages.dev), förhandsvisning per PR. `main` reserverad för framtida formella releaser
+  (uppdaterat 2026-06-09 när Cloudflare-kopplingen aktiverades, se `docs/decisions.md`).
 - **Delning:** publik PWA-URL + ev. rumskod/länk för att gå med i tips-ligan.
 
 ## 4. Funktioner (faser)

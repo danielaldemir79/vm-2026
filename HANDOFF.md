@@ -5,6 +5,46 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-09 , T3 KLAR - PR #29 väntar på Daniels merge
+
+**Branch:** `feature/T3-datalager` @ HEAD `489995d`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/29 mot `develop` (Closes #3, state: OPEN)
+**Board:** issue #3 i "In Review" (korrekt, dirigenten flyttar till Done EFTER Daniels merge).
+**Copilot-loop:** 4 rundor (6 -> 2 -> 2 -> 0 fynd), PR ren.
+
+**KLART med bevis (SHA + verifiering):**
+- `bf78607` - Domänmodell, fixtures-först, env-gate, tabellberäkning med FIFA-tiebreakers
+- `4ebabe4` - FIFA-tiebreak-beslut dokumenterat + fixtures-mönstret i docs/patterns.md
+- `7fd8bd1` - Cloudflare-produktionsgren-rättning (main -> develop) i deploy.md/decisions.md/SPEC.md/CLAUDE.md
+- `b83c43b` - Copilot runda 1: C1 group-filter, C2 regressionstester, C3/C4 3-bokstavskoder, C5 memoiserad live-promise, C6 docstring
+- `3d6a264` - Copilot runda 2: C7+C8 Match diskriminerad union, FinishedMatch bär icke-null result
+- `489995d` - Copilot runda 3: C9+C10 groupId-för-gruppmatch som datakontrakt, ej typgaranti
+- Verifiering (oberoende, dirigenten på `489995d`): **111 tester gröna (10 filer)**, build grönt, lint rent, format rent, inga secrets
+- FIFA-tiebreak-ordning källverifierad mot 2 oberoende källor (ESPN + aggregat): VM 2026 har inbördes möte FÖRE total målskillnad, koden gör rätt
+- 5/5 acceptanskriterier bockade i issue #3 (av journalisten 2026-06-09)
+
+**PINNADE punkter (bär framåt):**
+- **F1 (T4, critical):** tabellberäkningen re-itererar INTE inbördes-tabellen för en kvar-lika-delmängd (3+ lag lika, några men inte alla separeras). Medveten KISS-avgränsning i T3, dokumenterad. **T4 ska aktivt besluta om full FIFA-iteration behövs och, om ja, skriva ett test som konstruerar kvar-lika-delmängd och bevisar re-iterationen.** Ägare: senior-dev i T4. (Källa: `compute-standings.ts` ~rad 209-215.)
+- **T7-pin:** ljust tema, accent == success-grön (#0e7a44). T7 ska ge success en distinkt AA-klarande ton.
+- **T14 hög-risk:** Supabase/auth/RLS, inga secrets i repo. Live-Supabase-klienten är en medveten fail-loud-stub, T14 tänder den.
+- **Cloudflare KOPPLAT:** produktion = `develop`, live på vm-2026.pages.dev. T1:s Cloudflare-pin är STÄNGD.
+
+**FORTSÄTTNINGS-PROMPT:**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. T3 är klar (läs `HANDOFF.md`).
+>
+> Om PR #29 ÄNNU INTE mergad: Daniel mergar den manuellt mot `develop`. Dirigenten
+> uppdaterar board-kortet (#3) till Done efter merge.
+>
+> Om PR #29 REDAN mergad: plocka nästa task.
+> **T4 (#4, critical - FIFA-data)** är nästa, beror på T3. Label `critical` -> bredare review-panel.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+> Bär in dessa pinnar i T4:
+> - **F1-pinnen:** besluta om full FIFA-re-iteration (kvar-lika-delmängd) behövs och lägg i så fall ett test som bevisar det. Aldrig gissa treeplats-delmängd ur tabell, det kör via FIFA:s fastlagda tabell (SPEC §5/§8).
+> - **Treeplats-seedning aldrig gissa:** tabell-driven, uttömmande tester, källor i SPEC §8.
+> - T7-pin, T14-pin lever vidare.
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T2 KLAR - PR #28 väntar på Daniels merge
 
 **Branch:** `feature/T2-design-temasystem` @ HEAD `89c38c8`
@@ -98,7 +138,8 @@ commit. `main` @ `c896cfb`. Arbetsträd rent, pushat till origin.
 - `docs/SPEC.md` + `CLAUDE.md` + `docs/decisions.md` + `docs/patterns.md` uppdaterade/skapade,
   committat `ed524aa` på develop, pushat.
 - Stack låst: React + Vite + TS, Tailwind + Framer Motion, vite-plugin-pwa, Supabase.
-  Hosting: Cloudflare Pages (produktion från main, förhandsvisning från develop/PR).
+  Hosting: Cloudflare Pages (produktion från develop, live på vm-2026.pages.dev, förhandsvisning
+  per PR; main reserverad för framtida releaser, rättat 2026-06-09 i T3, se docs/decisions.md).
 - Board (GitHub Projects #2, https://github.com/users/danielaldemir79/projects/2): 26 tasks
   (issue #1-#26), 4 faser, kolumner Backlog -> Ready -> In Progress -> In Review -> Done.
   **T1 (#1) i Ready**, resten Backlog. Etiketter: phase-0/1/2/3, critical (#4), high-risk (#14).

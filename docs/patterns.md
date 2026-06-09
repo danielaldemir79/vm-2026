@@ -50,3 +50,26 @@ utan att röra primitiverna. Testa reduced-motion genom att mocka `useReducedMot
 att `initial`-propen saknar transform vid reducerad rörelse.
 **Varför:** Dubbelt skydd = deterministiskt, testbart WCAG 2.3.3-beteende. jsdom saknar
 `matchMedia`, så lägg en neutral stub i `src/test/setup.ts`.
+
+### fixtures-forst-datakalla-med-env-gate (React + Vite, VM 2026)
+
+**Recept (samma kod tänds live utan ändring):**
+1. Definiera domäntyperna FÖRST (`src/domain/types.ts`), strikt typade.
+2. Skriv fixtures (`src/data/fixtures.ts`) som uppfyller EXAKT samma typer som live-datan kommer
+   göra (samma fältnamn, samma form). Annoteras mot typerna så `tsc -b` failar om formen avviker.
+3. Definiera ett `DataSource`-kontrakt (async-metoder) i `src/data/data-source.ts` som både
+   fixtures och live uppfyller.
+4. En `getDataSource(env = import.meta.env)`-gate väljer källa: `isSupabaseConfigured(env)` (båda
+   `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` finns och är icke-tomma) -> live, annars fixtures
+   med en **fail-loud `console.warn`** så fixtures-läget syns och övergången till live inte glöms.
+5. Live-klienten laddas via **dynamisk import** (`import('./supabase-client')`) så Rollup inte måste
+   lösa ett Supabase-paket som ännu inte är installerat, fixtures-bygget förblir rent.
+6. Live-stubben **fail loud:ar** (kastar) vid anrop innan den är byggd, i stället för att returnera
+   tyst tom data som ser giltig ut.
+7. Injicera `env` som parameter (default `import.meta.env`) så gaten kan enhetstestas utan att mocka
+   `import.meta` globalt.
+
+**Varför:** Hela appen kan byggas och testas innan Supabase-kontot finns (T14), utan kod-ändring vid
+aktivering. Fixtures som uppfyller live-typerna fångar mappnings-drift i bygget i stället för att
+gömma den i en otestad live-gren. Detta är Agent Kit-playbookens generella "fixtures-först"-mönster
+konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
