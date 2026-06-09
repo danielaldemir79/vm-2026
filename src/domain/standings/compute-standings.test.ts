@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeStandings } from './compute-standings';
-import type { Match, MatchResult } from '../types';
+import { compareHeadToHead, computeStandings, type H2HStats } from './compute-standings';
+import type { GroupStanding, Match, MatchResult } from '../types';
 
 // Testhjälpare: bygg en färdigspelad gruppmatch kort och läsbart. Bara fälten
 // som tabellberäkningen bryr sig om varierar per test, resten är konstanter.
@@ -453,6 +453,76 @@ describe('computeStandings, tiebreak: lika poäng löses i FIFA-ordning', () => 
   });
 });
 
+describe('computeStandings, FIFA artikel 13 STEG 2: RE-ITERATION på kvar-lika delmängd', () => {
+  // F1-beslutet (T4): FIFA:s officiella ordalydelse (Regulations FWC26, Article
+  // 13, steg 2) KRÄVER att inbördes-kriterierna (a-c) RÄKNAS OM på enbart den
+  // kvar-lika delmängden när det första inbördes-passet separerar NÅGRA men inte
+  // alla lag: "criteria a) to c) above are applied to the matches between the
+  // REMAINING teams only". T3 lämnade detta som en KISS-avgränsning; T4 imple-
+  // menterar det. Källa + beslut: docs/decisions.md.
+  it('räknar om inbördes på den kvar-lika delmängden och ändrar ordningen', () => {
+    // Konstruktion (alla fyra lika på poäng = 3p via idel oavgjorda, alla med
+    // total MS 0). Hittad via uttömmande sökning (se commit-meddelandet):
+    //   A 0-0 B, A 0-0 C, A 2-2 D, B 1-1 C, B 1-1 D, C 1-1 D
+    //
+    // FÖRSTA inbördes-passet (alla 4): alla matcher oavgjorda -> lika inbördes
+    // poäng och MS. Inbördes GJORDA MÅL: A=2, B=2, C=2, D=4 -> D separeras till
+    // toppen, A/B/C kvar lika (alla 2 inbördes-mål).
+    //
+    // RE-ITERATION på {A,B,C}: nu räknas BARA A-B (0-0), A-C (0-0), B-C (1-1).
+    // Inbördes gjorda mål i delmängden: A=0, B=1, C=1 -> A FÄRRE -> A sjunker
+    // till sist; B och C lika -> stabil fallback B före C.
+    //   MED re-iteration:  D, B, C, A
+    //   UTAN re-iteration: D, A, B, C  (A skulle felaktigt ligga tvåa)
+    // Att A hamnar SIST i stället för tvåa är just re-iterationens effekt.
+    const teams = ['A', 'B', 'C', 'D'];
+    const matches = [
+      groupMatch('A', 'B', 0, 0),
+      groupMatch('A', 'C', 0, 0),
+      groupMatch('A', 'D', 2, 2),
+      groupMatch('B', 'C', 1, 1),
+      groupMatch('B', 'D', 1, 1),
+      groupMatch('C', 'D', 1, 1),
+    ];
+
+    const table = computeStandings(teams, matches);
+
+    // Förutsättning: alla fyra lika på poäng och total MS (annars testar vi inte
+    // re-iterationen utan ett tidigare kriterium).
+    for (const r of table) {
+      expect(r.points).toBe(3);
+      expect(r.goalDifference).toBe(0);
+    }
+    // Kärn-assertionen: re-iterationen trycker ner A till sist (vore A tvåa utan
+    // re-iteration). Detta BEVISAR att steg 2-omräkningen sker.
+    expect(table.map((r) => r.teamId)).toEqual(['D', 'B', 'C', 'A']);
+  });
+
+  it('re-itererar i flera nivåer utan att fastna (terminerar på strikt mindre delmängd)', () => {
+    // En djupare kedja: ett lag separeras i varje pass. Vi verifierar bara att
+    // funktionen terminerar och ger en total ordning av rätt längd (ingen
+    // oändlig rekursion), kärn-ordningen täcks av testet ovan.
+    const teams = ['A', 'B', 'C', 'D'];
+    const matches = [
+      groupMatch('A', 'B', 0, 0),
+      groupMatch('A', 'C', 0, 0),
+      groupMatch('A', 'D', 3, 3),
+      groupMatch('B', 'C', 2, 2),
+      groupMatch('B', 'D', 1, 1),
+      groupMatch('C', 'D', 1, 1),
+    ];
+
+    const table = computeStandings(teams, matches);
+
+    expect(table).toHaveLength(4);
+    expect(new Set(table.map((r) => r.teamId)).size).toBe(4);
+    // Alla lika på poäng/MS, så ordningen avgörs helt av inbördes-iterationen.
+    for (const r of table) {
+      expect(r.points).toBe(3);
+    }
+  });
+});
+
 describe('computeStandings, determinism och renhet', () => {
   it('är ren: muterar inte input-matcherna', () => {
     const teams = ['SWE', 'BRA'];
@@ -485,5 +555,59 @@ describe('computeStandings, determinism och renhet', () => {
     const b = computeStandings(['GER', 'ARG', 'BRA', 'SWE'], matches);
 
     expect(b.map((r) => r.teamId)).toEqual(a.map((r) => r.teamId));
+  });
+});
+
+describe('compareHeadToHead, fail-loud-invariant (C5): saknad rad i mini-tabellen kastar', () => {
+  // Bakgrund (C5): `compareHeadToHead` litade tidigare på att returnera 0 ("lika")
+  // om ett lag saknade rad i h2h-mini-tabellen. Eftersom anroparen
+  // (`resolveTiedGroup`) ALLTID bygger h2h över exakt de jämförda lagen kan det
+  // bara hända vid ett programmeringsfel, och en tyst 0 hade då MASKERAT felet
+  // och kunnat ge fel ordning i en kritisk tiebreak (SPEC §5). Den vägen kan per
+  // konstruktion inte nås via det publika computeStandings-API:t, så vi testar
+  // funktionen direkt med en avsiktligt ofullständig map.
+
+  /** En minimal lag-rad; bara teamId är relevant för compareHeadToHead. */
+  function standing(teamId: string): GroupStanding {
+    return {
+      teamId,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDifference: 0,
+      points: 0,
+      rank: 0,
+    };
+  }
+
+  function h2hEntry() {
+    return { points: 0, goalDifference: 0, goalsFor: 0 };
+  }
+
+  it('kastar när lag A saknar rad i mini-tabellen', () => {
+    const h2h: H2HStats = new Map([['B', h2hEntry()]]);
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).toThrow(/Invariant-brott/);
+    // Felmeddelandet ska peka ut det saknade laget (fail loud, meningsfullt fel).
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).toThrow(/"A"/);
+  });
+
+  it('kastar när lag B saknar rad i mini-tabellen', () => {
+    const h2h: H2HStats = new Map([['A', h2hEntry()]]);
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).toThrow(/"B"/);
+  });
+
+  it('kastar INTE när båda lagen finns (legitim väg, ingen falsk fail-loud)', () => {
+    const h2h: H2HStats = new Map([
+      ['A', h2hEntry()],
+      ['B', h2hEntry()],
+    ]);
+    // Båda har en rad: detta är den NORMALA vägen, ingen throw, returnerar 0
+    // (a-c skiljer inte två tomma rader). Vaktar att fail-loud inte slår på en
+    // giltig jämförelse.
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).not.toThrow();
+    expect(compareHeadToHead(standing('A'), standing('B'), h2h)).toBe(0);
   });
 });

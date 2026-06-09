@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "gen:third-place-table": "vite-node scripts/generate-third-place-table.ts"
   },
   "dependencies": {
     "motion": "^12.40.0",

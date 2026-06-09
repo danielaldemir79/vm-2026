@@ -208,18 +208,32 @@ export interface GroupTable {
 }
 
 /**
- * Källan till ett lag i en slutspelsposition: gruppvinnare, grupptvåa eller en
- * av de 8 bästa treorna (SPEC §5). Detta är BracketSlot-typens kontrakt redo
- * för T4, T3 bygger INTE den fullständiga seedningen.
+ * Källan till ett lag i en slutspelsposition.
+ *
+ * Vid SEXTONDELSFINALEN kommer ett lag från en grupp-position: gruppvinnare,
+ * grupptvåa eller en av de 8 bästa treorna (SPEC §5). I SENARE rundor kommer
+ * laget i stället från utfallet av en tidigare slutspelsmatch (vinnaren, eller
+ * i bronsmatchen förloraren). Unionen modellerar alla dessa former explicit, så
+ * en slot ALDRIG behöver gissa eller maskera var dess lag kommer ifrån.
+ *
+ * T3 lade grunden med de tre grupp-källorna (redo för T4). T4 lade till de två
+ * match-progressions-källorna (`match-winner`/`match-loser`) när hela trädet
+ * byggdes, så typen täcker både sextondelsfinalen och resten av slutspelet.
  */
 export type BracketSource =
   | { kind: 'group-winner'; group: GroupId }
   | { kind: 'group-runner-up'; group: GroupId }
   // Bästa-trea: vilken trea som hamnar här avgörs av FIFA:s förbestämda
-  // tredjeplats-tabell utifrån VILKA grupper de kvalificerade treorna kom från
-  // (SPEC §5). Den seedningen är T4:s ansvar, inte T3:s, slot:en bär bara att
-  // källan ÄR en bästa-trea.
-  | { kind: 'best-third'; eligibleGroups: GroupId[] };
+  // tredjeplats-tabell (Annexe C) utifrån VILKA grupper de kvalificerade treorna
+  // kom från (SPEC §5). Seedningen görs av seedThirdPlaces (T4); slot:en bär de
+  // 5 grupper vars trea KAN hamna här (FIFA Article 12.6). `readonly`: detta är
+  // en STATISK källhänvisad behörighetslista (Article 12.6) som aldrig får
+  // muteras efter konstruktion, readonly gör oavsiktlig mutation till ett typfel.
+  | { kind: 'best-third'; eligibleGroups: readonly GroupId[] }
+  // Lag kommer från vinnaren av en tidigare slutspelsmatch (åttondel och framåt).
+  | { kind: 'match-winner'; matchId: string }
+  // Lag kommer från förloraren av en tidigare match (bronsmatchen, M103).
+  | { kind: 'match-loser'; matchId: string };
 
 /**
  * En position i slutspelsträdet. `resolvedTeamId` är null tills gruppspelet är
