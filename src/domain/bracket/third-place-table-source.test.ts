@@ -92,6 +92,10 @@ describe('Annexe C-tabellen: MUTATIONSTEST (beviset att låset fångar ett bytt 
 
   it('hittar ett behörighets-bevarande byte på mittraden (annars är testet meningslöst)', () => {
     const rows = parseAnnexeC(sourceText);
+    // Fail loud FÖRE swap-sökningen: om parsningen missar mittraden är rows[250]
+    // undefined, och då skulle findEligiblePreservingSwap kasta ett kryptiskt
+    // "cannot read length of undefined" i stället för en tydlig assertion.
+    expect(rows[MUTATED_ROW], `rad ${MUTATED_ROW} saknas i den parsade källan`).toBeDefined();
     const swap = findEligiblePreservingSwap(rows[MUTATED_ROW]);
     expect(swap, `rad ${MUTATED_ROW} saknar ett behörighets-bevarande byte`).not.toBeNull();
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeStandings } from './compute-standings';
-import type { Match, MatchResult } from '../types';
+import { compareHeadToHead, computeStandings, type H2HStats } from './compute-standings';
+import type { GroupStanding, Match, MatchResult } from '../types';
 
 // Testhjälpare: bygg en färdigspelad gruppmatch kort och läsbart. Bara fälten
 // som tabellberäkningen bryr sig om varierar per test, resten är konstanter.
@@ -555,5 +555,59 @@ describe('computeStandings, determinism och renhet', () => {
     const b = computeStandings(['GER', 'ARG', 'BRA', 'SWE'], matches);
 
     expect(b.map((r) => r.teamId)).toEqual(a.map((r) => r.teamId));
+  });
+});
+
+describe('compareHeadToHead, fail-loud-invariant (C5): saknad rad i mini-tabellen kastar', () => {
+  // Bakgrund (C5): `compareHeadToHead` litade tidigare på att returnera 0 ("lika")
+  // om ett lag saknade rad i h2h-mini-tabellen. Eftersom anroparen
+  // (`resolveTiedGroup`) ALLTID bygger h2h över exakt de jämförda lagen kan det
+  // bara hända vid ett programmeringsfel, och en tyst 0 hade då MASKERAT felet
+  // och kunnat ge fel ordning i en kritisk tiebreak (SPEC §5). Den vägen kan per
+  // konstruktion inte nås via det publika computeStandings-API:t, så vi testar
+  // funktionen direkt med en avsiktligt ofullständig map.
+
+  /** En minimal lag-rad; bara teamId är relevant för compareHeadToHead. */
+  function standing(teamId: string): GroupStanding {
+    return {
+      teamId,
+      played: 0,
+      won: 0,
+      drawn: 0,
+      lost: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+      goalDifference: 0,
+      points: 0,
+      rank: 0,
+    };
+  }
+
+  function h2hEntry() {
+    return { points: 0, goalDifference: 0, goalsFor: 0 };
+  }
+
+  it('kastar när lag A saknar rad i mini-tabellen', () => {
+    const h2h: H2HStats = new Map([['B', h2hEntry()]]);
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).toThrow(/Invariant-brott/);
+    // Felmeddelandet ska peka ut det saknade laget (fail loud, meningsfullt fel).
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).toThrow(/"A"/);
+  });
+
+  it('kastar när lag B saknar rad i mini-tabellen', () => {
+    const h2h: H2HStats = new Map([['A', h2hEntry()]]);
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).toThrow(/"B"/);
+  });
+
+  it('kastar INTE när båda lagen finns (legitim väg, ingen falsk fail-loud)', () => {
+    const h2h: H2HStats = new Map([
+      ['A', h2hEntry()],
+      ['B', h2hEntry()],
+    ]);
+    // Båda har en rad: detta är den NORMALA vägen, ingen throw, returnerar 0
+    // (a-c skiljer inte två tomma rader). Vaktar att fail-loud inte slår på en
+    // giltig jämförelse.
+    expect(() => compareHeadToHead(standing('A'), standing('B'), h2h)).not.toThrow();
+    expect(compareHeadToHead(standing('A'), standing('B'), h2h)).toBe(0);
   });
 });

@@ -69,8 +69,14 @@ import type { FinishedMatch, GroupStanding, Match } from '../types';
  */
 type CountedMatch = FinishedMatch & { homeTeamId: string; awayTeamId: string };
 
-/** Inbördes mini-tabell: teamId -> { poäng, målskillnad, gjorda mål } (a-c). */
-type H2HStats = Map<string, { points: number; goalDifference: number; goalsFor: number }>;
+/**
+ * Inbördes mini-tabell: teamId -> { poäng, målskillnad, gjorda mål } (a-c).
+ * Exporterad enbart för att fail-loud-INVARIANTEN i `compareHeadToHead` ska gå
+ * att testa direkt: invariant-vägen (ett lag utan rad i mini-tabellen) kan per
+ * konstruktion ALDRIG nås via det publika `computeStandings`-API:t, så det enda
+ * meningsfulla testet matar `compareHeadToHead` direkt med en ofullständig map.
+ */
+export type H2HStats = Map<string, { points: number; goalDifference: number; goalsFor: number }>;
 
 /** Poäng per utfall enligt fotbollens standard (3-1-0). */
 const POINTS_WIN = 3;
@@ -206,12 +212,29 @@ function headToHeadStats(
  * Returnerar < 0 om `a` före `b`, > 0 om efter, 0 om a-c inte skiljer dem.
  * h2h är beräknad på exakt den delmängd matcher som steget gäller (hela den
  * lika gruppen i steg 1, eller den kvar-lika delmängden vid re-iteration).
+ *
+ * INVARIANT (fail loud, PRINCIPLES §8): `compareHeadToHead` anropas BARA av
+ * `resolveTiedGroup`, som bygger `h2h` via `headToHeadStats` över EXAKT de lag
+ * som finns i `tied` och bara jämför lag UR `tied` (sorteringen och delmängds-
+ * uppdelningen rör sig aldrig utanför den mängden). Alltså måste både `a` och
+ * `b` ha en rad i `h2h`. Saknas en rad är det ett ÄKTA programmeringsfel
+ * (h2h byggdes inte över de jämförda lagen), inte en normal väg. Tidigare
+ * returnerade koden då tyst 0 ("lika"), vilket kunde MASKERA buggen och ge fel
+ * ordning i en KRITISK tiebreak (SPEC §5: får aldrig gissas). Vi kastar i
+ * stället ett tydligt invariant-fel så felet syns vid källan i stället för att
+ * tyst förvanska slutspels-seedningen.
  */
-function compareHeadToHead(a: GroupStanding, b: GroupStanding, h2h: H2HStats): number {
+// Exporterad enbart för testning av fail-loud-invarianten (se H2HStats ovan).
+export function compareHeadToHead(a: GroupStanding, b: GroupStanding, h2h: H2HStats): number {
   const ha = h2h.get(a.teamId);
   const hb = h2h.get(b.teamId);
   if (!ha || !hb) {
-    return 0; // ett lag saknas i mini-tabellen: a-c kan inte skilja dem.
+    const missing = !ha ? a.teamId : b.teamId;
+    throw new Error(
+      `Invariant-brott i FIFA-tiebreak: laget "${missing}" saknar en rad i ` +
+        `inbördes-mini-tabellen (h2h byggdes inte över de jämförda lagen). ` +
+        `Detta ska aldrig hända via resolveTiedGroup, det är ett programmeringsfel.`
+    );
   }
   if (ha.points !== hb.points) {
     return hb.points - ha.points; // a) inbördes poäng
