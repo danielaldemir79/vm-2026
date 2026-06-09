@@ -1,10 +1,11 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GroupStageView } from './GroupStageView';
+import { ResultsProvider } from '../results/ResultsProvider';
 
 // Fixtures-miljö (ingen Supabase-env) => datakällan ger fixtures-datan, dvs den
-// verifierade VM 2026-datan med alla 12 grupper. Vi injicerar env i vyn så vi
-// inte behöver mocka import.meta globalt (samma mönster som datakällans tester).
+// verifierade VM 2026-datan med alla 12 grupper. Env injiceras nu i den delade
+// ResultsProvider (T6 lyfte seedningen dit), inte i vyn, så vi wrappar vyn.
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
 }
@@ -16,9 +17,19 @@ function liveEnv(): ImportMetaEnv {
   } as ImportMetaEnv;
 }
 
+// GroupStageView är nu en ren konsument av den delade storen (T6). Rendera den
+// inuti en ResultsProvider med rätt env så seedningen sker som förr.
+function renderView(env: ImportMetaEnv) {
+  return render(
+    <ResultsProvider env={env}>
+      <GroupStageView />
+    </ResultsProvider>
+  );
+}
+
 describe('GroupStageView, renderar gruppspelet', () => {
   it('visar alla 12 grupper (A-L) som tabeller när datan laddats', async () => {
-    render(<GroupStageView env={fixturesEnv()} />);
+    renderView(fixturesEnv());
 
     // Vänta in den async datahämtningen, sedan ska 12 tabeller finnas.
     await waitFor(() => {
@@ -31,7 +42,7 @@ describe('GroupStageView, renderar gruppspelet', () => {
   });
 
   it('renderar i ett etiketterat section-landmark (a11y)', async () => {
-    render(<GroupStageView env={fixturesEnv()} />);
+    renderView(fixturesEnv());
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2, name: /Gruppspelet/i })).toBeInTheDocument();
     });
@@ -40,7 +51,7 @@ describe('GroupStageView, renderar gruppspelet', () => {
   });
 
   it('visar de riktiga lagnamnen ur den verifierade datan (t.ex. Sverige i grupp F)', async () => {
-    render(<GroupStageView env={fixturesEnv()} />);
+    renderView(fixturesEnv());
     await waitFor(() => {
       // Sverige finns i grupp F (verifierad T4-data), bevisar att vyn kopplats
       // mot den riktiga lag-/gruppdatan, inte platshållare.
@@ -49,7 +60,7 @@ describe('GroupStageView, renderar gruppspelet', () => {
   });
 
   it('visar att tabellerna är härledda live (S/V/O/F/GM/IM/MS/P i grupp A)', async () => {
-    render(<GroupStageView env={fixturesEnv()} />);
+    renderView(fixturesEnv());
     await waitFor(() => {
       expect(screen.getByRole('table', { name: /Grupp A/i })).toBeInTheDocument();
     });
@@ -73,7 +84,7 @@ describe('GroupStageView, renderar gruppspelet', () => {
 
 describe('GroupStageView, datakälla-läge', () => {
   it('visar ett demo-data-märke i fixtures-läge (transparens)', async () => {
-    render(<GroupStageView env={fixturesEnv()} />);
+    renderView(fixturesEnv());
     await waitFor(() => {
       expect(screen.getByText(/demo-data/i)).toBeInTheDocument();
     });
@@ -84,7 +95,7 @@ describe('GroupStageView, fel-väg (fail loud, inte tyst tom vy)', () => {
   it('visar ett fel-meddelande när datakällan kastar (live-stub före T14)', async () => {
     // Live-env utan riktig klient => datakällans stub KASTAR vid getMatches.
     // Vyn ska visa felet via role="alert", inte tyst rendera en tom vy.
-    render(<GroupStageView env={liveEnv()} />);
+    renderView(liveEnv());
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');

@@ -1,22 +1,29 @@
 // React-hook som matar gruppspelsvyn med data och gör tabellerna LIVE.
 //
-// Ansvar (tunt, en sak): ladda lag/grupper/matcher EN gång via datakällan
-// (getDataSource, fixtures-först-seamen), hålla matcherna i React-state, och
-// HÄRLEDA grupptabellerna (deriveGroupTables) reaktivt. "Live" = när matcherna i
-// state ändras (en resultatinmatning i T6 anropar setMatches) räknas tabellerna
-// om automatiskt via useMemo, ingen tabell lagras dubbelt. Själva inmatnings-
-// UI:t är T6, hooken exponerar bara setMatches-seamen så T6 kan koppla in sig.
+// Ansvar (tunt, en sak): läsa den DELADE results-storen (matcher = den enda
+// sanningen) och HÄRLEDA grupptabellerna (deriveGroupTables) reaktivt. "Live" =
+// när matcherna i storen ändras (en resultatinmatning i T6 anropar storens
+// submitResult/setMatches) räknas tabellerna om automatiskt via useMemo, ingen
+// tabell lagras dubbelt.
 //
-// VARFÖR matcher i state men tabeller härledda: matchresultaten är den enda
+// ÄNDRING I T6 (arkitektur): FÖRR ägde denna hook matchlistan i lokal vy-state
+// och seedade den själv. T6 LYFTE matchlistan till ResultsProvider (en delad
+// källa) så att resultatinmatnings-UI:t och gruppspelsvyn delar EXAKT samma
+// matcher, en inmatning uppdaterar tabellerna. Hooken är nu en tunn KONSUMENT av
+// storen: den läser status/matcher/lag därifrån och äger bara HÄRLEDNINGEN av
+// tabeller (sin enda kvarvarande egna logik). GroupData-kontraktet utåt är
+// oförändrat (status/tables/teams/mode/error/setMatches), så vyn och dess tester
+// står still, bara sanningens hemvist flyttade upp.
+//
+// VARFÖR matcher i storen men tabeller härledda: matchresultaten är den enda
 // sanningen (SPEC §6). Tabellen är en ren funktion av dem, så att lagra tabellen
 // vore dubbellagring som kan driva isär. useMemo gör om-beräkningen reaktiv utan
-// en extra state-kopia. teams/groups hålls också i state men ändras inte under
-// turneringen, de laddas en gång.
+// en extra state-kopia.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { DataSourceMode } from '../../data';
-import { getDataSource, getDataSourceMode } from '../../data';
-import type { Group, GroupTable, Match, Team } from '../../domain/types';
+import type { GroupTable, Match, Team } from '../../domain/types';
+import { useResultsStore } from '../results/results-context';
 import { deriveGroupTables } from './derive-group-tables';
 
 /** Laddningstillstånd för en async datahämtning, explicit (inte bara "data | null"). */
@@ -38,71 +45,33 @@ export interface GroupData {
   /** Felmeddelande vid status === 'error', annars null. */
   error: string | null;
   /**
-   * Ersätt matchlistan (T6:s resultatinmatning kopplar in sig här). Att sätta
-   * nya matcher räknar om tabellerna reaktivt via useMemo. Exponeras redan nu så
-   * "live"-seamen finns och är testbar innan inmatnings-UI:t byggs.
+   * Ersätt matchlistan i den delade storen (lågnivå-seam, T18:s realtid + tester
+   * använder det). Resultatinmatnings-UI:t använder hellre storens submitResult.
+   * Kvar i GroupData-kontraktet så befintliga konsumenter/tester står still.
    */
   setMatches: (matches: Match[]) => void;
 }
 
 /**
- * Ladda gruppspelsdata och härled live-tabeller.
+ * Läs gruppspelsdata ur den delade storen och härled live-tabeller.
  *
- * @param env  import.meta.env injiceras för testbarhet (samma mönster som
- *             getDataSource), default = den riktiga miljön.
+ * MÅSTE användas inuti en <ResultsProvider> (useResultsStore fail-loud:ar
+ * annars). Env-injektionen som T5 hade flyttade till providern (den äger
+ * seedningen nu), så hooken tar inga argument längre.
  */
-export function useGroupData(env: ImportMetaEnv = import.meta.env): GroupData {
-  const [status, setStatus] = useState<LoadStatus>('loading');
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [error, setError] = useState<string | null>(null);
+export function useGroupData(): GroupData {
+  const { status, groups, matches, teams, mode, error, setMatches } = useResultsStore();
 
-  // Vilket läge (fixtures/live) som är aktivt beror bara på env, härled en gång.
-  const mode = useMemo(() => getDataSourceMode(env), [env]);
-
-  useEffect(() => {
-    // En avbryt-flagga så att om komponenten unmountas (eller env byter) innan
-    // hämtningen är klar, sätter vi inte state på en avmonterad komponent.
-    let cancelled = false;
-    const dataSource = getDataSource(env);
-
-    setStatus('loading');
-    setError(null);
-
-    Promise.all([dataSource.getGroups(), dataSource.getTeams(), dataSource.getMatches()])
-      .then(([loadedGroups, loadedTeams, loadedMatches]) => {
-        if (cancelled) {
-          return;
-        }
-        setGroups(loadedGroups);
-        setTeams(loadedTeams);
-        setMatches(loadedMatches);
-        setStatus('ready');
-      })
-      .catch((err: unknown) => {
-        if (cancelled) {
-          return;
-        }
-        // Fail loud (PRINCIPLES §8): visa felet, maskera det inte som tom vy.
-        // Vanligast i live-läge innan T14 (stubben kastar med avsikt).
-        setError(err instanceof Error ? err.message : 'Kunde inte ladda gruppspelsdata.');
-        setStatus('error');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [env]);
-
-  // Härled tabellerna reaktivt: räknas om bara när grupper eller matcher ändras.
-  // Det är "live"-mekaniken, en setMatches (T6) triggar en ny härledning.
+  // Härled tabellerna reaktivt: räknas om bara när grupper, matcher eller status
+  // ändras. Det är "live"-mekaniken, en resultatinmatning (submitResult) ändrar
+  // matcherna i storen och triggar en ny härledning.
   //
   // VARFÖR gata på status: GroupData-kontraktet säger att tables är tomt tills
-  // status === 'ready'. Vid ett env-byte (eller initial laddning) ligger gamla
-  // groups/matches kvar i state tills den nya hämtningen settlar, och en oavkortad
-  // härledning skulle då exponera STALE tabeller medan status är loading/error
-  // (kontraktsbrott). Så vi släpper bara igenom härledningen i ready-läget; annars [].
+  // status === 'ready'. Vid en initial laddning (eller env-byte i providern)
+  // ligger gamla groups/matches kvar i state tills den nya hämtningen settlar,
+  // och en oavkortad härledning skulle då exponera STALE tabeller medan status är
+  // loading/error (kontraktsbrott, se decisions.md C8). Så vi släpper bara igenom
+  // härledningen i ready-läget; annars [].
   const tables = useMemo(
     () => (status === 'ready' ? deriveGroupTables(groups, matches) : []),
     [status, groups, matches]
