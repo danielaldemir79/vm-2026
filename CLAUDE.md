@@ -19,7 +19,8 @@ Detta repo är **arbetsstycket**. Motorn är Agent Kit (installerat plugin), som
 
 - PWA: React + Vite + TypeScript, Tailwind + Framer Motion, vite-plugin-pwa.
 - Molnbas: Supabase (Postgres + Auth + Realtime + RLS).
-- Hosting: Cloudflare Pages. Produktion deployas från `main`, förhandsvisning från `develop` + PR.
+- Hosting: Cloudflare Pages (git-integration, inga secrets i repot). Produktion deployas från `main`,
+  förhandsvisning från `develop` + PR. Manuell koppling: [`docs/deploy.md`](docs/deploy.md).
 - Arkitektur: härledd state (rena funktioner) + fixtures-först (miljö-gating till live Supabase).
 
 ## Verifiering (se Agent Kit docs/verification.md)
