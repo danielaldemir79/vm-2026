@@ -122,13 +122,11 @@ function SkeletonCard() {
   );
 }
 
-export interface GroupStageViewProps {
-  /** Injicerbar miljö (testbarhet), default = den riktiga via useGroupData. */
-  env?: ImportMetaEnv;
-}
-
-export function GroupStageView({ env }: GroupStageViewProps) {
-  const { status, tables, teams, mode, error } = useGroupData(env);
+export function GroupStageView() {
+  // Läser den DELADE results-storen via useGroupData (T6). Miljö-injektionen
+  // (fixtures/live) sköts av <ResultsProvider> ovanför i trädet, inte här, så
+  // vyn är en ren konsument. Måste därför renderas inuti en ResultsProvider.
+  const { status, tables, teams, mode, error } = useGroupData();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
 
   return (
