@@ -11,6 +11,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
 import { SwatchGrid } from './components/foundation/SwatchGrid';
 import { MotionDemo } from './components/foundation/MotionDemo';
+import { GroupStageView } from './features/groups';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -110,6 +111,14 @@ export default function App() {
           </Slide>
         </div>
 
+        {/* Gruppspelsvyn (T5): alla 12 grupper med live-tabeller. Den FUNKTIONELLA
+            + tillgängliga strukturen byggs här; design-frontend ger den premium-
+            visuell polish ovanpå. Slide-in för känslan, samma rörelse-primitiv som
+            resten av showcasen. */}
+        <Slide direction="up">
+          <GroupStageView />
+        </Slide>
+
         {/* Typografi-prov: visar display- mot brödtext-stacken. */}
         <Slide direction="up">
           <Panel>
@@ -125,7 +134,8 @@ export default function App() {
         </Slide>
 
         <footer className="border-t border-border pt-6 text-sm text-fg-muted">
-          Fundamentet är på plats: tema, rörelse och palett. Matchvyerna byggs härnäst.
+          Fundamentet är på plats: tema, rörelse, palett och gruppspelet. Slutspelsträdet byggs
+          härnäst.
         </footer>
       </main>
     </div>

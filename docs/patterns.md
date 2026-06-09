@@ -74,6 +74,46 @@ aktivering. Fixtures som uppfyller live-typerna fångar mappnings-drift i bygget
 gömma den i en otestad live-gren. Detta är Agent Kit-playbookens generella "fixtures-först"-mönster
 konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
 
+### harledd-state-vy: ren-derive + hook-med-state + reaktiv-memo (React, VM 2026)
+
+**Recept (en levande vy ovanpå härledd state, inga dubbellagrade beräkningar):**
+
+1. Lägg HÄRLEDNINGEN i en REN, React-fri modul (`src/features/<x>/derive-*.ts`): `(domändata, råa-fakta)
+   => härledd-form[]`. Den delegerar till den redan testade domän-funktionen (här `computeStandings`),
+   räknar inte om logiken själv (DRY). Muterar aldrig sina argument, så den kan köras om vid varje ändring.
+2. En hook (`use-*-data.ts`) laddar EN gång via den etablerade datakällan (`getDataSource(env)`,
+   fixtures-seamen), håller de RÅA FAKTA (matcher) i `useState`, och HÄRLEDER den visade formen via
+   `useMemo([status, domändata, råa-fakta])`. Lagra ALDRIG den härledda formen i state, det vore
+   dubbellagring som kan driva isär. GATA härledningen på `status === 'ready'` (annars `[]`): de råa fakta
+   ligger kvar i state under en ny laddning (t.ex. env-byte), och en oavkortad härledning skulle exponera
+   STALE form medan status är loading/error (kontraktsbrott, se decisions.md C8). Exponera en `setFakta`-
+   sättare så nästa task (inmatning) kopplar in sig, "live" = en `setFakta` triggar en ny memo-härledning
+   automatiskt i ready-läget.
+3. Modellera laddningstillståndet EXPLICIT (`'loading' | 'ready' | 'error'`), inte bara `data | null`.
+   Fel FAIL-LOUD:ar (`role="alert"`), inte en tyst tom vy (PRINCIPLES §8). Vanligast: live-stubben kastar
+   före T14, vyn ska visa det.
+4. Injicera `env` (default `import.meta.env`) genom hook + vy så datakälle-läget kan testas utan att mocka
+   `import.meta` globalt (samma mönster som `getDataSource`). Använd en `cancelled`-flagga i `useEffect` så
+   ett state-update inte sker efter unmount.
+5. Presentations-komponenten är REN (tar färdig-härledd form, renderar bara). Bygg TILLGÄNGLIG semantik
+   (riktig `<table>` med `<caption>`/`<th scope>`, `role="status"`/`role="alert"`), och lämna PREMIUM-
+   visuell styling till design-frontend, men gör strukturen lätt att styla: stabil semantik + data-attribut
+   (t.ex. `data-qualified`) i stället för inbakade statusfärger (respektera T7-pinnen: accent/success-krock).
+6. Test-täckning: vyn renderar rätt antal element (12 grupper), tillgänglig struktur (roller/landmärken),
+   den REAKTIVA omräkningen (sätt nya fakta via sättaren -> assertera ny härledd form), fel-vägen
+   (datakällan kastar -> `role="alert"`, inga tabeller), OCH kontrakts-invarianten "härledd form tom utom
+   vid ready" (assertera `[]` i loading-läget + ett env-byte ready->felande källa som bevisar att den gamla
+   formen INTE läcker). Skapa env-objektet EN gång per test (stabil referens): hooken har `useEffect([env])`,
+   så ett inline-objekt i renderHook-callbacken ger en ny referens vid varje render och kan trigga om
+   laddningen (flaky/loopande test). Wrappa async-settle i `waitFor` så inget state-update sker efter testet
+   (act-varning).
+
+**Varför:** SPEC §6:s härledda state hela vägen ut i UI:t. En sanning (de råa fakta), den visade formen
+är en ren funktion av dem, så "live" blir gratis och korrekt utan en andra kopia. Hooken äger I/O +
+state, den rena modulen äger logiken (testbar fristående), komponenten äger bara presentation (frikopplad,
+lätt för design-frontend att ta över). Återanvänds av kommande vy-tasks (slutspelsträd, topplista). Källa:
+T5 (`src/features/groups/`: `deriveGroupTables` + `useGroupData` + `GroupTable`/`GroupStageView`).
+
 ### gissningskanslig-data-genereras-ur-auktoritativ-kalla-med-validerande-generator (VM 2026)
 
 **Recept (stor, regel-kritisk datatabell utan handknapp och utan gissning):**
@@ -112,3 +152,22 @@ mot källan i stället för att jaga den. Detta uppfyller källhänvisnings-krav
 Källa: T4 (treeplats-tabellen, `scripts/generate-third-place-table.ts` + `src/domain/bracket/annexe-c-parser.ts`
 + committat `annexe-c-source.txt` -> `src/domain/bracket/third-place-table.ts`, källånkrat av
 `third-place-table-source.test.ts`).
+
+### fargoberoende-framhavning-nar-tva-roller-delar-hue (design, VM 2026)
+
+**Recept:** När en zon ska framhävas men en token-roll den vill använda KAN sammanfalla med en annan
+roll i något tema (i VM 2026: `--vm-accent` === `--vm-success` === #0e7a44 i ljust tema), framhäv med
+FLERA samtidiga signaler som INTE är beroende av att färgerna skiljer sig:
+1. FORM/markör (här en placerings-medalj med ring i `--vm-gold` / fg-ton),
+2. KANT eller list (här `inset box-shadow` mot `--color-accent`),
+3. YT-ton (svag `color-mix(... accent 7% ...)` bakom raden),
+4. AVDELARE/typografi (tjockare gräns vid "snittet", starkare vikt på nyckeltalen).
+Håll texten/siffran i framhävnings-markören på full `--color-fg`-kontrast, låt rollens hue leva i
+bakgrund + kant, så markören är AA oavsett hue-kollision. Behåll en stabil `data-*`-hake (här
+`data-qualified`) + `sr-only`-text så a11y och framtida färgläggning hänger ihop.
+**Varför:** En framhävning som BARA är en färg går sönder (osynlig eller tvetydig) i det tema där två
+roller delar hue, och låser dessutom den andra rollen från att få en egen ton senare. Redundanta,
+färg-oberoende signaler läses i båda teman och låter en senare task färglägga fritt utan att bryta
+designen. Verifiera i webbläsaren att kollisionen är LIVE (läs `getComputedStyle` på `--vm-accent` vs
+`--vm-success`) och att zonen ändå läses. Källa: T5 design-frontend (`src/features/groups/GroupTable.tsx`,
+kvalificeringszonen, T7-pin).
