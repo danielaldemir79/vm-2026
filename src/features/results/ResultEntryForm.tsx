@@ -17,7 +17,7 @@
 
 import { useId, useMemo, useState, type FormEvent } from 'react';
 import type { Match, MatchStatus, Team } from '../../domain/types';
-import type { ResultEntry, ResultValidationError } from './validate-result';
+import type { ResultEntry, ResultValidationError, ResultValidationField } from './validate-result';
 
 /** De status användaren kan välja i formuläret, med svenska etiketter. */
 const STATUS_OPTIONS: ReadonlyArray<{ value: MatchStatus; label: string }> = [
@@ -103,22 +103,29 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
   const errorsId = `${baseId}-errors`;
 
   // Snabb uppslagning fält -> har-fel, för aria-invalid + describedby per fält.
+  // Fel utan `field` (t.ex. okänd match) hör inte till någon input och hoppas
+  // över här, de visas ändå i fel-listan (role=alert) nedan.
   const errorsByField = useMemo(() => {
-    const map = new Map<ResultValidationError['field'], ResultValidationError[]>();
+    const set = new Set<ResultValidationField>();
     for (const e of errors) {
-      const bucket = map.get(e.field);
-      if (bucket) {
-        bucket.push(e);
-      } else {
-        map.set(e.field, [e]);
+      if (e.field !== undefined) {
+        set.add(e.field);
       }
     }
-    return map;
+    return set;
   }, [errors]);
 
-  const describedBy = (field: ResultValidationError['field']): string | undefined =>
-    errorsByField.has(field) ? errorsId : undefined;
-  const invalid = (field: ResultValidationError['field']): boolean => errorsByField.has(field);
+  // Ett 'result'-fel ("finished utan resultat") är inte bundet till ett enskilt
+  // måltal utan till BÅDA, så det kopplas till hemma- OCH borta-fältet (C1).
+  // Övriga fält matchar exakt sitt eget namn. Skärmläsaren får då fel-kontexten
+  // på de tomma målfälten, inte bara i fel-listan.
+  const hasFieldError = (field: ResultValidationField): boolean =>
+    errorsByField.has(field) ||
+    ((field === 'home' || field === 'away') && errorsByField.has('result'));
+
+  const describedBy = (field: ResultValidationField): string | undefined =>
+    hasFieldError(field) ? errorsId : undefined;
+  const invalid = (field: ResultValidationField): boolean => hasFieldError(field);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -91,6 +91,31 @@ describe('ResultEntryForm, fel-vägar (visas + kopplas via aria)', () => {
     // describedby ska peka på fel-listans id (role=alert).
     expect(screen.getByRole('alert')).toHaveAttribute('id', describedBy!);
   });
+
+  // C1: ett 'result'-fel ("finished utan resultat") sitter inte på ett enskilt
+  // måltal utan på BÅDA. Tidigare markerades inget fält som ogiltigt eftersom
+  // hjälparna bara kollade exakt fältnamn ('result' matchar ingen input). Nu ska
+  // BÅDA målfälten bli aria-invalid och peka på fel-listan via describedby, så
+  // skärmläsaren får fel-kontexten på de tomma fälten, inte bara i fel-listan.
+  it('kopplar ett "result"-fel (finished utan resultat) till BÅDA målfälten (aria)', () => {
+    const match = scheduledMatch();
+    render(<ResultEntryForm match={match} teamsById={teamsById} onSubmit={realSubmit(match)} />);
+
+    // Status finished men målfälten lämnas tomma => 'finished-without-result' (field 'result').
+    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(/kräver både hemma- och bortamål/i);
+
+    const homeInput = screen.getByLabelText(/Mexiko \(hemma\)/);
+    const awayInput = screen.getByLabelText(/Sydafrika \(borta\)/);
+    expect(homeInput).toHaveAttribute('aria-invalid', 'true');
+    expect(awayInput).toHaveAttribute('aria-invalid', 'true');
+    // Båda målfälten pekar på fel-listans id (role=alert) via describedby.
+    expect(homeInput).toHaveAttribute('aria-describedby', alert.getAttribute('id')!);
+    expect(awayInput).toHaveAttribute('aria-describedby', alert.getAttribute('id')!);
+  });
 });
 
 describe('ResultEntryForm, lyckad inmatning', () => {

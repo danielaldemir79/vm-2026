@@ -200,7 +200,11 @@ export function GoalCelebrationOverlay({
   );
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+    // aria-hidden på OVERLAYNS EGEN rot (defense-in-depth): "Mål!" är ren visuell
+    // fest, aldrig skärmläsar-innehåll, även om lagret någon gång renderas
+    // fristående utanför en redan dold container. pointer-events-none gör att
+    // den aldrig fångar klick (overlay over hela vyn).
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
       <AnimatePresence>
         {celebration ? (
           <motion.div

@@ -76,15 +76,25 @@ describe('submitResult, validering (fel-väg, inget uppdateras)', () => {
     const { result } = renderHook(() => useResultsStore(), { wrapper: wrapperFor(fixturesEnv()) });
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
-    let ok = true;
+    let validation: ReturnType<typeof result.current.submitResult> | undefined;
     act(() => {
-      ok = result.current.submitResult('finns-inte', {
+      validation = result.current.submitResult('finns-inte', {
         homeGoals: 1,
         awayGoals: 0,
         status: 'finished',
-      }).ok;
+      });
     });
-    expect(ok).toBe(false);
+
+    // C3: en okänd match får sin EGNA kod 'unknown-match' (inte återanvänd
+    // 'invalid-status-transition') och bär INGET field, så ingen input markeras
+    // felaktigt ogiltig. Semantiskt korrekt + rätt aria-koppling i formuläret.
+    expect(validation).toBeDefined();
+    expect(validation!.ok).toBe(false);
+    if (validation && !validation.ok) {
+      const [err] = validation.errors;
+      expect(err.code).toBe('unknown-match');
+      expect(err.field).toBeUndefined();
+    }
   });
 });
 
