@@ -10,3 +10,8 @@ package-lock.json
 # inception/dirigenten och ska inte få formaterings-churn från kod-grinden.
 *.md
 
+# FIFA Annexe C-källutdraget är en OFÖRÄNDRAD textextraktion (gold source som
+# tabellen regenereras och diffas mot). Prettier har ingen parser för .txt och
+# får aldrig röra den: minsta omformatering skulle bryta troheten mot PDF:en.
+src/domain/bracket/annexe-c-source.txt
+

@@ -5,6 +5,129 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T4 (Copilot runda 1, C5): FIFA-tiebreak head-to-head är FAIL-LOUD vid invariant-brott
+
+**Beslut:** `compareHeadToHead` (`src/domain/standings/compute-standings.ts`) KASTAR nu ett tydligt
+invariant-fel om ett av de jämförda lagen saknar en rad i inbördes-mini-tabellen (`h2h`), i stället för
+att tyst returnera 0 ("lika"). Anroparen `resolveTiedGroup` bygger alltid `h2h` via `headToHeadStats`
+över EXAKT de lag som finns i `tied` och jämför bara lag UR `tied`, så en saknad rad kan bara uppstå vid
+ett programmeringsfel, aldrig på den normala vägen. Funktionen + typen `H2HStats` exporteras enbart för
+test, eftersom invariant-vägen per konstruktion inte kan nås via det publika `computeStandings`-API:t och
+därför måste verifieras genom ett direktanrop med en avsiktligt ofullständig map.
+**Varför (Copilot C5, korrekthet):** En tyst `return 0` på ett invariant-brott MASKERAR buggen och kan ge
+fel ordning i en KRITISK tiebreak, just den fel-klass SPEC §5 säger aldrig får gissas. Fail loud
+(PRINCIPLES §8) gör att felet syns vid källan i stället för att tyst förvanska slutspels-seedningen. Den
+LEGITIMA vägen (båda lagen har en rad, a-c skiljer dem inte -> returnerar 0) är oförändrad och täcks av ett
+test, så fail-loud slår bara på ett äkta invariant-brott.
+**Källa:** Regulations for the FIFA World Cup 26 (May 2026), Article 13 (inbördes-kriterierna a-c), sid.
+26-27. https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
+
+**Not (C3, dev-ergonomi):** Generatorn `scripts/generate-third-place-table.ts` körs nu via
+`npm run gen:third-place-table` (drar `vite-node`, som redan följer med toolchainen via vitest, inget nytt
+beroende). Tidigare antog scriptet Node 24:s native `.ts`-type-stripping, men projektets CI kör Node 22
+(`.github/workflows/ci.yml`), så en contributor på Node 22 kunde inte återköra generatorn. Källånkrings-
+testet (`third-place-table-source.test.ts`) verifierar tabellen via Vites `?raw` och körs oförändrat på
+Node 22, så låset är opåverkat, detta gäller bara contributors regenererings-väg.
+
+---
+
+## 2026-06-09 , T4 (Copilot runda 2, C8): kritisk bracket-strukturdata indexeras FAIL-LOUD (`setOnce`)
+
+**Beslut:** Map-uppbyggnaden av slutspels-indexen sker nu via en delad `setOnce`-hjälpare
+(`src/domain/bracket/set-once.ts`) som KASTAR vid en dubblett-nyckel i stället för att tyst skriva över.
+Två ställen härdade: `winnerGoesTo` i `build-bracket.ts` (vilken slot tar emot en matchvinnare, exakt EN
+per match) och `TABLE_INDEX` i `seed-third-places.ts` (Annexe C-kombination -> rad, de 495 kombinationerna
+ska vara UNIKA). Invariant: en given strukturnyckel får härledas från exakt EN källa, en dubblett betyder
+ett schemafel, inte en giltig uppdatering. Vakten verifieras av `set-once.test.ts` (dubblett kastar, första
+värdet skrivs inte över); `build-bracket.test.ts` bekräftar att den RIKTIGA strukturen inte triggar vakten
+(normal väg intakt).
+**Varför (Copilot C8, dataintegritet):** En tyst `Map.set(...)`-överskrivning på en dubblett-nyckel skulle
+ge ett "giltigt"-SEENDE men FELKOPPLAT träd / fel treplats-uppslag, just den fel-klass kritisk källhänvisad
+strukturdata (SPEC §5) aldrig får drabbas av. Fail loud (PRINCIPLES §8) gör att ett schemafel i
+bracket-structure eller en korrupt Annexe C-tabell syns vid källan i bygget/testet i stället för att tyst
+ge fel slutspelskoppling. `setOnce` lades i en egen modul eftersom den nu delas av två konsumenter (DRY).
+
+---
+
+## 2026-06-09 , T4 (review F1+F2): Annexe C-tabellen LÅST mot committat FIFA-källutdrag (regenerera-och-diffa)
+
+**Beslut:** Den genererade Annexe C-tabellen (`src/domain/bracket/third-place-table.ts`, 495 rader)
+är nu förankrad till FIFA-KÄLLAN, inte bara till sig själv. Det RÅA Annexe C-textutdraget committas
+som `src/domain/bracket/annexe-c-source.txt` (oförändrad `pdftotext -layout`-extraktion av Annexe C),
+och ett test (`third-place-table-source.test.ts`) REGENERERAR tabellen ur det committade utdraget och
+kräver VÄRDE-likhet med den committade `.ts`-filen (fail loud vid minsta skillnad, radslut-normaliserat
+så CRLF/LF inte ger falskt fel). Trust-kedjan: FIFA PDF -> committat utdrag (spot-checkbart mot PDF,
+sid. 80-97) -> generator -> tabell (bevisat lika av testet). Parsnings-/emit-logiken flyttades till en
+typad modul `src/domain/bracket/annexe-c-parser.ts` som BÅDE generatorn och testet importerar (EN sanning,
+ingen duplicerad parser). Generatorn är nu `scripts/generate-third-place-table.ts` (körs via
+`npm run gen:third-place-table`, se C3-noten nedan) och defaultar till det committade utdraget.
+**Varför (review-fynd F1, dataintegritet):** Det "uttömmande" 495-testet vaktade bara STRUKTURELLA
+invarianter (behörighet + kollisionsfrihet), en SVAGARE invariant än FIFA fastställer. Varje av de 495
+kombinationerna har 3-214 behörighets-giltiga, kollisionsfria tilldelningar, men FIFA fastställer EXAKT EN.
+Alltså passerade ~493 rader bara strukturellt: ett värde-fel mitt i tabellen (regex som glider en kolumn,
+PDF-feltolkning, hand-edit) som råkar landa på en ANNAN behörig kolumn passerade tyst, just den fel-klass
+SPEC §5 säger aldrig får gissas. Källånkringen stänger gapet: varje rad är nu låst till FIFA:s faktiska värde.
+**Bevis (mutationstest, acceptanskriterium):** `third-place-table-source.test.ts` byter två behöriga treor
+på mittraden (rad 250) och bevisar att regenerera-och-diffa FAILAR, medan det strukturella `validate()`
+ACCEPTERAR samma mutation (visar gapet). Empiriskt verifierat: en temporär mutation av rad 250 i den
+committade `.ts`:en gjorde källånkrings-testet RÖTT medan det strukturella 495-testet förblev grönt.
+**F2 (generator ej CI-körbar) löst av samma fix:** källutdraget är nu committat, så generatorns härledning
+regenereras och diffas i CI, drift generator<->tabell upptäcks.
+**Källa (gissas ALDRIG):** Regulations for the FIFA World Cup 26 (May 2026), Annexe C "Combinations for
+eight best third-placed teams", sid. 80-97. Extraherad med `pdftotext -layout`. Källutdragets preambel
+bär URL + sid-hänvisning + extraktionskommando.
+https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
+
+## 2026-06-09 , T4: treeplats-motorn + slutspelsträd är STRUKTURELLT, källhänvisat till FIFA:s regelverk
+
+**Beslut:** Den kritiska treeplats-/slutspelsmotorn (SPEC §5) byggs på grupp-POSITIONER (1A, 2C,
+bästa-trea-av-grupp-X), inte på lagidentiteter. Tre filer i `src/domain/bracket/`:
+`bracket-structure.ts` (de 32 slutspelsmatcherna M73-M104 med källor + hela trädets koppling),
+`third-place-table.ts` (FIFA:s Annexe C, 495 rader, GENERERAD), `seed-third-places.ts` (motorn:
+8 kvalificerade treor -> kollisionsfri seedning), `build-bracket.ts` (BracketSlot-graf med
+nextSlotId genom hela trädet).
+**Källa (gissas ALDRIG):** Regulations for the FIFA World Cup 26 (May 2026):
+Article 12.6-12.11 (slutspelsträdet, sid. 23-25) + Annexe C (de 495 kombinationerna, sid. 80-97).
+https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
+Korskollad mot Wikipedia "2026 FIFA World Cup knockout stage" (2026-06-09). Bracket-flödet
+(R32 M89-M96, QF M97-M100, SF M101-M102, brons M103, final M104) stämde exakt mellan båda källor.
+**Varför STRUKTURELLT:** treeplats-tabellen beror på vilka grupp-POSITIONER (3:a-från-X) som går
+vidare, inte på vilka specifika lag som lottats. Därför kan motorn byggas OCH uttömmande testas
+(alla 495 kombinationer) helt oberoende av den faktiska 2026-lottningen, vilket också är robustast:
+även om exakt lagdata ändras står motorn fast. Lagidentiteter/schema är data, inte logik (se T4-Findings).
+**Varför GENERERAD tabell:** 495 rader är för felkänsligt att handknappa och svårt att review:a.
+`scripts/generate-third-place-table.ts` parsar tabellen ur FIFA:s PDF (via `pdftotext -layout`),
+VALIDERAR (495 unika kombinationer, varje rad 8 unika giltiga grupper) och vägrar generera vid fel
+(fail loud). Datan är därmed spårbar till källan och kan regenereras. Ett integritetstest
+(`third-place-table.test.ts`) bevakar fullständigheten vid bygget. (Källånkringen mot ett committat
+FIFA-utdrag tillkom i review-fixen F1+F2, se den nyare T4-raden överst.)
+
+## 2026-06-09 , T4 (F1-beslutet): FIFA artikel 13 STEG 2-RE-ITERATION krävs, T3:s KISS-avgränsning rättad
+
+**Beslut:** `computeStandings` (`src/domain/standings/compute-standings.ts`) RE-ITERERAR nu
+inbördes-kriterierna (a-c) på en kvar-lika delmängd. T3 lämnade detta öppet som F1 (medveten KISS):
+när inbördes-mötet skiljer NÅGRA men inte alla lika lag, räknades inbördes-tabellen INTE om för den
+kvar-lika delmängden. F1 avgjordes mot FIFA:s OFFICIELLA ordalydelse: svaret är **JA, re-iteration
+krävs.** Ny funktion `resolveTiedGroup` partitionerar de lika lagen efter första inbördes-passet och
+RÄKNAR OM a-c rekursivt på enbart den kvar-lika delmängdens inbördes-matcher; faller till de
+övergripande kriterierna (d total MS, e total mål) + stabil teamId-fallback först när a-c inte skiljer
+någon. Ett test (`compute-standings.test.ts`, "STEG 2: RE-ITERATION") konstruerar en kvar-lika
+delmängd och bevisar att re-iterationen ändrar ordningen (lag A går från tvåa till sist).
+**Källa (verbatim, gissas ALDRIG):** Regulations for the FIFA World Cup 26 (May 2026), Article 13,
+steg 2 (sid. 26-27): "If, after having applied criteria a) to c) above, teams still have an equal
+ranking ... criteria a) to c) above are applied to the matches between the REMAINING teams only.
+If no decision can be made through this procedure, criteria d) to f) below shall apply ..."
+https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
+**Nyans:** re-iterationen återupptar STEG 1 (a-c) på den mindre mängden, INTE från poäng (alla i
+delmängden har redan samma poäng). Termination garanteras: re-iteration sker bara på en STRIKT
+mindre delmängd. Regelverket säger uttryckligen att steg 2:s d-f-svans INTE startar om, så när a-c
+är uttömt sorteras resten direkt på d-e (ingen ytterligare iteration där). Detta är en RÄTTELSE av
+T3-beslutet "FIFA-tiebreak-ordning" nedan, som beskrev re-iterationen som en accepterad avgränsning.
+**Bekräftat:** tiebreak-ORDNINGEN T3 redan implementerade (poäng, inbördes a-c, total MS, total mål)
+stämmer exakt mot regelverket och korskollades mot ESPN + FOX 2026-06-09. Bara re-iterationen saknades.
+
+---
+
 ## 2026-06-09 , T3 (Copilot runda 3): groupId-för-gruppmatch är ett DATAKONTRAKT, inte en typgaranti (C9+C10)
 
 **Beslut (Option A, kommentar-only):** Kommentarerna i `compute-standings.ts` (filhuvud + isCounted)
