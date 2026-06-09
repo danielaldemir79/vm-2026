@@ -16,7 +16,8 @@
 //
 // KÄLLA (gissas ALDRIG): Svensk TV-tablå (Daniel, 2026-06-09), ur SPEC §8:s
 //   svenska sändningskällor (svenskafans, fotbollskanalen). AUKTORITATIV för
-//   avsparkstid + svensk TV-kanal. Tid = svensk tid (Europe/Stockholm).
+//   avsparkstid + svensk TV-kanal. Tid I KÄLLAN = svensk tid (Europe/Stockholm);
+//   parsade kickoffUtc/Match.kickoff lagras i UTC (se tidszons-noten nedan).
 //   Arena/stad saknas i källan (känd lucka, gissas aldrig, se VENUE_UNKNOWN).
 
 import type { GroupId, Match, MatchStage } from '../../domain/types';
@@ -151,7 +152,11 @@ export interface ParsedKnockoutSource {
 /** En parsad gruppmatch (lag kända ur tablån). */
 export interface ParsedGroupMatch {
   kind: 'group';
-  /** Avsparkstid, svensk tid, i tablåns ordning. */
+  /**
+   * Avsparkstid som UTC ISO-instant (härlett FRÅN tablåns svenska väggklocka,
+   * Europe/Stockholm, av zonedWallTimeToUtcIso). Värdet är alltså UTC, inte
+   * svensk tid: vid felsökning av off-by-one kring midnatt är detta UTC-sidan.
+   */
   kickoffUtc: string;
   homeTeamId: string;
   awayTeamId: string;
@@ -164,6 +169,7 @@ export interface ParsedKnockoutMatch {
   /** FIFA:s officiella matchnummer (73-104). */
   matchNumber: number;
   stage: MatchStage;
+  /** Avsparkstid som UTC ISO-instant (härlett ur svensk väggklocka, se ParsedGroupMatch). */
   kickoffUtc: string;
   home: ParsedKnockoutSource;
   away: ParsedKnockoutSource;
