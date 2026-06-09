@@ -5,6 +5,40 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T3: FIFA-tiebreak-ordning för gruppspelstabellen (VM 2026)
+
+**Beslut:** Tabellberäkningen (`src/domain/standings/compute-standings.ts`) rangordnar lag enligt
+FIFA:s officiella ordning för VM 2026 (artikel 13), i denna prioritet: (1) poäng, (2) inbördes
+poäng, (3) inbördes målskillnad, (4) inbördes gjorda mål, (5) total målskillnad, (6) totalt gjorda
+mål. Kriterium 2 till 4 räknas bara på matcherna MELLAN de lag som står lika (en mini-tabell).
+**Varför / nyansen:** VM 2026 ÄNDRADE ordningen mot tidigare mästerskap, inbördes möte
+(head-to-head) kommer nu FÖRE total målskillnad, inte efter. Detta gissades inte: ordningen
+verifierades mot FIFA:s regler och ESPN:s genomgång (2026-06-09). Att råka behålla den gamla
+ordningen (total MS före inbördes) skulle ge fel tabell i just de tighta lägen som avgör vilka lag
+som går vidare, kärnan i SPEC §5:s dataintegritets-krav.
+
+**Beslut (scope-avgränsning):** Kriterium 7 (fair play / disciplin) och 8 (lottning) implementeras
+INTE i T3. När alla deterministiska kriterier (1 till 6) ger exakt lika faller funktionen tillbaka
+på en stabil sortering på lag-id.
+**Varför:** Fair play kräver kort-/disciplindata som domänmodellen inte modellerar (Match bär inga
+kort) och kan inte beräknas deterministiskt ur matchresultaten. Lottning är per definition
+slumpmässig. Båda ligger utanför vad T3:s data tillåter, att gissa dem vore att hitta på. Den
+stabila lag-id-sorteringen är uttryckligen INTE en FIFA-tiebreak, bara en garanti att samma indata
+alltid ger samma utdata (deterministisk, ej "flaxig" ordning), tydligt kommenterad som sådan.
+Den fullständiga slutspels-seedningen (8 bästa treor + FIFA:s treeplats-tabell) är T4, inte T3,
+T3 levererar bara BracketSlot-TYPEN (källa: gruppvinnare/tvåa/bästa-trea) redo för T4.
+
+**Beslut:** Datalagret byggs fixtures-först med en miljö-gate (`src/data/data-source.ts`): saknas
+Supabase-env körs typad fixtures-data med en fail-loud-logg, finns env väljs en (ännu tunn) live-
+klient. Domänmodellen (`src/domain/types.ts`) typar kärn-entiteterna fullt och social-entiteterna
+som stubs för Fas 2.
+**Varför:** Låter hela appen byggas och testas innan Supabase-kontot (T14) finns, utan kod-ändring
+vid live-aktivering. Fixtures uppfyller exakt samma typer som live-datan (annars döljs en mappnings-
+drift i den otestade live-grenen, en känd fallgrop). Detta är Agent Kit-playbookens "fixtures-
+först"-mönster. Se `docs/patterns.md`.
+
+---
+
 ## 2026-06-09 , T2: Tema-arkitektur (no-flash + token-kontrakt + rörelse-primitiver)
 
 **Beslut:** No-flash-temat sätts av ett blockerande inline-script som injiceras FÖRST i
