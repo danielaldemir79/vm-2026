@@ -21,9 +21,18 @@ import { DEFAULT_THEME, THEME_ATTRIBUTE, THEME_STORAGE_KEY, THEMES } from './the
 /**
  * Bygg innehållet i det blockerande inline-scriptet.
  *
- * Scriptets resolve-regel speglar resolveInitialTheme() MEDVETET och minimalt:
- *   sparat giltigt val  ->  system-preferens  ->  DEFAULT_THEME.
- * Hålls i synk via test. All övrig tema-logik bor i modulerna, inte här.
+ * Scriptets resolve-regel speglar resolveInitialTheme() MEDVETET och exakt,
+ * med samma prioritet och samma OBEROENDE fel-guards:
+ *   1. sparat giltigt val  (läses i egen try/catch -> null vid blockerad storage)
+ *   2. system-preferens    (läses i egen try/catch -> "ej läsbart" vid fel/saknad)
+ *   3. DEFAULT_THEME        (bara när systempreferensen inte kan läsas)
+ *
+ * Två oberoende try/catch (i stället för ETT runt allt) är poängen: om
+ * localStorage kastar men matchMedia funkar ska scriptet falla till
+ * SYSTEM-preferensen, inte till default. Ett gemensamt try/catch skulle
+ * felaktigt hoppa förbi system-preferensen och bryta prioriteten ovan.
+ * Hålls i synk med resolveInitialTheme via test. All övrig tema-logik bor i
+ * modulerna, inte här.
  *
  * Konstanterna serialiseras med JSON.stringify så att t.ex. nyckel-namn med
  * specialtecken inte kan bryta scriptet, och så att en framtida ändring av
@@ -35,20 +44,39 @@ export function buildThemeInitScript(): string {
   const validThemes = JSON.stringify([...THEMES]);
   const defaultTheme = JSON.stringify(DEFAULT_THEME);
 
-  // IIFE: inga globala läckor. try/catch: blockerad storage (privat läge) får
-  // aldrig krascha sid-renderingen, då faller vi till system/default precis
-  // som theme-core gör.
+  // IIFE: inga globala läckor. Synkront, importerar ingen ES-modul, så
+  // no-flash-egenskapen behålls (temat sätts före first paint).
   return `(function () {
+  var attribute = ${attribute};
+  var defaultTheme = ${defaultTheme};
+  var valid = ${validThemes};
+
+  // 1. Sparat val. Egen try/catch: blockerad/privat storage ger null
+  //    ("inget val"), exakt som readStoredTheme i theme-core.
+  var stored = null;
   try {
-    var stored = localStorage.getItem(${storageKey});
-    var valid = ${validThemes};
-    var theme = valid.indexOf(stored) !== -1
-      ? stored
-      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    document.documentElement.setAttribute(${attribute}, theme);
+    stored = localStorage.getItem(${storageKey});
   } catch (e) {
-    document.documentElement.setAttribute(${attribute}, ${defaultTheme});
+    stored = null;
   }
+  if (valid.indexOf(stored) !== -1) {
+    document.documentElement.setAttribute(attribute, stored);
+    return;
+  }
+
+  // 2. System-preferens. Egen try/catch: om matchMedia saknas/kastar
+  //    behandlas systempreferensen som "ej läsbar" (motsvarar null hos
+  //    resolveInitialTheme) och vi faller till default i steg 3.
+  var prefersDark = null;
+  try {
+    prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } catch (e) {
+    prefersDark = null;
+  }
+
+  // 3. DEFAULT_THEME bara när systempreferensen inte kunde läsas.
+  var theme = prefersDark === null ? defaultTheme : (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute(attribute, theme);
 })();`;
 }
 
