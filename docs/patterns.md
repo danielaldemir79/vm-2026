@@ -74,6 +74,39 @@ aktivering. Fixtures som uppfyller live-typerna fångar mappnings-drift i bygget
 gömma den i en otestad live-gren. Detta är Agent Kit-playbookens generella "fixtures-först"-mönster
 konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
 
+### harledd-state-vy: ren-derive + hook-med-state + reaktiv-memo (React, VM 2026)
+
+**Recept (en levande vy ovanpå härledd state, inga dubbellagrade beräkningar):**
+
+1. Lägg HÄRLEDNINGEN i en REN, React-fri modul (`src/features/<x>/derive-*.ts`): `(domändata, råa-fakta)
+   => härledd-form[]`. Den delegerar till den redan testade domän-funktionen (här `computeStandings`),
+   räknar inte om logiken själv (DRY). Muterar aldrig sina argument, så den kan köras om vid varje ändring.
+2. En hook (`use-*-data.ts`) laddar EN gång via den etablerade datakällan (`getDataSource(env)`,
+   fixtures-seamen), håller de RÅA FAKTA (matcher) i `useState`, och HÄRLEDER den visade formen via
+   `useMemo([domändata, råa-fakta])`. Lagra ALDRIG den härledda formen i state, det vore dubbellagring som
+   kan driva isär. Exponera en `setFakta`-sättare så nästa task (inmatning) kopplar in sig, "live" = en
+   `setFakta` triggar en ny memo-härledning automatiskt.
+3. Modellera laddningstillståndet EXPLICIT (`'loading' | 'ready' | 'error'`), inte bara `data | null`.
+   Fel FAIL-LOUD:ar (`role="alert"`), inte en tyst tom vy (PRINCIPLES §8). Vanligast: live-stubben kastar
+   före T14, vyn ska visa det.
+4. Injicera `env` (default `import.meta.env`) genom hook + vy så datakälle-läget kan testas utan att mocka
+   `import.meta` globalt (samma mönster som `getDataSource`). Använd en `cancelled`-flagga i `useEffect` så
+   ett state-update inte sker efter unmount.
+5. Presentations-komponenten är REN (tar färdig-härledd form, renderar bara). Bygg TILLGÄNGLIG semantik
+   (riktig `<table>` med `<caption>`/`<th scope>`, `role="status"`/`role="alert"`), och lämna PREMIUM-
+   visuell styling till design-frontend, men gör strukturen lätt att styla: stabil semantik + data-attribut
+   (t.ex. `data-qualified`) i stället för inbakade statusfärger (respektera T7-pinnen: accent/success-krock).
+6. Test-täckning: vyn renderar rätt antal element (12 grupper), tillgänglig struktur (roller/landmärken),
+   den REAKTIVA omräkningen (sätt nya fakta via sättaren -> assertera ny härledd form), och fel-vägen
+   (datakällan kastar -> `role="alert"`, inga tabeller). Wrappa async-settle i `waitFor` så inget
+   state-update sker efter testet (act-varning).
+
+**Varför:** SPEC §6:s härledda state hela vägen ut i UI:t. En sanning (de råa fakta), den visade formen
+är en ren funktion av dem, så "live" blir gratis och korrekt utan en andra kopia. Hooken äger I/O +
+state, den rena modulen äger logiken (testbar fristående), komponenten äger bara presentation (frikopplad,
+lätt för design-frontend att ta över). Återanvänds av kommande vy-tasks (slutspelsträd, topplista). Källa:
+T5 (`src/features/groups/`: `deriveGroupTables` + `useGroupData` + `GroupTable`/`GroupStageView`).
+
 ### gissningskanslig-data-genereras-ur-auktoritativ-kalla-med-validerande-generator (VM 2026)
 
 **Recept (stor, regel-kritisk datatabell utan handknapp och utan gissning):**
