@@ -11,7 +11,11 @@
 // om deras lag råkar finnas i `teamIds`. Annars skulle en blandad matchlista
 // (en call-site som skickar in både grupp- och slutspelsmatcher) förorena
 // grupptabellen med slutspelsresultat. En gruppmatch UTAN groupId ignoreras
-// också (data-defekt: en gruppmatch ska alltid ha en grupp, se Match-typen).
+// också (data-defekt). Att en gruppmatch har en grupp är ett DATAKONTRAKT
+// från datakällan, INTE en typgaranti: Match.groupId är `GroupId | null`
+// oavsett stage (slutspelsmatcher har null), så typen tvingar inte fram en
+// grupp för stage === 'group'. Den rena funktionen litar därför inte blint på
+// källan utan filtrerar defensivt på `groupId !== null` i isCounted nedan.
 //
 // ============================================================================
 // FIFA-tiebreak-ordning (VM 2026, gissas ALDRIG, källa nedan)
@@ -81,7 +85,10 @@ function emptyStanding(teamId: string): GroupStanding {
  * råkar finnas i `teamIds`: funktionen beräknar en grupptabell och får aldrig
  * förorenas av slutspelsresultat om en call-site skickar in en blandad lista
  * (dataintegritet, se filhuvudet). En gruppmatch utan groupId är en data-defekt
- * (Match-typen säger att gruppmatcher har en grupp) och hoppas också över.
+ * och hoppas också över: att en gruppmatch har en grupp är ett DATAKONTRAKT
+ * från datakällan, inte en typgaranti (Match.groupId är `GroupId | null` oavsett
+ * stage), så `groupId !== null`-kollen nedan är en avsiktligt DEFENSIV filtrering
+ * av källan, inte en redundant koll mot en typ som redan utesluter null.
  * En match som inte är färdigspelad (kommande/pågående) bidrar inte, så en
  * ofullständig grupp ger korrekta delsummor (edge-fall).
  *
