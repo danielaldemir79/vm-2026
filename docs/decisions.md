@@ -5,6 +5,42 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-09 , T2: Tema-arkitektur (no-flash + token-kontrakt + rörelse-primitiver)
+
+**Beslut:** No-flash-temat sätts av ett blockerande inline-script som injiceras FÖRST i
+`<head>` (Vite `transformIndexHtml` med `injectTo: 'head-prepend'`). Scriptets innehåll
+GENERERAS från `src/theme/theme-constants.ts` (samma nyckel/attribut/default/giltiga teman
+som React-providern), inte handkopierat, och ett test (`theme-init.test.ts`) kör den exakta
+genererade koden och vaktar att resolve-regeln matchar `resolveInitialTheme`.
+**Varför:** Temat måste sitta på `<html>` innan CSS appliceras och innan first paint, annars
+FOUC. Ett inline-script är det enda som hinner det (en ES-modul laddas deferred och tappar
+no-flash). Risken är att kopiera magiska strängar in i HTML som tyst driver isär, en sanning
+via codegen + synk-test löser det. Detta är Agent Kit-playbookens "no-flash-tema-utan-
+duplicerade-strängar" (Astro/`define:vars`) anpassad till React + Vite (`transformIndexHtml`
+är Vites motsvarighet). Se `docs/patterns.md`.
+
+**Beslut:** Design-tokens uttrycks som CSS-variabler i Tailwind v4 `@theme inline`, med
+semantiska roll-namn (`--color-bg/surface/accent/...`) som pekar på tema-växlande variabler
+(`--vm-*`), roterade på `[data-theme]`. ALLA värden bor isolerat i EN fil, `src/theme/tokens.css`.
+**Varför:** Token-STRUKTUREN (kontraktet) ägs av tema-motorn och ska vara stabil, men VÄRDENA
+(premium-palett, typografi, känsla) authoras av design-frontend-agenten. Genom att isolera
+värdena i en fil kan design äga dem utan att röra plumbingen (provider, init-script, wiring).
+Semantiska roll-namn (inte råa färger) låter design byta hue/skala fritt utan att bryta
+konsumenter. Värdena i `tokens.css` är de slutgiltiga premium-värdena (palett, typografi,
+känsla), authorade av design-frontend-agenten i T2.
+
+**Beslut:** Rörelse-primitiver (`Fade`/`Slide`/`Spring`) byggs som tunna wrappers över
+`motion`-paketets `motion.div`. Reducerad rörelse hanteras i två lager: `MotionProvider`
+sätter `MotionConfig reducedMotion="user"` (bred deklarativ grind), och Slide/Spring nollställer
+dessutom transform-/skal-förskjutningen explicit via `useReducedMotion`.
+**Varför:** Dubbelt skydd ger deterministiskt och testbart reduced-motion-beteende (WCAG 2.3.3):
+elementen tonar bara in utan att resa/poppa. Easing/timing är isolerade i `motion-presets.ts`
+så design kan finjustera personligheten utan att röra primitiverna. Paketet `motion` är det
+nuvarande namnet på Framer Motion (samma version/maintainer, peer-rent mot React 19 + Vite 7,
+ingen `--force`).
+
+---
+
 ## 2026-06-09 , T1: Cloudflare-deploy via git-integration, inga secrets i repot
 
 **Beslut:** Cloudflare Pages kopplas till repot via Cloudflares egen git-integration (Cloudflare

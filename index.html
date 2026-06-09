@@ -5,7 +5,11 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1220" />
+    <!-- Matchar den nya mörka fond-tokenen (--vm-bg, dark) så systemfälten tonar in rätt. -->
+    <meta name="theme-color" content="#091310" />
+    <!-- Preload av det självhostade display-typsnittet: hämtas tidigt, font-display:swap
+         gör att render aldrig blockeras. Ett litet woff2 (latin-subset, variabel vikt). -->
+    <link rel="preload" href="/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin />
     <meta
       name="description"
       content="Följ fotbolls-VM 2026 tillsammans: matcher, tabeller, slutspelsträd och tips."
