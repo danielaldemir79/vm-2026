@@ -162,11 +162,12 @@ describe('inmatning -> härledd tabell ändras (en sanning, härledd state)', ()
     });
     await waitFor(() => expect(result.current.store.status).toBe('ready'));
 
-    // Grupp A har en redan spelad match (m-a-1: mex 2-0 rsa). Redigera den till
-    // ett rsa-storseger och bevisa att tabellen följer med.
+    // g-A-1 är gruppens första match (Mexiko mot Sydafrika) i den riktiga
+    // matchplanen (T4b), scheduled tills resultat matas in. Mata in 0-5 till
+    // Sydafrika och bevisa att den härledda tabellen följer med.
     let ok = false;
     act(() => {
-      ok = result.current.store.submitResult('m-a-1', {
+      ok = result.current.store.submitResult('g-A-1', {
         homeGoals: 0,
         awayGoals: 5,
         status: 'finished',
@@ -177,7 +178,7 @@ describe('inmatning -> härledd tabell ändras (en sanning, härledd state)', ()
     await waitFor(() => {
       const groupA = result.current.group.tables.find((t) => t.groupId === 'A')!;
       const rsa = groupA.standings.find((r) => r.teamId === 'rsa')!;
-      // rsa vann nu 5-0: 3 poäng, +5 i målskillnad (bevisar omräkningen ur inmatningen).
+      // rsa vann 5-0: 3 poäng, +5 i målskillnad (bevisar omräkningen ur inmatningen).
       expect(rsa.points).toBe(3);
       expect(rsa.goalDifference).toBe(5);
     });
