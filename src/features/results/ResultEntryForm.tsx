@@ -171,101 +171,30 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
           {matchLabel}
         </legend>
 
-        {/* Kortets kropp: på desktop står kontrollerna (status + spara) till
-            vänster och scoreboarden till höger, så kortets bredd fylls med avsikt
-            i stället för att scoreboarden flyter i tomrum. På mobil staplar de
-            (scoreboard överst, kontroller under), kompakt och utan horisontell
-            scroll. items-center håller raderna i lod mot varandra. */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          {/* Scoreline: hemma- och borta-fälten hugger en centrerad "mot"-avdelare,
-              så raden läses som en faktisk resultat-rad (2 mot 0), inte två lösa
-              fält. Varje lag-kolumn har sin label centrerad ÖVER sitt fält.
-              order: scoreboarden överst på mobil, men till höger på desktop. */}
-          <div className="order-1 flex items-end justify-center gap-3 sm:order-2 sm:gap-5">
-            {/* Hemma-lag. Code-badgen ligger UTANFÖR <label> (egen aria-hidden-rad)
-              så labelns tillgängliga text förblir exakt "{lag} (hemma)", det
-              skärmläsaren och testerna läser; badgen är bara visuell krydda. */}
-            <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 sm:max-w-[13rem]">
-              <span className="flex max-w-full items-center gap-1.5 text-xs">
-                {homeCode ? (
-                  <span
-                    aria-hidden="true"
-                    className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wide"
-                    style={{
-                      backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
-                      color: 'var(--color-fg)',
-                    }}
-                  >
-                    {homeCode}
-                  </span>
-                ) : null}
-                <label htmlFor={homeId} className="min-w-0 truncate text-fg-muted">
-                  <span className="font-medium text-fg">{home}</span> (hemma)
-                </label>
-              </span>
-              <input
-                id={homeId}
-                name="homeGoals"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                value={homeGoals}
-                onChange={(e) => setHomeGoals(e.target.value)}
-                aria-invalid={invalid('home') || undefined}
-                aria-describedby={describedBy('home')}
-                className={`${FIELD_BASE} h-14 w-16 px-2 text-center font-display text-2xl font-bold tabular-nums`}
-              />
-            </div>
+        {/* Kortets kropp som ett STABILT KOLUMN-RUTNÄT (#39, Daniels feedback).
+            PROBLEMET som löses: med en flex-layout där lag-kolumnerna var `flex-1`
+            knuffade olika långa lagnamn poängrutorna i sidled, så rutorna, "mot"-
+            etiketten och Spara hoppade kort för kort. Lösningen är ett grid med
+            FASTA spår för score-blocket: bara KONTROLL-spåret är flexibelt
+            (`minmax(0,1fr)`), medan hemma-ruta / "mot" / borta-ruta sitter i spår
+            med innehålls-bestämd (auto) bredd som är IDENTISK på varje kort
+            (samma input-bredd, samma "mot"). Lagnamnen lever som etiketter OVANFÖR
+            sina rutor och TRUNKERAS (ellipsis) inom rut-bredden, så ett långt namn
+            kan aldrig knuffa layouten, fullständigt namn via title (+ labelns text
+            som skärmläsaren läser).
 
-            {/* "mot"-avdelaren, vertikalt centrerad mot fälten (inte labels). */}
-            <span
-              aria-hidden="true"
-              className="shrink-0 pb-4 font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted"
-            >
-              mot
-            </span>
-
-            {/* Borta-lag: speglad layout, samma label-utanför-badge-mönster så även
-              denna labels tillgängliga text förblir exakt "{lag} (borta)". */}
-            <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 sm:max-w-[13rem]">
-              <span className="flex max-w-full items-center gap-1.5 text-xs">
-                {awayCode ? (
-                  <span
-                    aria-hidden="true"
-                    className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wide"
-                    style={{
-                      backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
-                      color: 'var(--color-fg)',
-                    }}
-                  >
-                    {awayCode}
-                  </span>
-                ) : null}
-                <label htmlFor={awayId} className="min-w-0 truncate text-fg-muted">
-                  <span className="font-medium text-fg">{away}</span> (borta)
-                </label>
-              </span>
-              <input
-                id={awayId}
-                name="awayGoals"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                value={awayGoals}
-                onChange={(e) => setAwayGoals(e.target.value)}
-                aria-invalid={invalid('away') || undefined}
-                aria-describedby={describedBy('away')}
-                className={`${FIELD_BASE} h-14 w-16 px-2 text-center font-display text-2xl font-bold tabular-nums`}
-              />
-            </div>
-          </div>
-
-          {/* Kontroller: status-väljare + spara. Ligger till vänster på desktop
-              (order-1), under scoreboarden på mobil (order-2). Spara fyller
-              kontroll-radens bredd på mobil men håller sig kompakt på desktop. */}
-          <div className="order-2 flex flex-wrap items-end gap-3 sm:order-1">
+            Mobil (default): score-raden överst (centrerad), kontrollerna under, allt
+            staplat och utan horisontell scroll ner till smala vikbara skärmar (280px).
+            Desktop (sm+): kontroller till vänster, score-blocket till höger, i lod. */}
+        <div
+          data-result-card-body=""
+          className="grid grid-cols-[auto_auto_auto] items-end justify-center gap-x-3 gap-y-4 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:justify-between sm:gap-x-5"
+        >
+          {/* Kontroller: status-väljare + spara. Spänner hela score-raden på mobil
+              (col-span-3, under scoreboarden) men sitter i sitt eget flexibla spår
+              på desktop (col 1, vänster). Det är detta spår, INTE lag-kolumnerna,
+              som tar upp kortets variabla bredd, så score-rutorna står still. */}
+          <div className="order-2 col-span-3 flex flex-wrap items-end justify-center gap-3 sm:order-1 sm:col-span-1 sm:justify-start">
             <div className="flex flex-col gap-1.5">
               <label htmlFor={statusId} className="text-xs font-medium text-fg-muted">
                 Status
@@ -293,6 +222,90 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
             >
               Spara
             </button>
+          </div>
+
+          {/* Hemma-lag (grid-cell, FAST bredd via input-spåret). Namnet truncar
+              inom rut-bredden (w-16): ett långt lagnamn klipps med ellipsis i
+              stället för att knuffa rutan, fullt namn via title + labelns text. */}
+          <div className="order-1 flex w-16 flex-col items-center gap-1.5 sm:order-2">
+            <span className="flex w-full items-center justify-center gap-1 text-xs">
+              {homeCode ? (
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wide"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    color: 'var(--color-fg)',
+                  }}
+                >
+                  {homeCode}
+                </span>
+              ) : null}
+              {/* min-w-0 + truncate: tillåt krympning under innehållets bredd så
+                  ellipsisen slår in i stället för att spräcka grid-cellen. title
+                  ger fullt namn vid hover (labelns text ger det åt skärmläsaren). */}
+              <label htmlFor={homeId} title={home} className="min-w-0 truncate text-fg-muted">
+                <span className="font-medium text-fg">{home}</span>
+                <span className="sr-only"> (hemma)</span>
+              </label>
+            </span>
+            <input
+              id={homeId}
+              name="homeGoals"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={homeGoals}
+              onChange={(e) => setHomeGoals(e.target.value)}
+              aria-invalid={invalid('home') || undefined}
+              aria-describedby={describedBy('home')}
+              className={`${FIELD_BASE} h-14 w-16 px-2 text-center font-display text-2xl font-bold tabular-nums`}
+            />
+          </div>
+
+          {/* "mot"-avdelaren (grid-cell, fast). Vertikalt mot rutorna (pb-4 lyfter
+              den från label-raden så den linjerar mot inputs, inte namnen). */}
+          <span
+            aria-hidden="true"
+            className="order-1 self-end pb-4 font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted sm:order-2 sm:self-center sm:pb-0"
+          >
+            mot
+          </span>
+
+          {/* Borta-lag: speglad layout, samma truncate-inom-rut-bredd. */}
+          <div className="order-1 flex w-16 flex-col items-center gap-1.5 sm:order-2">
+            <span className="flex w-full items-center justify-center gap-1 text-xs">
+              {awayCode ? (
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wide"
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    color: 'var(--color-fg)',
+                  }}
+                >
+                  {awayCode}
+                </span>
+              ) : null}
+              <label htmlFor={awayId} title={away} className="min-w-0 truncate text-fg-muted">
+                <span className="font-medium text-fg">{away}</span>
+                <span className="sr-only"> (borta)</span>
+              </label>
+            </span>
+            <input
+              id={awayId}
+              name="awayGoals"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={awayGoals}
+              onChange={(e) => setAwayGoals(e.target.value)}
+              aria-invalid={invalid('away') || undefined}
+              aria-describedby={describedBy('away')}
+              className={`${FIELD_BASE} h-14 w-16 px-2 text-center font-display text-2xl font-bold tabular-nums`}
+            />
           </div>
         </div>
 
