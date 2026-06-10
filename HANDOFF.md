@@ -5,6 +5,75 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T10/#10 (lag-profiler) KLAR - PR #45 väntar på merge
+
+**Branch:** `feature/T10-lagprofiler` @ HEAD `6486fbc`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/45 mot `develop` (Closes #10, state: OPEN)
+**Board:** issue #10 i "In Review" (korrekt). Dirigenten stänger issue #10 MANUELLT och flyttar kort #10 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt att merga, förbättra brister och mata på nya tasks.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `677c9a3` - källankrad lag-profil-data (FIFA-ranking april 2026 + stjärnspelare + kuriosa), parser + generator + 48/48-låst test + decisions.md
+- `b453a52` - profil-modal + TeamNameButton (senior-developer)
+- `f142aaa` - docs (senior-developer)
+- `4dd6d0d` - flake-fix seed-race (senior-developer)
+- `cb60657` - premium-modal, värsta-falls-AA över alla 360 hues (design-frontend)
+- `f614bb3` - docs (design-frontend)
+- `18ff82b` - MotionGlobalConfig.skipAnimations (design-frontend)
+- `24eb866` - lokal panel: F1 faktafel ESP-kuriosa rättad + F3 fokus-tester (senior-developer)
+- `98e5973` - React 19 passiv-effekt-flush-race rotorsakad (senior-developer)
+- `a6c2783` - barrel (Copilot C1)
+- `e8cce76` - bootstrap-cirkularitet bruten, team-refs.ts (Copilot C2)
+- `1b93fb9` - äkta tom-stjärnor-test + stavfel (Copilot C3)
+- `72a9a7f` - fokus-effekt stabilt id (Copilot C7)
+- `800c307` - okänt lag ej klickbart + Escape-deps (Copilot C8+C9)
+- `6486fbc` - opponent-uppslags-miss fail-loud-light (Copilot C10, HEAD)
+
+**Verifiering (dirigenten):** 554 tester gröna (53 filer), build/lint/format rent. Alla 19 Copilot-trådar lösta (5 rundor, exit nådd 4->2->1->2->1).
+
+**"Bästa speldraget" (bestPlay):** medvetet utelämnat (subjektivt utan källbar grund). `Team.bestPlay` tom för alla 48 lag, låst av test. FIFA-rankingen är styrke-signal i profil-vyn i stället. Dokumenterat i decisions.md T10 och i issue #10-bodyn.
+
+**FIFA-ranking:** aprilutgåvan 2026 (officiell, senaste vid bygget). Nästa officiella utgåva publiceras 2026-06-11 (dagen turneringen startar). Om Daniel vill uppdatera: ändra rank-värden i `src/data/wc2026/team-profiles-source.txt` + kör `npm run gen:team-profiles` - källankrings-testet låser automatiskt.
+
+**PINNADE punkter (oförändrade):**
+- **T14-pin UTÖKAD:** flippa `LIVE_READY = true` + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion (inget test refererar "LIVE_READY=false"). Guard-testet BRYTS medvetet vid flip. Projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn (3 dagar framåt) tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+
+**"Behöver Daniel"-kö:**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista. Alternativ: (a) visa meddelande "turneringen avslutad", (b) ankra fönstret till sista speldagen.
+- **FIFA-ranking juni-uppdatering:** aprilutgåvan 2026 används nu. Junirankingen publiceras 2026-06-11 - om den ska speglas i appen: ändra rank-värden i källfilen + `npm run gen:team-profiles`. Lägg som liten framtida task eller hantera vid hemkomst.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` i `memory/lessons/senior-developer.md` har nått Förekomst 3 (T4 + T8 + T9). Typ: korsar flera agenter (reviewer + senior-developer) -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` i `memory/lessons/journalist.md` har nått Förekomst 3 (T7 + HOTFIX #37 + T8). Typ: agent-beteende (journalist) -> permanent regel i journalistens fil. Väntar Daniels godkännande.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
+>
+> Om PR #45 (T10/#10, feature/T10-lagprofiler) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 45 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #10 manuellt (`gh issue close 10`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #10 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar klickbara lagnamn och profil-modal med ranking + stjärnor + kuriosa. Skicka demo till Daniel.
+>
+> Om PR #45 REDAN mergad:
+> T1-T10 + T4b + HOTFIX #37 + T27/#39 + T28/#42 är klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: T11 (#11)** - "Vad krävs-kalkylator": live-scenarier sista gruppomgången, vad varje lag behöver för att avancera. Kolla issue-bodyn för fullständigt scope.
+>
+> Bär framåt (alla tasks):
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion. Projekt kmzhyblzxangpxydufve.
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35), #39-F1-produktbeslut, FIFA-ranking-juni-uppdatering, 2 befordringar (Förekomst 3, väntar Daniels godkännande).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T10/#10 (lag-profiler) KLAR - väntar review + PR
 
 **Branch:** `feature/T10-lagprofiler` (= develop HEAD + T10-commits, EJ pushad)
