@@ -5,6 +5,43 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T9 (issue #9, design-frontend): premium-bracket ovanpå seamen, AA UPPMÄTT i båda teman
+
+**Beslut (visuellt lager, rör ALDRIG semantiken):** Det premium-visuella trädet byggs ENBART ovanpå
+senior-devs data-attribut (`data-bracket-round/-match/-slot`, `data-slot-resolution`, `data-winner`,
+`data-bracket-scroll/-locked`) via en dedikerad `src/features/bracket/bracket.css` + klass-hakar i
+`BracketView.tsx`. All a11y-semantik (6 runda-regioner med exakta aria-labels, h2/h3-hierarki,
+`<ul>/<li>`-slots, sr-only "(vidare)", möjliga-chippets aria-label) står kvar, och alla 462 tester är
+gröna. "Arena i kvällsljus" för trädet: intensiteten BYGGER mot finalen (numrerad runda-marker 1->6,
+semifinalens kant tar accent, FINALEN får en guld-signatur: guld-kant + guld-tint + guld-glow), allt
+via `color-mix`/tema-token (aldrig rå hex) så det är troget BÅDA teman.
+
+**Beslut (vinnar-framhävning FÄRG-OBEROENDE, T7/T8-pin):** Den slot som vann (`data-winner`) markeras
+med ett LAGER signaler, aldrig bara grönt: accent-kant-bar (form) + accent-tint-yta (yta) + en
+medalj-bock ✓ som glyf (ikon) + fetare text (vikt). Verifierat live i reduced-motion att markörerna
+STÅR KVAR (bar + tint + bock) medan rörelsen nollas, så vinnaren är tydlig i gråskala/för färgblinda.
+
+**Beslut (avancerings-animation = CSS, inte JS, samma motgift som hero:n):** "Förs fram"-känslan är en
+ENGÅNGS glow-puls + medalj-pop i ren CSS (`@keyframes` i bracket.css), ingen layout-påverkan (CLS=0).
+Den globala reduced-motion-regeln räcker INTE (den fryser keyframes på slutläget), så bracket-rörelsen
+nollas EXPLICIT med `animation: none` vid `prefers-reduced-motion: reduce`. Verifierat live:
+`animationName` blir `none` på vinnar-slot, medalj-pseudo och scroll-hintens pil.
+
+**Beslut (responsiv scroll som FEATURE):** Trädet är brett till sin natur. På smala skärmar scrollas
+det i sidled (seamens `overflow-x-auto`) med mjuka edge-fade-masker (`mask-image` mot tema) + en mobil
+"Svep i sidled →"-hint (döljs >= 1024px). Verifierat live 280/360/768/1024/1440px: NOLL sid-overflow
+(dokumentet scrollar aldrig horisontellt, bara bracket-containern), ingen skyldig nod sticker ut.
+
+**Beslut (AA UPPMÄTT, inte påstått, i BÅDA teman, canvas-komposit-metoden):** All text mätt på faktiskt
+renderad yta (komposit av halvgenomskinliga tints mot effektiv bakgrund), inte mot hex offline. Mörkt
+tema: vinnar-lagnamn 15.8:1, resolved lagnamn 15.24:1, muted positions-etikett 7.5:1, final-text på
+guld-tint 7.5:1, möjliga-chip/match-nr-cap 7.5:1, guld marker 11.28:1, runda-titel 8.39:1. Ljust tema:
+vinnar-lagnamn 13.62:1, resolved 17.91:1, muted/final-text/chip/cap 6.52:1, runda-titel 5.92:1, final
+guld-marker **5.03:1** (alla >= 4.5:1 AA normal text). **Fynd som rättades:** guld-text på vit yta för
+final-markern föll på 3.29:1 i ljust tema (under AA). Fixad till en SOLID guld-bricka med near-black
+ink (`#1c1403`), samma färg-oberoende AA-säkra mönster som "Dagens match"-chippet (T7-pin): 5.03:1
+ljust / ~10.9:1 mörkt. Ingen AA-siffra i denna logg är antagen, varje är uppmätt i webbläsaren.
+
 ## 2026-06-10 , T9 (issue #9): slutspelsträdet som härledd state + två källhänvisade FIFA-regler
 
 **Beslut (arkitektur, härledd state):** Slutspelsträdet LAGRAS aldrig, det är en REN funktion
