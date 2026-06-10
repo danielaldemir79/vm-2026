@@ -529,6 +529,87 @@ describe('TeamProfilePanel, edge-fall: okänt lag-id (fail-safe, ingen dialog)',
   });
 });
 
+describe('TeamProfilePanel, lagets väg: motståndare saknas i uppslaget (fail-loud-light, C10)', () => {
+  // C10: en match i lagets väg kan peka på ett opponentId som är ICKE-null men SAKNAS i
+  // teamsById (data-inkonsistens, t.ex. en match seedad mot ett lag som inte finns i
+  // store-uppslaget). Tidigare maskerade panelen det som "Ej klart" (samma text som ett
+  // genuint okänt slutspels-slot), vilket DOLDE felet. Fixen visar i stället id-strängen
+  // när uppslaget missar, men behåller "Ej klart" för ett GENUINT null (tomt slutspels-
+  // slot). Vi renderar panelen direkt mot en konstruerad store (ingen async-seedning) så
+  // grenen testas deterministiskt; alla riktiga fixtures-matcher har kända motståndare.
+  function storeWith(teams: Team[], groups: Group[], matches: Match[]): ResultsStore {
+    return {
+      status: 'ready',
+      matches,
+      teams,
+      groups,
+      mode: 'fixtures',
+      error: null,
+      setMatches: () => {},
+      submitResult: () => ({ ok: true }),
+    };
+  }
+
+  const swedenTeam: Team = {
+    id: 'swe',
+    name: 'Sverige',
+    code: 'SWE',
+    group: 'A',
+    fifaRanking: 25,
+    starPlayers: ['Alexander Isak'],
+  };
+  const groups: Group[] = [{ id: 'A', teamIds: ['swe'] }];
+
+  /** En Sverige-match mot ett givet borta-id (null = obestämt slutspels-slot). */
+  function sweMatch(id: string, awayTeamId: string | null): Match {
+    return {
+      id,
+      stage: 'group',
+      groupId: 'A',
+      homeTeamId: 'swe',
+      awayTeamId,
+      kickoff: '2026-06-12T18:00:00.000Z',
+      venue: 'Testarena',
+      status: 'scheduled',
+      result: null,
+    };
+  }
+
+  it('visar opponent-id-strängen (inte "Ej klart") när motståndaren saknas i uppslaget', () => {
+    // Matchen pekar på 'phantom' som borta-lag, men 'phantom' finns INTE i store-teamen
+    // -> teamsById-uppslaget missar. Panelen ska då visa id:t synligt (fail-loud-light),
+    // inte gömma inkonsistensen bakom "Ej klart".
+    const match = sweMatch('m-phantom', 'phantom');
+    const { container } = render(
+      <ResultsStoreContext.Provider value={storeWith([swedenTeam], groups, [match])}>
+        <TeamProfilePanel openTeamId="swe" onClose={() => {}} />
+      </ResultsStoreContext.Provider>
+    );
+
+    const row = container.querySelector('[data-profile-path-match="m-phantom"]')!;
+    expect(row).not.toBeNull();
+    // Id-strängen syns (felet är synligt), och raden visar INTE det maskerande "Ej klart".
+    expect(row).toHaveTextContent('phantom');
+    expect(row).not.toHaveTextContent('Ej klart');
+  });
+
+  it('behåller "Ej klart" när motståndaren är genuint obestämd (null, tomt slutspels-slot)', () => {
+    // Kontroll-fall: ett ÄKTA null-motstånd (matchen har ingen borta-motståndare än) ska
+    // FORTSATT visa "Ej klart". Fixen får inte över-korrigera och börja visa något annat
+    // för det legitima obestämda fallet.
+    const match = sweMatch('m-open', null);
+    const { container } = render(
+      <ResultsStoreContext.Provider value={storeWith([swedenTeam], groups, [match])}>
+        <TeamProfilePanel openTeamId="swe" onClose={() => {}} />
+      </ResultsStoreContext.Provider>
+    );
+
+    const row = container.querySelector('[data-profile-path-match="m-open"]')!;
+    expect(row).not.toBeNull();
+    expect(row).toHaveTextContent('Ej klart');
+  });
+});
+
 describe('useTeamProfile, fail loud utan provider', () => {
   it('kastar om den används utan TeamProfileProvider (wiring-fel, inte tyst no-op)', () => {
     function Bare() {

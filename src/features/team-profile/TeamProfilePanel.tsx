@@ -45,12 +45,22 @@ export interface TeamProfilePanelProps {
   onClose: () => void;
 }
 
-/** Visningsnamn för ett (känt eller okänt) motståndarlag i lagets väg. */
+/**
+ * Visningsnamn för ett motståndarlag i lagets väg.
+ *
+ * - opponentId === null: motståndaren är genuint okänd än (t.ex. en tom slutspels-
+ *   slot innan seedningen, deriveTeamProfile sätter null), vi visar "Ej klart".
+ * - opponentId men UTAN träff i teamsById: en DATA-INKONSISTENS (en match pekar på ett
+ *   lag-id som inte finns i lag-uppslaget). Vi visar då id-STRÄNGEN i stället för att
+ *   maskera felet som "Ej klart" (fail-loud-light, C10): det är ärligt mot
+ *   tittaren OCH gör inkonsistensen synlig vid review/test i stället för att tyst
+ *   låtsas att motståndaren är obestämd. Vi kraschar inte (KISS), men gömmer inte felet.
+ */
 function opponentName(opponentId: string | null, teamsById: ReadonlyMap<string, Team>): string {
   if (opponentId === null) {
     return 'Ej klart';
   }
-  return teamsById.get(opponentId)?.name ?? 'Ej klart';
+  return teamsById.get(opponentId)?.name ?? opponentId;
 }
 
 /** En rad i lagets väg: steg, datum + tid, motståndare, hemma/borta, ev. resultat. */
