@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { buildThemeInitScript } from './src/theme/theme-init';
+import { VM_2026_MANIFEST } from './src/pwa/app-manifest';
 
 // No-flash tema-injektion. Detta är React + Vites motsvarighet till Astros
 // define:vars: i stället för att handkopiera tema-nyckel/attribut/default som
@@ -66,36 +67,10 @@ export default defineConfig({
         // (registerType: autoUpdate), så cachen inte växer obegränsat.
         cleanupOutdatedCaches: true,
       },
-      manifest: {
-        name: 'VM 2026',
-        short_name: 'VM 2026',
-        description:
-          'Följ fotbolls-VM 2026 tillsammans: matcher, tabeller, slutspelsträd och tips.',
-        lang: 'sv',
-        theme_color: '#091310',
-        background_color: '#091310',
-        display: 'standalone',
-        start_url: '/',
-        scope: '/',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-          {
-            src: 'pwa-maskable-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-        ],
-      },
+      // Manifestet bor i en egen ren modul (src/pwa/app-manifest.ts) så dess
+      // WebAPK-mintningskrav (id, separat maskable-ikon, 192+512) kan källankras
+      // av ett test utan att bygga dist. Se T30/#50 + decisions.md.
+      manifest: VM_2026_MANIFEST,
     }),
   ],
   test: {

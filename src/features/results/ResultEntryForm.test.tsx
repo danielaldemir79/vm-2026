@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ResultEntryForm } from './ResultEntryForm';
 import { validateResultEntry, type ResultEntry } from './validate-result';
-import type { Match, Team } from '../../domain/types';
+import type { LiveMatch, Match, Team } from '../../domain/types';
 
 // Vi använder fireEvent (redan tillgängligt via @testing-library/react) i stället
 // för @testing-library/user-event, för att inte lägga till ett nytt beroende för
@@ -196,7 +196,11 @@ describe('ResultEntryForm, auto-spelad + Rensa resultat (T31, #51)', () => {
   // Tomma mål ska då BEVARA 'live' (en validerad no-op, live -> live tillåts), och
   // för en LIVE-match gäller realSubmit (riktig validering) så det måste passera grön.
   it('LIVE: ett tomt Spara bevarar status live (ingen regression till scheduled)', () => {
-    const live: Match = { ...scheduledMatch(), status: 'live' };
+    // scheduledMatch() har result: null, vilket LiveMatch kräver. Annotera som
+    // LiveMatch (inte den breda Match-unionen) så TS narrowar result-fältet rätt;
+    // en spread över den breda unionen kan annars inte bevisa result: null för
+    // live-grenen (TS2322). Diskriminerad union, se domain/types.ts.
+    const live: LiveMatch = { ...scheduledMatch(), status: 'live', result: null };
     const onSubmit = vi.fn(realSubmit(live));
     render(<ResultEntryForm match={live} teamsById={teamsById} onSubmit={onSubmit} />);
     fireEvent.click(screen.getByRole('button', { name: /Spara/ }));

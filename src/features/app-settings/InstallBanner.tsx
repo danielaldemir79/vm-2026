@@ -5,6 +5,7 @@
 // useInstallPrompt; denna komponent renderar bara. Diskret = ett litet kort, inte
 // en påträngande overlay, och med en avfärda-knapp som respekteras permanent.
 
+import { ANDROID_PLAY_PROTECT_NOTE, detectAndroid } from './install-prompt';
 import { useInstallPrompt } from './use-install-prompt';
 
 /**
@@ -49,6 +50,11 @@ export function InstallBanner() {
     return null;
   }
 
+  // Play Protect-noten är Android-specifik. Läge 'prompt' fyras även av
+  // desktop-Chrome (samma beforeinstallprompt-event), så vi gate:ar noten på
+  // Android-UA, annars vore raden missvisande på desktop (T30/#50, C4).
+  const showPlayProtectNote = mode === 'prompt' && detectAndroid(navigator);
+
   return (
     <section
       aria-labelledby="install-rubrik"
@@ -62,9 +68,21 @@ export function InstallBanner() {
             Installera VM 2026
           </h2>
           {mode === 'prompt' ? (
-            <p className="text-sm text-fg-muted">
-              Lägg till appen på hemskärmen för helskärm, snabb start och offline-läge.
-            </p>
+            <>
+              <p className="text-sm text-fg-muted">
+                Lägg till appen på hemskärmen för helskärm, snabb start och offline-läge.
+              </p>
+              {/* Ärlig rad om Play Protect-varningen (T30/#50). Den kan inte
+                  elimineras från vår sida (WebAPK:ns targetSdk ägs av webbläsarens
+                  mintningsserver), så vi lugnar i stället för att förvirra. Diskret
+                  (mindre + dämpad) så den inte stjäl fokus från install-knappen.
+                  Visas BARA på Android (C4), den är irrelevant på desktop-Chrome. */}
+              {showPlayProtectNote ? (
+                <p data-install-play-protect-note="" className="text-xs text-fg-muted/80">
+                  {ANDROID_PLAY_PROTECT_NOTE}
+                </p>
+              ) : null}
+            </>
           ) : (
             // iOS-instruktion: Safari saknar install-prompt, så vi visar vägen.
             <p data-install-ios-steps="" className="text-sm text-fg-muted">

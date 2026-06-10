@@ -5,6 +5,70 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T30/#50 (Play Protect-varning) KLAR - PR #55 väntar på merge
+
+**Branch:** `feature/T30-play-protect` @ HEAD `5f16405`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/55 mot `develop` (Closes #50, state: OPEN)
+**Board:** issue #50 i "In Review" (korrekt). Dirigenten stänger issue #50 MANUELLT och flyttar kort #50 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `927a056` - fix(results): rätta typfel i LiveMatch-fixture (build-blockerare, sidofix)
+- `70f6c68` - feat(pwa): härda WebAPK-manifest + ärlig Play Protect-rad (#50, manifest-modul + id + not + källankrad rotorsak)
+- `cab9c4e` - test(pwa): gör ikon-storleksparsning W3C-spec-trogen (#50, C1 C2)
+- `9b51832` - fix(T30): strikt parseSizes-validering i app-manifest-test (#50, C3)
+- `5f16405` - fix(pwa): gate:a Play Protect-noten på Android-UA (#50, C4 C5)
+
+**Verifiering:** 792 tester gröna + 12 env-skippade. Panel: godkänd, alla källor WebFetch-verifierade mot primärkälla, en nit avvisad. Copilot: 4 rundor (2→1→2→0). Build/lint/format rent.
+
+**Rotorsak (dokumenterad, källhänvisad):** WebAPK targetSdk sätts av webbläsarleverantören (Chrome/Samsung Internet) vid WebAPK-mintning och ligger utanför vår kontroll. Vi har härdad manifest (id, scope, display-override, maskable-ikoner) och en ärlig UX-rad (Android-gatad) som förklarar läget för användaren. Beslut + källhänvisningar i decisions.md.
+
+**Alla 4/4 acceptanskriterier bockade i issue #50** (journalisten 2026-06-10).
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #55 (T30/#50, feature/T30-play-protect) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 55 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #50 manuellt (`gh issue close 50`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #50 till Done på boarden.
+> Verifiera att vm-2026.pages.dev har uppdaterad manifest (kontrollera Application-fliken i DevTools) och att Android-noten syns i installationsflödet på en Android-enhet eller via UA-override.
+>
+> Om PR #55 REDAN mergad:
+> T30 är klar och mergad. Plocka nästa task.
+> **Nästa task: #54 (T32, Daniels feedback 4)** - inställnings-z-index-buggen (dialog hamnar bakom sidan), simulerings-bannern placeras vid resultatinmatningen, hero-etiketten visar datum i stället för "DAGENS MATCH" när matchen inte är idag. Se issue #54 för fullständigt scope. Därefter T15 (tips-motorn), sedan T25 (T26 DR-webb-inbäddning skippad, stängd not planned).
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T31/#51 (Showcasen bort + auto-spelad) KLAR - PR #53 väntar på merge
 
 **Branch:** `feature/T31-feedback3` @ HEAD `7cd8bd7`
