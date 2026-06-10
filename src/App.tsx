@@ -149,13 +149,6 @@ function AppShell() {
               en tunn wrapper som bara läser sim-seamen i storen (en sanning); i
               vilo-läge är den helt neutral (ingen ram, ingen tint). */}
             <SimulationFrame>
-              {/* Banner:n (kontrollen + markeringen) ligger överst i ramen så
-                Starta/Återställ/Avsluta + statusmeddelandet syns innan man
-                bläddrar i de simulerade vyerna. */}
-              <Slide direction="up">
-                <SimulationBanner />
-              </Slide>
-
               {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
                 datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
                 SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA
@@ -186,6 +179,19 @@ function AppShell() {
                 premium-trädet med kopplingslinjer + vinnar-animation ovanpå. */}
               <Slide direction="up">
                 <BracketView />
+              </Slide>
+
+              {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + statusmeddelandet)
+                sitter DIREKT ovanför resultatinmatningen (T32, #54, Daniels feedback
+                4, fynd 2). Sim-läget handlar om RESULTAT (man spelar ut tänkta
+                resultat), så kontrollen får tydlig koppling genom att stå vid
+                inmatnings-sektionen i stället för högst upp på sidan. Sim-RAMEN
+                (SimulationFrame) omsluter fortfarande ALLA påverkade vyer (daily,
+                gruppspel, "Vad krävs", slutspelsträd, inmatning) och bär den globala
+                "labbet"-markeringen + den sticky badge:n; det är bara själva
+                kontroll-banner:n som flyttat hit. */}
+              <Slide direction="up">
+                <SimulationBanner />
               </Slide>
 
               <Slide direction="up">
