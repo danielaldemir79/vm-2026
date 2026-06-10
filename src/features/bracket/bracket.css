@@ -1,0 +1,291 @@
+/* =============================================================================
+   SLUTSPELSTRÄDETS PREMIUM-VISUELLA LAGER (design-frontend, T9 / issue #9).
+   =============================================================================
+
+   "Arena i kvällsljus", men för trädet: sextondel -> final som ett vackert träd
+   där intensiteten BYGGER mot finalen (guld-accenten), med kopplings-affordans
+   mellan rundorna och en vinnar-framhävning som är FÄRG-OBEROENDE (form + medalj
+   + yta + kant, aldrig bara grönt, T7/T8-pin).
+
+   ÄGARSKAP (seam): senior-dev äger semantik + data-attribut i BracketView.tsx
+   (data-bracket-round/-match/-slot, data-slot-resolution, data-winner,
+   data-bracket-scroll/-locked). Detta lager STYLAR ovanpå de hakarna och rör
+   inte datan, så all a11y-semantik + alla tester står kvar (PRINCIPLES §4).
+
+   ALLT stylat via tema-token (color-mix / var(--vm-*)), aldrig rå hex, så trädet
+   är troget BÅDA teman (mörkt grund + ljust). Rörelse är RENT dekorativ och nollas
+   av den globala reduced-motion-grinden (index.css) PLUS en explicit `animation:
+   none`-regel här (samma motgift som hero:n, patterns.md: den svepande regeln
+   fryser annars keyframes på slutläget i stället för att stänga av dem).
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   1. TRÄD-CONTAINERN + SCROLL-AFFORDANS.
+   Trädet är brett till sin natur. På smala skärmar scrollas det i sidled (seamen
+   sätter overflow-x-auto), och vi gör scrollen till en FEATURE: mjuka skugg-kanter
+   som tonar in/ut och signalerar "det finns mer åt sidan", plus en diskret
+   scroll-hint som bara visas där det faktiskt går att scrolla.
+   -------------------------------------------------------------------------- */
+.vm-bracket {
+  position: relative;
+}
+
+/* Skugg-kanter (edge-fade): två dekorativa overlays i container-kanterna som
+   antyder att innehållet fortsätter utanför vyn. Tonas mot fond-token så de är
+   trogna båda teman. Pekar inte på pointer-events (ren dekoration). */
+.vm-bracket-scroll {
+  /* En mjuk maskering som tonar ut trädets vänster/höger-kant, så kort som
+     skär av i kanten inte ser "klippta" ut utan glider ut elegant. Maskering
+     (inte en overlay) så den fungerar oavsett fondens ton i båda teman. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 1.25rem,
+    #000 calc(100% - 1.25rem),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 1.25rem,
+    #000 calc(100% - 1.25rem),
+    transparent 100%
+  );
+  /* Mjuk, träg scroll-känsla på touch + snabb tangentbords-scroll. */
+  scroll-behavior: smooth;
+}
+
+/* Scroll-hint: en diskret "svep i sidled"-pill som ENBART visas på smala skärmar
+   (där trädet garanterat svämmar över). På breda skärmar ryms trädet och hinten
+   är onödig, så vi döljer den. Den är en visuell affordans, inte interaktiv. */
+.vm-bracket-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+@media (min-width: 1024px) {
+  .vm-bracket-hint {
+    display: none;
+  }
+}
+
+/* Den lilla svep-pilen i hinten andas lugnt i sidled, så ögat fattar "scrolla".
+   Ren dekoration, nollas av reduced-motion-grinden nedan. */
+.vm-bracket-hint-arrow {
+  animation: vm-bracket-nudge 1.8s ease-in-out infinite;
+}
+@keyframes vm-bracket-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(3px);
+    opacity: 1;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   2. RUNDORNA: en kolumn per runda, vertikalt centrerade så trädet läser som ett
+   träd (matcherna sitter mitt i kolumnen) och kopplings-affordansen mellan rundor
+   blir meningsfull. Intensiteten byggs mot finalen via per-runda-accenter.
+   -------------------------------------------------------------------------- */
+.vm-bracket-round {
+  position: relative;
+  /* Centrera matchkorten vertikalt i kolumnen: senare rundor har färre kort, så
+     centrering får dem att möta sina föregångare på mitten (träd-känsla). */
+  justify-content: center;
+}
+
+/* Runda-rubrikens "eyebrow"-marker: en liten numrerad bricka + linje som ger
+   varje runda en redaktionell rubrik-känsla. Accenten intensifieras mot finalen
+   (se per-stage nedan), default = dämpad kant. */
+.vm-bracket-round-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-fg-muted);
+  font-weight: 700;
+  font-size: 0.6875rem;
+  line-height: 1;
+}
+
+/* KOPPLINGS-AFFORDANS mellan rundor: en kort horisontell "feeder"-stub på höger
+   kant av varje runda-kolumn (utom den sista visuella), plus en vertikal
+   samlings-linje, ritad med en pseudo-yta. Den läser som "den här rundan matar
+   nästa", utan att fejka exakt bezier-geometri som den platta kolumn-datan inte
+   bär. Tonad mot border-token (subtil, läsbarheten är helig). */
+.vm-bracket-round::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  right: -0.75rem;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--color-border) 80%, transparent) 12%,
+    color-mix(in srgb, var(--color-border) 80%, transparent) 88%,
+    transparent
+  );
+  pointer-events: none;
+}
+/* Final + bronsmatch är de sista (yttersta) kolumnerna; ingen koppling efter dem. */
+.vm-bracket-round[data-bracket-round='final']::after,
+.vm-bracket-round[data-bracket-round='third-place']::after {
+  display: none;
+}
+
+/* -----------------------------------------------------------------------------
+   3. MATCHKORTEN: per-runda-intensitet. Tidiga rundor är lugna (neutral yta).
+   Mot finalen lyfts korten: en aning starkare kant + en svag accent-glow, så
+   ögat dras höger genom trädet. Finalen + bronsmatchen får signatur-behandling.
+   -------------------------------------------------------------------------- */
+.vm-bracket-match {
+  position: relative;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vm-bracket-match:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* Semi-final: kanten börjar ta accent-färg (vi närmar oss toppen). */
+.vm-bracket-round[data-bracket-round='semi-final'] .vm-bracket-match {
+  border-color: color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+}
+
+/* FINALEN: guld-signatur (FÄRG-OBEROENDE framhävning, samma princip som
+   "Dagens match"-kortet, T7-pin): guld-kant + en varm guld-tint i ytan +
+   en mjuk guld-glow. Detta är trädets krona, den skärm folk visar för kompisar. */
+.vm-bracket-round[data-bracket-round='final'] .vm-bracket-match {
+  border-color: color-mix(in srgb, var(--vm-gold) 55%, var(--color-border));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vm-gold) 12%, var(--color-surface-raised)),
+    var(--color-surface-raised)
+  );
+  box-shadow:
+    var(--vm-shadow-raised),
+    0 0 0 1px color-mix(in srgb, var(--vm-gold) 30%, transparent),
+    0 8px 32px color-mix(in srgb, var(--vm-gold) 22%, transparent);
+}
+
+/* BRONSMATCHEN: en lugnare brons-ton (varm men nedtonad), så den läser som
+   "tredjepris" bredvid finalens guld utan att tävla om uppmärksamheten. */
+.vm-bracket-round[data-bracket-round='third-place'] .vm-bracket-match {
+  border-color: color-mix(in srgb, var(--vm-gold) 28%, var(--color-border));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vm-gold) 5%, var(--color-surface)),
+    var(--color-surface)
+  );
+}
+
+/* -----------------------------------------------------------------------------
+   4. VINNAR-FRAMHÄVNING (FÄRG-OBEROENDE, T7/T8-pin): den slot vars lag vann (seamen
+   sätter data-winner) får ett LAGER av signaler, aldrig bara en färg:
+     - en accent-kant-bar till vänster (form),
+     - en upphöjd yt-ton (yta),
+     - en medalj-bock som glyf (ikon, inte färg),
+     - fetare text (vikt).
+   Så vinnaren syns för färgblinda + i gråskala + i båda teman.
+   -------------------------------------------------------------------------- */
+.vm-bracket-slot {
+  position: relative;
+  transition: background-color 0.25s ease;
+}
+
+.vm-bracket-slot[data-winner] {
+  /* Yt-ton: en svag accent-tint så den vinnande raden lyfter ur kortet. */
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  /* Form: en accent-bar längst till vänster i raden (vinst-markör). */
+  box-shadow: inset 3px 0 0 0 var(--color-accent);
+}
+
+/* Medalj-bock: en liten cirkel med ett check, ren glyf (form, inte färg). Renderas
+   via ett pseudo-element så TSX-semantiken inte rörs, och sr-only-texten "(vidare)"
+   som seamen redan lägger bär informationen för skärmläsare. */
+.vm-bracket-slot[data-winner] .vm-bracket-slot-name::after {
+  content: '✓';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-left: 0.375rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+  /* Bocken poppar fram när vinnaren propagerar (se vm-bracket-advance). */
+  transform-origin: center;
+}
+
+/* -----------------------------------------------------------------------------
+   5. AVANCERINGS-ANIMATION: när en vinnare propagerar tänds raden med en mjuk,
+   ENGÅNGS framhävning (en lugn glow-puls + bockens inpopp), så det KÄNNS att laget
+   gått vidare, utan att vara stökigt. Rent dekorativt: nollas helt av reduced-motion.
+   Detta är CSS (inte JS) av samma skäl som hero:n: ingen layout-påverkan (CLS=0),
+   och a11y-grinden är gratis via @media-regeln nedan.
+   -------------------------------------------------------------------------- */
+@keyframes vm-bracket-advance {
+  0% {
+    background-color: color-mix(in srgb, var(--color-accent) 42%, transparent);
+  }
+  100% {
+    background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+}
+@keyframes vm-bracket-medal-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-bracket-slot[data-winner] {
+    /* En enda lugn glow-puls vid framhävning (förs fram-känslan). */
+    animation: vm-bracket-advance 1.1s ease-out 1;
+  }
+  .vm-bracket-slot[data-winner] .vm-bracket-slot-name::after {
+    animation: vm-bracket-medal-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1;
+  }
+}
+
+/* A11y-grind (WCAG 2.3.3): vid minskad rörelse stängs ALL dekorativ bracket-rörelse
+   AV helt (inte snappas till slutläget, samma motgift som hero:n, patterns.md).
+   Vinnar-tillståndet är fortfarande tydligt: kant-bar + yt-ton + bock + sr-only-text
+   står kvar, bara RÖRELSEN tas bort. Scroll-hintens nudge och kort-hover-lyftet
+   stängs också av. */
+@media (prefers-reduced-motion: reduce) {
+  .vm-bracket-slot[data-winner],
+  .vm-bracket-slot[data-winner] .vm-bracket-slot-name::after,
+  .vm-bracket-hint-arrow {
+    animation: none !important;
+  }
+  /* Även den mjuka scroll-glidningen tas bort (C11): snärtig scroll utan rörelse. */
+  .vm-bracket-scroll {
+    scroll-behavior: auto;
+  }
+}

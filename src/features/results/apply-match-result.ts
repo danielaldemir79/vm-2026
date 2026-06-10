@@ -79,7 +79,9 @@ export function applyMatchResult(
     throw new Error(`applyMatchResult: ingen match med id "${matchId}" finns i listan.`);
   }
 
-  const validation = validateResultEntry(target.status, entry);
+  // Stage med: en slutspelsmatch med lika ordinarie ställning kräver straffar
+  // (FIFA Article 14), vilket valideringen bara kan avgöra med matchens stage.
+  const validation = validateResultEntry(target.status, entry, target.stage);
   if (!validation.ok) {
     // Samla fel-koderna i meddelandet så ett brutet flöde är spårbart i loggen.
     const codes = validation.errors.map((e) => e.code).join(', ');

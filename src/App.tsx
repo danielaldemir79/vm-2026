@@ -13,6 +13,7 @@ import { SwatchGrid } from './components/foundation/SwatchGrid';
 import { MotionDemo } from './components/foundation/MotionDemo';
 import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
+import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
@@ -133,6 +134,16 @@ export default function App() {
             <GroupStageView />
           </Slide>
 
+          {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. Läser
+              SAMMA delade store som gruppspelet, så det justeras under gruppspelet
+              (möjliga lag), låses vid grupp-slut (FIFA-seedningen) och för fram
+              vinnaren när ett slutspelsresultat matas in. Den FUNKTIONELLA +
+              tillgängliga strukturen + data-seamen byggs här; design-frontend ger
+              premium-trädet med kopplingslinjer + vinnar-animation ovanpå. */}
+          <Slide direction="up">
+            <BracketView />
+          </Slide>
+
           <Slide direction="up">
             <Panel>
               {/* Design-frontends premium-firande kopplas in via render-proppen.
@@ -162,8 +173,8 @@ export default function App() {
         </Slide>
 
         <footer className="border-t border-border pt-6 text-sm text-fg-muted">
-          Fundamentet är på plats: tema, rörelse, palett och gruppspelet. Slutspelsträdet byggs
-          härnäst.
+          Fundamentet är på plats: tema, rörelse, palett, gruppspelet och det levande
+          slutspelsträdet. Tips-ligan byggs härnäst.
         </footer>
       </main>
     </div>

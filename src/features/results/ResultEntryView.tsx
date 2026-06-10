@@ -155,20 +155,17 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
               träd är inte i a11y-trädet), så knapptextens hiddenCount stämmer. */}
           {editable.map((match) => (
             <li key={match.id} hidden={!isInWindow(match.id)}>
-              {/* key inkluderar matchens status + mål, inte bara match.id (C10):
-                  ResultEntryForm seedar sin lokala useState EN gång vid mount.
-                  Ändras matchen externt i storen (samma match.id => samma React-
-                  instans), t.ex. en framtida realtids-uppdatering (T18), re-seedar
-                  formuläret aldrig och UI:t kan visa gamla mål/status. En key som
-                  ändras med status + mål re-mountar formuläret så det re-seedar
-                  mot den nya matchen. Målen härleds via `match.result?` (null på
-                  scheduled/live, MatchResult på finished i Match-unionen), så
-                  uttrycket är säkert oavsett union-variant.
-                  Default nu (T6): inga externa uppdateringar finns, så inget
-                  pågående edit clobbras; T18 (realtid) kan senare förfina
-                  konflikt-hanteringen (extern uppdatering vs lokal edit). */}
+              {/* STABIL key (match.id), INTE en data-beroende key (C7/C8): tidigare
+                  re-mountades formuläret när matchens status/mål ändrades externt,
+                  för att tvinga en re-seed. Men en re-mount KLOTTRAR ÖVER ett
+                  pågående osparat edit, och den gamla nyckeln saknade dessutom
+                  straffarna (de blev stale, C8). ResultEntryForm synkar nu sig
+                  själv mot matchens nuvarande värden via en DIRTY-medveten effekt:
+                  den re-seedar mål, status OCH straffar konsekvent när matchen
+                  uppdateras externt (realtid T18), men bara när formuläret är
+                  "rent" (inget osparat edit), så pågående inmatning bevaras. Därför
+                  behövs ingen re-mount-key längre, instansen lever kvar. */}
               <ResultEntryForm
-                key={`${match.id}-${match.status}-${match.result?.homeGoals ?? ''}-${match.result?.awayGoals ?? ''}`}
                 match={match}
                 teamsById={teamsById}
                 onSubmit={submitResult}
