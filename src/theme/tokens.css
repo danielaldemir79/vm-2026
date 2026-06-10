@@ -96,6 +96,20 @@
   /* Dekorativa stöd-toner (utanför @theme, fritt designvärde). Guld + grön glow. */
   --vm-gold: #f3c14e;
   --vm-glow-accent: 31 224 130; /* RGB-delar för rgb()/rgba()-glow i mörkt tema */
+
+  /* SIMULERINGS-TON (T12, what-if-läget). En dämpad indigo/violett som signalerar
+     "labbet/hypotetiskt" och som med FLIT ligger utanför appens rollfärger (grön
+     accent, guld/warning, mint/teal success, korall danger), så ingen kan förväxla
+     sim-markeringen med ett riktigt resultat-tillstånd. UPPMÄTT WCAG AA (relativ
+     luminans, värsta yta i mörkt tema):
+     - --vm-sim som TEXT/ikon/kant på mörka ytor: 8.44:1 (bg) / 7.55:1 (surface) /
+       6.27:1 (surface-raised). Alla >= 4.5:1 (normal text).
+     - --vm-sim-ink (near-black) PÅ en fylld --vm-sim-pill: 8.74:1.
+     --vm-glow-sim = RGB-delar för den låg-alfa glow/tint som ramar in sim-zonen. */
+  --vm-sim: #b3a0ff;
+  --vm-sim-ink: #0c0a1a;
+  --vm-sim-pill: #b3a0ff;
+  --vm-glow-sim: 179 160 255;
 }
 
 :root[data-theme='light'] {
@@ -137,6 +151,18 @@
   /* Dekorativa stöd-toner i ljust tema. */
   --vm-gold: #b07d10;
   --vm-glow-accent: 14 122 68;
+
+  /* SIMULERINGS-TON i ljust tema (T12). Djup indigo/violett, samma "labbet"-roll
+     och samma utanför-rollfärgerna-motiv som i mörkt tema. UPPMÄTT WCAG AA:
+     - --vm-sim som TEXT/ikon/kant på ljusa ytor: 7.60:1 (vit surface) /
+       6.90:1 (fond #f1f5f0). Båda >= 4.5:1 (normal text).
+     - --vm-sim-ink (vit) PÅ en fylld --vm-sim-pill (#5b3bb8): 7.60:1.
+     --vm-glow-sim är den ljusa violettens RGB-delar (en ljusare ton bär glow:en
+     bättre mot den ljusa fonden än den mörka text-tonen). */
+  --vm-sim: #5b3bb8;
+  --vm-sim-ink: #ffffff;
+  --vm-sim-pill: #5b3bb8;
+  --vm-glow-sim: 124 92 246;
 }
 
 /* -----------------------------------------------------------------------------
@@ -386,4 +412,112 @@ body {
       color-mix(in srgb, var(--vm-gold) 12%, transparent),
       transparent 58%
     );
+}
+
+/* -----------------------------------------------------------------------------
+   8. WHAT-IF-SIMULERINGENS VISUELLA LAGER (T12, issue #12). [VÄRDE, ej @theme-kontrakt]
+
+   MÅL (taskens punkt 1): när what-if-läget är PÅ ska HELA den simulerade zonen
+   tydligt kännas HYPOTETISK, så ingen någonsin förväxlar en simulering med de
+   riktiga resultaten, UTAN att läsbarheten sänks. Markeringen är medvetet
+   FÄRG-OBEROENDE: den bärs av (a) text + ikon ("SIMULERINGSLÄGE" + en kolv-ikon
+   i en sticky badge, byggd i SimulationFrame.tsx) OCH (b) en violett ton/kant.
+   Tonen ensam räcker aldrig (en färgblind eller färg-okänslig användare ser
+   badge-texten + ikonen), men tonen FÖRSTÄRKER signalen för alla andra.
+
+   VARFÖR VIOLETT: --vm-sim ligger med flit utanför appens rollfärger (grön accent,
+   guld/warning, mint/teal success, korall danger), så sim-ramen aldrig kan läsas
+   som "ett riktigt resultat-tillstånd". Indigo/violett läser kulturellt som
+   "labb/utkast/hypotetiskt".
+
+   KONTRAST-VAKT (taskens punkt 3, canvas-komposit, värsta fall, BÅDA teman):
+   sim-zonen lägger en SVAG violett tint bakom innehållet (--vm-sim vid 6 % alfa
+   över sidans fond). All brödtext på kort står på OGENOMSKINLIGA surface-ytor
+   (tinten syns bara i mellanrummen), men även i värsta fallet (dämpad text rakt
+   på den tintade fonden) håller kontrasten AA: muted-text över den 6 %-tintade
+   fonden mäter 7.49:1 (mörkt) / 5.50:1 (ljust), brödtext (fg) 14.1:1 / 13.5:1.
+   Kant-ringen + glow:en bär ALDRIG text, så de kan inte sänka någon kontrast.
+   Mätningarna är svepta som canvas-komposit (alfa-blend över base-ytan), inte
+   ett typfall, och de uppmätta värdena står i decisions.md T12-visuellt.
+   -------------------------------------------------------------------------- */
+
+/* Sim-zonen: en violett INRAMNING (inset-ring + mjuk ytterglow) som tydligt
+   avgränsar det hypotetiska området, plus en svag violett tint i fonden. Ringen
+   ritas med box-shadow (ingen layout-påverkan, ingen CLS), tinten med en
+   pseudo-yta så den ligger BAKOM innehållet och aldrig mörklägger text. */
+[data-simulation-frame][data-simulation-active='true'] {
+  /* position + z-index:0 skapar en LOKAL stacking-kontext på ramen. Utan den
+     (position: relative men z-index: auto) tolkas ::before-tintens z-index: -1
+     mot närmaste stacking-kontext-förfader (ytterst rot-elementet), så tinten
+     kan ritas BAKOM sidans/förälderns bakgrund och försvinna. z-index: 0 håller
+     pseudo-ytan (z-index: -1) bakom ramens innehåll men INOM sim-zonen. */
+  position: relative;
+  z-index: 0;
+  border-radius: var(--radius-card);
+  /* Inset violett ring (1.5px) + mjuk ytter-glow. color-mix mot transparent ger
+     en dämpad ring som följer temat via --vm-sim. Ingen text på ringen. */
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--vm-sim) 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--vm-sim) 22%, transparent),
+    0 8px 40px -12px color-mix(in srgb, var(--vm-sim) 35%, transparent);
+}
+
+/* Den svaga violetta tinten: en pseudo-yta BAKOM innehållet (z-index -1, inom
+   ramens EGNA stacking-kontext, etablerad av z-index: 0 på ramen ovan) så den
+   färgar mellanrummen men aldrig lägger sig över läsbar text OCH aldrig hamnar
+   bakom sidans bakgrund. 6 % alfa = den kontrast-mätta gränsen med stor marginal. */
+[data-simulation-frame][data-simulation-active='true']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 60% at 50% 0%,
+      color-mix(in srgb, var(--vm-sim) 8%, transparent),
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--vm-sim) 6%, transparent);
+}
+
+/* Mjuk in-tonad ram-övergång (dekorativ), gatad på reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-simulation-frame] {
+    transition: box-shadow 0.35s ease;
+  }
+}
+
+/* Den STICKY badge:n ("SIMULERINGSLÄGE" + kolv-ikon): en violett pill som följer
+   med när man bläddrar i de simulerade vyerna, så markeringen aldrig hamnar utom
+   synhåll. Ink-text på fylld --vm-sim-pill (uppmätt 8.74:1 mörkt / 7.60:1 ljust).
+   En lugn andnings-puls på status-pricken (samma idé som .vm-live-dot) signalerar
+   "aktivt läge" utan att vara stökig, nollad vid reducerad rörelse. */
+.vm-sim-badge {
+  background-color: var(--vm-sim-pill);
+  color: var(--vm-sim-ink);
+  box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--vm-sim) 60%, transparent);
+}
+
+.vm-sim-dot {
+  background-color: var(--vm-sim-ink);
+  animation: vm-sim-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes vm-sim-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Statisk prick vid reducerad rörelse (samma policy som hero-animationerna). */
+  .vm-sim-dot {
+    animation: none !important;
+  }
 }
