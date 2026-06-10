@@ -35,11 +35,19 @@ function parseSizes(sizes: string): ParsedSize[] {
     .split(/\s+/)
     .filter((token) => token.length > 0)
     .map((token) => {
-      if (token.toLowerCase() === 'any') {
+      const lower = token.toLowerCase();
+      if (lower === 'any') {
         return { width: Infinity, height: Infinity };
       }
-      const [w, h] = token.toLowerCase().split('x');
-      return { width: Number(w), height: Number(h) };
+      // Spec-strikt: en WxH-token är två heltal separerade av "x" (case-insensitivt).
+      // Källa: W3C App Manifest, "sizes member" -> HTML "valid icon size" = w "x"/"X" h.
+      // Vi failar HÅRT på allt annat ("192x192x192", saknad höjd) så testet inte ger
+      // falsk positiv genom att tyst släppa igenom ogiltiga tokens (Copilot C3, #50).
+      const match = /^(\d+)x(\d+)$/.exec(lower);
+      if (match === null) {
+        throw new Error(`Ogiltig sizes-token: "${token}"`);
+      }
+      return { width: Number(match[1]), height: Number(match[2]) };
     });
 }
 
@@ -109,5 +117,15 @@ describe('VM_2026_MANIFEST, WebAPK-mintningskrav', () => {
     // maskable. Här: de två png-ikonerna utan purpose-fält.
     const anyIcons = VM_2026_MANIFEST.icons.filter((icon) => icon.purpose === undefined);
     expect(anyIcons.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('parseSizes, spec-strikt token-validering (Copilot C3, #50)', () => {
+  it('failar hårt på ogiltiga tokens i stället för att ge falsk positiv', () => {
+    // En ogiltig sizes-token får ALDRIG tyst tolkas som en giltig storlek, annars
+    // vaktar testet en svagare invariant än kravet. "192x192x192" (för många delar)
+    // och "192x" (saknad höjd) ska kasta. (W3C App Manifest, sizes member.)
+    expect(() => hasExactSize({ sizes: '192x192x192' }, 192)).toThrow();
+    expect(() => hasExactSize({ sizes: '192x' }, 192)).toThrow();
   });
 });
