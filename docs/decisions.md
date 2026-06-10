@@ -5,6 +5,37 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 1): inställningspanelen hamnade BAKOM sidan, rotorsak + fix
+
+**Symptom (Daniels mobil):** Klick på kugghjulet öppnade inställningarna, men panelen lades
+bakom/utanför innehållet och syntes inte.
+
+**Rotorsak (verifierad LIVE i browsern, inte gissad):** `SettingsControl`-overlayn
+(`fixed inset-0 z-50`) renderades INLINE inuti appens `<header>`, som är
+`sticky top-0 z-10 backdrop-blur-md`. Två CSS-effekter slog samtidigt:
+1. **Containing block för fixed:** en ancestor med `transform`/`filter`/`backdrop-filter` blir
+   containing block för sina `position: fixed`-descendant (CSS Positioned Layout, MDN
+   "Containing block": https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_display/Containing_block).
+   Headern har `backdrop-filter: blur(12px)`, så overlayns `inset-0` löstes mot headerns
+   64px-box i stället för viewporten (uppmätt: overlayRect 1236×**64**, dialog top **-95**).
+2. **Instängd stacking context:** headerns `sticky` + `z-index: 10` skapar en stacking context
+   (MDN "Stacking context": https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_positioned_layout/Stacking_context),
+   så overlayns `z-50` var instängd i headerns z-10-lager och kunde inte nå över `<main>`.
+
+**Fix:** overlayn portaleras till `document.body` via `createPortal` (React DOM). `document.body`
+saknar transform/filter/backdrop-filter/stacking-context (verifierat live), så `fixed inset-0
+z-50` löses mot viewporten i rot-stacking-contexten och ligger överst, oberoende av VAR triggern
+sitter. Efter fixen (live): overlayParent = `<body>`, overlayRect 1237×1222 (full skärm), dialog
+centrerad/synlig (desktop) och bottom-sheet (mobil 390px, top 590 = bottom 844), `elementFromPoint`
+på dialogens mitt träffar dialogen (ligger överst). **Varför portal och inte att flytta gear-knappen
+ut ur headern:** kugghjulet HÖR hemma i headern; portalen är den robusta lösningen som låter
+triggern bo var som helst. `TeamProfilePanel`/`OnboardingDialog` "fungerade" bara för att de råkar
+renderas utanför en sådan ancestor (inuti `<main>` resp. på rot-nivå), inte tack vare ett topplager.
+Spårbart: #54 + denna rad + `SettingsControl.tsx` (createPortal) + nytt regressionstest
+(overlayn är ett direkt barn av `document.body`).
+
+---
+
 ## 2026-06-10 , T30 (#50): Play Protect-varningen vid Android-install, rotorsak + vad vi kan/inte kan göra
 
 **Symptom (Daniels skärmdump):** Vid installation av PWA:n på Android visar Google Play Protect
