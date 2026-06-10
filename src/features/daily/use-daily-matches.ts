@@ -51,12 +51,18 @@ export interface DailyMatchesData {
 }
 
 /**
- * Hitta startdagen: dagens svenska datum om det är en speldag, annars den
- * NÄRMAST kommande speldagen (turneringen kan ligga i framtiden, "idag" före
- * 11 juni 2026 -> peka mot premiären). Faller tillbaka på sista dagen om allt
- * redan är spelat. Returnerar -1 bara för en helt tom lista.
+ * Hitta startdagen i `days` (som nu rymmer VARJE kalenderdag i turneringsspannet,
+ * även vilodagar, se groupMatchesByDay):
+ *  - "Idag" om dagens svenska datum ligger inom spannet, OAVSETT om det är en
+ *    speldag eller en vilodag. En vilodag som "idag" landar alltså på vilodagen
+ *    och vyn visar vilodags-panelen (Copilot R2, C7: medvetet och dokumenterat
+ *    beteende, decisions.md). Det är mer intuitivt än att tvinga fram nästa
+ *    speldag mitt under ett pågående mästerskap, användaren vill se "idag".
+ *  - NÄRMAST kommande dag om "idag" ligger FÖRE spannet ("idag" före 11 juni
+ *    2026 -> premiären).
+ *  - Sista dagen om allt redan är passerat. Returnerar -1 bara för en tom lista.
  *
- * @param days  Speldagarna i kronologisk ordning.
+ * @param days  Dagarna i kronologisk ordning (speldagar OCH vilodagar).
  * @param now   "Nu" (injicerbart för test), används bara för att härleda dagens
  *              svenska datum-nyckel.
  */
@@ -71,9 +77,11 @@ export function initialDayIndex(
     new Date(typeof now === 'number' ? now : now.getTime()).toISOString()
   );
   // Första dagen vars nyckel >= dagens nyckel (sträng-jämförelse = datum-
-  // jämförelse på ISO-form). Det ger "idag om det spelas, annars nästa speldag".
+  // jämförelse på ISO-form). Eftersom spannet nu är komplett (inga hål) matchar
+  // detta EXAKT "idag" när idag ligger i spannet (speldag eller vilodag), annars
+  // premiären (idag före spannet) via det första framtida datumet.
   const idx = days.findIndex((d) => d.dateKey >= todayKey);
-  // -1 = alla speldagar ligger i det förflutna -> visa den sista (mest aktuella).
+  // -1 = hela spannet ligger i det förflutna -> visa den sista (mest aktuella).
   return idx === -1 ? days.length - 1 : idx;
 }
 

@@ -40,6 +40,15 @@ function threeDays(): MatchDay[] {
   ]);
 }
 
+// Två speldagar med en VILODAG emellan (06-11, [06-12 vilodag], 06-13), för att
+// pröva start-/navigerings-beteendet kring tomma dagar (C7).
+function spanWithRestDay(): MatchDay[] {
+  return groupMatchesByDay([
+    sched('p1', '2026-06-11T17:00:00.000Z'),
+    sched('p2', '2026-06-13T17:00:00.000Z'),
+  ]);
+}
+
 describe('initialDayIndex, startdag = idag eller närmast kommande speldag', () => {
   const days = threeDays(); // 2026-06-11, -12, -13 (svensk)
 
@@ -58,6 +67,15 @@ describe('initialDayIndex, startdag = idag eller närmast kommande speldag', () 
 
   it('ger -1 för en helt tom lista', () => {
     expect(initialDayIndex([], new Date('2026-06-12T08:00:00.000Z'))).toBe(-1);
+  });
+
+  it('landar på en VILODAG när "idag" är en vilodag mitt i spannet (C7, dokumenterat val)', () => {
+    // Spann: 06-11 (spel), 06-12 (vilodag), 06-13 (spel). "Idag" = 06-12 ska
+    // landa på vilodagen (index 1), inte tvinga fram nästa speldag. Vyn visar då
+    // vilodags-panelen. Se decisions.md (Copilot R2, C7).
+    const days = spanWithRestDay(); // 2026-06-11, -12 (vilodag), -13
+    expect(days[1].matches).toEqual([]); // bekräfta att index 1 verkligen är vilodagen
+    expect(initialDayIndex(days, new Date('2026-06-12T08:00:00.000Z'))).toBe(1);
   });
 });
 
@@ -143,6 +161,48 @@ describe('useDailyMatches, datumnavigering', () => {
     act(() => result.current.goToIndex(total - 1));
     await waitFor(() => expect(result.current.selectedIndex).toBe(total - 1));
     expect(result.current.canGoNext).toBe(false);
+  });
+
+  it('en VILODAG i schemat är nåbar via navigeringen och visar tom-dag-tillståndet (C7)', async () => {
+    // VM 2026 (fixtures) spelas 11 juni-19 juli och HAR vilodagar mellan ronderna.
+    // Kompletthetskravet (issue #7 DoD): navigeringen ska kunna landa på en sådan
+    // dag, då har selectedDay matches=[] (vyn visar vilodags-panelen).
+    const before = new Date('2026-06-01T00:00:00.000Z');
+    const { result } = renderHook(() => useDailyMatches(before), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(result.current.selectedIndex).toBeGreaterThanOrEqual(0));
+
+    // Det finns minst en vilodag i spannet (annars vore C7-kravet inte prövbart).
+    const restDayIndex = result.current.days.findIndex((d) => d.matches.length === 0);
+    expect(restDayIndex).toBeGreaterThan(-1);
+
+    // Navigera dit och bekräfta tom-dag-tillståndet.
+    act(() => result.current.goToIndex(restDayIndex));
+    await waitFor(() => expect(result.current.selectedIndex).toBe(restDayIndex));
+    expect(result.current.selectedDay?.matches).toEqual([]);
+    // På en vilodag finns ingen "dagens match".
+    expect(result.current.matchOfTheDay).toBeNull();
+  });
+
+  it('första dagen är kant-disabled bakåt och sista dagen kant-disabled framåt (oförändrat med vilodagar)', async () => {
+    const before = new Date('2026-06-01T00:00:00.000Z');
+    const { result } = renderHook(() => useDailyMatches(before), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const total = result.current.days.length;
+    act(() => result.current.goToIndex(0));
+    await waitFor(() => expect(result.current.selectedIndex).toBe(0));
+    expect(result.current.canGoPrev).toBe(false);
+    expect(result.current.canGoNext).toBe(true);
+
+    act(() => result.current.goToIndex(total - 1));
+    await waitFor(() => expect(result.current.selectedIndex).toBe(total - 1));
+    expect(result.current.canGoNext).toBe(false);
+    expect(result.current.canGoPrev).toBe(true);
   });
 });
 

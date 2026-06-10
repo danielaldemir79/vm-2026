@@ -73,6 +73,65 @@ describe('groupMatchesByDay, gruppering + ordning', () => {
     expect(groupMatchesByDay([])).toEqual([]);
   });
 
+  it('inkluderar VILODAGAR (tomma dagar) mellan första och sista speldag (C7, issue #7 DoD)', () => {
+    // Två speldagar med ETT dygns lucka emellan (06-11 och 06-13). Den mellan-
+    // liggande dagen 06-12 har inga matcher men ska finnas i listan som vilodag,
+    // annars hoppar datumnavigeringen rakt över den (kompletthetsgapet C7).
+    const matches = [
+      sched('a', '2026-06-11T17:00:00.000Z'), // 06-11 svensk
+      sched('b', '2026-06-13T17:00:00.000Z'), // 06-13 svensk
+    ];
+    const days = groupMatchesByDay(matches);
+
+    expect(days.map((d) => d.dateKey)).toEqual(['2026-06-11', '2026-06-12', '2026-06-13']);
+    // Mitten-dagen är en vilodag: finns med, men utan matcher.
+    const restDay = days.find((d) => d.dateKey === '2026-06-12');
+    expect(restDay).toBeDefined();
+    expect(restDay?.matches).toEqual([]);
+    // Speldagarna bär fortfarande sina matcher.
+    expect(days[0].matches.map((m) => m.id)).toEqual(['a']);
+    expect(days[2].matches.map((m) => m.id)).toEqual(['b']);
+  });
+
+  it('fyller ett LÄNGRE vilodags-gap (flera dygn i rad utan matcher)', () => {
+    // 06-11 och 06-15: tre vilodagar (06-12, -13, -14) ska alla finnas. Speglar
+    // det verkliga gapet mellan gruppspel och slutspel i VM 2026.
+    const matches = [
+      sched('start', '2026-06-11T17:00:00.000Z'),
+      sched('slut', '2026-06-15T17:00:00.000Z'),
+    ];
+    const days = groupMatchesByDay(matches);
+
+    expect(days.map((d) => d.dateKey)).toEqual([
+      '2026-06-11',
+      '2026-06-12',
+      '2026-06-13',
+      '2026-06-14',
+      '2026-06-15',
+    ]);
+    expect(days.filter((d) => d.matches.length === 0).map((d) => d.dateKey)).toEqual([
+      '2026-06-12',
+      '2026-06-13',
+      '2026-06-14',
+    ]);
+  });
+
+  it('en enda speldag ger exakt en dag (inga påhittade tomma dagar runt om)', () => {
+    const days = groupMatchesByDay([sched('only', '2026-06-11T17:00:00.000Z')]);
+    expect(days.map((d) => d.dateKey)).toEqual(['2026-06-11']);
+    expect(days[0].matches.map((m) => m.id)).toEqual(['only']);
+  });
+
+  it('konsekutiva speldagar får inga extra tomma dagar', () => {
+    const matches = [
+      sched('m1', '2026-06-11T17:00:00.000Z'),
+      sched('m2', '2026-06-12T17:00:00.000Z'),
+    ];
+    const days = groupMatchesByDay(matches);
+    expect(days).toHaveLength(2);
+    expect(days.every((d) => d.matches.length > 0)).toBe(true);
+  });
+
   it('muterar inte sina argument', () => {
     const matches = [
       sched('b', '2026-06-11T22:00:00.000Z'),

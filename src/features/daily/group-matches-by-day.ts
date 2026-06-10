@@ -64,9 +64,43 @@ export function localDateKey(isoInstant: string, timeZone: string = DISPLAY_TIME
 }
 
 /**
+ * Räkna upp ALLA kalenderdag-nycklar (YYYY-MM-DD) från `firstKey` till `lastKey`,
+ * inklusive bägge ändar, i kronologisk ordning. Returnerar bara `firstKey` när
+ * de är lika.
+ *
+ * VARFÖR UTC-midnatt i aritmetiken (och inte den svenska zonen): vi stegar
+ * KALENDERDAGAR, inte instanter. Genom att tolka varje nyckel som midnatt UTC och
+ * addera exakt 24 h får varje steg garanterat nästa kalenderdatum, utan att en
+ * sommartids-övergång (DST) i Europe/Stockholm kan göra ett dygn till 23/25 h och
+ * råka hoppa över eller upprepa ett datum. Nycklarna är redan rena svenska
+ * kalenderdatum (härledda i DISPLAY_TIMEZONE av `localDateKey`); här gör vi bara
+ * ren datum-aritmetik på dem, ingen zon-konvertering tillbaka.
+ */
+function enumerateDateKeys(firstKey: string, lastKey: string): string[] {
+  const keys: string[] = [];
+  const end = new Date(`${lastKey}T00:00:00.000Z`).getTime();
+  let cursor = new Date(`${firstKey}T00:00:00.000Z`).getTime();
+  // Slå vakt mot en orimlig (omvänd) ordning: skulle bara hända vid en bugg, men
+  // en obegränsad loop vore värre än en tydlig tom retur.
+  while (cursor <= end) {
+    keys.push(new Date(cursor).toISOString().slice(0, 10));
+    cursor += 86_400_000; // exakt 24 h i UTC = nästa kalenderdatum
+  }
+  return keys;
+}
+
+/**
  * Gruppera matcher per svensk kalenderdag och returnera dagarna i
  * KRONOLOGISK ordning (tidigaste dagen först), var och en med sina matcher
  * sorterade på avsparkstid.
+ *
+ * VILODAGAR INKLUDERAS (Copilot R2, C7 / issue #7 DoD "hanterar dagar utan
+ * matcher"): listan innehåller en post för VARJE kalenderdag mellan turneringens
+ * första och sista speldag, även de utan matcher (`matches: []`). VM 2026 spelas
+ * 11 juni-19 juli och har vilodagar mellan ronderna (t.ex. mellan gruppspelets
+ * slut och sextondelarna); utan tomma dagar hoppade datumnavigeringen rakt över
+ * dem och vilodags-panelen i vyn blev oåtkomlig. Med dem går navigeringen dag för
+ * dag och en vilodag är nåbar och visar sitt tomma-dag-tillstånd.
  *
  * Tom indata ger en tom lista (normalfall: "idag" kan ligga före turneringen,
  * datumnavigeringen visar tom-dag-tillståndet). Funktionen muterar inte sina
@@ -91,13 +125,24 @@ export function groupMatchesByDay(
     }
   }
 
-  // Sortera dagarna kronologiskt (dateKey är ISO-datumform, sträng-sort = datum-
-  // sort) och matcherna inom varje dag på avsparks-instant (UTC-jämförelse är
-  // korrekt även mellan två svenska klockslag, instanten är entydig).
-  return [...byDay.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([dateKey, dayMatches]) => ({
+  if (byDay.size === 0) {
+    return [];
+  }
+
+  // Spannets ändar: tidigaste och senaste speldag (dateKey är ISO-datumform, så
+  // sträng-min/-max = datum-min/-max).
+  const playedKeys = [...byDay.keys()].sort((a, b) => a.localeCompare(b));
+  const firstKey = playedKeys[0];
+  const lastKey = playedKeys[playedKeys.length - 1];
+
+  // Bygg varje kalenderdag i spannet (inkl. vilodagar) i kronologisk ordning.
+  // Matcherna inom en dag sorteras på avsparks-instant (UTC-jämförelse är korrekt
+  // även mellan två svenska klockslag, instanten är entydig); en vilodag får [].
+  return enumerateDateKeys(firstKey, lastKey).map((dateKey) => {
+    const dayMatches = byDay.get(dateKey) ?? [];
+    return {
       dateKey,
       matches: [...dayMatches].sort((a, b) => a.kickoff.localeCompare(b.kickoff)),
-    }));
+    };
+  });
 }
