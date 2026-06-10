@@ -1,8 +1,16 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoomPanel } from './RoomPanel';
 import { RoomsStoreContext, type RoomsStore } from './rooms-context';
 import type { ReactNode } from 'react';
+
+// share-room mockas så kopiera-/dela-knapparna når sin timeout-gren deterministiskt
+// (lyckad kopp -> "Kopierad!" -> auto-återställning), utan att röra riktiga webb-API:er.
+vi.mock('./share-room', () => ({
+  buildInviteText: () => 'inbjudan',
+  copyText: vi.fn(async () => true),
+  shareInvite: vi.fn(async () => 'unsupported' as const),
+}));
 
 // RoomPanel är en ren konsument av rums-storen. Vi ger en STUB-store direkt via
 // context, så panelen kan testas isolerat (utan Supabase / provider-init). Det
@@ -142,6 +150,59 @@ describe('RoomPanel', () => {
       const notice = document.querySelector('[data-rooms-notice]');
       expect(notice).toHaveTextContent(/RLS nekade lämnandet/i);
       expect(notice).toHaveAttribute('data-rooms-notice-tone', 'error');
+    });
+  });
+
+  // C12/C13 (Copilot-runda 2): kopiera-/dela-knapparnas auto-återställning körde
+  // window.setTimeout utan cleanup, så setState kunde ticka EFTER unmount (React-
+  // varning + flaky test). Timeout-id:t hålls nu i en ref och rensas vid unmount.
+  describe('kopiera/dela auto-återställning städas (C12/C13)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    function renderActiveRoom() {
+      return renderWith(stubStore({ activeRoom: { id: 'r1', name: 'Vänner', code: 'aaa11' } }));
+    }
+
+    it('kopiera-knappen visar Kopierad! och återställer etiketten efter timeouten', async () => {
+      renderActiveRoom();
+      const copyBtn = screen.getByRole('button', { name: /Kopiera rumskoden/i });
+
+      // Klicket är async (await copyText) -> spola mikrotasks innen vi mäter.
+      await act(async () => {
+        fireEvent.click(copyBtn);
+      });
+      expect(screen.getByRole('button', { name: /kopierad/i })).toBeInTheDocument();
+
+      // Timeouten (2200 ms) återställer etiketten till "Kopiera kod".
+      await act(async () => {
+        vi.advanceTimersByTime(2200);
+      });
+      expect(screen.getByRole('button', { name: /Kopiera rumskoden/i })).toBeInTheDocument();
+    });
+
+    it('unmount före timeouten ger ingen setState-efter-unmount-varning', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { unmount } = renderActiveRoom();
+
+      // Tänd BÅDA knapparnas timeout (kopiera + dela), unmounta sedan medan de tickar.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Kopiera rumskoden/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Dela rummet/i }));
+      });
+      unmount();
+
+      // Brinner en städad timeout ändå av rör den ingen avmonterad komponent.
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(errorSpy).not.toHaveBeenCalled();
     });
   });
 });
