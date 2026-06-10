@@ -293,6 +293,33 @@ describe('villkorstext: vinst/oavgjort räcker, ärligt formulerat', () => {
     expect(a3.condition).toMatch(/vinst räcker/i);
     expect(a3.condition).not.toMatch(/oavgjort räcker/i);
   });
+
+  it('lag med FLERA egna matcher kvar får plural-text (Copilot C3), inte singular', () => {
+    // ownResultGuarantees låser ALLA lagets egna matcher till utfallet, så texten
+    // måste säga "i lagets matcher" (plural) när laget har mer än en match kvar,
+    // annars låter "Oavgjort räcker" som EN match. Här har A1 TVÅ egna matcher kvar.
+    //
+    // Probe-verifierat upplägg (3 spelade, 3 kvar = n=3 <= MAX, scenario-fasen):
+    //   Spelade:  A1-A4 3-0, A2-A3 1-0, A2-A4 1-0  -> A2:6, A1:3, A3:0, A4:0
+    //   Kvar:     A1-A2, A1-A3 (A1:s två egna), A3-A4 (övrig)
+    // Oavgjort i BÅDA A1-matcherna -> A1=5. A2=7 (etta). A3 max 1+3=4, A4 max 0+3=3,
+    // så A1=5 är säkert topp-2 oavsett A3-A4 -> oavgjort i lagets matcher räcker.
+    const m: Match[] = [
+      fin('m1', 'A1', 'A4', 3, 0), // A1: 3, A4: 0
+      fin('m2', 'A2', 'A3', 1, 0), // A2: 3, A3: 0
+      fin('m3', 'A2', 'A4', 1, 0), // A2: 6
+      sched('m4', 'A1', 'A2'), // A1:s egen match 1
+      sched('m5', 'A1', 'A3'), // A1:s egen match 2
+      sched('m6', 'A3', 'A4'), // övrig match (inte A1:s)
+    ];
+    const s = computeGroupScenario(TEAMS, m, GROUP);
+    expect(s.phase).toBe('scenarios');
+    const a1 = teamOf(s.teams, 'A1');
+    // Plural-form, ärlig om att det gäller flera matcher, inte en.
+    expect(a1.condition).toMatch(/oavgjort i lagets matcher räcker/i);
+    // Singular-formuleringen ska INTE användas här (det vore vilseledande).
+    expect(a1.condition).not.toMatch(/oavgjort räcker för topp-2/i);
+  });
 });
 
 describe('åskådar-lag (Copilot C1): inget eget kvar -> ärlig text, aldrig "måste vinna"', () => {
