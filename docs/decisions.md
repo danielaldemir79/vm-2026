@@ -5,7 +5,27 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
-## 2026-06-10 , T31 (#51, Daniels feedback): "designfundament"-showcasen borttagen
+## 2026-06-10 , T31 (#51, Daniels feedback): auto-spelad vid spar, status-väljaren borttagen
+
+**Beslut:** Statusväljaren ("Ej spelad"/"Pågår"/"Spelad"-dropdownen) togs bort ur
+`ResultEntryForm`. Statusen sätts AUTOMATISKT vid spar och HÄRLEDS ur målfälten
+(`intendedStatus`): något måltal ifyllt -> `finished` (spelad), inga mål -> `scheduled`.
+Ett halv-ifyllt fall (bara ett mål) härleds till `finished` och fångas då av valideringens
+`finished-without-result` ("kräver både ... mål"), så användaren leds att fylla i båda utan
+ett manuellt status-steg. En "Rensa resultat"-knapp lades till, synlig BARA när matchen är
+spelad (`match.status === 'finished'`), som sparar en tom inmatning (-> scheduled, inget
+resultat) och därmed är den minsta sanna vägen att ÅNGRA/nollställa en spelad match.
+**Varför:** Det manuella status-steget var ett onödigt moment (Daniels feedback): när man
+skriver in mål ÄR matchen spelad. Härledd status håller UI:t i fas med resultatet utan en
+extra väljare. **Bevarat oförändrat:** (a) T9:s slutspels-/straffvalidering (FIFA Art. 14):
+straff-fältens synlighet drivs nu av den härledda statusen i stället för väljaren, men
+`validate-result.ts` + `apply-match-result.ts` är ORÖRDA, så lika slutspelsmatch + straffar
+= spelad, och lika utan straff-vinnare = valideringsfel, precis som förr. (b) Rum-läget (T14)
+och sim-läget (T12): `submitResult`-seamen tar fortfarande en entry med status, och formuläret
+skickar den härledda statusen, så bägge vägarna fungerar oförändrat (verifierat: hela sviten
+grön, inkl. rooms-wiring- och simulerings-integrationstesterna). `validate-result`-koden
+`result-without-finished` är nu onåbar FRÅN formuläret men kvar för det lägre API-kontraktet
+(direkta `submitResult`-anropare), ärligt behållen.
 
 **Beslut:** T2:s showcase-block i `App.tsx` (Paletten/Rörelsen-griden under rubrikerna
 "Designfundament"/"Levande känsla" + Typografi-provet) togs bort ur den renderade vyn, och de

@@ -7,7 +7,8 @@ import type { Match, Team } from '../../domain/types';
 // Vi använder fireEvent (redan tillgängligt via @testing-library/react) i stället
 // för @testing-library/user-event, för att inte lägga till ett nytt beroende för
 // det dessa tester behöver (PRINCIPLES §11). fireEvent.change räcker för att
-// driva native input/select och submit deterministiskt.
+// driva native number-input och submit deterministiskt. (Status-väljaren togs
+// bort i T31, #51, statusen sätts automatiskt vid spar ur de ifyllda målen.)
 
 const teams: Team[] = [
   { id: 'mex', name: 'Mexiko', code: 'MEX', group: 'A' },
@@ -49,7 +50,9 @@ describe('ResultEntryForm, tillgänglighet', () => {
     // getByLabelText hittar bara om label är korrekt kopplad (htmlFor/id).
     expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Status/)).toBeInTheDocument();
+    // T31 (#51): status-väljaren är borttagen (statusen sätts automatiskt vid spar),
+    // så det finns inget Status-fält längre i formuläret.
+    expect(screen.queryByLabelText(/Status/)).not.toBeInTheDocument();
   });
 
   it('namnger matchen i en legend (skärmläsar-kontext)', () => {
@@ -69,8 +72,10 @@ describe('ResultEntryForm, fel-vägar (visas + kopplas via aria)', () => {
     const match = scheduledMatch();
     render(<ResultEntryForm match={match} teamsById={teamsById} onSubmit={realSubmit(match)} />);
 
+    // Ett ifyllt (ogiltigt) mål -> statusen härleds till spelad (finished) vid spar
+    // (T31, #51), så valideringen kör och fångar det ogiltiga målet.
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '-1' } });
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
 
     const alert = screen.getByRole('alert');
@@ -82,8 +87,10 @@ describe('ResultEntryForm, fel-vägar (visas + kopplas via aria)', () => {
     const match = scheduledMatch();
     render(<ResultEntryForm match={match} teamsById={teamsById} onSubmit={realSubmit(match)} />);
 
+    // Decimaltal i hemma-fältet -> status härleds till finished vid spar (T31), och
+    // valideringen kopplar heltals-felet till hemma-fältet.
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2.5' } });
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
 
     const homeInput = screen.getByLabelText(/Mexiko \(hemma\)/);
@@ -103,8 +110,10 @@ describe('ResultEntryForm, fel-vägar (visas + kopplas via aria)', () => {
     const match = scheduledMatch();
     render(<ResultEntryForm match={match} teamsById={teamsById} onSubmit={realSubmit(match)} />);
 
-    // Status finished men målfälten lämnas tomma => 'finished-without-result' (field 'result').
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    // T31 (#51): ETT ifyllt mål -> statusen härleds till spelad (finished), men det
+    // andra målet saknas => 'finished-without-result' (field 'result'). Det är så
+    // det halv-ifyllda fallet ber användaren fylla i BÅDA målen utan en status-väljare.
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
 
     const alert = screen.getByRole('alert');
@@ -129,9 +138,10 @@ describe('ResultEntryForm, lyckad inmatning', () => {
       <ResultEntryForm match={match} teamsById={teamsById} onSubmit={onSubmit} onSaved={onSaved} />
     );
 
+    // T31 (#51): inga status-väljare, statusen sätts AUTOMATISKT till spelad
+    // (finished) av att båda målen fylls i. Entry:n bär ändå status 'finished'.
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
     fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
 
     expect(onSubmit).toHaveBeenCalledWith('m1', { homeGoals: 2, awayGoals: 1, status: 'finished' });
@@ -153,6 +163,69 @@ describe('ResultEntryForm, lyckad inmatning', () => {
   });
 });
 
+// T31 (#51, Daniels feedback): statusen sätts AUTOMATISKT vid spar (det manuella
+// "Ej spelad"-steget togs bort), och en "Rensa resultat"-knapp ger en explicit väg
+// att ångra/nollställa en spelad match tillbaka till ej spelad.
+describe('ResultEntryForm, auto-spelad + Rensa resultat (T31, #51)', () => {
+  it('fyller man i båda målen sätts status automatiskt till spelad (finished) vid spar', () => {
+    const onSubmit = vi.fn(() => ({ ok: true }) as const);
+    render(<ResultEntryForm match={scheduledMatch()} teamsById={teamsById} onSubmit={onSubmit} />);
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
+    // Status 'finished' härleddes utan att användaren rörde någon status-väljare.
+    expect(onSubmit).toHaveBeenCalledWith('m1', { homeGoals: 3, awayGoals: 0, status: 'finished' });
+  });
+
+  it('sparar man UTAN mål är det en no-op-spelning: status scheduled, inget resultat', () => {
+    // Tomma fält -> avsedd status scheduled, inget resultat, validt (ingen status-
+    // övergång krävs). Bevisar att ett tomt spar inte felaktigt blir en spelad match.
+    const onSubmit = vi.fn(() => ({ ok: true }) as const);
+    render(<ResultEntryForm match={scheduledMatch()} teamsById={teamsById} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
+    expect(onSubmit).toHaveBeenCalledWith('m1', {
+      homeGoals: null,
+      awayGoals: null,
+      status: 'scheduled',
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('en SPELAD match visar "Rensa resultat" som nollställer tillbaka till ej spelad', () => {
+    // En match som är spelad i storen (3-2) -> knappen finns och sparar en TOM
+    // inmatning (status scheduled, inga mål), dvs ångrar resultatet.
+    const finished: Match = {
+      ...scheduledMatch(),
+      status: 'finished',
+      result: { homeGoals: 3, awayGoals: 2 },
+    };
+    const onSubmit = vi.fn(() => ({ ok: true }) as const);
+    render(<ResultEntryForm match={finished} teamsById={teamsById} onSubmit={onSubmit} />);
+
+    const clear = screen.getByRole('button', { name: /Rensa resultat/ });
+    fireEvent.click(clear);
+    expect(onSubmit).toHaveBeenCalledWith('m1', {
+      homeGoals: null,
+      awayGoals: null,
+      status: 'scheduled',
+    });
+    // Fälten töms lokalt direkt (UI speglar nollningen innan storen synkar in).
+    expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(null);
+    expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toHaveValue(null);
+  });
+
+  it('en EJ SPELAD match visar INTE "Rensa resultat" (inget att ångra)', () => {
+    render(
+      <ResultEntryForm
+        match={scheduledMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    expect(screen.queryByRole('button', { name: /Rensa resultat/ })).not.toBeInTheDocument();
+  });
+});
+
 // Straffläggning i slutspel (F1/penalties-pinnen, FIFA Art. 14). Straff-fälten
 // visas BARA för en slutspelsmatch som matas in som spelad med lika ordinarie
 // ställning, och submit:en bär då straffarna. Gruppspel visar dem aldrig.
@@ -171,6 +244,9 @@ describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
     };
   }
 
+  // T31 (#51): straff-fältens synlighet drivs nu av den HÄRLEDDA statusen (ifyllda
+  // lika mål -> spelad -> straff-fält i slutspel), ingen status-väljare. T9:s
+  // slutspels-/straffregel (FIFA Art. 14) är oförändrad, bara triggern är auto.
   it('GRUPPSPEL: visar ALDRIG straff-fält, även vid lika ställning', () => {
     render(
       <ResultEntryForm
@@ -179,7 +255,6 @@ describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
         onSubmit={() => ({ ok: true })}
       />
     );
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
     expect(document.querySelector('[data-penalties-row]')).toBeNull();
@@ -193,7 +268,6 @@ describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
         onSubmit={() => ({ ok: true })}
       />
     );
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
     // Ledning 2-1: ingen straffläggning.
@@ -216,7 +290,6 @@ describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
         onSubmit={() => ({ ok: true })}
       />
     );
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '-1' } });
     fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '-1' } });
     expect(document.querySelector('[data-penalties-row]')).toBeNull();
@@ -225,7 +298,6 @@ describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
   it('SLUTSPEL: submit bär straffarna när ställningen är lika', () => {
     const onSubmit = vi.fn(() => ({ ok: true }) as const);
     render(<ResultEntryForm match={knockoutMatch()} teamsById={teamsById} onSubmit={onSubmit} />);
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
     // Straff-fälten (synliga nu): hemma 4, borta 2.
@@ -276,7 +348,7 @@ describe('ResultEntryForm, synkar mot extern matchuppdatering (C7/C8)', () => {
     };
   }
 
-  it('seedar om MÅL + status när matchen uppdateras externt (rent formulär)', () => {
+  it('seedar om MÅLEN när matchen uppdateras externt (rent formulär)', () => {
     const { rerender } = render(
       <ResultEntryForm
         match={scheduledMatch()}
@@ -284,7 +356,7 @@ describe('ResultEntryForm, synkar mot extern matchuppdatering (C7/C8)', () => {
         onSubmit={() => ({ ok: true })}
       />
     );
-    // Inget inmatat än: fälten är tomma, status "Ej spelad".
+    // Inget inmatat än: målfälten är tomma (matchen är ej spelad).
     expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(null);
 
     // Extern uppdatering: samma match får nu ett resultat (finished 2-1).
@@ -298,9 +370,11 @@ describe('ResultEntryForm, synkar mot extern matchuppdatering (C7/C8)', () => {
     );
 
     // Fälten ska spegla det nya externa resultatet (inte de gamla mount-värdena).
+    // T31 (#51): statusen har ingen egen väljare längre, den härleds ur de seedade
+    // målen (ifyllda mål -> spelad), så att målen synkat in är hela kontraktet här.
     expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(2);
     expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toHaveValue(1);
-    expect(screen.getByLabelText(/Status/)).toHaveValue('finished');
+    expect(screen.queryByLabelText(/Status/)).not.toBeInTheDocument();
   });
 
   it('seedar om STRAFFARNA när bara penalties ändras externt (C8, konsekvent med målen)', () => {
@@ -364,10 +438,10 @@ describe('ResultEntryForm, synkar mot extern matchuppdatering (C7/C8)', () => {
     const { rerender } = render(
       <ResultEntryForm match={scheduledMatch()} teamsById={teamsById} onSubmit={onSubmit} />
     );
-    // Mata in och spara (dirty -> rent igen).
+    // Mata in och spara (dirty -> rent igen). T31 (#51): att fylla i båda målen
+    // sätter statusen automatiskt till spelad, ingen status-väljare att röra.
     fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
-    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
     fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
 
