@@ -36,6 +36,24 @@ const FIELD_BASE =
   'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] ' +
   'hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))]';
 
+// Score-rutans delade klasser: kompakt, men ett bekvämt touch-mål (48px hög,
+// över 44px-tröskeln, WCAG 2.5.5) och stark display-siffra. w-16 (64px) är LÅST
+// av strukturtestet (#39): den fasta rut-bredden är det som håller kolumnerna i
+// linje kort för kort, så ett långt lagnamn aldrig kan knuffa scoreboarden.
+const SCORE_INPUT = `${FIELD_BASE} h-12 w-16 px-2 text-center font-display text-[1.375rem] font-bold leading-none tabular-nums`;
+
+// Lag-etikettens delade klasser: en avsiktlig ellipsis (truncate är LÅST av
+// #39-testet), dämpad ton + tight tracking så ett kapat namn läses som DESIGN,
+// inte som ett tryckfel. Fullt namn via title (+ labelns text åt skärmläsaren).
+const TEAM_LABEL =
+  'min-w-0 truncate text-[0.8125rem] leading-tight tracking-[0.01em] text-fg-muted';
+
+// FIFA-landskodens chip: liten, kompakt monogram-bricka i fg-ton (samma recept
+// som grupptabellens kod-chip, en sanning för lag-identitet). Texten bär full
+// fg-kontrast, tonen lever bara i bakgrunden, så chipet är AA oavsett tema.
+const CODE_CHIP =
+  'shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wider';
+
 export interface ResultEntryFormProps {
   match: Match;
   teamsById: ReadonlyMap<string, Team>;
@@ -156,118 +174,59 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
       // pil-steg), inte som hård grind.
       noValidate
       data-match-id={match.id}
-      className="group/form flex flex-col gap-4 rounded-card border border-border bg-surface p-4 shadow-[var(--vm-shadow-card)] transition-shadow duration-300 hover:shadow-[var(--vm-shadow-raised)] sm:p-5"
+      // "Arena i kvällsljus"-finish (#39): kortet är KOMPAKT (tightare padding +
+      // gap än det luftiga utgångsläget) och bär en diskret premium-yta, en svag
+      // varm topp-list (inset box-shadow i guld-ton) som fångar "kvällsljuset"
+      // utan att bli en grell kant. Skuggorna ligger i KLASSEN (inte inline) så
+      // hover-lyftet faktiskt kan överskrida vilo-skuggan, inline-style hade
+      // vunnit över :hover-utility:n och fryst skuggan. color-mix mot tokens, så
+      // den följer temat och dämpas rent i ljust läge. Hover lyfter kortet
+      // (starkare skugga + en aning klarare accent-kant) så listan känns
+      // interaktiv utan att skrika.
+      className="group/form flex flex-col gap-3 rounded-card border border-border bg-surface p-3.5 shadow-[var(--vm-shadow-card),inset_0_1px_0_0_color-mix(in_srgb,var(--vm-gold)_22%,transparent)] transition-[box-shadow,border-color] duration-300 hover:border-[color-mix(in_srgb,var(--color-accent)_28%,var(--color-border))] hover:shadow-[var(--vm-shadow-raised),inset_0_1px_0_0_color-mix(in_srgb,var(--vm-gold)_34%,transparent)] sm:p-5"
     >
-      <fieldset className="m-0 flex flex-col gap-4 border-0 p-0">
+      <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
         {/* legend namnger hela inmatningen för skärmläsare (vilka lag). Visuellt
             är den matchens rubrik med en liten gräsplan-grön puls-prick. legend
             ligger utanför grid:en nedan så den spänner hela kortets bredd. */}
-        <legend className="flex items-center gap-2 font-display text-sm font-semibold sm:text-base">
+        <legend className="flex items-center gap-2 font-display text-sm font-semibold leading-tight tracking-[-0.01em] sm:text-[0.9375rem]">
           <span
             aria-hidden="true"
-            className="inline-block h-1.5 w-1.5 rounded-pill"
+            className="inline-block h-1.5 w-1.5 shrink-0 rounded-pill"
             style={{ backgroundColor: 'var(--color-accent)' }}
           />
           {matchLabel}
         </legend>
 
-        {/* Kortets kropp: på desktop står kontrollerna (status + spara) till
-            vänster och scoreboarden till höger, så kortets bredd fylls med avsikt
-            i stället för att scoreboarden flyter i tomrum. På mobil staplar de
-            (scoreboard överst, kontroller under), kompakt och utan horisontell
-            scroll. items-center håller raderna i lod mot varandra. */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          {/* Scoreline: hemma- och borta-fälten hugger en centrerad "mot"-avdelare,
-              så raden läses som en faktisk resultat-rad (2 mot 0), inte två lösa
-              fält. Varje lag-kolumn har sin label centrerad ÖVER sitt fält.
-              order: scoreboarden överst på mobil, men till höger på desktop. */}
-          <div className="order-1 flex items-end justify-center gap-3 sm:order-2 sm:gap-5">
-            {/* Hemma-lag. Code-badgen ligger UTANFÖR <label> (egen aria-hidden-rad)
-              så labelns tillgängliga text förblir exakt "{lag} (hemma)", det
-              skärmläsaren och testerna läser; badgen är bara visuell krydda. */}
-            <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 sm:max-w-[13rem]">
-              <span className="flex max-w-full items-center gap-1.5 text-xs">
-                {homeCode ? (
-                  <span
-                    aria-hidden="true"
-                    className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wide"
-                    style={{
-                      backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
-                      color: 'var(--color-fg)',
-                    }}
-                  >
-                    {homeCode}
-                  </span>
-                ) : null}
-                <label htmlFor={homeId} className="min-w-0 truncate text-fg-muted">
-                  <span className="font-medium text-fg">{home}</span> (hemma)
-                </label>
-              </span>
-              <input
-                id={homeId}
-                name="homeGoals"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                value={homeGoals}
-                onChange={(e) => setHomeGoals(e.target.value)}
-                aria-invalid={invalid('home') || undefined}
-                aria-describedby={describedBy('home')}
-                className={`${FIELD_BASE} h-14 w-16 px-2 text-center font-display text-2xl font-bold tabular-nums`}
-              />
-            </div>
+        {/* Kortets kropp som ett STABILT KOLUMN-RUTNÄT (#39, Daniels feedback).
+            PROBLEMET som löses: med en flex-layout där lag-kolumnerna var `flex-1`
+            knuffade olika långa lagnamn poängrutorna i sidled, så rutorna, "mot"-
+            etiketten och Spara hoppade kort för kort. Lösningen är ett grid med
+            FASTA spår för score-blocket: bara KONTROLL-spåret är flexibelt
+            (`minmax(0,1fr)`), medan hemma-ruta / "mot" / borta-ruta sitter i spår
+            med innehålls-bestämd (auto) bredd som är IDENTISK på varje kort
+            (samma input-bredd, samma "mot"). Lagnamnen lever som etiketter OVANFÖR
+            sina rutor och TRUNKERAS (ellipsis) inom rut-bredden, så ett långt namn
+            kan aldrig knuffa layouten, fullständigt namn via title (+ labelns text
+            som skärmläsaren läser).
 
-            {/* "mot"-avdelaren, vertikalt centrerad mot fälten (inte labels). */}
-            <span
-              aria-hidden="true"
-              className="shrink-0 pb-4 font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted"
-            >
-              mot
-            </span>
-
-            {/* Borta-lag: speglad layout, samma label-utanför-badge-mönster så även
-              denna labels tillgängliga text förblir exakt "{lag} (borta)". */}
-            <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 sm:max-w-[13rem]">
-              <span className="flex max-w-full items-center gap-1.5 text-xs">
-                {awayCode ? (
-                  <span
-                    aria-hidden="true"
-                    className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wide"
-                    style={{
-                      backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
-                      color: 'var(--color-fg)',
-                    }}
-                  >
-                    {awayCode}
-                  </span>
-                ) : null}
-                <label htmlFor={awayId} className="min-w-0 truncate text-fg-muted">
-                  <span className="font-medium text-fg">{away}</span> (borta)
-                </label>
-              </span>
-              <input
-                id={awayId}
-                name="awayGoals"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                value={awayGoals}
-                onChange={(e) => setAwayGoals(e.target.value)}
-                aria-invalid={invalid('away') || undefined}
-                aria-describedby={describedBy('away')}
-                className={`${FIELD_BASE} h-14 w-16 px-2 text-center font-display text-2xl font-bold tabular-nums`}
-              />
-            </div>
-          </div>
-
-          {/* Kontroller: status-väljare + spara. Ligger till vänster på desktop
-              (order-1), under scoreboarden på mobil (order-2). Spara fyller
-              kontroll-radens bredd på mobil men håller sig kompakt på desktop. */}
-          <div className="order-2 flex flex-wrap items-end gap-3 sm:order-1">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor={statusId} className="text-xs font-medium text-fg-muted">
+            Mobil (default): score-raden överst (centrerad), kontrollerna under, allt
+            staplat och utan horisontell scroll ner till smala vikbara skärmar (280px).
+            Desktop (sm+): kontroller till vänster, score-blocket till höger, i lod. */}
+        <div
+          data-result-card-body=""
+          className="grid grid-cols-[auto_auto_auto] items-end justify-center gap-x-2.5 gap-y-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:justify-between sm:gap-x-4"
+        >
+          {/* Kontroller: status-väljare + spara. Spänner hela score-raden på mobil
+              (col-span-3, under scoreboarden) men sitter i sitt eget flexibla spår
+              på desktop (col 1, vänster). Det är detta spår, INTE lag-kolumnerna,
+              som tar upp kortets variabla bredd, så score-rutorna står still. */}
+          <div className="order-2 col-span-3 flex flex-wrap items-end justify-center gap-2.5 sm:order-1 sm:col-span-1 sm:justify-start">
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor={statusId}
+                className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-fg-muted"
+              >
                 Status
               </label>
               <select
@@ -289,10 +248,101 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
 
             <button
               type="submit"
-              className="ml-auto h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
+              className="ml-auto h-11 self-end rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
             >
               Spara
             </button>
+          </div>
+
+          {/* Hemma-lag (grid-cell, FAST bredd via input-spåret). Namnet truncar
+              inom rut-bredden (w-16): ett långt lagnamn klipps med ellipsis i
+              stället för att knuffa rutan, fullt namn via title + labelns text. */}
+          <div className="order-1 flex w-16 flex-col items-center gap-1 sm:order-2">
+            <span className="flex w-full items-center justify-center gap-1">
+              {homeCode ? (
+                <span
+                  aria-hidden="true"
+                  className={CODE_CHIP}
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    color: 'var(--color-fg)',
+                  }}
+                >
+                  {homeCode}
+                </span>
+              ) : null}
+              {/* min-w-0 + truncate: tillåt krympning under innehållets bredd så
+                  ellipsisen slår in i stället för att spräcka grid-cellen. title
+                  ger fullt namn vid hover (labelns text ger det åt skärmläsaren). */}
+              <label htmlFor={homeId} title={home} className={TEAM_LABEL}>
+                <span className="font-semibold text-fg">{home}</span>
+                <span className="sr-only"> (hemma)</span>
+              </label>
+            </span>
+            <input
+              id={homeId}
+              name="homeGoals"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={homeGoals}
+              onChange={(e) => setHomeGoals(e.target.value)}
+              aria-invalid={invalid('home') || undefined}
+              aria-describedby={describedBy('home')}
+              className={SCORE_INPUT}
+            />
+          </div>
+
+          {/* "mot"-avdelaren (grid-cell, fast). Vertikalt mot rutorna: pb lyfter
+              den från label-raden så den linjerar mot mitten av score-rutorna
+              (48px höga nu), inte mot namnen. Dämpad guld-ton ger den en diskret
+              "mot"-signatur i stället för en grå etikett, kvällsljus-detaljen. */}
+          <span
+            aria-hidden="true"
+            className="order-1 self-end pb-3 font-display text-[0.6875rem] font-semibold uppercase tracking-[0.18em] sm:order-2 sm:self-center sm:pb-0"
+            // Guld-skiftad "mot": en varm kvällsljus-detalj i stället för en grå
+            // etikett. Blandningen lutar mot fg-muted (AA-säker bastext-ton) så
+            // även ljust tema håller AA som normal text (uppmätt 4.5:1+, se
+            // handoff), gulden ger karaktären utan att sänka läsbarheten.
+            style={{ color: 'color-mix(in srgb, var(--vm-gold) 52%, var(--color-fg-muted))' }}
+          >
+            mot
+          </span>
+
+          {/* Borta-lag: speglad layout, samma truncate-inom-rut-bredd. */}
+          <div className="order-1 flex w-16 flex-col items-center gap-1 sm:order-2">
+            <span className="flex w-full items-center justify-center gap-1">
+              {awayCode ? (
+                <span
+                  aria-hidden="true"
+                  className={CODE_CHIP}
+                  style={{
+                    backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    color: 'var(--color-fg)',
+                  }}
+                >
+                  {awayCode}
+                </span>
+              ) : null}
+              <label htmlFor={awayId} title={away} className={TEAM_LABEL}>
+                <span className="font-semibold text-fg">{away}</span>
+                <span className="sr-only"> (borta)</span>
+              </label>
+            </span>
+            <input
+              id={awayId}
+              name="awayGoals"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={awayGoals}
+              onChange={(e) => setAwayGoals(e.target.value)}
+              aria-invalid={invalid('away') || undefined}
+              aria-describedby={describedBy('away')}
+              className={SCORE_INPUT}
+            />
           </div>
         </div>
 

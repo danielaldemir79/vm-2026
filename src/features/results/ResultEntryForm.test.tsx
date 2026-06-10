@@ -150,3 +150,97 @@ describe('ResultEntryForm, lyckad inmatning', () => {
     expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toHaveValue(2);
   });
 });
+
+// STABIL KOLUMN-LAYOUT (#39, Daniels feedback): poängrutorna ska ligga i samma
+// kolumner kort för kort oavsett lagnamnens längd, och ett långt namn ska trunkera
+// (ellipsis) utan att knuffa layouten. jsdom har ingen riktig layout-motor, så vi
+// kan inte mäta pixlar; vi vaktar i stället de STRUKTURELLA garantierna som ger
+// den stabila layouten: rutorna har en FAST bredd-klass (oberoende av namn),
+// lagnamnet är `truncate` med fullt namn i title, och a11y-namnet bevaras.
+describe('ResultEntryForm, stabil kolumn-layout (#39)', () => {
+  // Ett extremt långt lagnamn (den värsta knuff-risken i den gamla flex-layouten).
+  const longTeams = new Map<string, Team>([
+    [
+      'long',
+      {
+        id: 'long',
+        name: 'Bosnien och Hercegovina-landslaget med långt namn',
+        code: 'BIH',
+        group: 'A',
+      },
+    ],
+    ['rsa', { id: 'rsa', name: 'Sydafrika', code: 'RSA', group: 'A' }],
+  ]);
+  function longNameMatch(): Match {
+    return { ...scheduledMatch(), homeTeamId: 'long', awayTeamId: 'rsa' };
+  }
+
+  it('poäng-fälten har en FAST bredd-klass (w-16), oberoende av lagnamnets längd', () => {
+    const { rerender } = render(
+      <ResultEntryForm
+        match={scheduledMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    // Kort lagnamn: rutan är w-16.
+    expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveClass('w-16');
+
+    // Långt lagnamn: SAMMA fasta bredd, namnet får inte ha tänjt rutan.
+    rerender(
+      <ResultEntryForm
+        match={longNameMatch()}
+        teamsById={longTeams}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    const longHome = screen.getByLabelText(/Bosnien och Hercegovina.*\(hemma\)/);
+    expect(longHome).toHaveClass('w-16');
+  });
+
+  it('lagnamnet trunkeras (ellipsis) och bär fullt namn via title (ingen ful avhuggning)', () => {
+    render(
+      <ResultEntryForm
+        match={longNameMatch()}
+        teamsById={longTeams}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    // Labeln (kopplad till hemma-fältet) är truncate och har title = fullt namn.
+    const input = screen.getByLabelText(/Bosnien och Hercegovina.*\(hemma\)/);
+    const label = document.querySelector(`label[for="${input.id}"]`) as HTMLElement;
+    expect(label).not.toBeNull();
+    expect(label).toHaveClass('truncate');
+    expect(label).toHaveAttribute('title', 'Bosnien och Hercegovina-landslaget med långt namn');
+  });
+
+  it('a11y-namnet bevarar "(hemma)"/"(borta)" trots truncate (sr-only suffix)', () => {
+    render(
+      <ResultEntryForm
+        match={longNameMatch()}
+        teamsById={longTeams}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    // getByLabelText matchar bara om hela det tillgängliga namnet finns, inkl suffix.
+    expect(
+      screen.getByLabelText(/Bosnien och Hercegovina-landslaget med långt namn \(hemma\)/)
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toBeInTheDocument();
+  });
+
+  it('"mot"-avdelaren och score-blocket ligger i ett rutnät (stabila kolumn-spår)', () => {
+    const { container } = render(
+      <ResultEntryForm
+        match={scheduledMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    const body = container.querySelector('[data-result-card-body]');
+    expect(body).not.toBeNull();
+    // Grid-layouten är seamen som ger stabila kolumner (design-frontend kan
+    // finslipa spåren, men det MÅSTE vara ett grid, inte den gamla flex-knuffen).
+    expect(body).toHaveClass('grid');
+  });
+});

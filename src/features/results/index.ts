@@ -35,3 +35,7 @@ export type {
   ResultValidationField,
 } from './validate-result';
 export { applyMatchResult } from './apply-match-result';
+
+// 3-dagars fönster-urval för inmatningslistan (#39): ren, testbar funktion.
+export { windowMatches, WINDOW_DAYS } from './result-window';
+export type { ResultWindow } from './result-window';

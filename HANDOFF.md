@@ -5,6 +5,71 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T27/#39 KLAR - PR #41 väntar på autonom merge
+
+**Branch:** `feature/T27-resultatlista-ux` @ HEAD `34fdd28`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/41 mot `develop` (Closes #39, state: OPEN)
+**Board:** issue #39 i "In Review" (korrekt). Dirigenten stänger issue #39 MANUELLT och flyttar kort #39 till Done EFTER merge.
+
+**Autonomt läge: Daniel är borta ~1 vecka. Utökad fullmakt: dirigenten mergar, förbättrar brister den ser, och matar på nya tasks.**
+
+**KLART med bevis (SHA + verifiering):**
+- `6ce12ce` - windowMatches-helper + expandera-kontroll (senior-developer)
+- `0d5566c` - kolumn-grid med fasta spår + ellipsis-trunkering (senior-developer)
+- `14a133b` - decisions.md doc (senior-developer)
+- `ad05842` + `f9b06d2` - design premium + AA-uppmätt i browser (design-frontend)
+- `376b324` - useTodayKey-hook (dag-medveten, minut-tick gatad på dagsbyte + visibilitychange)
+- `34fdd28` - dag-medvetet fönster + hidden-attribut (ej list-filtrering) (HEAD)
+- Verifiering (dirigenten oberoende): **406 tester gröna (43 filer)**, build/lint/format rent
+- Lokal panel: F1 (post-turnerings-asymmetri: tom default-vy efter 19 juli vs daily-vyns klampning) PINNAD som produktbeslut till Daniels hemkomst-kö; F2 avvisad (rule-of-three, 2:a stegnings-dubbletten, extrahera vid 3:e)
+- Copilot: 2 rundor (2 -> 0), C1 (fruset fönster över midnatt) + C2 (osparad inmatning tappades vid ihopfäll) åtgärdade
+- Alla 5/5 acceptanskriterier bockade i issue #39 (journalisten 2026-06-10)
+- **T8 + #39 demo:** dirigenten skickar live-skärmdumpar till Daniel vid hemkomst (T8 dags-tema + T27 resultatlista ihop)
+
+**PINNADE punkter (bär framåt):**
+- **F1/penalties-pin (T9, ägare senior-developer):** reducern hanterar inte `MatchResult.penalties`. T9 fixar. Acceptanstest: redigera finished slutspelsmatch med straff, penalties bevaras.
+- **T14-pin UTÖKAD:** När live-klienten byggs i T14, gör ALLA fyra stegen i SAMMA ändring:
+  (1) Sätt `LIVE_READY = true` i `src/data/data-source.ts`.
+  (2) Ta bort interims-warn (den `console.warn` med "LIVE_READY=false ... byggs i T14").
+  (3) Uppdatera live-felvägstester (de som assertar fixtures-fallback vid env+ej-live-ready).
+  (4) Lägg F2-assertion: inget test refererar strängen "LIVE_READY=false".
+  Guard-testet BRYTS medvetet vid flip - så stegen inte glöms.
+- **T14-pin (Supabase):** projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad, Backlog):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash-notering:** FNV-hash används på 2 ställen, avvisad konsolidering (YAGNI, rule-of-three). Konsolidera till delad hjälpare vid 3:e användning.
+- **Stegnings-dubblett-notering (windowDateKeys vs enumerateDateKeys):** 2 användningar, avvisad extraktion (rule-of-three). Extrahera delad hjälpare vid 3:e användning.
+
+**"Behöver Daniel"-kö (han är borta):**
+- **F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger current default-vy (3 dagar framåt) en tom lista. Alternativ: (a) behåll tom vy + visa meddelande "turneringen avslutad", (b) ankra fönstret till sista speldagen (19 juli) när today > sista match. Daniel bestämmer vid hemkomst.
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
+>
+> Om PR #41 (T27/#39, feature/T27-resultatlista-ux) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 41 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #39 manuellt (`gh issue close 39`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #39 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar dag-tema + kollinjerad resultatlista med 3-dagarsfönster, inga alerts. Skicka demo-skärmdumpar (T8 + T27 ihop) till Daniel.
+>
+> Om PR #41 REDAN mergad:
+> T1-T8 + T4b + HOTFIX #37 + T27/#39 är klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: T9 (#9, slutspels-inmatning) - F1/penalties-pinnen gäller!**
+>
+> Bär framåt (alla tasks):
+> - **F1/penalties-pin (T9):** reducern hanterar inte penalties. T9 fixar.
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion. Se senaste T14-sektionen ovan.
+> - **T14-pin (Supabase):** projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten.
+> - **#35 (arena/stad, Backlog):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+> - **"Behöver Daniel"-kö:** F1-produktbeslut (post-turnerings-vy), push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35). Notifiera Daniel vid hemkomst.
+> - **Utökad fullmakt:** dirigenten får förbättra brister och mata på nya tasks för att göra sidan bättre.
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T8 KLAR - PR #40 väntar på autonom merge
 
 **Branch:** `feature/T8-dags-tema` @ HEAD `12cd8e9`
