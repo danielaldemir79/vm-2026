@@ -20,6 +20,7 @@ import { useMemo } from 'react';
 import type { Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { useDailyMatches } from './use-daily-matches';
+import { useDayTheme } from './use-day-theme';
 import { MatchCard } from './MatchCard';
 import { formatDayHeading, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
@@ -137,6 +138,19 @@ export function DailyMatchesView() {
   } = useDailyMatches();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
 
+  // Dynamiskt DAGS-TEMA (T8): härled en subtil, deterministisk accent-hue ur den
+  // valda dagens lag och lägg den som en CSS-variabel + stabilt data-attribut på
+  // hero:ns dekor-yta. Påverkar BARA dekorativa ytor (design-frontend väver in
+  // hue:n i gradienter/glow), aldrig text-/yt-tokens, så läsbarheten (WCAG AA)
+  // aldrig sänks (kontrast-vakt, decisions.md T8). Mjuka övergångar vid dag-byte
+  // sköts av en CSS-transition på ytan (design-frontend), som reduced-motion-
+  // grinden i index.css nollar. Tom/ingen vald dag -> default-tema (ingen hue).
+  const { dayThemeProps } = useDayTheme(
+    selectedDay?.matches ?? [],
+    teamsById,
+    selectedDay?.dateKey
+  );
+
   return (
     <section aria-labelledby="dagens-matcher-rubrik" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -207,8 +221,14 @@ export function DailyMatchesView() {
           <Slide direction="up">
             <div
               data-daily-hero=""
+              data-day-theme={dayThemeProps['data-day-theme']}
+              data-day-theme-source={dayThemeProps['data-day-theme-source']}
               className="relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
               style={{
+                // Dags-temats hue (--vm-day-hue) injiceras via seamen så design-
+                // frontend kan väva in den i hero:ns dekor (gradienter/glow). I
+                // default-läget saknas variabeln och hero:n behåller T2:s ton.
+                ...dayThemeProps.style,
                 backgroundColor: 'var(--color-surface-raised)',
                 backgroundImage:
                   'radial-gradient(110% 120% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 55%), radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--vm-gold) 12%, transparent), transparent 55%)',
