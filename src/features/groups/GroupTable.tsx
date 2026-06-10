@@ -21,7 +21,7 @@
 
 import type { CSSProperties } from 'react';
 import type { GroupStanding, GroupId, Team } from '../../domain/types';
-import { TeamNameButton } from '../team-profile/TeamNameButton';
+import { TeamNameButton } from '../team-profile';
 
 /** Hur många lag som går vidare DIREKT från gruppen (etta + tvåa, SPEC §5). */
 const DIRECT_ADVANCE_RANK = 2;
