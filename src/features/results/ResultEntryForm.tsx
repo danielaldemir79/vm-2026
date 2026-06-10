@@ -28,17 +28,46 @@ function isKnockout(match: Match): boolean {
   return match.stage !== 'group';
 }
 
-/** De status användaren kan välja i formuläret, med svenska etiketter. */
-const STATUS_OPTIONS: ReadonlyArray<{ value: MatchStatus; label: string }> = [
-  { value: 'scheduled', label: 'Ej spelad' },
-  { value: 'live', label: 'Pågår' },
-  { value: 'finished', label: 'Spelad' },
-];
+/**
+ * Härled matchens AVSEDDA status ur det användaren matat in (T31, #51, auto-spelad).
+ *
+ * Det manuella status-steget ("Ej spelad"-dropdownen) togs bort: när användaren
+ * fyller i mål och sparar ÄR matchen spelad. Regeln:
+ *   - något måltal ifyllt -> 'finished' (spelad). Är bara ETT mål ifyllt fångar
+ *     valideringen det som 'finished-without-result' ("kräver både ... mål"), så
+ *     den avsedda statusen är finished och felmeddelandet blir korrekt.
+ *   - inga mål ifyllda -> matchens NUVARANDE status BEVARAS om den är 'live'
+ *     (annars 'scheduled'). VARFÖR (C1, #51): formuläret renderas även för en
+ *     pågående match (status 'live'), och utan tömt resultat ska ett tomt Spara
+ *     INTE backa en live-match till 'scheduled' (oavsiktlig statusregression).
+ *     Att stanna i 'live' är en validerad no-op-övergång (live -> live tillåts,
+ *     inget resultat sätts, se validate-result ALLOWED_TRANSITIONS). En match
+ *     som ÄNNU inte börjat (scheduled) eller ska NOLLSTÄLLAS från spelad
+ *     (finished -> scheduled, den avsiktliga reset-vägen) ger som förr 'scheduled'.
+ *
+ * Att nollställa en spelad match tillbaka till 'scheduled' kan ske på TVÅ
+ * likvärdiga vägar, båda producerar samma validerade back-övergång genom
+ * denna härledning: (1) tömma båda mål-fälten och trycka Spara (matchen är
+ * 'finished' -> tomt ger 'scheduled'), och (2) den explicita "Rensa
+ * resultat"-knappen nedan (som sparar en entry med tomma mål och status
+ * 'scheduled' direkt). Rensa-knappen är alltså inte den enda vägen, bara en
+ * tydligare genväg som syns först när matchen är spelad. Inget "tyst" sker: ett
+ * tömt-fält-spar är en avsiktlig användarhandling och går genom samma validering.
+ */
+function intendedStatus(homeGoals: string, awayGoals: string, current: MatchStatus): MatchStatus {
+  const hasAnyGoal = homeGoals.trim() !== '' || awayGoals.trim() !== '';
+  if (hasAnyGoal) {
+    return 'finished';
+  }
+  // Tomma mål: bevara 'live' (no-op för en pågående match), annars 'scheduled'
+  // (ej-startad no-op ELLER nollställning av en spelad match tillbaka till ej spelad).
+  return current === 'live' ? 'live' : 'scheduled';
+}
 
 // Delade fält-klasser: en stark, tema-trogen fokus-ring (WCAG 2.4.7, synlig i
 // båda teman via --color-accent) och en mjuk hover/focus-lyft. En sanning så
-// mål-fälten och status-väljaren ser ut som EN familj. Färgen på ringen är
-// accent (interaktions-affordans, inte status), så T7-pinnen hålls ren.
+// mål-fälten ser ut som EN familj. Färgen på ringen är accent (interaktions-
+// affordans, inte status), så T7-pinnen hålls ren.
 const FIELD_BASE =
   'rounded-md border border-border bg-bg text-fg transition-colors duration-150 ' +
   'outline-none focus-visible:border-accent ' +
@@ -110,18 +139,19 @@ function parseGoals(raw: string): number | null {
  * både den initiala seedningen (useState-init) OCH den externa synkningen
  * (useEffect), så de aldrig kan drifta isär (DRY). Ett tomt resultat -> tomma
  * fält, ett inmatat resultat -> dess värden som strängar.
+ *
+ * Status seedas INTE längre (T31, #51): den härleds ur målfälten vid spar
+ * (intendedStatus), så formuläret håller bara mål + straffar i state.
  */
 function seedFields(match: Match): {
   homeGoals: string;
   awayGoals: string;
-  status: MatchStatus;
   homePens: string;
   awayPens: string;
 } {
   return {
     homeGoals: match.result ? String(match.result.homeGoals) : '',
     awayGoals: match.result ? String(match.result.awayGoals) : '',
-    status: match.status,
     homePens: match.result?.penalties ? String(match.result.penalties.homeGoals) : '',
     awayPens: match.result?.penalties ? String(match.result.penalties.awayGoals) : '',
   };
@@ -138,11 +168,18 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
   const seed = seedFields(match);
   const [homeGoals, setHomeGoals] = useState<string>(seed.homeGoals);
   const [awayGoals, setAwayGoals] = useState<string>(seed.awayGoals);
-  const [status, setStatus] = useState<MatchStatus>(seed.status);
   // Straffmål (bara slutspel), seedade från ett ev. inmatat penalties-resultat.
   const [homePens, setHomePens] = useState<string>(seed.homePens);
   const [awayPens, setAwayPens] = useState<string>(seed.awayPens);
   const [errors, setErrors] = useState<ResultValidationError[]>([]);
+
+  // AVSEDD status (T31, #51): härledd ur målfälten, inte vald i en dropdown.
+  // Driver både straff-fältens synlighet och submit-statusen, så de aldrig
+  // kan säga emot varandra (EN sanning, samma som den gamla `status`-state-var
+  // gjorde, fast nu härledd i stället för manuellt vald). Matchens nuvarande
+  // status skickas med så ett tomt Spara på en LIVE-match inte backar den till
+  // scheduled (C1, #51): tomma mål bevarar 'live', annars 'scheduled'.
+  const status = intendedStatus(homeGoals, awayGoals, match.status);
 
   // DIRTY-flagga (C7/C8): true så fort användaren rört ETT fält och ännu inte
   // sparat. Den styr den externa synkningen nedan, så ett pågående lokalt edit
@@ -158,9 +195,10 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
   // undan det, vi synkar bara när formuläret är "rent". Effekten beror på de
   // RÅA match-värdena (inte på match-referensen), så en ny match-array med samma
   // värden inte trigger:ar en onödig re-seed. Goals OCH straffar synkas tillsammans,
-  // så de två fältgrupperna behandlas konsekvent (C8).
+  // så de två fältgrupperna behandlas konsekvent (C8). Status synkas inte längre
+  // (T31, #51): den härleds ur de synkade målfälten, så när målen seedas om följer
+  // den avsedda statusen automatiskt.
   const { homeGoals: seedHome, awayGoals: seedAway } = seed;
-  const seedStatus = seed.status;
   const { homePens: seedHomePens, awayPens: seedAwayPens } = seed;
   useEffect(() => {
     if (dirtyRef.current) {
@@ -168,18 +206,16 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
     }
     setHomeGoals(seedHome);
     setAwayGoals(seedAway);
-    setStatus(seedStatus);
     setHomePens(seedHomePens);
     setAwayPens(seedAwayPens);
     // Beror på de råa seed-värdena: synkar om bara när matchens faktiska data ändras.
-  }, [seedHome, seedAway, seedStatus, seedHomePens, seedAwayPens]);
+  }, [seedHome, seedAway, seedHomePens, seedAwayPens]);
 
   // Unika, stabila fält-id:n så <label htmlFor> och aria-describedby pekar rätt
   // även när flera matcher renderas samtidigt (a11y).
   const baseId = useId();
   const homeId = `${baseId}-home`;
   const awayId = `${baseId}-away`;
-  const statusId = `${baseId}-status`;
   const homePensId = `${baseId}-home-pens`;
   const awayPensId = `${baseId}-away-pens`;
   const errorsId = `${baseId}-errors`;
@@ -241,8 +277,28 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
     };
   }
 
+  /**
+   * Spara en inmatning via storen och hantera resultatet: vid ok rensa fel,
+   * nolla dirty-flaggan och trigga föräldern (firande), vid fel visa felen.
+   * Delas av spar-knappen OCH "Rensa resultat"-knappen (DRY, en spar-väg).
+   */
+  function save(entry: ResultEntry) {
+    const result = onSubmit(match.id, entry);
+    if (result.ok) {
+      setErrors([]);
+      // Sparat: formuläret är inte längre "smutsigt". Nästa externa uppdatering av
+      // matchen (storen återspeglar nu sparningen, ev. realtid T18) får synka in.
+      dirtyRef.current = false;
+      onSaved?.(match, entry);
+    } else {
+      setErrors(result.errors);
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Status sätts AUTOMATISKT (T31, #51): ifyllda mål -> spelad (finished). Inget
+    // manuellt status-steg längre. `status` är härledd ur målfälten (intendedStatus).
     const entry: ResultEntry = {
       homeGoals: parseGoals(homeGoals),
       awayGoals: parseGoals(awayGoals),
@@ -256,19 +312,31 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
         ? { penalties: { homeGoals: parseGoals(homePens), awayGoals: parseGoals(awayPens) } }
         : {}),
     };
-    const result = onSubmit(match.id, entry);
-    if (result.ok) {
-      setErrors([]);
-      // Sparat: formuläret är inte längre "smutsigt". Nästa externa uppdatering av
-      // matchen (storen återspeglar nu sparningen, ev. realtid T18) får synka in.
-      dirtyRef.current = false;
-      onSaved?.(match, entry);
-    } else {
-      setErrors(result.errors);
-    }
+    save(entry);
+  }
+
+  /**
+   * ÅNGRA/nollställ en spelad match tillbaka till ej spelad (T31, #51 (b)). När
+   * status sätts automatiskt vid spar behövs en explicit väg att ta tillbaka ett
+   * resultat, annars sitter en felinmatad spelad match fast. Vi sparar en tom
+   * inmatning (inga mål -> status scheduled, result null), tömmer fälten lokalt och
+   * markerar formuläret rent så storens nya (nollade) läge får synka tillbaka in.
+   * Visas bara för en match som FAKTISKT är spelad (se knappen nedan), så knappen
+   * aldrig dyker upp på en match utan resultat att rensa.
+   */
+  function handleClear() {
+    setHomeGoals('');
+    setAwayGoals('');
+    setHomePens('');
+    setAwayPens('');
+    save({ homeGoals: null, awayGoals: null, status: 'scheduled' });
   }
 
   const matchLabel = `${home} mot ${away}`;
+  // "Rensa resultat" visas bara när matchen i storen är spelad: först då finns
+  // ett resultat att ångra. (En osparad lokal inmatning rensas genom att tömma
+  // fälten, knappen är till för att backa ett redan SPARAT resultat.)
+  const canClear = match.status === 'finished';
 
   return (
     <form
@@ -331,34 +399,27 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
           data-result-card-body=""
           className="grid grid-cols-[auto_auto_auto] items-end justify-center gap-x-2.5 gap-y-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:justify-between sm:gap-x-4"
         >
-          {/* Kontroller: status-väljare + spara. Spänner hela score-raden på mobil
-              (col-span-3, under scoreboarden) men sitter i sitt eget flexibla spår
-              på desktop (col 1, vänster). Det är detta spår, INTE lag-kolumnerna,
-              som tar upp kortets variabla bredd, så score-rutorna står still. */}
+          {/* Kontroller (T31, #51): bara Spara + en valfri "Rensa resultat". Status-
+              väljaren togs bort, statusen sätts automatiskt vid spar (ifyllda mål ->
+              spelad). Spänner hela score-raden på mobil (col-span-3, under
+              scoreboarden) men sitter i sitt eget flexibla spår på desktop (col 1,
+              vänster). Det är detta spår, INTE lag-kolumnerna, som tar upp kortets
+              variabla bredd, så score-rutorna står still. */}
           <div className="order-2 col-span-3 flex flex-wrap items-end justify-center gap-2.5 sm:order-1 sm:col-span-1 sm:justify-start">
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor={statusId}
-                className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-fg-muted"
+            {/* "Rensa resultat" (ångra/nollställ): visas bara när matchen är spelad,
+                så det alltid finns en väg att backa ett felinmatat resultat tillbaka
+                till ej spelad. En sekundär (kant-) knapp så den inte konkurrerar med
+                Spara. type="button" så den inte triggar form-submit. */}
+            {canClear ? (
+              <button
+                type="button"
+                onClick={handleClear}
+                data-clear-result=""
+                className="h-11 self-end rounded-pill border border-border px-5 font-display text-sm font-semibold text-fg-muted shadow-sm transition-[transform,box-shadow,color,border-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] hover:text-fg focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px"
               >
-                Status
-              </label>
-              <select
-                id={statusId}
-                name="status"
-                value={status}
-                onChange={(e) => edit(setStatus)(e.target.value as MatchStatus)}
-                aria-invalid={invalid('status') || undefined}
-                aria-describedby={describedBy('status')}
-                className={`${FIELD_BASE} h-11 px-3 pr-8 text-sm`}
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+                Rensa resultat
+              </button>
+            ) : null}
 
             <button
               type="submit"

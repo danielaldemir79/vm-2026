@@ -26,9 +26,10 @@ async function saveFirstResult() {
   const form = document.querySelector('form[data-match-id="g-A-1"]') as HTMLFormElement | null;
   expect(form).not.toBeNull();
   const scoped = within(form as HTMLFormElement);
+  // T31 (#51): att fylla i båda målen sätter statusen automatiskt till spelad
+  // (finished), så spar-seamen + målfirandet/feedbacken triggas, ingen status-väljare.
   fireEvent.change(scoped.getByLabelText(/\(hemma\)/), { target: { value: '2' } });
   fireEvent.change(scoped.getByLabelText(/\(borta\)/), { target: { value: '1' } });
-  fireEvent.change(scoped.getByLabelText(/Status/), { target: { value: 'finished' } });
   fireEvent.click(scoped.getByRole('button', { name: /Spara/ }));
 }
 
