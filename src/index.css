@@ -21,7 +21,7 @@ body {
      KÄNNS levande utan att vara stökig (SPEC §7).
    - vm-sheen: en långsam ljus-svep över hero-fonden ("arena-ljus" som rör sig).
    Båda är RENT dekorativa och nollas av reduced-motion-regeln nedan (WCAG
-   2.3.3): pricken blir då en statisk prick, sveptet stannar, ingen distraktion.
+   2.3.3): pricken blir då en statisk prick, svepet stannar, ingen distraktion.
    Layouten påverkas aldrig (ingen CLS): bara opacitet/bakgrundsposition rör sig. */
 @keyframes vm-pulse {
   0%,
@@ -62,8 +62,8 @@ body {
 
    VARFÖR den svepande regeln INTE räcker för hero-animationerna (Copilot R2, C5):
    `animation-duration: 0.01ms` + `iteration-count: 1` kör animationen EN gång till
-   slut nästan momentant, så keyframsen landar på sitt SLUT-läge (100%), inte sitt
-   start-läge. För `vm-sheen` är 100 % `background-position: 140% 0%` -> sveptet
+   slut nästan momentant, så keyframesen landar på sitt SLUT-läge (100%), inte sitt
+   start-läge. För `vm-sheen` är 100 % `background-position: 140% 0%` -> svepet
    fryser mitt i/utanför fonden i stället för i ro. Designintentet (decisions.md,
    T7 design-lager) är en HELT statisk hero vid reducerad rörelse. Därför nollas
    de dekorativa hero-animationerna EXPLICIT med `animation: none` nedan, så de
