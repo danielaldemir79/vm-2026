@@ -28,7 +28,12 @@ export interface PredictionsViewProps {
   now?: Date;
 }
 
-export function PredictionsView({ env, now }: PredictionsViewProps) {
+// Default-värdena sätts HÄR (inte bara inne i hookarna): proparna är optional för
+// testbarhet, men utan rum kallas hookarna ändå ovillkorligt (Rules of Hooks), så
+// vi coalescar till giltiga icke-undefined värden FÖRE anropen. Hookarna har egna
+// defaultar också, men att uttrycka det vid call-siten gör typkontraktet sant och
+// läsbart, ingen konsument behöver gissa att undefined "blir" nuet/env.
+export function PredictionsView({ env = import.meta.env, now = new Date() }: PredictionsViewProps) {
   const store = usePredictionsStore();
   const { status, matches, teams, error } = usePredictableData(env);
 

@@ -192,7 +192,12 @@ export type Database = {
         }[];
       };
       // T15 (#15): slå upp en matchs avsparkstid (deadline-låsets klocka).
-      match_kickoff: { Args: { p_match_id: string }; Returns: string };
+      // Returns string | null: RPC:n är ett rent `select k.kickoff ... where match_id = ...`
+      // (migration 20260611120200_t15_predictions_rls.sql) och ger NULL för en okänd match.
+      // Det NULL:et är inte ett misstag utan en SÄKERHETS-fail-safe som RLS förlitar sig på
+      // (now() < NULL => skriv nekas, now() >= NULL => andras tips dolda), så typen får inte
+      // ljuga om non-null, framtida konsumenter måste hantera NULL-fallet.
+      match_kickoff: { Args: { p_match_id: string }; Returns: string | null };
     };
     Enums: {
       [_ in never]: never;
