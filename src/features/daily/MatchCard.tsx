@@ -159,8 +159,11 @@ export function MatchCard({ match, teamsById, highlight = false }: MatchCardProp
       </div>
 
       {/* Botten-rad: metadata (TV-kanal-märke + ev. arena + featured-etikett).
-          dl/dt/dd ger semantiska par; dt:erna är visuellt dolda (sr-only) men når
-          skärmläsare. Highlight-etiketten är färg-oberoende text (T7-pin). */}
+          dl/dt/dd ger semantiska par. De flesta dt:er är visuellt dolda (sr-only)
+          eftersom värdet bär sin egen identitet (TV-badgen, det färg-oberoende
+          highlight-chippet), men Arena-dt:n är SYNLIG (font-semibold): ett bart
+          arena-/stadsnamn behöver en synlig "Arena"-etikett för att inte bli
+          tvetydigt. Alla dt:er når ändå skärmläsare oavsett. */}
       <dl className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
         {highlight ? (
           <div className="flex items-center gap-1">
