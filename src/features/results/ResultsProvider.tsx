@@ -136,7 +136,9 @@ export function ResultsProvider({
           ],
         };
       }
-      const validation = validateResultEntry(target.status, entry);
+      // Stage med: slutspelsmatch med lika ordinarie ställning kräver straffar
+      // (FIFA Article 14), valideringen behöver matchens stage för den regeln.
+      const validation = validateResultEntry(target.status, entry, target.stage);
       if (!validation.ok) {
         return validation; // ogiltig inmatning: lämna listan orörd
       }

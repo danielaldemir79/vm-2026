@@ -19,6 +19,14 @@ import { useId, useMemo, useState, type FormEvent } from 'react';
 import type { Match, MatchStatus, Team } from '../../domain/types';
 import type { ResultEntry, ResultValidationError, ResultValidationField } from './validate-result';
 
+/**
+ * Är detta en slutspelsmatch? Bara där kan en lika ordinarie ställning kräva en
+ * straffläggning (FIFA Article 14). En sanning som styr om straff-fälten visas.
+ */
+function isKnockout(match: Match): boolean {
+  return match.stage !== 'group';
+}
+
 /** De status användaren kan välja i formuläret, med svenska etiketter. */
 const STATUS_OPTIONS: ReadonlyArray<{ value: MatchStatus; label: string }> = [
   { value: 'scheduled', label: 'Ej spelad' },
@@ -110,6 +118,13 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
     match.result ? String(match.result.awayGoals) : ''
   );
   const [status, setStatus] = useState<MatchStatus>(match.status);
+  // Straffmål (bara slutspel), seedade från ett ev. inmatat penalties-resultat.
+  const [homePens, setHomePens] = useState<string>(
+    match.result?.penalties ? String(match.result.penalties.homeGoals) : ''
+  );
+  const [awayPens, setAwayPens] = useState<string>(
+    match.result?.penalties ? String(match.result.penalties.awayGoals) : ''
+  );
   const [errors, setErrors] = useState<ResultValidationError[]>([]);
 
   // Unika, stabila fält-id:n så <label htmlFor> och aria-describedby pekar rätt
@@ -118,7 +133,22 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
   const homeId = `${baseId}-home`;
   const awayId = `${baseId}-away`;
   const statusId = `${baseId}-status`;
+  const homePensId = `${baseId}-home-pens`;
+  const awayPensId = `${baseId}-away-pens`;
   const errorsId = `${baseId}-errors`;
+
+  // Straff-fälten visas bara när en straffläggning är RELEVANT: en slutspelsmatch
+  // som matas in som spelad (finished) med lika ordinarie ställning (FIFA Art. 14).
+  // Härleds reaktivt ur de inmatade fälten, så fälten dyker upp i samma ögonblick
+  // som användaren skriver in en lika ställning. Tomma/ogiltiga mål -> inte lika.
+  const showPenalties = useMemo(() => {
+    if (!isKnockout(match) || status !== 'finished') {
+      return false;
+    }
+    const h = parseGoals(homeGoals);
+    const a = parseGoals(awayGoals);
+    return h !== null && a !== null && Number.isInteger(h) && Number.isInteger(a) && h === a;
+  }, [match, status, homeGoals, awayGoals]);
 
   // Snabb uppslagning fält -> har-fel, för aria-invalid + describedby per fält.
   // Fel utan `field` (t.ex. okänd match) hör inte till någon input och hoppas
@@ -151,6 +181,14 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
       homeGoals: parseGoals(homeGoals),
       awayGoals: parseGoals(awayGoals),
       status,
+      // Ta BARA med straffar när de är RELEVANTA (slutspel, finished, lika), annars
+      // UTELÄMNA fältet helt. Att inte skicka penalties betyder "ingen straffläggning",
+      // så ett gammalt straff-värde som ligger kvar i state efter att ställningen
+      // ändrats till avgjord aldrig läcker in i inmatningen. Den synliga formen
+      // (showPenalties) styr inmatningens form, en sanning.
+      ...(showPenalties
+        ? { penalties: { homeGoals: parseGoals(homePens), awayGoals: parseGoals(awayPens) } }
+        : {}),
     };
     const result = onSubmit(match.id, entry);
     if (result.ok) {
@@ -345,6 +383,66 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
             />
           </div>
         </div>
+
+        {/* Straffläggning (FIFA Article 14): visas BARA för en slutspelsmatch som
+            matas in som spelad med lika ordinarie ställning. data-penalties-row är
+            en stabil hake för design-frontend (och tester). Layout speglar score-
+            raden: hemma-straff / "straffar" / borta-straff, fast bredd så det
+            linjerar med score-rutorna ovanför. */}
+        {showPenalties ? (
+          <div data-penalties-row="" className="flex items-end justify-center gap-2.5">
+            <div className="flex w-16 flex-col items-center gap-1">
+              <label
+                htmlFor={homePensId}
+                className="text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-fg-muted"
+              >
+                Straff
+                <span className="sr-only"> {home}</span>
+              </label>
+              <input
+                id={homePensId}
+                name="homePenalties"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={homePens}
+                onChange={(e) => setHomePens(e.target.value)}
+                aria-invalid={invalid('penalties') || undefined}
+                aria-describedby={describedBy('penalties')}
+                className={SCORE_INPUT}
+              />
+            </div>
+            <span
+              aria-hidden="true"
+              className="self-end pb-3 font-display text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-fg-muted"
+            >
+              straffar
+            </span>
+            <div className="flex w-16 flex-col items-center gap-1">
+              <label
+                htmlFor={awayPensId}
+                className="text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-fg-muted"
+              >
+                Straff
+                <span className="sr-only"> {away}</span>
+              </label>
+              <input
+                id={awayPensId}
+                name="awayPenalties"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={awayPens}
+                onChange={(e) => setAwayPens(e.target.value)}
+                aria-invalid={invalid('penalties') || undefined}
+                aria-describedby={describedBy('penalties')}
+                className={SCORE_INPUT}
+              />
+            </div>
+          </div>
+        ) : null}
 
         {/* Fel-lista: role="alert" annonseras direkt (fail loud), och fälten
             pekar hit via aria-describedby. Tom lista renderas inte (inget brus).

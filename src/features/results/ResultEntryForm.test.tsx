@@ -30,9 +30,11 @@ function scheduledMatch(): Match {
 }
 
 // En onSubmit som delegerar till den riktiga valideringen, så formuläret testas
-// mot det faktiska kontraktet (inte en attrapp som alltid säger ok).
+// mot det faktiska kontraktet (inte en attrapp som alltid säger ok). Stage skickas
+// med så slutspels-straffregeln (FIFA Art. 14) gäller för slutspelsmatcher.
 function realSubmit(match: Match) {
-  return (_matchId: string, entry: ResultEntry) => validateResultEntry(match.status, entry);
+  return (_matchId: string, entry: ResultEntry) =>
+    validateResultEntry(match.status, entry, match.stage);
 }
 
 describe('ResultEntryForm, tillgänglighet', () => {
@@ -148,6 +150,93 @@ describe('ResultEntryForm, lyckad inmatning', () => {
     );
     expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(3);
     expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toHaveValue(2);
+  });
+});
+
+// Straffläggning i slutspel (F1/penalties-pinnen, FIFA Art. 14). Straff-fälten
+// visas BARA för en slutspelsmatch som matas in som spelad med lika ordinarie
+// ställning, och submit:en bär då straffarna. Gruppspel visar dem aldrig.
+describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
+  function knockoutMatch(): Match {
+    return {
+      id: 'M73',
+      stage: 'round-of-32',
+      groupId: null,
+      homeTeamId: 'mex',
+      awayTeamId: 'rsa',
+      kickoff: '2026-07-01T19:00:00Z',
+      venue: 'Testarena',
+      result: null,
+      status: 'scheduled',
+    };
+  }
+
+  it('GRUPPSPEL: visar ALDRIG straff-fält, även vid lika ställning', () => {
+    render(
+      <ResultEntryForm
+        match={scheduledMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
+    expect(document.querySelector('[data-penalties-row]')).toBeNull();
+  });
+
+  it('SLUTSPEL: straff-fält dyker upp vid lika ställning (spelad), inte vid ledning', () => {
+    render(
+      <ResultEntryForm
+        match={knockoutMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
+    // Ledning 2-1: ingen straffläggning.
+    expect(document.querySelector('[data-penalties-row]')).toBeNull();
+
+    // Ändra till lika 1-1: straff-raden dyker upp.
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2' } });
+    expect(document.querySelector('[data-penalties-row]')).not.toBeNull();
+  });
+
+  it('SLUTSPEL: submit bär straffarna när ställningen är lika', () => {
+    const onSubmit = vi.fn(() => ({ ok: true }) as const);
+    render(<ResultEntryForm match={knockoutMatch()} teamsById={teamsById} onSubmit={onSubmit} />);
+    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
+    // Straff-fälten (synliga nu): hemma 4, borta 2.
+    const pensInputs = document.querySelector('[data-penalties-row]')!.querySelectorAll('input');
+    fireEvent.change(pensInputs[0], { target: { value: '4' } });
+    fireEvent.change(pensInputs[1], { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
+
+    expect(onSubmit).toHaveBeenCalledWith('M73', {
+      homeGoals: 1,
+      awayGoals: 1,
+      status: 'finished',
+      penalties: { homeGoals: 4, awayGoals: 2 },
+    });
+  });
+
+  it('SLUTSPEL: seedar straff-fälten från ett redan straff-avgjort resultat', () => {
+    const finished: Match = {
+      ...knockoutMatch(),
+      status: 'finished',
+      result: { homeGoals: 1, awayGoals: 1, penalties: { homeGoals: 5, awayGoals: 3 } },
+    };
+    render(
+      <ResultEntryForm match={finished} teamsById={teamsById} onSubmit={() => ({ ok: true })} />
+    );
+    const pensInputs = document.querySelector('[data-penalties-row]')!.querySelectorAll('input');
+    expect(pensInputs[0]).toHaveValue(5);
+    expect(pensInputs[1]).toHaveValue(3);
   });
 });
 
