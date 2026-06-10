@@ -165,7 +165,7 @@ describe('deriveDayTheme: dag -> dekorativ accent-hue', () => {
       );
     });
 
-    it('felmeddelandet pekar ut matchen och idt (felsökbart, inte tyst)', () => {
+    it('felmeddelandet pekar ut matchen och id:t (felsökbart, inte tyst)', () => {
       const teams = teamsMap();
       expect(() => deriveDayTheme([match('badmatch', 'x', null)], teams)).toThrow(/badmatch/);
     });
