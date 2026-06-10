@@ -190,7 +190,8 @@ describe('DailyMatchesView, hero-etikett: "Dagens match" vs matchens datum (#54)
   function featuredLabelText(): string | null {
     // Det framträdande kortet bär ett (tomt) data-highlight-attribut. Etiketten är
     // dess föregående syskon (<p> ovanför kortet i samma kolumn-div). Kortets rot ÄR
-    // en <div>, så vi tar dess FÖRÄLDER (kolumnen) och läser kolumnens första <p>.
+    // en <article> (MatchCard, data-match-card), så vi tar dess FÖRÄLDER (kolumnen)
+    // och läser kolumnens första <p>.
     const highlight = document.querySelector('[data-daily-hero] [data-match-card][data-highlight]');
     const column = highlight?.parentElement;
     const label = column?.querySelector('p');
