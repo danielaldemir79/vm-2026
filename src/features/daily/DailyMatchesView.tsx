@@ -223,27 +223,23 @@ export function DailyMatchesView() {
               data-daily-hero=""
               data-day-theme={dayThemeProps['data-day-theme']}
               data-day-theme-source={dayThemeProps['data-day-theme-source']}
-              className="relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
-              style={{
-                // Dags-temats hue (--vm-day-hue) injiceras via seamen så design-
-                // frontend kan väva in den i hero:ns dekor (gradienter/glow). I
-                // default-läget saknas variabeln och hero:n behåller T2:s ton.
-                ...dayThemeProps.style,
-                backgroundColor: 'var(--color-surface-raised)',
-                backgroundImage:
-                  'radial-gradient(110% 120% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 55%), radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--vm-gold) 12%, transparent), transparent 55%)',
-              }}
+              className="vm-daily-hero relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
+              // Dags-temats hue (--vm-day-hue) injiceras via seamen. Hero-dekoren
+              // (radiella ljus + sheen) byggs i .vm-daily-hero (tokens.css §6) och
+              // tonas mot hue:n när data-day-theme='active'. I default-läget saknas
+              // variabeln och dekoren faller på T2:s neutrala ton. Den dynamiska
+              // tonen lever BARA i background-image (dekor), aldrig i en text-/yt-
+              // token, så läsbarheten (WCAG AA) kan inte sänkas (kontrast-vakt).
+              style={dayThemeProps.style}
             >
               {/* Rörligt ljus-svep: ett brett, mjukt sken som långsamt drar över
-                  fonden (arena-strålkastare). Rent dekorativt, aria-hidden, och
-                  vm-hero-sheen stannar vid reducerad rörelse (index.css). */}
+                  fonden (arena-strålkastare). Rent dekorativt, aria-hidden.
+                  vm-hero-sheen driver animationen (index.css, stannar vid reducerad
+                  rörelse); vm-daily-hero-sheen bär själva gradienten (tonas mot
+                  dagens hue i active-läget, tokens.css §6). */}
               <div
                 aria-hidden="true"
-                className="vm-hero-sheen pointer-events-none absolute inset-0 -z-10 opacity-70"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(105deg, transparent 30%, rgb(var(--vm-glow-accent) / 0.10) 50%, transparent 70%)',
-                }}
+                className="vm-hero-sheen vm-daily-hero-sheen pointer-events-none absolute inset-0 -z-10 opacity-70"
               />
 
               <div className="flex flex-col gap-7 p-5 sm:p-7 lg:flex-row lg:items-stretch lg:gap-10 lg:p-8">
