@@ -5,6 +5,19 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T10 (issue #10): Copilot C10, fail-loud-light motståndare i lagets väg
+
+**Beslut (C10, TeamProfilePanel/`opponentName`):** När en match i lagets väg har ett `opponentId` som
+är ICKE-null men SAKNAS i `teamsById` (data-inkonsistens) visar panelen nu id-STRÄNGEN i stället för det
+maskerande `'Ej klart'`. Ett genuint `null`-motstånd (tomt slutspels-slot innan seedningen) behåller
+`'Ej klart'`. **Varför:** `'Ej klart'` betyder "motståndaren är obestämd än"; att återanvända samma text
+för ett trasigt uppslag DOLDE felet (såg ut som ett legitimt obestämt slot). Fail-loud-light: visa id:t så
+inkonsistensen syns för tittare OCH fångas vid review/test, utan att krascha vyn (KISS). Test:
+`TeamProfilePanel.test.tsx` C10-block (id-sträng visas vid miss, `null` visar fortsatt "Ej klart").
+**Spårbarhet:** intern UX/fail-loud-rule, ingen extern källa, spårbar via #10 + C10 + denna rad.
+
+---
+
 ## 2026-06-10 , T10 (issue #10): Copilot C8+C9, okänt lag ej klickbart + Escape-effekt på stabilt id
 
 **Beslut (C8, GroupTable):** Ett lagnamn i grupptabellen är klickbart (öppnar lagprofilen via
