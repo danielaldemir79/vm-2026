@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { BracketView } from './BracketView';
+import { BracketView, SlotRow } from './BracketView';
 import { ResultsProvider } from '../results/ResultsProvider';
+import type { BracketSlotState } from './derive-bracket';
 
 // Fixtures-miljö (ingen Supabase-env) => datakällan ger den verifierade VM 2026-
 // datan (alla 12 grupper + 104 matcher, alla scheduled). BracketView är en ren
@@ -116,6 +117,50 @@ describe('BracketView, GRUPPSPEL PÅGÅR (fixtures: alla matcher scheduled)', ()
     const scroll = document.querySelector('[data-bracket-scroll]');
     expect(scroll).not.toBeNull();
     expect(scroll).toHaveClass('overflow-x-auto');
+  });
+});
+
+// C10 (Copilot runda 3): möjliga-lag-chippets text/aria var alltid plural
+// ("möjliga"), så vid exakt 1 kandidat blev det grammatiskt fel ("1 möjliga
+// lag"). Böjs nu som matchCountLabel: "1 möjligt lag" / "n möjliga lag".
+describe('SlotRow, möjliga-lag-chippets böjning (C10)', () => {
+  // Bygg en 'possible'-slot med ett givet antal kandidater (bara fälten chippet
+  // läser; resten av BracketSlotState är irrelevant för den här raden).
+  function possibleSlot(candidateTeamIds: string[]): BracketSlotState {
+    return {
+      id: 'M73-home',
+      matchId: 'M73',
+      side: 'home',
+      stage: 'round-of-32',
+      nextSlotId: null,
+      resolution: 'possible',
+      label: '2:a grupp A',
+      teamId: null,
+      candidateTeamIds,
+    };
+  }
+
+  function renderSlot(slot: BracketSlotState) {
+    return render(
+      <ul>
+        <SlotRow slot={slot} teamsById={new Map()} isWinner={false} />
+      </ul>
+    );
+  }
+
+  it('SINGULAR: exakt 1 kandidat böjs "1 möjligt lag" (inte "1 möjliga lag")', () => {
+    renderSlot(possibleSlot(['A1']));
+    const chip = screen.getByText('1 möjligt lag');
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveAttribute('aria-label', '1 möjligt lag');
+    expect(screen.queryByText('1 möjliga lag')).toBeNull();
+  });
+
+  it('PLURAL: fler än 1 kandidat böjs "n möjliga lag"', () => {
+    renderSlot(possibleSlot(['A3', 'B3', 'C3', 'D3', 'F3']));
+    const chip = screen.getByText('5 möjliga lag');
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveAttribute('aria-label', '5 möjliga lag');
   });
 });
 

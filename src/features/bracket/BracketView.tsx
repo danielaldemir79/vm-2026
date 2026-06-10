@@ -60,6 +60,17 @@ function matchCountLabel(count: number): string {
 }
 
 /**
+ * Grammatiskt korrekt antal möjliga lag (C10, samma böjnings-mönster som
+ * matchCountLabel). "Lag" är ett neutrum-ord, så adjektivet böjs "möjligt" i
+ * singular och "möjliga" i plural: "1 möjligt lag" / "4 möjliga lag". En slot
+ * kan ha exakt 1 kvarvarande kandidat (t.ex. när alla utom ett alternativ är
+ * uteslutet), och då läses "1 möjliga lag" upp, grammatiskt fel.
+ */
+function possibleTeamsLabel(count: number): string {
+  return `${count} ${count === 1 ? 'möjligt' : 'möjliga'} lag`;
+}
+
+/**
  * Visnings-texten för en slot, beroende på dess tillstånd:
  *   - resolved: lagets namn (gissas aldrig, "Ej klart" om uppslaget saknar det).
  *   - possible/tbd: positions-etiketten ("1:a grupp E", "3:a A/B/C/D/F",
@@ -83,7 +94,9 @@ function slotText(slot: BracketSlotState, teamsById: ReadonlyMap<string, Team>):
  * Möjliga lag (under gruppspelet) visas som ett diskret antal ("4 möjliga"), så
  * raden inte blir textig men ändå kommunicerar att platsen inte är låst.
  */
-function SlotRow({
+// Exporterad för enhetstest av slot-rendering (möjliga-lag-chippets böjning,
+// C10). Renderas i produktion bara via MatchCard nedan.
+export function SlotRow({
   slot,
   teamsById,
   isWinner,
@@ -120,9 +133,11 @@ function SlotRow({
         <span
           className="shrink-0 rounded-pill border border-border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
           // aria-label gör antalet begripligt för skärmläsare (inte bara "4 möjliga").
-          aria-label={`${possibleCount} möjliga lag`}
+          // Böjs korrekt i singular/plural (C10): "1 möjligt lag" / "4 möjliga lag".
+          aria-label={possibleTeamsLabel(possibleCount)}
         >
-          {possibleCount} möjliga
+          {/* Visa hela böjda etiketten så chippet är grammatiskt rätt även vid 1. */}
+          {possibleTeamsLabel(possibleCount)}
         </span>
       ) : null}
     </li>
