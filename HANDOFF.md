@@ -5,6 +5,76 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , HOTFIX #37 KLAR - PR #38 väntar på autonom merge
+
+**Branch:** `feature/hotfix-37-fixtures-i-produktion` @ HEAD `6381761`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/38 mot `develop` (Closes #37, state: OPEN)
+**Board:** issue #37 i "In Review" (korrekt). Dirigenten stänger issue #37 MANUELLT och flyttar kort #37 till Done EFTER merge.
+
+**Autonomt läge: Daniel är borta ~1 vecka.** Full fullmakt: dirigenten mergar till develop och betar av hela listan.
+
+**KLART med bevis (SHA + verifiering):**
+- `69ccbae` - senior-dev: LIVE_READY-gate + tester (355 tester gröna, build/lint/format rent)
+- `6381761` - Copilot C1+C2 doc-fixar: tvåstegs-gate beskriven i patterns.md + stavfel (HEAD)
+- Verifiering (dirigenten + reviewer oberoende): 355 tester gröna, build/lint/format rent
+- Reviewern mutationstestade guard + injektion (LIVE_READY-flip -> guard-test RÖTT, bevisat)
+- Alla 4/5 acceptanskriterier bockade i issue #37 (kriterium 5 bockas av dirigenten efter merge)
+- Lokal panel: 1 runda (F1 avvisad nit, F2 pinnad till T14)
+- Copilot: 2 rundor (2->1->0 fynd, exit nådd), sista doc-fyndet åtgärdat i journalist-steget
+
+**Journalist-åtgärd (Copilot-fynd ID 3384908301, decisions.md):** T7:s C5-C8-beslut låg direkt
+under HOTFIX #37-rubriken, vilket blandade ihop de två besluts-spåren. Åtgärd: separator + egen
+rubrik `## 2026-06-10 , T7 (issue #7): Copilot-review R2 (C5-C8)` tillagt ovanför T7-blocket.
+
+**Rotorsak (kontext):** Supabase-env i Cloudflare (satt 2026-06-09 inför T14) flippade env-gaten
+till live-läge medan klienten är fail-loud-stub -> produktionen visade fel-alerts sedan 9/6.
+Nu: fixtures i produktion tills T14 flippar LIVE_READY.
+
+**PINNADE punkter (bär framåt):**
+- **T14-pin UTÖKAD:** När live-klienten är byggd i T14, gör ALLA fyra stegen i SAMMA ändring:
+  (1) Sätt `LIVE_READY = true` i `src/data/data-source.ts`.
+  (2) Ta bort interims-warn (den `console.warn` med "LIVE_READY=false ... byggs i T14").
+  (3) Uppdatera live-felvägstester (de som assertar fixtures-fallback vid env+ej-live-ready).
+  (4) Lägg F2-assertionen: inget test refererar strängen "LIVE_READY=false" (pinnad av lokal panel).
+  Guard-testet BRYTS medvetet vid flip - så stegen inte glöms.
+- **F2/T8-pin (ägare design-frontend):** success-token == accent #0e7a44 i ljust tema. T8 ger success en distinkt AA-klarande ton.
+- **F1/penalties-pin (T9, ägare senior-developer):** reducern hanterar inte `MatchResult.penalties`. T9 fixar. Acceptanstest: redigera finished slutspelsmatch med straff, penalties bevaras.
+- **T14-pin (Supabase):** projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad, Backlog):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+
+**"Behöver Daniel"-kö (han är borta):**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga och beta av hela task-listan autonomt.
+>
+> Om PR #38 (HOTFIX #37, feature/hotfix-37-fixtures-i-produktion) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 38 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #37 manuellt (`gh issue close 37`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #37 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar matchdata, inga alerts.
+>
+> Om PR #38 REDAN mergad:
+> T1-T7 + T4b + HOTFIX #37 är klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: #8 (T8, Dynamiskt dags-tema)** - F2/T8-pin gäller: success-token == accent #0e7a44 i ljust tema, T8 ger success en distinkt AA-klarande ton, ägare design-frontend.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+>
+> Därefter (i ordning, autonomt): T9 (F1/penalties-pin!), T10, T11, T12, T13 - alla Fas 1.
+> Sedan T14 (Supabase live - projekt kmzhyblzxangpxydufve, anon-auth på, T14-pin UTÖKAD gäller, RLS per auth.uid()+rum).
+> Därefter Fas 2 (T15-T20), Fas 3 (T21-T26).
+>
+> Bär framåt (alla tasks):
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion. Se HOTFIX-sektionen ovan.
+> - **F2/T8-pin:** success-token == accent-grön (#0e7a44) i ljust tema. T8 ger success en distinkt AA-ton, ägare design-frontend.
+> - **F1/penalties-pin (T9):** reducern hanterar inte penalties. T9 fixar.
+> - **Supabase:** projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten.
+> - **#35 (arena/stad, Backlog):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35). Notifiera Daniel vid hemkomst.
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T7 KLAR - PR #36 väntar på autonom merge
 
 **Branch:** `feature/T7-daglig-matchvy` @ HEAD `d88b8eb`

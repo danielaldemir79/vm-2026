@@ -34,6 +34,10 @@ användarens ansikte.
 Guard-testet `LIVE_READY ... är false` i `data-source.test.ts` BRYTS medvetet när konstanten flippas,
 så de två stegen inte glöms.
 
+---
+
+## 2026-06-10 , T7 (issue #7): Copilot-review R2 (C5-C8)
+
 **Beslut (C5, reduced-motion stänger AV hero-animationerna helt):** Vid `prefers-reduced-motion: reduce`
 nollas de dekorativa hero-animationerna EXPLICIT med `animation: none` på `.vm-hero-sheen` och
 `.vm-live-dot` (`src/index.css`), utöver den svepande `animation-duration: 0.01ms`-regeln.
