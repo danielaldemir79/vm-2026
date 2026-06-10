@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getDataSource, getDataSourceMode, isSupabaseConfigured } from './data-source';
+import { getDataSource, getDataSourceMode, isSupabaseConfigured, LIVE_READY } from './data-source';
 import { createSupabaseDataSource } from './supabase-client';
 import * as supabaseClient from './supabase-client';
 import { fixtureMatches, fixtureTeams } from './fixtures';
@@ -15,6 +15,14 @@ const liveEnv = {
 function envWith(overrides: Partial<ImportMetaEnv>): ImportMetaEnv {
   return overrides as ImportMetaEnv;
 }
+
+describe('LIVE_READY, hotfix-grindens skarpläge (#37)', () => {
+  it('är false tills T14 byggt live-klienten (annars tänder produktion den kastande stubben)', () => {
+    // Detta lås är medvetet: när T14 flippar LIVE_READY ska detta test brytas
+    // SAMTIDIGT som interims-varningen tas bort, så de två stegen inte glöms.
+    expect(LIVE_READY).toBe(false);
+  });
+});
 
 describe('isSupabaseConfigured, miljö-detektering', () => {
   it('är false när BÅDA env-variablerna saknas (fixtures-läge)', () => {
@@ -55,7 +63,10 @@ describe('getDataSourceMode', () => {
     expect(getDataSourceMode(envWith({}))).toBe('fixtures');
   });
 
-  it('rapporterar live när env finns', () => {
+  it('rapporterar fixtures när env FINNS men LIVE_READY är false (interims-läget #37)', () => {
+    // Avgörande: läget måste spegla gaten, inte bara env. Annars hade UI:t märkt
+    // demo-data som "live" medan datakällan i själva verket är fixtures.
+    // Standarden (LIVE_READY=false) gäller, så ingen liveReady-injektion här.
     expect(
       getDataSourceMode(
         envWith({
@@ -63,7 +74,13 @@ describe('getDataSourceMode', () => {
           VITE_SUPABASE_ANON_KEY: 'anon-key',
         })
       )
-    ).toBe('live');
+    ).toBe('fixtures');
+  });
+
+  it('rapporterar live när env finns OCH LIVE_READY är true', () => {
+    // Live-grenen verifieras genom att injicera liveReady=true (KISS, ingen
+    // global konstant att flippa).
+    expect(getDataSourceMode(liveEnv as ImportMetaEnv, true)).toBe('live');
   });
 });
 
@@ -79,7 +96,7 @@ describe('getDataSource, fixtures-läge (env saknas)', () => {
 
     // Fail-loud: fixtures-läget ska SYNAS så övergången till live inte glöms.
     expect(warn).toHaveBeenCalledOnce();
-    expect(warn.mock.calls[0][0]).toContain('FIXTURES-läge');
+    expect(warn.mock.calls[0][0]).toContain('Supabase-env saknas');
 
     // Källan returnerar den typade fixtures-datan.
     await expect(ds.getTeams()).resolves.toEqual(fixtureTeams);
@@ -87,20 +104,43 @@ describe('getDataSource, fixtures-läge (env saknas)', () => {
   });
 });
 
-describe('getDataSource, live-läge (env finns)', () => {
+describe('getDataSource, interims-läget (env satt men LIVE_READY false, #37)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('väljer live-vägen UTAN fixtures-varning när env finns', () => {
+  it('kör FIXTURES (inte den kastande stubben) och varnar att klienten väntar på T14', async () => {
+    // Detta är hela hotfixen #37: i produktion är Supabase-env satt (Cloudflare),
+    // men supabase-client.ts är fortfarande en kastande stub. Med default
+    // (LIVE_READY=false) MÅSTE gaten falla till fixtures, annars ser Daniels
+    // vänner fel-alerts i alla vyer.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const ds = getDataSource(
-      envWith({
-        VITE_SUPABASE_URL: 'https://x.supabase.co',
-        VITE_SUPABASE_ANON_KEY: 'anon-key',
-      })
-    );
+    const ds = getDataSource(liveEnv as ImportMetaEnv);
+
+    // En EGEN varning som skiljer interims-läget från "env saknas".
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toContain('LIVE_READY=false');
+
+    // Fixtures-data, INTE ett kast: produktion visar matcher, inte fel.
+    await expect(ds.getTeams()).resolves.toEqual(fixtureTeams);
+    await expect(ds.getMatches()).resolves.toEqual(fixtureMatches);
+  });
+});
+
+describe('getDataSource, live-läge (env finns OCH LIVE_READY true)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Live-grenen tänds genom att injicera liveReady=true (default är false sedan
+  // #37). Det håller testet enkelt (KISS): ingen global konstant att flippa,
+  // bara en parameter, och live-vägens beteende verifieras oförändrat.
+
+  it('väljer live-vägen UTAN fixtures-varning när env finns och live är redo', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const ds = getDataSource(liveEnv as ImportMetaEnv, true);
 
     // Ingen fixtures-fail-loud i live-läge, den hör bara hemma i fixtures-vägen.
     expect(warn).not.toHaveBeenCalled();
@@ -110,12 +150,7 @@ describe('getDataSource, live-läge (env finns)', () => {
   });
 
   it('live-källan fail loud:ar vid anrop före T14 (kastar, inte tyst tom data)', async () => {
-    const ds = getDataSource(
-      envWith({
-        VITE_SUPABASE_URL: 'https://x.supabase.co',
-        VITE_SUPABASE_ANON_KEY: 'anon-key',
-      })
-    );
+    const ds = getDataSource(liveEnv as ImportMetaEnv, true);
 
     // Stubben ska KASTA (inte returnera tom array) så ett för tidigt live-läge
     // upptäcks, inte maskeras som ett giltigt tomt svar.
@@ -127,7 +162,7 @@ describe('getDataSource, live-läge (env finns)', () => {
     // getGroups/getMatches. Nu memoiseras promisen, så fabriken körs en gång.
     const factory = vi.spyOn(supabaseClient, 'createSupabaseDataSource');
 
-    const ds = getDataSource(liveEnv as ImportMetaEnv);
+    const ds = getDataSource(liveEnv as ImportMetaEnv, true);
 
     // Flera anrop på samma instans (de fail loud:ar, men init ska bara ske en gång).
     await Promise.allSettled([ds.getTeams(), ds.getGroups(), ds.getMatches(), ds.getTeams()]);

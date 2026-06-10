@@ -46,8 +46,10 @@ describe('ResultEntryView, rendering + a11y', () => {
 
 describe('ResultEntryView, fel-väg (fail loud)', () => {
   it('visar ett fel-meddelande när källan kastar (live-stub före T14)', async () => {
+    // liveReady=true driver LIVE-grenen (stubben som kastar). Produktion (#37)
+    // använder defaulten false, så env satt utan byggd klient ger fixtures.
     render(
-      <ResultsProvider env={liveEnv()}>
+      <ResultsProvider env={liveEnv()} liveReady={true}>
         <ResultEntryView />
       </ResultsProvider>
     );
