@@ -45,6 +45,8 @@ scroll vid 280) och i båda teman.
 text-buren/färg-oberoende, `SimulationBanner.test.tsx` oförändrad). Tokens i `tokens.css` (§
 SIM-TON + §8), wiring i `App.tsx`.
 
+**Beslut (sim-overlayt är medvetet icke-persistent):** Sim-läget nollställs vid sidladdning. En PWA-omladdning (eller "Återställ allt") ger alltid tillbaka den riktiga datan. Beteendet är korrekt och avsiktligt: sandlådan ska vara lätt att lämna och får aldrig riskera att hypotetiska resultat förväxlas med sparad verklig data efter en session.
+
 ---
 
 ## 2026-06-10 , T12 (issue #12): What-if-simulatorn = hypotetiskt overlay ovanpå den delade storen

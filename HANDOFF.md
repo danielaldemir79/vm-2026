@@ -5,6 +5,69 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T12/#12 (What-if-simulator) KLAR - PR #47 väntar på merge
+
+**Branch:** `feature/T12-whatif` @ HEAD `411beb8`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/47 mot `develop` (Closes #12, state: OPEN)
+**Board:** issue #12 i "In Review" (korrekt). Dirigenten stänger issue #12 MANUELLT och flyttar kort #12 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt att merga, förbättra brister och mata på nya tasks.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `deab609` - overlay-arkitektur + apply-simulation + sim-store + SimulationBanner + 21 tester
+- `c43aeee` - docs (senior-developer + design-frontend)
+- `d1c85ee` - SimulationFrame, violett app-global lägets-markering (design-frontend)
+- `177fb4e` - docs AA-beslut (design-frontend)
+- `99b8637` - Copilot C1: lokal stacking-kontext på sim-ramen
+- `973c6d3` - Copilot C2+C3: enter/exitSimulation idempotenta
+- `411beb8` - Copilot C4: en live region, badge aria-hidden (HEAD)
+
+**Verifiering (dirigenten):** 609 tester gröna, build/lint/format rent. Copilot 3 rundor, runda 3 = 2 triviala fynd (C5 avvisad: "Sim-seamen" korrekt svensk bestämd form; C6 journalist-uppgift = slug-fix i patterns.md). Reviewern probe-bevisade isoleringen + sabotage-testade skyddsräckena.
+
+**Journalist-åtgärder (denna session):**
+- **C6/patterns.md rad ~622:** rubrik-slug rättad - mellanslag efter "markering-" borttaget.
+- **F1/decisions.md:** lagt till besluts-rad om att sim-overlayt är medvetet icke-persistent (sidladdning återställer till riktig data).
+
+**Alla 4/4 acceptanskriterier bockade i issue #12** (journalisten 2026-06-10).
+
+**PINNADE punkter (oförändrade):**
+- **T14-pin UTÖKAD:** flippa `LIVE_READY = true` + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion (inget test refererar "LIVE_READY=false"). Guard-testet BRYTS medvetet vid flip. Projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn (3 dagar framåt) tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista. Alternativ: (a) visa meddelande "turneringen avslutad", (b) ankra fönstret till sista speldagen.
+- **FIFA-ranking juni-uppdatering:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - om den ska speglas: ändra rank-värden i källfilen + `npm run gen:team-profiles`.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` i `memory/lessons/senior-developer.md` har nått Förekomst 3 (T4 + T8 + T9). Typ: korsar flera agenter (reviewer + senior-developer) -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` i `memory/lessons/journalist.md` har nått Förekomst 3 (T7 + HOTFIX #37 + T8). Typ: agent-beteende (journalist) -> permanent regel i journalistens fil. Väntar Daniels godkännande.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
+>
+> Om PR #47 (T12/#12, feature/T12-whatif) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 47 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #12 manuellt (`gh issue close 12`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #12 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar "SIMULERINGSLÄGE"-banner + violett ram när sim-läget aktiveras, att tabell/träd ändras live, och att "Återställ allt" ger tillbaka riktig data. Skicka demo till Daniel.
+>
+> Om PR #47 REDAN mergad:
+> T1-T12 + T4b + HOTFIX #37 + T27/#39 + T28/#42 + T10 + T11 är klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: T13 (#13)** - "Fas 1-deploy + installation/onboarding + offline": installerbar PWA med ikon, onboarding-tour, offline-cache-strategi, prod-deploy. Kolla issue-bodyn för fullständigt scope. Beror på T1 + T7 (båda klara). Därefter T14 (Supabase live, T14-pin UTÖKAD).
+>
+> Bär framåt (alla tasks):
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion. Projekt kmzhyblzxangpxydufve.
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35), #39-F1-produktbeslut, FIFA-ranking-juni-uppdatering, 2 befordringar (Förekomst 3, väntar Daniels godkännande).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T11/#11 (Vad krävs-kalkylator) KLAR - PR #46 väntar på merge
 
 **Branch:** `feature/T11-vad-kravs` @ HEAD `4400a6e`
