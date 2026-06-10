@@ -5,6 +5,36 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , #39 (T27) senior-developer: resultatinmatning, stabilt kolumn-grid + 3-dagars fönster
+
+**Beslut (stabil kolumn-layout):** ResultEntryForm-kortets kropp gick från en flex-layout med
+`flex-1`-lag-kolumner till ett CSS-GRID med fasta/proportionella spår: bara KONTROLL-spåret är
+flexibelt (`minmax(0,1fr)`), score-blocket (hemma-ruta / "mot" / borta-ruta) sitter i auto-spår med
+IDENTISK bredd på varje kort. Lagnamnen trunkeras (`truncate`, ellipsis) inom rut-bredden, fullt namn
+via `title` (+ labelns text för skärmläsare, "(hemma)"/"(borta)"-suffixet flyttat till `sr-only` så det
+inte konkurrerar om den trunkerade bredden).
+**Varför:** Daniels mobil-feedback (#39): olika långa lagnamn knuffade poängrutorna i sidled kort för
+kort, och namn höggs av fult. Med `flex-1` ärver kolumnbredden innehållet, så rutorna kunde aldrig
+linjera mellan kort. Ett grid där bara kontroll-spåret är flexibelt låser score-kolumnerna på samma
+plats oavsett namnlängd. Grundlayouten (grid-spåren) ägs av senior-dev; design-frontend finjusterar
+spår/typografi via seamen `data-result-card-body`. Ingen horisontell overflow 280px (vikbar) -> desktop.
+
+**Beslut (3-dagars fönster + expandera):** Inmatningslistan visar default bara matcher inom de närmaste
+3 SVENSKA kalenderdagarna; en tillgänglig "Visa alla matcher (N dolda)"-knapp (`aria-expanded`,
+`aria-controls`) fäller ut hela listan, "Visa färre" fäller ihop. ANKARDAGEN = idag om turneringen
+pågår, annars PREMIÄRDAGEN (idag före första matchen). Ren funktion `windowMatches(matches, now)` i
+`result-window.ts`, återanvänder `localDateKey` från features/daily (DRY, EN sanning för svensk-dag-
+härledningen, off-by-one-säker). WINDOW_DAYS = 3.
+**Varför:** Hela VM:t är 104 matcher = en orimligt lång lista (Daniels feedback). Default-fönstret håller
+listan kort utan att gömma data (allt nås via expandera). Premiär-ankringen följer samma intuition som
+den dagliga vyns `initialDayIndex` (visa premiären innan turneringen börjat, inte ett tomt fönster runt
+"idag"). Edge-fall källtestade i `result-window.test.ts`: ej börjad, slutet (< 3 dagar kvar), allt inom
+fönstret (ingen knapp), vilodag i fönstret (kalenderdagar räknas, inte matcher), tom indata, ogiltig
+kickoff (fail loud via localDateKey). Detta är en UX-/produkt-regel (ingen extern auktoritativ källa att
+källhänvisa), spårbar via #39 + denna rad.
+
+---
+
 ## 2026-06-10 , T8 (issue #8) design-frontend: dags-tonen vävd in i heron + T8-PIN löst (success-ton)
 
 **Beslut (T8-PIN LÖST, success får en egen AA-ton i ljust tema):** I ljust tema var
