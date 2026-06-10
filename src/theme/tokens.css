@@ -20,8 +20,11 @@
    WCAG AA (verifierat på dessa slutvärden, se handoff Verification):
    - Brödtext (fg) mot bg/surface/surface-raised: 12.6:1 - 17.9:1 i båda teman.
    - Dämpad text (fg-muted) klarar AA som NORMAL text (>= 4.5:1) i båda teman.
-   - Accent/guld/success/danger mot ytor: >= 3:1 (stor text / UI-komponenter),
-     i ljust tema klarar accenten dessutom AA som normal text (5.4:1).
+   - Accent/guld/danger mot ytor: >= 3:1 (stor text / UI-komponenter), i ljust
+     tema klarar accenten dessutom AA som normal text (5.4:1).
+   - success har en EGEN ton i båda teman (T8-PIN, skild från accent): i ljust
+     tema teal-grön #0f766e som klarar AA som normal text (>= 4.97:1 mot ytorna
+     den används på), i mörkt tema mintgrön #5ad1a0 (7.4:1 - 9.9:1 mot ytorna).
    ========================================================================== */
 
 /* -----------------------------------------------------------------------------
@@ -103,8 +106,16 @@
   --vm-accent: #0e7a44;
   --vm-accent-fg: #ffffff;
 
-  /* Status: AA-säkra mörka toner för ljus yta. */
-  --vm-success: #0e7a44;
+  /* Status: AA-säkra mörka toner för ljus yta.
+     success = djup teal-grön (T8-PIN): tidigare var success === accent (#0e7a44)
+     i ljust tema, så de två rollerna var visuellt OMÖJLIGA att skilja (T5/T7-pin).
+     Nu en egen ton som (a) skiljer sig tydligt från accentens skogsgrön (hue 175
+     mot 150, deltaE76 ~28, en omisskännlig teal-skiftning), (b) fortfarande läses
+     som positivt/grönt, (c) klarar WCAG AA på ALLA ytor den faktiskt används på:
+     - bg-success med text-bg (#f1f5f0) ovanpå (SwatchGrid): 4.97:1 (normal text).
+     - success som textfärg på vit yta / på fond #f1f5f0: 5.47:1 / 4.97:1.
+     Värdena är UPPMÄTTA (relativ luminans), inte antagna (decisions.md T8-PIN). */
+  --vm-success: #0f766e;
   --vm-warning: #8a5a05;
   --vm-danger: #c4302c;
 
