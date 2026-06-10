@@ -28,8 +28,10 @@ describe('formatDayHeading / formatDayShort, läsbar svensk dag-rubrik', () => {
 
   it('ger en full svensk dag-rubrik UTAN årtal (hero-etiketten, #54)', () => {
     const heading = formatDayHeadingNoYear('2026-06-11');
-    // "torsdag 11 juni" (versaliseras av CSS i vyn), aldrig årtalet.
-    expect(heading.toLowerCase()).toBe('torsdag 11 juni');
+    // "torsdag 11 juni" (versaliseras av CSS i vyn), aldrig årtalet. Asserta
+    // delsträngar (ICU-versioner kan skilja i interpunktion/mellanslag), inte exakt match.
+    expect(heading.toLowerCase()).toContain('torsdag');
+    expect(heading.toLowerCase()).toContain('11 juni');
     expect(heading).not.toContain('2026');
   });
 
