@@ -44,7 +44,7 @@ T1-T13 + hotfix #37 + T27/#39 + T28/#42 + T4b är klara och mergade (eller vänt
 - **FIFA-ranking juni-uppdatering:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - om den ska speglas: ändra rank-värden i källfilen + `npm run gen:team-profiles`.
 - **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` i `memory/lessons/senior-developer.md` har nått Förekomst 3 (T4 + T8 + T9). Typ: korsar flera agenter (reviewer + senior-developer) -> regel i `memory/README.md`. Väntar Daniels godkännande.
 - **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` i `memory/lessons/journalist.md` har nått Förekomst 3 (T7 + HOTFIX #37 + T8). Typ: agent-beteende (journalist) -> permanent regel i journalistens fil. Väntar Daniels godkännande.
-- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst. Autonomt bygge fortsätter pa develop med T14.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst. Autonomt bygge fortsätter på develop med T14.
 
 **FORTSÄTTNINGS-PROMPT (autonom session):**
 > Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
@@ -58,10 +58,10 @@ T1-T13 + hotfix #37 + T27/#39 + T28/#42 + T4b är klara och mergade (eller vänt
 > Om PR #49 REDAN mergad:
 > Fas 1 (T1-T13 + hotfix + T27/#39 + T28/#42 + T4b) är komplett och mergad mot develop. Release-gränsen (develop -> main + release-cleanup-skillen) väntar Daniels hemkomst-go - kör INTE den autonomt.
 > Plocka nästa task från boarden.
-> **Nästa task: T14 (#14, hög-risk: Supabase/auth/RLS -> bredare review-panel)** - "Live-data via Supabase": flippa LIVE_READY, koppla riktig auth/Realtime/RLS, koppla Supabase-synk pa online-seamen fran T13. Projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten. Kolla issue-bodyn för fullständigt scope.
+> **Nästa task: T14 (#14, hög-risk: Supabase/auth/RLS -> bredare review-panel)** - "Live-data via Supabase": flippa LIVE_READY, koppla riktig auth/Realtime/RLS, koppla Supabase-synk på online-seamen från T13. Projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten. Kolla issue-bodyn för fullständigt scope.
 >
 > Bär framåt (alla tasks):
-> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion + koppla riktig Supabase-synk pa online-seamen. Projekt kmzhyblzxangpxydufve.
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion + koppla riktig Supabase-synk på online-seamen. Projekt kmzhyblzxangpxydufve.
 > - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
 > - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
 > - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
