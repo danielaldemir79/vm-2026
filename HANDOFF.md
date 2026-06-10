@@ -5,6 +5,63 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T28/#42 KLAR - PR #44 väntar på merge
+
+**Branch:** `feature/T28-matchlista-kontext` @ HEAD `b7ad6c2`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/44 mot `develop` (Closes #42, state: OPEN)
+**Board:** issue #42 i "In Review" (korrekt). Dirigenten stänger issue #42 MANUELLT och flyttar kort #42 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt att merga, förbättra brister och mata på nya tasks.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `c80ca4f` - dag-rubriker + kontext-rad + dubblerad toggle + fokus-flytt (senior-developer)
+- `760ed49` - decisions (senior-developer)
+- `48cb2c1` - sticky dag-rubrik + klock-ikon + steg-chip (design-frontend)
+- `b7ad6c2` - decisions kontrast-tabell (design-frontend, HEAD)
+
+**Journalist-åtgärd (Copilot-fynd ID 3386311706):** `docs/decisions.md` rad 64, "Toggeln" rättad till "Togglen" (konsekvent med övrig text i blocket).
+
+**Verifiering (dirigenten oberoende):** 501 tester gröna (49 filer), build/lint/format rent. Lokal panel: inga blockerande (F1 nit avvisad). Copilot: 1 runda, 1 trivialt fynd = exit nådd.
+
+**Alla 6/6 acceptanskriterier bockade i issue #42** (journalisten 2026-06-10).
+
+**PINNADE punkter (bär framåt, oförändrade):**
+- **T14-pin UTÖKAD:** flippa `LIVE_READY = true` + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion (inget test refererar "LIVE_READY=false"). Guard-testet BRYTS medvetet vid flip. Projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn (3 dagar framåt) tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+
+**"Behöver Daniel"-kö (han är borta):**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista. Alternativ: (a) visa meddelande "turneringen avslutad", (b) ankra fönstret till sista speldagen.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` i `memory/lessons/senior-developer.md` har nått Förekomst 3 (T4 + T8 + T9). Typ: korsar flera agenter (reviewer + senior-developer) -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` i `memory/lessons/journalist.md` har nått Förekomst 3 (T7 + HOTFIX #37 + T8). Typ: agent-beteende (journalist) -> permanent regel i journalistens fil. Väntar Daniels godkännande.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
+>
+> Om PR #44 (T28/#42, feature/T28-matchlista-kontext) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 44 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #42 manuellt (`gh issue close 42`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #42 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar dag-rubriker + kontext-rad + dubblerad toggle i matchlistan. Skicka demo till Daniel.
+>
+> Om PR #44 REDAN mergad:
+> T1-T9 + T4b + HOTFIX #37 + T27/#39 + T28/#42 är klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: T10 (#10)** - kolla issue-bodyn för scope. Därefter T11-T13, sedan T14 (Supabase live, kmzhyblzxangpxydufve, T14-pin UTÖKAD gäller).
+>
+> Bär framåt (alla tasks):
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion. Projekt kmzhyblzxangpxydufve.
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35), #39-F1-produktbeslut, 2 BEFORDRINGAR (reviewer + journalist, båda Förekomst 3, väntar Daniels godkännande).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T9/#9 KLAR - PR #43 väntar på autonom merge
 
 **Branch:** `feature/T9-slutspelstrad` @ HEAD `3c1afe6`
