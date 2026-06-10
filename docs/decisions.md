@@ -5,7 +5,7 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
-## 2026-06-10 , HOTFIX (issue #37): datakälle-gaten kräver `LIVE_READY` utöver env
+## 2026-06-10 , HOTFIX (issue #37): datakälla-gaten kräver `LIVE_READY` utöver env
 
 **Beslut:** Gaten i `src/data/data-source.ts` väljer live-källan bara när BÅDA villkoren är sanna:
 (1) Supabase-env satt (`isSupabaseConfigured`) OCH (2) en in-kod-konstant `LIVE_READY === true`.
