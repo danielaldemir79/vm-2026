@@ -50,9 +50,14 @@ export function TeamNameButton({ teamId, name, className, children }: TeamNameBu
       data-team-profile-trigger=""
       data-team-id={teamId}
       // Bas-semantik: en in-line knapp som ärver text-stilen (ingen knapp-chrome),
-      // så den smälter in i matchkortet/tabellen. Design-frontend lägger hover-/
-      // fokus-affordansen (t.ex. understruken på hover) ovanpå via klass-haken.
-      className={`cursor-pointer bg-transparent p-0 text-left text-inherit ${className ?? ''}`}
+      // så den smälter in i matchkortet/tabellen (tabellernas lugn bevaras).
+      // AFFORDANS (design, T10): en SUBTIL prickad underline som bara tänds på
+      // hover/fokus signalerar "klickbart" utan att skrika i vila. underline-offset
+      // håller strecket luftigt under baslinjen, decoration-color = fg-muted så det
+      // är diskret. Vid tangentbords-fokus tar :focus-visible-ringen (index.css)
+      // över som primär affordans, men understrykningen tänds även där (samma regel),
+      // så mus- och tangentbordsanvändare får samma signal.
+      className={`cursor-pointer rounded-sm bg-transparent p-0 text-left text-inherit underline-offset-[3px] decoration-fg-muted/60 decoration-dotted hover:underline focus-visible:underline ${className ?? ''}`}
     >
       {children ?? name}
     </button>

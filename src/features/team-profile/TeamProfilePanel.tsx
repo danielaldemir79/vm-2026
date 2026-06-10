@@ -23,14 +23,19 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import type { Match, Team } from '../../domain/types';
 import { useResultsStore } from '../results/results-context';
 import { stageLabel } from '../daily/match-display';
 import { formatKickoffTime, formatDayShort } from '../daily/format-datetime';
 import { localDateKey } from '../daily/group-matches-by-day';
 import { TeamFlag } from '../daily/TeamFlag';
+import { hueFromCode } from '../daily/team-hue';
+import { springs, transitions } from '../../motion';
 import { deriveTeamProfile, type TeamProfileMatch } from './derive-team-profile';
 
 export interface TeamProfilePanelProps {
@@ -66,7 +71,7 @@ function PathRow({
     <li
       data-profile-path-match={match.id}
       data-profile-path-stage={match.stage}
-      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b border-border/50 py-2 last:border-b-0"
+      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md px-2 py-2 transition-colors hover:bg-surface-raised"
     >
       <span className="min-w-[5.5rem] text-xs font-semibold uppercase tracking-wide text-fg-muted">
         {stageLabel(match)}
@@ -76,11 +81,14 @@ function PathRow({
         <span className="font-semibold">{opponent}</span>
         {isHome ? ' (hemma)' : ''}
       </span>
-      <span className="ml-auto text-xs text-fg-muted">
+      <span className="ml-auto text-xs tabular-nums text-fg-muted">
         {formatDayShort(dayKey)} {time}
       </span>
       {result ? (
-        <span data-profile-path-result="" className="w-full text-sm font-semibold tabular-nums">
+        <span
+          data-profile-path-result=""
+          className="w-full pt-0.5 text-sm font-bold tabular-nums text-accent"
+        >
           {result}
         </span>
       ) : null}
@@ -107,6 +115,15 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
   const { teams, groups, matches } = useResultsStore();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  // Rörelse-grind (a11y, WCAG 2.3.3): vi reser bara panelen (y/scale) när motion-
+  // preferensen EXPLICIT är "tillåt rörelse" (=== false). useReducedMotion kan ge
+  // null på första renderingen innan media-frågan lästs; behandlar vi då null som
+  // "tillåt rörelse" startar panelen med en transform som en reduced-motion-användare
+  // sen ser blinka bort (verifierat: en 1-frames y=28-flash). Genom att kräva ett
+  // EXPLICIT false startar vi i det säkra läget (bara opacitet) tills preferensen är
+  // känd, så en reduced-motion-användare aldrig ser en resa. Samma kontrakt som
+  // Slide/Spring-primitiverna (initial = bara opacitet vid reducerad rörelse).
+  const motionEnabled = useReducedMotion() === false;
 
   const teamsById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const team = openTeamId === null ? undefined : teamsById.get(openTeamId);
@@ -181,16 +198,33 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
   const headingId = 'lagprofil-rubrik';
   const { fifaRanking, starPlayers, trivia, group, matches: pathMatches } = profile;
 
+  // Lagets signaturfärg (samma hue som TeamFlag-discen, en sanning via team-hue) väver
+  // in i hero-bandets DEKOR via --vm-profile-hue. Bara ett tal -> aldrig en text-/yt-
+  // färg (kontrast-vakten i tokens.css §7), så profilens ton blir distinkt per lag utan
+  // att röra någon text-kontrast.
+  const heroStyle = { '--vm-profile-hue': hueFromCode(team!.code) } as CSSProperties;
+
+  // In-animation: overlayn tonar in, panelen reser sig mjukt (spring) underifrån. Vid
+  // reducerad rörelse (eller innan preferensen är känd) nollas resan helt (bara
+  // opacitet), så a11y-kontraktet hålls (WCAG 2.3.3). Ingen ut-animation (panelen
+  // villkorsrenderas bort direkt vid stäng), det håller stäng-flödet enkelt och
+  // testbart (KISS).
+  const panelInitial = motionEnabled ? { opacity: 0, y: 28, scale: 0.98 } : { opacity: 0 };
+  const panelAnimate = motionEnabled ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1 };
+
   return (
     // Overlay: täcker skärmen, klick på bakgrunden (men inte på panelen) stänger.
-    // Den visuella bakgrunds-tonen/blur:en lämnas till design-frontend via klass-haken.
-    <div
+    // Dimning (color-mix) + blur (.vm-profile-overlay i tokens.css) lyfter fram modalen.
+    <motion.div
       data-team-profile-overlay=""
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-6"
-      style={{ backgroundColor: 'color-mix(in srgb, var(--color-bg) 72%, transparent)' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={transitions.quick}
+      className="vm-profile-overlay fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-6"
+      style={{ backgroundColor: 'color-mix(in srgb, var(--color-bg) 70%, transparent)' }}
     >
-      <div
+      <motion.div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
@@ -199,117 +233,153 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
         // Stoppa klick på panelen från att bubbla upp till overlayns onClose.
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onDialogKeyDown}
-        className="relative flex w-full max-w-lg flex-col gap-5 rounded-card border border-border bg-surface p-5 shadow-[var(--vm-shadow-raised)] sm:p-7"
+        initial={panelInitial}
+        animate={panelAnimate}
+        transition={motionEnabled ? springs.gentle : transitions.quick}
+        // Mobil: nästan-fullskärm "bottom sheet" (max-h + rundade topphörn, fäst i
+        // nederkant av overlayn). Desktop (sm+): centrerad panel, max-bredd, alla hörn
+        // rundade. max-h + intern scroll på kroppen säkrar att långt innehåll aldrig
+        // svämmar över, även på 280px-skärmar.
+        className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-card border border-border bg-surface shadow-[var(--vm-shadow-raised)] sm:max-h-[88dvh] sm:rounded-card"
       >
-        {/* Stäng-knapp (stabil fokus-startpunkt). */}
+        {/* Stäng-knapp (stabil fokus-startpunkt), svävar över hero:n med egen fond så
+            den syns mot den ljustonade dekoren. */}
         <button
           ref={closeButtonRef}
           type="button"
           onClick={onClose}
           aria-label="Stäng lagprofil"
           data-team-profile-close=""
-          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-pill border border-border text-fg-muted transition-colors hover:bg-surface-raised"
+          className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-pill border border-border bg-surface/80 text-fg-muted backdrop-blur-sm transition-colors hover:bg-surface-raised hover:text-fg"
         >
-          <span aria-hidden="true" className="text-lg leading-none">
+          <span aria-hidden="true" className="text-xl leading-none">
             ×
           </span>
         </button>
 
-        {/* Rubrik: emblem + lagnamn + landskod. Emblemet är dekoration (aria-hidden). */}
-        <header className="flex items-center gap-3 pr-10">
-          <TeamFlag code={team!.code} size="md" />
-          <div className="flex flex-col">
-            <h2 id={headingId} className="font-display text-2xl font-bold leading-tight">
-              {team!.name}
-            </h2>
-            <p className="text-sm text-fg-muted">
-              Grupp {group} · {team!.code}
-            </p>
-          </div>
-        </header>
-
-        {/* Nyckeltal: FIFA-ranking (källånkrad styrke-signal). Saknas den visas en
-            tydlig "data saknas"-text i stället för en gissad siffra. */}
-        <dl className="grid grid-cols-2 gap-3">
-          <div
-            data-profile-ranking=""
-            className="flex flex-col gap-0.5 rounded-card border border-border bg-surface-raised px-4 py-3"
+        {/* Scroll-region: hero + sektioner. Hero:n scrollar med (enkelt, lugnt), men
+            kroppen får aldrig svämma över overlayns kant. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {/* HERO: "arena i kvällsljus" i lagets ton. Stort emblem + lagnamn + grupp/kod
+              + FIFA-ranking som tydlig guld-badge. Dekoren bor i .vm-profile-hero. */}
+          <header
+            data-profile-hero=""
+            style={heroStyle}
+            className="vm-profile-hero relative flex flex-col gap-4 border-b border-border px-5 pb-5 pt-6 sm:px-7 sm:pb-6 sm:pt-7"
           >
-            <dt className="text-xs uppercase tracking-wide text-fg-muted">FIFA-ranking</dt>
-            <dd className="font-display text-2xl font-bold tabular-nums">
-              {fifaRanking !== null ? `#${fifaRanking}` : 'Data saknas'}
-            </dd>
-          </div>
-          <div className="flex flex-col gap-0.5 rounded-card border border-border bg-surface-raised px-4 py-3">
-            <dt className="text-xs uppercase tracking-wide text-fg-muted">Grupp</dt>
-            <dd className="font-display text-2xl font-bold">{group}</dd>
-          </div>
-        </dl>
-
-        {/* Stjärnspelare: 1-3 källbelagda namn. Tom lista -> en ärlig "data saknas"-rad
-            (hellre tomt än gissat), aldrig en uppdiktad spelare. */}
-        <section aria-labelledby="profil-stjarnor" className="flex flex-col gap-2">
-          <h3 id="profil-stjarnor" className="text-sm font-semibold uppercase tracking-wide">
-            Stjärnspelare
-          </h3>
-          {starPlayers.length > 0 ? (
-            <ul
-              aria-labelledby="profil-stjarnor"
-              data-profile-stars=""
-              className="flex flex-wrap gap-2"
-            >
-              {starPlayers.map((player) => (
-                <li
-                  key={player}
-                  className="rounded-pill border border-border bg-surface-raised px-3 py-1 text-sm font-medium"
+            <div className="flex items-center gap-4 pr-12">
+              <TeamFlag code={team!.code} size="lg" />
+              <div className="flex min-w-0 flex-col">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-fg-muted">
+                  Grupp {group} · {team!.code}
+                </p>
+                <h2
+                  id={headingId}
+                  className="font-display text-[1.625rem] font-bold leading-tight sm:text-3xl"
                 >
-                  {player}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p data-profile-stars="empty" className="text-sm text-fg-muted">
-              Data saknas
-            </p>
-          )}
-        </section>
+                  {team!.name}
+                </h2>
+              </div>
+            </div>
 
-        {/* Kuriosa: en kort verifierbar faktarad. Saknas den döljs sektionen (inget
-            tomt skal). */}
-        {trivia ? (
-          <section aria-labelledby="profil-kuriosa" className="flex flex-col gap-1">
-            <h3 id="profil-kuriosa" className="text-sm font-semibold uppercase tracking-wide">
-              Kuriosa
-            </h3>
-            <p data-profile-trivia="" className="text-sm text-fg-muted">
-              {trivia}
-            </p>
-          </section>
-        ) : null}
-
-        {/* Lagets väg: grupp + lagets matcher (kronologiskt). Inga matcher (ska inte
-            hända för ett WC-lag, men edge-säkert) -> en lugn text. */}
-        <section aria-labelledby="profil-vag" className="flex flex-col gap-2">
-          <h3 id="profil-vag" className="text-sm font-semibold uppercase tracking-wide">
-            Lagets väg
-          </h3>
-          {pathMatches.length > 0 ? (
-            <ul
-              aria-labelledby="profil-vag"
-              data-profile-path=""
-              className="m-0 flex list-none flex-col p-0"
+            {/* FIFA-ranking: källånkrad styrke-signal som premium-badge (guld-kant +
+                accent-siffra). Saknas datan visas en ärlig text, ingen gissad siffra. */}
+            <div
+              data-profile-ranking=""
+              className="inline-flex w-fit items-baseline gap-2 rounded-pill border px-4 py-1.5"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--color-surface) 78%, transparent)',
+                borderColor: 'color-mix(in srgb, var(--vm-gold) 55%, var(--color-border))',
+              }}
             >
-              {pathMatches.map((entry) => (
-                <PathRow key={entry.match.id} entry={entry} teamsById={teamsById} />
-              ))}
-            </ul>
-          ) : (
-            <p data-profile-path="empty" className="text-sm text-fg-muted">
-              Inga matcher i schemat än.
-            </p>
-          )}
-        </section>
-      </div>
-    </div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                FIFA-ranking
+              </span>
+              <span className="font-display text-lg font-bold tabular-nums">
+                {fifaRanking !== null ? `#${fifaRanking}` : 'Data saknas'}
+              </span>
+            </div>
+          </header>
+
+          {/* KROPP: sektionerna, generös andning, tydlig hierarki. */}
+          <div className="flex flex-col gap-6 px-5 py-6 sm:px-7">
+            {/* Stjärnspelare: 1-3 källbelagda namn. Tom lista -> en ärlig "data saknas"-
+                rad (hellre tomt än gissat), aldrig en uppdiktad spelare. */}
+            <section aria-labelledby="profil-stjarnor" className="flex flex-col gap-3">
+              <SectionHeading id="profil-stjarnor">Stjärnspelare</SectionHeading>
+              {starPlayers.length > 0 ? (
+                <ul
+                  aria-labelledby="profil-stjarnor"
+                  data-profile-stars=""
+                  className="flex flex-wrap gap-2"
+                >
+                  {starPlayers.map((player) => (
+                    <li
+                      key={player}
+                      className="rounded-pill border border-border bg-surface-raised px-3.5 py-1.5 text-sm font-medium"
+                    >
+                      {player}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p data-profile-stars="empty" className="text-sm text-fg-muted">
+                  Data saknas
+                </p>
+              )}
+            </section>
+
+            {/* Kuriosa: en kort verifierbar faktarad. Saknas den döljs sektionen (inget
+                tomt skal). En accent-list visuellt ankrar den som ett "visste du"-kort. */}
+            {trivia ? (
+              <section aria-labelledby="profil-kuriosa" className="flex flex-col gap-3">
+                <SectionHeading id="profil-kuriosa">Kuriosa</SectionHeading>
+                <p
+                  data-profile-trivia=""
+                  className="rounded-lg border-l-2 bg-surface-raised px-4 py-3 text-sm leading-relaxed text-fg-muted"
+                  style={{ borderLeftColor: 'color-mix(in srgb, var(--vm-gold) 70%, transparent)' }}
+                >
+                  {trivia}
+                </p>
+              </section>
+            ) : null}
+
+            {/* Lagets väg: grupp + lagets matcher (kronologiskt). Inga matcher (ska inte
+                hända för ett WC-lag, men edge-säkert) -> en lugn text. */}
+            <section aria-labelledby="profil-vag" className="flex flex-col gap-3">
+              <SectionHeading id="profil-vag">Lagets väg</SectionHeading>
+              {pathMatches.length > 0 ? (
+                <ul
+                  aria-labelledby="profil-vag"
+                  data-profile-path=""
+                  className="m-0 flex list-none flex-col gap-1 p-0"
+                >
+                  {pathMatches.map((entry) => (
+                    <PathRow key={entry.match.id} entry={entry} teamsById={teamsById} />
+                  ))}
+                </ul>
+              ) : (
+                <p data-profile-path="empty" className="text-sm text-fg-muted">
+                  Inga matcher i schemat än.
+                </p>
+              )}
+            </section>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/** En sektionsrubrik med en liten accent-markör, för enhetlig hierarki i kroppen. */
+function SectionHeading({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <h3
+      id={id}
+      className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-fg-muted"
+    >
+      <span aria-hidden="true" className="h-3 w-1 rounded-pill bg-accent" />
+      {children}
+    </h3>
   );
 }
