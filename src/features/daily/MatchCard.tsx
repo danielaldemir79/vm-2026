@@ -30,7 +30,7 @@ import { formatKickoffTime } from './format-datetime';
 import { isVenuePlaceholder, stageLabel, teamDisplayName } from './match-display';
 import { TeamFlag } from './TeamFlag';
 import { TvBadge } from './TvBadge';
-import { TeamNameButton } from '../team-profile/TeamNameButton';
+import { TeamNameButton } from '../team-profile';
 
 export interface MatchCardProps {
   match: Match;
