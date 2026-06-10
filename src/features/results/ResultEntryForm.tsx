@@ -15,7 +15,7 @@
 // liten enhet med eget tillstånd (mål + status + fel). En per-match-form håller
 // fält-id:n unika (a11y) och låter en inmatning vara optimistisk och isolerad.
 
-import { useId, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { Match, MatchStatus, Team } from '../../domain/types';
 import type { ResultEntry, ResultValidationError, ResultValidationField } from './validate-result';
 
@@ -104,6 +104,28 @@ function parseGoals(raw: string): number | null {
   return Number(trimmed);
 }
 
+/**
+ * Härled formulärets fält-strängar ur matchens NUVARANDE läge. EN sanning för
+ * både den initiala seedningen (useState-init) OCH den externa synkningen
+ * (useEffect), så de aldrig kan drifta isär (DRY). Ett tomt resultat -> tomma
+ * fält, ett inmatat resultat -> dess värden som strängar.
+ */
+function seedFields(match: Match): {
+  homeGoals: string;
+  awayGoals: string;
+  status: MatchStatus;
+  homePens: string;
+  awayPens: string;
+} {
+  return {
+    homeGoals: match.result ? String(match.result.homeGoals) : '',
+    awayGoals: match.result ? String(match.result.awayGoals) : '',
+    status: match.status,
+    homePens: match.result?.penalties ? String(match.result.penalties.homeGoals) : '',
+    awayPens: match.result?.penalties ? String(match.result.penalties.awayGoals) : '',
+  };
+}
+
 export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultEntryFormProps) {
   const home = teamName(match.homeTeamId, teamsById);
   const away = teamName(match.awayTeamId, teamsById);
@@ -111,21 +133,45 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
   const awayCode = teamCode(match.awayTeamId, teamsById);
 
   // Seeda formuläret från matchens NUVARANDE läge (redigera = se det inmatade).
-  const [homeGoals, setHomeGoals] = useState<string>(
-    match.result ? String(match.result.homeGoals) : ''
-  );
-  const [awayGoals, setAwayGoals] = useState<string>(
-    match.result ? String(match.result.awayGoals) : ''
-  );
-  const [status, setStatus] = useState<MatchStatus>(match.status);
+  // EN seedningskälla (seedFields) för både init och den externa synkningen nedan.
+  const seed = seedFields(match);
+  const [homeGoals, setHomeGoals] = useState<string>(seed.homeGoals);
+  const [awayGoals, setAwayGoals] = useState<string>(seed.awayGoals);
+  const [status, setStatus] = useState<MatchStatus>(seed.status);
   // Straffmål (bara slutspel), seedade från ett ev. inmatat penalties-resultat.
-  const [homePens, setHomePens] = useState<string>(
-    match.result?.penalties ? String(match.result.penalties.homeGoals) : ''
-  );
-  const [awayPens, setAwayPens] = useState<string>(
-    match.result?.penalties ? String(match.result.penalties.awayGoals) : ''
-  );
+  const [homePens, setHomePens] = useState<string>(seed.homePens);
+  const [awayPens, setAwayPens] = useState<string>(seed.awayPens);
   const [errors, setErrors] = useState<ResultValidationError[]>([]);
+
+  // DIRTY-flagga (C7/C8): true så fort användaren rört ETT fält och ännu inte
+  // sparat. Den styr den externa synkningen nedan, så ett pågående lokalt edit
+  // ALDRIG klottras över av en extern matchuppdatering. En ref (inte state): den
+  // läses bara i effekten och ska inte trigga en re-render när den ändras.
+  const dirtyRef = useRef(false);
+
+  // Synka formuläret med matchens NUVARANDE värden när matchen UPPDATERAS EXTERNT
+  // (t.ex. realtid T18, eller att samma match ändras i den delade storen). Utan
+  // detta seedades fälten BARA vid mount, så ett externt resultat (inkl. straffar,
+  // C8) visades aldrig i ett redan monterat formulär. VARFÖR `!dirtyRef.current`:
+  // har användaren ett OSPARAT edit på gång ska en extern uppdatering inte rycka
+  // undan det, vi synkar bara när formuläret är "rent". Effekten beror på de
+  // RÅA match-värdena (inte på match-referensen), så en ny match-array med samma
+  // värden inte trigger:ar en onödig re-seed. Goals OCH straffar synkas tillsammans,
+  // så de två fältgrupperna behandlas konsekvent (C8).
+  const { homeGoals: seedHome, awayGoals: seedAway } = seed;
+  const seedStatus = seed.status;
+  const { homePens: seedHomePens, awayPens: seedAwayPens } = seed;
+  useEffect(() => {
+    if (dirtyRef.current) {
+      return;
+    }
+    setHomeGoals(seedHome);
+    setAwayGoals(seedAway);
+    setStatus(seedStatus);
+    setHomePens(seedHomePens);
+    setAwayPens(seedAwayPens);
+    // Beror på de råa seed-värdena: synkar om bara när matchens faktiska data ändras.
+  }, [seedHome, seedAway, seedStatus, seedHomePens, seedAwayPens]);
 
   // Unika, stabila fält-id:n så <label htmlFor> och aria-describedby pekar rätt
   // även när flera matcher renderas samtidigt (a11y).
@@ -175,6 +221,15 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
     hasFieldError(field) ? errorsId : undefined;
   const invalid = (field: ResultValidationField): boolean => hasFieldError(field);
 
+  // Varje fält-setter går via denna så DIRTY-flaggan sätts vid första lokala
+  // ändringen. Då vet sync-effekten att det finns ett osparat edit att skydda.
+  function edit<T>(setter: (value: T) => void): (value: T) => void {
+    return (value: T) => {
+      dirtyRef.current = true;
+      setter(value);
+    };
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const entry: ResultEntry = {
@@ -193,6 +248,9 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
     const result = onSubmit(match.id, entry);
     if (result.ok) {
       setErrors([]);
+      // Sparat: formuläret är inte längre "smutsigt". Nästa externa uppdatering av
+      // matchen (storen återspeglar nu sparningen, ev. realtid T18) får synka in.
+      dirtyRef.current = false;
       onSaved?.(match, entry);
     } else {
       setErrors(result.errors);
@@ -271,7 +329,7 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
                 id={statusId}
                 name="status"
                 value={status}
-                onChange={(e) => setStatus(e.target.value as MatchStatus)}
+                onChange={(e) => edit(setStatus)(e.target.value as MatchStatus)}
                 aria-invalid={invalid('status') || undefined}
                 aria-describedby={describedBy('status')}
                 className={`${FIELD_BASE} h-11 px-3 pr-8 text-sm`}
@@ -325,7 +383,7 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
               min={0}
               step={1}
               value={homeGoals}
-              onChange={(e) => setHomeGoals(e.target.value)}
+              onChange={(e) => edit(setHomeGoals)(e.target.value)}
               aria-invalid={invalid('home') || undefined}
               aria-describedby={describedBy('home')}
               className={SCORE_INPUT}
@@ -376,7 +434,7 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
               min={0}
               step={1}
               value={awayGoals}
-              onChange={(e) => setAwayGoals(e.target.value)}
+              onChange={(e) => edit(setAwayGoals)(e.target.value)}
               aria-invalid={invalid('away') || undefined}
               aria-describedby={describedBy('away')}
               className={SCORE_INPUT}
@@ -407,7 +465,7 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
                 min={0}
                 step={1}
                 value={homePens}
-                onChange={(e) => setHomePens(e.target.value)}
+                onChange={(e) => edit(setHomePens)(e.target.value)}
                 aria-invalid={invalid('penalties') || undefined}
                 aria-describedby={describedBy('penalties')}
                 className={SCORE_INPUT}
@@ -435,7 +493,7 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
                 min={0}
                 step={1}
                 value={awayPens}
-                onChange={(e) => setAwayPens(e.target.value)}
+                onChange={(e) => edit(setAwayPens)(e.target.value)}
                 aria-invalid={invalid('penalties') || undefined}
                 aria-describedby={describedBy('penalties')}
                 className={SCORE_INPUT}

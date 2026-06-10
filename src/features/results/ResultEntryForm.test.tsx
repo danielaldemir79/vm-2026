@@ -240,6 +240,133 @@ describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
   });
 });
 
+// EXTERN UPPDATERING (Copilot R2, C7/C8): matchen kan ändras EXTERNT i den delade
+// storen (t.ex. realtid T18, eller en annan vy) medan formuläret är monterat. Då
+// ska fälten synka in det nya värdet, mål OCH straffar konsekvent (C8), men ETT
+// pågående osparat lokalt edit ska aldrig klottras över (synka bara när inte dirty).
+describe('ResultEntryForm, synkar mot extern matchuppdatering (C7/C8)', () => {
+  function knockoutMatch(): Match {
+    return {
+      id: 'M73',
+      stage: 'round-of-32',
+      groupId: null,
+      homeTeamId: 'mex',
+      awayTeamId: 'rsa',
+      kickoff: '2026-07-01T19:00:00Z',
+      venue: 'Testarena',
+      result: null,
+      status: 'scheduled',
+    };
+  }
+
+  it('seedar om MÅL + status när matchen uppdateras externt (rent formulär)', () => {
+    const { rerender } = render(
+      <ResultEntryForm
+        match={scheduledMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    // Inget inmatat än: fälten är tomma, status "Ej spelad".
+    expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(null);
+
+    // Extern uppdatering: samma match får nu ett resultat (finished 2-1).
+    const updated: Match = {
+      ...scheduledMatch(),
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    };
+    rerender(
+      <ResultEntryForm match={updated} teamsById={teamsById} onSubmit={() => ({ ok: true })} />
+    );
+
+    // Fälten ska spegla det nya externa resultatet (inte de gamla mount-värdena).
+    expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(2);
+    expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toHaveValue(1);
+    expect(screen.getByLabelText(/Status/)).toHaveValue('finished');
+  });
+
+  it('seedar om STRAFFARNA när bara penalties ändras externt (C8, konsekvent med målen)', () => {
+    // Start: en straff-avgjord slutspelsmatch 1-1 (5-3 på straffar).
+    const start: Match = {
+      ...knockoutMatch(),
+      status: 'finished',
+      result: { homeGoals: 1, awayGoals: 1, penalties: { homeGoals: 5, awayGoals: 3 } },
+    };
+    const { rerender } = render(
+      <ResultEntryForm match={start} teamsById={teamsById} onSubmit={() => ({ ok: true })} />
+    );
+    let pens = document.querySelector('[data-penalties-row]')!.querySelectorAll('input');
+    expect(pens[0]).toHaveValue(5);
+    expect(pens[1]).toHaveValue(3);
+
+    // Extern uppdatering: SAMMA mål (1-1) men ANDRA straffar (4-2). Den gamla
+    // re-key-strategin saknade straffarna, så detta hade INTE synkats (C8).
+    const updated: Match = {
+      ...knockoutMatch(),
+      status: 'finished',
+      result: { homeGoals: 1, awayGoals: 1, penalties: { homeGoals: 4, awayGoals: 2 } },
+    };
+    rerender(
+      <ResultEntryForm match={updated} teamsById={teamsById} onSubmit={() => ({ ok: true })} />
+    );
+
+    pens = document.querySelector('[data-penalties-row]')!.querySelectorAll('input');
+    expect(pens[0]).toHaveValue(4);
+    expect(pens[1]).toHaveValue(2);
+  });
+
+  it('BEVARAR ett pågående osparat edit när matchen uppdateras externt (synka bara när inte dirty)', () => {
+    const { rerender } = render(
+      <ResultEntryForm
+        match={scheduledMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    // Användaren börjar skriva (osparat): hemma = 7. Formuläret är nu "smutsigt".
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '7' } });
+    expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(7);
+
+    // En extern uppdatering kommer in (t.ex. realtid) medan editet pågår.
+    const updated: Match = {
+      ...scheduledMatch(),
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    };
+    rerender(
+      <ResultEntryForm match={updated} teamsById={teamsById} onSubmit={() => ({ ok: true })} />
+    );
+
+    // Det osparade editet ska INTE klottras över av den externa uppdateringen.
+    expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(7);
+  });
+
+  it('efter SPARAT synkar formuläret igen mot nästa externa uppdatering (dirty nollas)', () => {
+    const onSubmit = vi.fn(() => ({ ok: true }) as const);
+    const { rerender } = render(
+      <ResultEntryForm match={scheduledMatch()} teamsById={teamsById} onSubmit={onSubmit} />
+    );
+    // Mata in och spara (dirty -> rent igen).
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+
+    // En SENARE extern uppdatering (annan vy korrigerade till 3-0) ska nu synka in,
+    // eftersom sparningen nollade dirty-flaggan.
+    const updated: Match = {
+      ...scheduledMatch(),
+      status: 'finished',
+      result: { homeGoals: 3, awayGoals: 0 },
+    };
+    rerender(<ResultEntryForm match={updated} teamsById={teamsById} onSubmit={onSubmit} />);
+    expect(screen.getByLabelText(/Mexiko \(hemma\)/)).toHaveValue(3);
+    expect(screen.getByLabelText(/Sydafrika \(borta\)/)).toHaveValue(0);
+  });
+});
+
 // STABIL KOLUMN-LAYOUT (#39, Daniels feedback): poängrutorna ska ligga i samma
 // kolumner kort för kort oavsett lagnamnens längd, och ett långt namn ska trunkera
 // (ellipsis) utan att knuffa layouten. jsdom har ingen riktig layout-motor, så vi
