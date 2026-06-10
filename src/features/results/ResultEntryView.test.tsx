@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResultEntryView } from './ResultEntryView';
 import { ResultsProvider } from './ResultsProvider';
 import { GroupStageView } from '../groups/GroupStageView';
+// GroupStageView har klickbara lagnamn (TeamNameButton, T10), så integrationstestet
+// som monterar den wrappas i TeamProfileProvider.
+import { TeamProfileProvider } from '../team-profile';
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
@@ -87,8 +90,10 @@ describe('ResultEntryView + GroupStageView, inmatning uppdaterar tabellen (en sa
   it('att spara ett resultat för en fixtures-match ändrar gruppspelstabellen', async () => {
     render(
       <ResultsProvider env={fixturesEnv()}>
-        <GroupStageView />
-        <ResultEntryView />
+        <TeamProfileProvider>
+          <GroupStageView />
+          <ResultEntryView />
+        </TeamProfileProvider>
       </ResultsProvider>
     );
 

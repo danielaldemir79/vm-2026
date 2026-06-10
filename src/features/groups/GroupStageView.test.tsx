@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GroupStageView } from './GroupStageView';
 import { ResultsProvider } from '../results/ResultsProvider';
+import { TeamProfileProvider } from '../team-profile';
 
 // Fixtures-miljö (ingen Supabase-env) => datakällan ger fixtures-datan, dvs den
 // verifierade VM 2026-datan med alla 12 grupper. Env injiceras nu i den delade
@@ -24,7 +25,9 @@ function liveEnv(): ImportMetaEnv {
 function renderView(env: ImportMetaEnv, liveReady = false) {
   return render(
     <ResultsProvider env={env} liveReady={liveReady}>
-      <GroupStageView />
+      <TeamProfileProvider>
+        <GroupStageView />
+      </TeamProfileProvider>
     </ResultsProvider>
   );
 }

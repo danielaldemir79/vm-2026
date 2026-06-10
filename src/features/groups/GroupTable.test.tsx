@@ -2,6 +2,9 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GroupTable } from './GroupTable';
 import type { GroupStanding, Team } from '../../domain/types';
+// Lagnamnen i tabellen är klickbara (TeamNameButton -> useTeamProfile, T10), så
+// renderingen sker i en minimal profil-context-stub (utan den fulla modalen).
+import { TeamProfileStub } from '../../test/team-profile-stub';
 
 // Bygg en standings-rad kort (alla numeriska fält explicit för läsbarhet).
 function row(teamId: string, rank: number, over: Partial<GroupStanding> = {}): GroupStanding {
@@ -51,7 +54,11 @@ const standings: GroupStanding[] = [
 ];
 
 function renderTable() {
-  return render(<GroupTable groupId="A" standings={standings} teamsById={teamsById} />);
+  return render(
+    <TeamProfileStub>
+      <GroupTable groupId="A" standings={standings} teamsById={teamsById} />
+    </TeamProfileStub>
+  );
 }
 
 describe('GroupTable, tillgänglig tabell-semantik', () => {
@@ -131,7 +138,11 @@ describe('GroupTable, fel-väg: okänt lag-id maskeras inte', () => {
     // En standings-rad för ett lag som inte finns i teamsById, ska inte tyst
     // dölja raden eller krascha, utan visa id:t så data-inkonsistensen syns.
     const orphan = [row('okant-lag', 1)];
-    render(<GroupTable groupId="B" standings={orphan} teamsById={teamsById} />);
+    render(
+      <TeamProfileStub>
+        <GroupTable groupId="B" standings={orphan} teamsById={teamsById} />
+      </TeamProfileStub>
+    );
 
     expect(screen.getByRole('rowheader', { name: /okant-lag/ })).toBeInTheDocument();
   });
