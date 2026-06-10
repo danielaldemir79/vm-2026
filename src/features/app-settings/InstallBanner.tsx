@@ -7,25 +7,38 @@
 
 import { useInstallPrompt } from './use-install-prompt';
 
-/** Liten nedladdnings-/installations-ikon (dekorativ, aria-hidden). */
+/**
+ * Liten installations-ikon i en mjuk accent-tonad "app-bricka" (dekorativ,
+ * aria-hidden). Brickan gör erbjudandet INBJUDANDE (det läser som en app-ikon
+ * att lägga till), utan att bli påträngande. KONTRAST (uppmätt, .vmshots): den
+ * gröna ikonen på accent-tinten (color-mix accent 12% surface) håller 7.53:1
+ * (mörkt) / 4.57:1 (ljust), båda >= 4.5:1, fast ikonen är dekorativ och
+ * etiketten ("Installera VM 2026") bär betydelsen ändå.
+ */
 function InstallIcon() {
   return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <span
       aria-hidden="true"
-      className="shrink-0 text-accent"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border text-accent"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--color-accent) 12%, var(--color-surface))',
+      }}
     >
-      <path d="M12 3v12" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M5 21h14" />
-    </svg>
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+      </svg>
+    </span>
   );
 }
 
@@ -42,7 +55,7 @@ export function InstallBanner() {
       data-install-banner={mode}
       className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4 shadow-[var(--vm-shadow-card)] sm:flex-row sm:items-center sm:justify-between sm:gap-4"
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <InstallIcon />
         <div className="flex flex-col gap-1">
           <h2 id="install-rubrik" className="font-display text-base font-bold sm:text-lg">
