@@ -5,6 +5,180 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T9 (issue #9): Copilot R3 (C9-C10), straff-gating + chip-böjning
+
+**Beslut (C9, `penalties-not-applicable` bara när det SÄKERT kan avgöras):** `validateResultEntry`
+(`validate-result.ts`) gav förr `penalties-not-applicable` så fort straffar var ifyllda men inte
+KRÄVDES, även när de ordinarie målen var ofullständiga/ogiltiga (finished utan bägge mål). Då är
+"Ta bort straffmålen" missvisande, för så snart målen rättas till en LIKA ställning blir straffarna
+i stället KRÄVDA (FIFA Article 14). Felet gatas nu bakom `penaltiesDefinitelyNotApplicable` =
+gruppspel (oavgjort står sig, straffar gäller aldrig) ELLER giltiga ordinarie mål som inte är lika
+(avgjord slutspelsmatch). I övriga "ej krävda"-fall bär de ordinarie målen redan sitt eget fel
+(`finished-without-result`/heltals-fel), och straffarnas relevans beror på att det felet rättas
+först, så straffarna flaggas inte då. **Källa för straff-regeln:** FIFA Article 14
+(`fifa-knockout-rules-source.txt`), oförändrad sedan F1/penalties-pinnen, gissas inte. Bevisat:
+slutspel finished utan/med-bara-ett/ogiltigt ordinarie mål + straffar -> målfelet, INTE
+`penalties-not-applicable`; gruppspel utan mål + straffar -> fortfarande `penalties-not-applicable`
+(gäller aldrig i grupp); slutspel med avgjorda mål + straffar -> fortfarande `penalties-not-applicable`.
+
+**Beslut (C10, möjliga-lag-chippet böjs grammatiskt):** Chippets text/aria i `SlotRow`
+(`BracketView.tsx`) var alltid plural ("möjliga"), så exakt 1 kvarvarande kandidat läste "1 möjliga
+lag", grammatiskt fel. Ny ren hjälpare `possibleTeamsLabel(count)` böjer som `matchCountLabel`:
+"lag" är neutrum, så adjektivet böjs "1 möjligt lag" / "n möjliga lag". Samma sträng driver nu både
+synlig text och aria-label (en sanning). `SlotRow` exporteras för enhetstest av böjningen (singular
++ plural).
+
+---
+
+## 2026-06-10 , T9 (issue #9): Copilot R2 (C4-C8), bl.a. bronsmatch-ordning + form-synk
+
+**Beslut (C4, bronsmatch FÖRE final i visnings-ordningen):** `ROUND_ORDER` (derive-bracket.ts) och
+`ROUND_STEP` (BracketView.tsx) listar nu `third-place` FÖRE `final` (brons-marker = 5, final = 6).
+Bronsmatchen (M103) SPELAS före finalen (M104), så trädets kolumner vänster -> höger visar ... semi ->
+brons -> final. **Källhänvisad (verifierad mot T4, gissas inte):** VM 2026:s svenska TV-tablå
+(`src/data/wc2026/tv-schedule-source.txt`) anger BRONSMATCH lör 18 juli (M103) och FINAL sön 19 juli
+(M104); `matches.ts` har kickoff M103 `2026-07-18T21:00:00Z` < M104 `2026-07-19T19:00:00Z`; och
+`bracket-structure.ts` (FIFA Art. 12.10-12.11) har M103 = brons, M104 = final. Bägge matas av
+semifinalerna (M101/M102), bronsen av förlorarna, finalen av vinnarna.
+
+**Beslut (C5, semantiskt korrekt teststage):** `homeWinsEverywhere()` i derive-bracket.test.ts satte
+`stage: 'round-of-32'` på ALLA bracket-matcher (även M103/M104). Använder nu `bm.stage` ur strukturen.
+Härledningen läser stage ur strukturen (inte ur Match-objektet), så utfallet är oförändrat, men testdatan
+ljuger inte längre om vilken runda en match tillhör.
+
+**Beslut (C6, qualifyingGroups kräver UNIK gruppmängd, inte antal):** `computeThirdPlaceRanking`
+(`rank-third-places.ts`) gatade på `ranked.length === GROUPS_TOTAL` (= antal treor). Det blev sant med en
+DUBBLETT-grupp + en SAKNAD grupp (t.ex. två A-treor, ingen L): 12 treor till antalet men 11 unika grupper,
+så topp-8 seedades på en ofullständig/dubblerad gruppmängd. Samma klass som C3 i derive-bracket. Nu krävs att
+Set:et av treornas grupp-id TÄCKER hela `GROUP_IDS` (en av varje, enda sanningen för giltiga grupper); det
+garanterar minst 12 treor på köpet. Fail-safe: hellre null än seedning på dubblerad data. Live ofarligt redan
+(enda anroparen `deriveBracket` gatar bakom `isGroupStageComplete` som efter C3 kräver unik täckning), men
+funktionen är publik (domain/index.ts) och garantin bor nu i FUNKTIONEN. Bevisat: 12-treor-med-dubblett (11
+unika) -> null, 13-tabeller-utan-L -> null. **Källa för gruppmängden:** `GROUP_IDS` i `src/domain/types.ts`
+(A-L, SPEC §5), samma kanoniska lista som C3.
+
+**Beslut (C7+C8, ResultEntryForm synkar mot extern matchuppdatering, DIRTY-medvetet):** Formuläret seedade
+sin lokala `useState` BARA vid mount, så ett externt ändrat resultat (realtid T18, eller samma match ändrad
+i den delade storen) visades aldrig i ett redan monterat formulär. Förr "löstes" det för MÅL/status via en
+data-beroende re-mount-key i `ResultEntryView` (`${id}-${status}-${homeGoals}-${awayGoals}`), men den (a)
+saknade STRAFFARNA, så penalties blev stale (C8, inkonsekvent med målen), och (b) en re-mount KLOTTRAR ÖVER
+ett pågående osparat edit. Nu synkar `ResultEntryForm` sig själv via en `useEffect` (C7) som re-seedar mål,
+status OCH straffar KONSEKVENT ur matchens nuvarande värden, men BARA när formuläret är "rent" (en
+`dirtyRef` sätts vid första lokala ändringen, nollas vid lyckat sparande), så ett pågående lokalt edit
+bevaras. Re-mount-keyn i `ResultEntryView` är därmed nedgraderad till en stabil `match.id` (instansen lever
+kvar; C2-garantin, osparad inmatning över expandera/ihopfäll, gäller fortfarande). En enda `seedFields(match)`
+är sanningen för både init och synk (DRY). Bevisat: extern mål-uppdatering synkar (rent), extern straff-only-
+uppdatering synkar (C8), osparat edit bevaras vid extern uppdatering, och efter sparat synkar nästa externa
+uppdatering in (dirty nollat).
+
+---
+
+## 2026-06-10 , T9 (issue #9, design-frontend): premium-bracket ovanpå seamen, AA UPPMÄTT i båda teman
+
+**Beslut (visuellt lager, rör ALDRIG semantiken):** Det premium-visuella trädet byggs ENBART ovanpå
+senior-devs data-attribut (`data-bracket-round/-match/-slot`, `data-slot-resolution`, `data-winner`,
+`data-bracket-scroll/-locked`) via en dedikerad `src/features/bracket/bracket.css` + klass-hakar i
+`BracketView.tsx`. All a11y-semantik (6 runda-regioner med exakta aria-labels, h2/h3-hierarki,
+`<ul>/<li>`-slots, sr-only "(vidare)", möjliga-chippets aria-label) står kvar, och alla 462 tester är
+gröna. "Arena i kvällsljus" för trädet: intensiteten BYGGER mot finalen (numrerad runda-marker 1->6,
+semifinalens kant tar accent, FINALEN får en guld-signatur: guld-kant + guld-tint + guld-glow), allt
+via `color-mix`/tema-token (aldrig rå hex) så det är troget BÅDA teman.
+
+**Beslut (vinnar-framhävning FÄRG-OBEROENDE, T7/T8-pin):** Den slot som vann (`data-winner`) markeras
+med ett LAGER signaler, aldrig bara grönt: accent-kant-bar (form) + accent-tint-yta (yta) + en
+medalj-bock ✓ som glyf (ikon) + fetare text (vikt). Verifierat live i reduced-motion att markörerna
+STÅR KVAR (bar + tint + bock) medan rörelsen nollas, så vinnaren är tydlig i gråskala/för färgblinda.
+
+**Beslut (avancerings-animation = CSS, inte JS, samma motgift som hero:n):** "Förs fram"-känslan är en
+ENGÅNGS glow-puls + medalj-pop i ren CSS (`@keyframes` i bracket.css), ingen layout-påverkan (CLS=0).
+Den globala reduced-motion-regeln räcker INTE (den fryser keyframes på slutläget), så bracket-rörelsen
+nollas EXPLICIT med `animation: none` vid `prefers-reduced-motion: reduce`. Verifierat live:
+`animationName` blir `none` på vinnar-slot, medalj-pseudo och scroll-hintens pil.
+
+**Beslut (responsiv scroll som FEATURE):** Trädet är brett till sin natur. På smala skärmar scrollas
+det i sidled (seamens `overflow-x-auto`) med mjuka edge-fade-masker (`mask-image` mot tema) + en mobil
+"Svep i sidled →"-hint (döljs >= 1024px). Verifierat live 280/360/768/1024/1440px: NOLL sid-overflow
+(dokumentet scrollar aldrig horisontellt, bara bracket-containern), ingen skyldig nod sticker ut.
+
+**Beslut (AA UPPMÄTT, inte påstått, i BÅDA teman, canvas-komposit-metoden):** All text mätt på faktiskt
+renderad yta (komposit av halvgenomskinliga tints mot effektiv bakgrund), inte mot hex offline. Mörkt
+tema: vinnar-lagnamn 15.8:1, resolved lagnamn 15.24:1, muted positions-etikett 7.5:1, final-text på
+guld-tint 7.5:1, möjliga-chip/match-nr-cap 7.5:1, guld marker 11.28:1, runda-titel 8.39:1. Ljust tema:
+vinnar-lagnamn 13.62:1, resolved 17.91:1, muted/final-text/chip/cap 6.52:1, runda-titel 5.92:1, final
+guld-marker **5.03:1** (alla >= 4.5:1 AA normal text). **Fynd som rättades:** guld-text på vit yta för
+final-markern föll på 3.29:1 i ljust tema (under AA). Fixad till en SOLID guld-bricka med near-black
+ink (`#1c1403`), samma färg-oberoende AA-säkra mönster som "Dagens match"-chippet (T7-pin): 5.03:1
+ljust / ~10.9:1 mörkt. Ingen AA-siffra i denna logg är antagen, varje är uppmätt i webbläsaren.
+
+## 2026-06-10 , T9 (issue #9): slutspelsträdet som härledd state + två källhänvisade FIFA-regler
+
+**Beslut (arkitektur, härledd state):** Slutspelsträdet LAGRAS aldrig, det är en REN funktion
+`deriveBracket(grupptabeller, matcher) -> BracketState` (`src/features/bracket/derive-bracket.ts`),
+exakt som grupptabellerna (SPEC §6). Tre datadrivna lägen, ingen gissning: (1) gruppspel pågår ->
+varje slot visar "möjliga lag" + en grupp-positions-etikett, (2) grupperna klara -> slotarna LÅSES
+till riktiga lag (gruppvinnare/tvåa ur tabellerna + de 8 bästa treorna seedade via FIFA Annexe C),
+(3) slutspelsresultat -> vinnaren propagerar till nästa slot (en passering i M73->M104-ordning
+räcker eftersom en match alltid kommer efter sina föregångare i FIFA-numreringen). Återanvänder HELA
+den verifierade T4-motorn (`bracket-structure.ts`, `build-bracket.ts`, `seedThirdPlaces`/Annexe C),
+definierar INGEN ny strukturell slutspelsregel. Vyn (`BracketView` + `useBracketData`) är en tunn
+konsument av den delade results-storen (samma sanning som gruppspel + inmatning), gatad på `ready`
+(samma stale-kontrakt som useGroupData, C8). Designseam: stabila data-attribut (`data-bracket-round/
+-match/-slot`, `data-slot-resolution`, `data-winner`, `data-bracket-locked`) så design-frontend bygger
+premium-trädet + vinnar-animationen utan att röra semantiken.
+
+**Beslut (KÄLLHÄNVISAD FIFA-REGEL 1, gissas ALDRIG): rankningen av grupptreorna -> de 8 bästa.**
+`rankThirdPlaces`/`computeThirdPlaceRanking` (`src/domain/bracket/rank-third-places.ts`) avgör VILKA 8
+av de 12 grupptreorna som kvalificerar. Regel: FIFA Article 13, "The eight best-ranked teams among
+those finishing third", kriterier a) flest poäng, b) total målskillnad, c) totalt gjorda mål, i ALLA
+gruppmatcher. **Viktig tolkning (källhänvisad):** detta är de ÖVERGRIPANDE kriterierna, INTE in-grupp-
+ordningens inbördes head-to-head (compute-standings steg 1), eftersom de tolv treorna kommer från
+olika grupper och ALDRIG mött varandra, det finns inget inbördes möte att räkna. Kriterium d (kort/
+disciplin) + e/f (FIFA-ranking) är inte deterministiskt beräkningsbara ur matchresultaten (samma
+avgränsning som compute-standings compareOverall), så vid exakt lika a-c används en stabil groupId-
+fallback, UTTRYCKLIGEN dokumenterad som EJ en FIFA-tiebreak. `qualifyingGroups` är null tills HELA
+rangordningen är komplett (en trea per grupp, alla 12), inte bara tills 8 treor finns, så ingen
+seedning sker på en gissning (fail-safe). **Källhänvisad rättelse (2026-06-10, lokal panel F1 +
+lessons `uttommande-test-vaktar-svagare-invariant`, Förekomst 3):** texten sa tidigare "null tills
+exakt 8 treor", men koden gatade på `qualified.length === QUALIFYING_THIRDS` (= `slice(0,8).length
+=== 8`), sant för ALLA n >= 8 treor, inte bara n === 8 (probe-bevisat: 9/10/11 treor gav `['A'..'H']`,
+topp-8 av en DELMÄNGD, inte null). Den AVSEDDA semantiken är "vänta tills ALLA grupptreor är
+rangordnade": topp-8 av en ofullständig mängd är en gissning, en grupp som inte spelat färdigt kan ha
+en bättre trea och knuffa ut en av de provisoriska 8 (testat: n=12 där grupp L sist får bästa trean
+ändrar de kvalificerade). Villkoret uttrycker nu garantin direkt (`ranked.length === GROUPS_TOTAL`,
+`GROUPS_TOTAL = GROUP_IDS.length`) och randen 7/8/9/11/12 är testad. Live ofarligt redan förr (enda
+anroparen `deriveBracket` gatar bakom `isGroupStageComplete` = alla 12 färdiga = alltid 12 treor), men
+funktionen är publik och garantin bor nu i FUNKTIONEN, inte i callerns grind.
+**Källa:** Regulations for the FIFA World Cup 26 (May 2026), Article 13, sid. 27-28. Committat verbatim
+i `src/domain/bracket/fifa-knockout-rules-source.txt` (pdftotext-utdrag), så reviewern kan BEKRÄFTA
+regeln mot källan i stället för att jaga den.
+
+**Beslut (KÄLLHÄNVISAD FIFA-REGEL 2, F1/penalties-pinnen LÖST): straffar i slutspel.** En
+slutspelsmatch kan INTE sluta oavgjort (FIFA Article 14): vid lika ordinarie ställning avgör straffar.
+Förr tappade results-reducern `MatchResult.penalties` tyst. Nu: `ResultEntry` bär penalties,
+`validateResultEntry` tar matchens stage och KRÄVER en avgörande straff-vinnare för en lika
+slutspelsmatch (avvisar lika-straffar och straffar där de inte är tillämpliga), `toMatchResult`
+BEVARAR straffarna, och `ResultEntryForm` visar straff-fält (`data-penalties-row`) bara vid slutspel +
+finished + lika ställning. Vinnar-härledningen i `deriveBracket` läser penalties för att propagera rätt
+lag; en lika match UTAN avgörande straffar propagerar INGEN vinnare (fail-safe, ingen gissning).
+**Acceptanstest (uppfyllt):** redigera en finished slutspelsmatch med straffar -> penalties bevaras
+(`apply-match-result.test.ts` + `validate-result.test.ts`).
+**Källa:** FIFA Regulations FWC2026 Article 14, sid. 28, committat i samma källfil.
+
+**Låsnings-regeln (härledd, inte ett flagg-fält):** `isGroupStageComplete` är sann när alla 12 grupper
+har varje lag på 3 spelade matcher (`played >= 3`, formatets konstant SPEC §5), härlett ur tabellerna
+så det är en ren funktion av sanningen. Först då seedas treorna och slotarna låses.
+**Källhänvisad rättelse (2026-06-10, Copilot R1 C3):** villkoret kollade tidigare bara `tables.length >=
+12`, ett ANTAL, inte 12 UNIKA grupper. 12 tabeller med en dubblett (två A) och en saknad grupp (ingen L)
+hade då låst gruppspelet felaktigt, varpå slot-resolvern slår upp den saknade gruppen, får undefined och
+ger en `resolved` slot med `teamId` null (en låst plats utan lag). Nu krävs att Set:et av `groupId` täcker
+hela `GROUP_IDS` (en av varje, A-L, enda sanningen för giltiga grupper), vilket på köpet garanterar minst
+12 tabeller, i stället för en lös 12:a som antal. Fail-safe: hellre fortsatt "pågår" än en felaktig låsning
+på dubblerad/ofullständig data. Bevisat av test (dubblett-scenario: 12 tabeller / 11 unika + 13 tabeller /
+L saknas, båda ger false). **Källa för grupp-mängden:** `GROUP_IDS` i `src/domain/types.ts` (A-L, SPEC §5),
+samma kanoniska lista som teams/fixtures härleds ur.
+
+---
+
 ## 2026-06-10 , #39 (T27) senior-developer: Copilot R1, dag-medvetet fönster (C1) + dolt-ej-filtrerat (C2)
 
 **Beslut (C1, dag-medvetet 3-dagars fönster):** `ResultEntryView` läser inte längre "idag" via ett

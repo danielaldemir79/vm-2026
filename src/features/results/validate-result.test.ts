@@ -11,6 +11,15 @@ function entry(
   return { homeGoals, awayGoals, status };
 }
 
+/** Bygg en finished-inmatning med straffar (för slutspels-fall, FIFA Art. 14). */
+function entryWithPens(
+  homeGoals: number | null,
+  awayGoals: number | null,
+  pens: { homeGoals: number | null; awayGoals: number | null } | null
+): ResultEntry {
+  return { homeGoals, awayGoals, status: 'finished', penalties: pens };
+}
+
 /** Plocka ut fel-koderna ur ett (förväntat) ogiltigt resultat. */
 function codesOf(result: ReturnType<typeof validateResultEntry>): string[] {
   return result.ok ? [] : result.errors.map((e) => e.code);
@@ -107,6 +116,159 @@ describe('validateResultEntry, status-övergångar', () => {
   });
 });
 
+// ============================================================================
+// Straffläggning i slutspel (F1/penalties-pinnen, FIFA Article 14). En
+// slutspelsmatch kan INTE sluta oavgjort: lika ordinarie ställning kräver en
+// avgörande straff-vinnare. Gruppspel påverkas inte (oavgjort står sig).
+// ============================================================================
+describe('validateResultEntry, slutspels-straffar (FIFA Art. 14)', () => {
+  it('GRUPPSPEL: lika ställning är giltigt utan straffar (oavgjort står sig)', () => {
+    // Default-stage är 'group', och explicit 'group'.
+    expect(validateResultEntry('scheduled', entry(1, 1, 'finished')).ok).toBe(true);
+    expect(validateResultEntry('scheduled', entry(1, 1, 'finished'), 'group').ok).toBe(true);
+  });
+
+  it('SLUTSPEL: lika ställning UTAN straffar kräver straff-vinnare (fail loud)', () => {
+    const r = validateResultEntry('scheduled', entry(1, 1, 'finished'), 'round-of-32');
+    expect(codesOf(r)).toContain('knockout-tie-needs-penalties');
+  });
+
+  it('SLUTSPEL: lika ställning MED giltig straff-vinnare är giltigt', () => {
+    const r = validateResultEntry(
+      'scheduled',
+      entryWithPens(1, 1, { homeGoals: 4, awayGoals: 3 }),
+      'final'
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it('SLUTSPEL: avgjord ordinarie ställning behöver INGA straffar', () => {
+    expect(validateResultEntry('scheduled', entry(2, 1, 'finished'), 'semi-final').ok).toBe(true);
+  });
+
+  it('SLUTSPEL: straffar som OCKSÅ slutar lika avvisas (ingen vinnare)', () => {
+    const r = validateResultEntry(
+      'scheduled',
+      entryWithPens(0, 0, { homeGoals: 3, awayGoals: 3 }),
+      'quarter-final'
+    );
+    expect(codesOf(r)).toContain('knockout-tie-needs-penalties');
+  });
+
+  it('SLUTSPEL: ogiltiga straffmål (negativa/decimal) avvisas med egen kod', () => {
+    expect(
+      codesOf(
+        validateResultEntry(
+          'scheduled',
+          entryWithPens(1, 1, { homeGoals: -1, awayGoals: 3 }),
+          'final'
+        )
+      )
+    ).toContain('penalties-home-not-integer');
+    expect(
+      codesOf(
+        validateResultEntry(
+          'scheduled',
+          entryWithPens(1, 1, { homeGoals: 4, awayGoals: 2.5 }),
+          'final'
+        )
+      )
+    ).toContain('penalties-away-not-integer');
+  });
+
+  it('avvisar straffar på en match som inte behöver dem (penalties-not-applicable)', () => {
+    // Slutspel men AVGJORD ordinarie tid: straffar ska inte bäras.
+    expect(
+      codesOf(
+        validateResultEntry(
+          'scheduled',
+          entryWithPens(2, 1, { homeGoals: 4, awayGoals: 3 }),
+          'final'
+        )
+      )
+    ).toContain('penalties-not-applicable');
+    // Gruppspel med lika ställning + straffar angivna: inte tillämpligt.
+    expect(
+      codesOf(
+        validateResultEntry(
+          'scheduled',
+          entryWithPens(1, 1, { homeGoals: 4, awayGoals: 3 }),
+          'group'
+        )
+      )
+    ).toContain('penalties-not-applicable');
+  });
+
+  // C9 (Copilot runda 3): 'penalties-not-applicable' fick förr ges så fort
+  // straffar var ifyllda men inte krävdes, ÄVEN när ordinarie mål var
+  // ofullständiga/ogiltiga. Då är "Ta bort straffmålen" missvisande, för så
+  // snart målen rättas till en lika ställning blir straffarna i stället KRÄVDA.
+  // Felet ska bara ges när det SÄKERT går att avgöra att straffar inte gäller
+  // (gruppspel, eller giltiga ordinarie mål som inte är lika).
+  describe('C9: penalties-not-applicable bara när det säkert kan avgöras', () => {
+    it('SLUTSPEL finished UTAN ordinarie mål + straffar: målfelet, INTE penalties-not-applicable', () => {
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(null, null, { homeGoals: 4, awayGoals: 3 }),
+          'round-of-32'
+        )
+      );
+      expect(codes).toContain('finished-without-result');
+      expect(codes).not.toContain('penalties-not-applicable');
+    });
+
+    it('SLUTSPEL finished med BARA ETT ordinarie mål + straffar: målfelet, inte penalties-not-applicable', () => {
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(2, null, { homeGoals: 4, awayGoals: 3 }),
+          'round-of-32'
+        )
+      );
+      expect(codes).toContain('finished-without-result');
+      expect(codes).not.toContain('penalties-not-applicable');
+    });
+
+    it('SLUTSPEL finished med OGILTIGT ordinarie mål (decimal) + straffar: heltalsfelet, inte penalties-not-applicable', () => {
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(1.5, 1, { homeGoals: 4, awayGoals: 3 }),
+          'round-of-32'
+        )
+      );
+      expect(codes).toContain('home-not-integer');
+      expect(codes).not.toContain('penalties-not-applicable');
+    });
+
+    it('GRUPPSPEL utan ordinarie mål + straffar: fortfarande penalties-not-applicable (gäller aldrig i grupp)', () => {
+      // I gruppspel går det att avgöra säkert oavsett mål: straffar gäller aldrig.
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(null, null, { homeGoals: 4, awayGoals: 3 }),
+          'group'
+        )
+      );
+      expect(codes).toContain('penalties-not-applicable');
+    });
+
+    it('SLUTSPEL finished med giltiga ordinarie mål som inte är lika + straffar: fortfarande penalties-not-applicable', () => {
+      // Avgjord ordinarie tid -> säkert att straffar inte gäller (kontroll att
+      // gatingen inte tystade det legitima fallet).
+      const codes = codesOf(
+        validateResultEntry(
+          'scheduled',
+          entryWithPens(3, 1, { homeGoals: 4, awayGoals: 3 }),
+          'quarter-final'
+        )
+      );
+      expect(codes).toContain('penalties-not-applicable');
+    });
+  });
+});
+
 describe('toMatchResult', () => {
   it('bygger ett MatchResult ur en validerad finished-inmatning', () => {
     expect(toMatchResult(entry(2, 1, 'finished'))).toEqual({ homeGoals: 2, awayGoals: 1 });
@@ -115,5 +277,18 @@ describe('toMatchResult', () => {
   it('kastar (fail loud) om ett måltal saknas (anropad utan validering)', () => {
     expect(() => toMatchResult(entry(null, 1, 'finished'))).toThrow();
     expect(() => toMatchResult(entry(2, null, 'finished'))).toThrow();
+  });
+
+  it('BEVARAR straffar i resultatet (F1/penalties-pinnen)', () => {
+    expect(toMatchResult(entryWithPens(1, 1, { homeGoals: 5, awayGoals: 4 }))).toEqual({
+      homeGoals: 1,
+      awayGoals: 1,
+      penalties: { homeGoals: 5, awayGoals: 4 },
+    });
+  });
+
+  it('utelämnar penalties-fältet när inga straffar matats in (ren ordinarie seger)', () => {
+    const result = toMatchResult(entry(2, 1, 'finished'));
+    expect(result.penalties).toBeUndefined();
   });
 });

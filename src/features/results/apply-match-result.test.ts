@@ -34,6 +34,21 @@ function finished(id: string, home: string, away: string, hg: number, ag: number
   };
 }
 
+/** En scheduled SLUTSPELSmatch (kort), för straff-fallen (FIFA Art. 14). */
+function scheduledKnockout(id: string, home: string, away: string): Match {
+  return {
+    id,
+    stage: 'round-of-32',
+    groupId: null,
+    homeTeamId: home,
+    awayTeamId: away,
+    kickoff: '2026-07-01T19:00:00Z',
+    venue: 'Testarena',
+    result: null,
+    status: 'scheduled',
+  };
+}
+
 describe('applyMatchResult, lyckad inmatning', () => {
   it('sätter ett finished-resultat på en scheduled match (ny diskriminerad form)', () => {
     const matches: Match[] = [scheduled('m1', 'mex', 'rsa'), scheduled('m2', 'kor', 'cze')];
@@ -89,6 +104,60 @@ describe('applyMatchResult, lyckad inmatning', () => {
       status: 'finished',
     });
     expect(next[0].result).toEqual({ homeGoals: 4, awayGoals: 2 });
+  });
+});
+
+// F1/penalties-pinnen (acceptanstest): en slutspelsmatch som avgörs på straffar
+// måste BEVARA straffarna genom reducern (förr tappades de tyst).
+describe('applyMatchResult, slutspels-straffar (F1-pinnen, FIFA Art. 14)', () => {
+  it('sätter ett straff-avgjort slutspels-resultat och BEVARAR penalties', () => {
+    const matches: Match[] = [scheduledKnockout('M73', 'mex', 'rsa')];
+    const next = applyMatchResult(matches, 'M73', {
+      homeGoals: 1,
+      awayGoals: 1,
+      status: 'finished',
+      penalties: { homeGoals: 4, awayGoals: 2 },
+    });
+    const m = next.find((x) => x.id === 'M73')!;
+    expect(m.status).toBe('finished');
+    expect(m.result).toEqual({
+      homeGoals: 1,
+      awayGoals: 1,
+      penalties: { homeGoals: 4, awayGoals: 2 },
+    });
+  });
+
+  it('REDIGERAR ett finished straff-resultat och bevarar de nya straffarna', () => {
+    // En finished slutspelsmatch (1-1, straffar 4-2) redigeras till andra straffar.
+    const knockoutFinished: Match = {
+      id: 'M73',
+      stage: 'round-of-32',
+      groupId: null,
+      homeTeamId: 'mex',
+      awayTeamId: 'rsa',
+      kickoff: '2026-07-01T19:00:00Z',
+      venue: 'Testarena',
+      result: { homeGoals: 1, awayGoals: 1, penalties: { homeGoals: 4, awayGoals: 2 } },
+      status: 'finished',
+    };
+    const next = applyMatchResult([knockoutFinished], 'M73', {
+      homeGoals: 2,
+      awayGoals: 2,
+      status: 'finished',
+      penalties: { homeGoals: 5, awayGoals: 6 },
+    });
+    expect(next[0].result).toEqual({
+      homeGoals: 2,
+      awayGoals: 2,
+      penalties: { homeGoals: 5, awayGoals: 6 },
+    });
+  });
+
+  it('kastar (fail loud) på en lika slutspelsmatch UTAN straff-vinnare', () => {
+    const matches: Match[] = [scheduledKnockout('M73', 'mex', 'rsa')];
+    expect(() =>
+      applyMatchResult(matches, 'M73', { homeGoals: 1, awayGoals: 1, status: 'finished' })
+    ).toThrow(/ogiltig inmatning/);
   });
 });
 

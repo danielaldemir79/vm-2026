@@ -1,0 +1,100 @@
+FIFA-regelutdrag för slutspels-seedningens RANKING-regler (gold source).
+========================================================================
+Detta är det OFÖRÄNDRADE textutdraget ur FIFA:s officiella regelverk för
+de två slutspels-regler som T9:s härledning vilar på och som ALDRIG får
+gissas:
+
+  1. Rankningen av de TOLV grupptreorna -> de 8 bästa (Article 13,
+     "The eight best-ranked teams among those finishing third").
+     Driver rank-third-places.ts (vilka 8 grupper bidrar med en trea
+     som går vidare).
+
+  2. Straffar i slutspel (Article 14): en slutspelsmatch kan inte sluta
+     oavgjort, vid lika ställning efter förlängning avgör straffar.
+     Driver penalties-validering + vinnar-härledningen i derive-bracket.ts.
+
+KÄLLA (gissas ALDRIG): Regulations for the FIFA World Cup 26 (May 2026),
+  Article 13 "Equal points and qualification for knockout stages" sid. 26-28,
+  Article 14 "Extra time and penalties (penalty shootout)" sid. 28.
+  https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf
+EXTRAHERAT MED: pdftotext -layout FWC2026_regulations_EN.pdf  (Poppler),
+  hämtad 2026-06-10. Verbatim ur Article 13 + 14.
+
+VIKTIGT om rankningen av treorna (mot in-grupp-ordningen i compute-standings):
+de tolv treorna har ALDRIG mött varandra (de kommer från olika grupper), så
+det finns INGET inbördes möte (head-to-head) att räkna. Därför är Article 13:s
+trea-ranking ENBART de ÖVERGRIPANDE kriterierna a-c (poäng, total målskillnad,
+totalt gjorda mål) över ALLA gruppmatcher, INTE steg 1:s inbördes a-c.
+Kriterium d (kort/disciplin) + e-f (FIFA-ranking) är inte deterministiskt
+beräkningsbara ur matchresultaten (domänmodellen bär inga kort, ingen ranking),
+exakt samma avgränsning som compute-standings gör för sin compareOverall.
+
+========================================================================
+
+Article 13: EQUAL POINTS AND QUALIFICATION FOR KNOCKOUT STAGES
+
+If two or more teams in the same group are equal on points after the completion
+of the group stage, the following criteria, in the order below, shall be applied to
+determine the ranking:
+
+Step 1:
+    a) greatest number of points obtained in the group matches between the teams
+        concerned;
+    b) superior goal difference resulting from the group matches between the
+        teams concerned;
+    c) greatest number of goals scored in all group matches between the teams
+        concerned.
+
+Step 2:
+If, after having applied criteria a) to c) above, teams still have an equal ranking, and
+in order to determine their final rankings, criteria a) to c) above are applied to the
+matches between the remaining teams only. If no decision can be made through
+this procedure, criteria d) to f) below shall apply as follows to the two or more teams
+still equal on points:
+    d) superior goal difference in all group matches;
+    e) greatest number of goals scored in all group matches;
+    f) highest team conduct score (players and team officials) relating to the number
+        of yellow and red cards obtained:
+             - yellow card:                                          minus 1 point
+             - indirect red card (as a result of two yellow cards):  minus 3 points
+             - direct red card:                                      minus 4 points
+             - yellow card and direct red card:                      minus 5 points
+    Only one of the above deductions shall be applied to a player or team official in a
+    single match. The team with the highest number of points shall be ranked highest.
+
+Step 3:
+If no decision can be made through the procedures of step 1 and 2, the following
+shall apply:
+    g) the two or more teams still equal on points shall be ranked according to the
+        most recent published edition of the FIFA/Coca-Cola Men's World Ranking;
+    h) ... continually until a decision can be made.
+
+The eight best-ranked teams among those finishing third (third-placed teams
+from 1 to 8)
+
+The eight best teams among those ranked third will be determined as follows:
+    a) greatest number of points obtained in all group matches;
+    b) goal difference resulting from all group matches;
+    c) greatest number of goals scored in all group matches;
+    d) highest team conduct score (players and team officials) relating to the number
+        of yellow and red cards obtained in all group matches and calculated as per
+        article 13 paragraph 1, step 2;
+    e) the two or more teams still equal on points shall be ranked according to the
+        most recent published edition of the FIFA/Coca-Cola Men's World Ranking;
+    f) ... continually until a decision can be made.
+
+========================================================================
+
+Article 14: EXTRA TIME AND PENALTIES (PENALTY SHOOTOUT)
+
+14.1 In the knockout stages, if a match is level at the end of normal playing time,
+     extra time shall be played. Extra time shall consist of two 15-minute periods ...
+
+14.2 If the score is still level at the end of extra time, penalties (penalty shoot-out)
+     shall be taken to determine the winner, in accordance with the procedure
+     specified in the Laws of the Game.
+
+14.3 Before the start of a penalty shootout to determine the outcome of a match:
+     a) ... the referee tosses a coin to decide the goal at which the kicks will be taken ...
+     b) the referee tosses a coin again, and the team that wins the toss decides
+        whether to take the first or second kick.

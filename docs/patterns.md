@@ -389,3 +389,91 @@ något som måste mätas om för varje genererad ton. Den rena härledningen är
 wrap, edge-fall, fail-loud), och seam:en låter design färglägga fritt utan att kunna bryta a11y. Källa: T8
 (`src/features/daily/team-hue.ts` + `day-theme.ts` + `use-day-theme.ts`, inkopplad på DailyMatchesView-hero:n,
 dekor-token i `tokens.css` sektion 6).
+
+### harlett-slutspelstrad-tre-lagen-ovanpa-en-verifierad-seednings-motor (VM 2026)
+
+**Recept (ett LEVANDE slutspelsträd som ren funktion av matchresultaten, utan att gissa en regel):**
+
+1. ÅTERANVÄND den verifierade strukturen + seedningen, bygg INTE om. En källhänvisad positions-struktur
+   (`bracket-structure.ts`, FIFA Article 12) + tree-grafen (`build-bracket.ts`) + treplats-seedningen
+   (`seedThirdPlaces`/Annexe C) finns redan (T4). Härledningen LIGGER OVANPÅ den och definierar ingen ny
+   strukturell slutspelsregel, den fyller bara lag-tillståndet (PRINCIPLES §4).
+2. HÄRLEDNINGEN i en REN modul (`derive-bracket.ts`): `(grupptabeller, matcher) => BracketState`. Tre
+   datadrivna lägen per slot, INGEN gissning: (a) gruppspel pågår -> `possible` + en positions-etikett
+   ("1:a grupp E", "3:a A/B/C/D/F" EXAKT ur strukturens eligibleGroups, inte spekulation om kvalificering);
+   (b) grupperna klara -> `resolved` till riktiga lag (gruppvinnare/tvåa ur tabellerna + de 8 bästa treorna
+   via seedningen); (c) slutspelsresultat -> vinnaren propagerar. Bygg slotarna i MATCH-ORDNING (M73->M104):
+   eftersom en match alltid kommer efter sina föregångare i FIFA-numreringen är föregångar-utfallet redan
+   beräknat när du når en match-progressions-slot, så EN passering propagerar vinnare genom hela trädet.
+3. LÅSNINGEN härleds, inte ur ett flagg-fält: `isGroupStageComplete` = alla 12 grupper har varje lag på 3
+   spelade matcher (`played >= 3`), en ren funktion av sanningen. Först då seedas treorna (annars stannar
+   bästa-trea-slotarna i `possible`-läget). `qualifyingGroups` är null tills rangordningen är komplett
+   (en trea per grupp, alla A-L representerade), så
+   seedThirdPlaces (som fail-loud:ar på fel antal) aldrig anropas på en ofullständig gissning.
+4. VINNAR-PROPAGERING via en ren `outcomeOf(match, home, away)`: ordinarie mål avgör, vid lika avgör
+   straffar (FIFA Article 14); en lika match UTAN avgörande straffar ger INGEN vinnare (fail-safe, propagera
+   aldrig en gissning). Bronsmatchen matas av `match-loser` (semifinal-förlorarna), final av `match-winner`.
+5. SEAM: hooken (`use-bracket-data.ts`) är en tunn konsument av den DELADE results-storen (samma sanning som
+   gruppspel + inmatning), härleder via `useMemo` gatad på `status === 'ready'` (samma stale-kontrakt som
+   useGroupData, C8). Vyn (`BracketView`) renderar stabil semantik (region per runda, slot som list-rad) +
+   DATA-ATTRIBUT (`data-bracket-round/-match/-slot`, `data-slot-resolution`, `data-winner`,
+   `data-bracket-locked`, `data-bracket-scroll`) som design-frontend bygger premium-trädet + vinnar-
+   animationen ("drag fram vinnaren") ovanpå, utan att röra härledningen. Responsiv-förberedd:
+   `overflow-x-auto` + fasta rund-kolumner (horisontell scroll på mobil, inget kläms ihop).
+6. TÄCKNING: enhetstesta härledningen i alla tre lägen + fel-vägar (lika utan straffar, ofullständigt
+   gruppspel), OCH ett LIVE-integrationstest som monterar vyn under storen, seedar ett fullständigt
+   gruppspel (bevisar låsning + kollisionsfri Annexe C-seedning) och ett slutspelsresultat (bevisar att
+   vinnaren förs fram till nästa slot), allt via samma `setMatches`-seam som inmatningen.
+
+**Källhänvisnings-krav (HARD) för gissningskänslig data:** två FIFA-regler källhänvisades INNAN koden
+skrevs och committades verbatim i `src/domain/bracket/fifa-knockout-rules-source.txt` (pdftotext-utdrag ur
+FWC2026-regelverket): (1) rankningen av grupptreorna -> de 8 bästa (Article 13, ENBART övergripande a-c,
+INTE inbördes head-to-head eftersom treorna aldrig mötts), (2) straffar i slutspel (Article 14). Så
+reviewern kan BEKRÄFTA reglerna mot källan i stället för att jaga dem.
+
+**Varför:** SPEC §5+§6 kräver ett träd som justeras under gruppspelet, låses korrekt vid grupp-slut (den
+ökända felkänsliga seedningen) och för fram vinnaren. Genom att göra trädet till en ren funktion av en enda
+sanning (matchlistan) ovanpå den redan verifierade, källhänvisade seednings-motorn blir "live" gratis och
+korrekt, och den kritiska FIFA-regeln kan aldrig drifta isär från koden. Generaliserar T5/T6:s "härledd-
+state-vy" till en andra härledd vy på samma delade store. Källa: T9 (`src/features/bracket/` +
+`src/domain/bracket/rank-third-places.ts`).
+
+### premium-bracket-ovanpa-data-attribut-seam-med-intensitet-mot-finalen (design, VM 2026)
+
+**Recept (ett vackert, läsbart slutspelsträd som stylas ENBART via seamens data-attribut):**
+
+1. STYLA OVANPÅ SEAMEN, rör aldrig semantiken. En dedikerad feature-CSS (`bracket.css`) + klass-hakar i
+   vyn hänger ALLT på senior-devs stabila data-attribut (`data-bracket-round/-match/-slot`,
+   `data-slot-resolution`, `data-winner`, `data-bracket-scroll/-locked`). Resultat: alla regioner,
+   rubrik-hierarkin, `<ul>/<li>`-slots och aria-labels står kvar, alla tester gröna. Inga råa hex,
+   bara `color-mix`/tema-token, så trädet är troget BÅDA teman.
+2. INTENSITET SOM BYGGER MOT FINALEN ger trädet riktning: en numrerad runda-marker (1->6) i rubriken,
+   semifinalens kant tar lite accent, och FINALEN får en signatur (guld-kant + guld-tint + guld-glow
+   via `color-mix(... var(--vm-gold) ...)`). Vertikalt centrerade rund-kolumner (`justify-content:
+   center`) ger träd-känslan (senare rundor möter sina föregångare på mitten) + en subtil
+   kopplings-affordans (en `::after`-feeder-linje per kolumn, utom de yttersta). Ärlig: fejkar inte
+   exakt bezier-geometri som den platta kolumn-datan inte bär.
+3. VINNAR-FRAMHÄVNING FÄRG-OBEROENDE (T7/T8-pin): stapla form + yta + ikon + vikt, aldrig bara färg.
+   `[data-winner]` -> accent-kant-bar (`box-shadow: inset 3px 0 0`) + accent-tint-yta + en medalj-bock ✓
+   (CSS-pseudo `::after` på en namn-span, så TSX-semantiken inte rörs) + fet text. Bevisat i reduced-
+   motion att markörerna står kvar medan rörelsen nollas -> vinnaren syns i gråskala/för färgblinda.
+4. AVANCERINGS-ANIMATION = CSS, inte JS (samma motgift som hero:n): en engångs glow-puls + medalj-pop
+   (`@keyframes`), noll layout-påverkan (CLS=0). Den globala reduced-motion-regeln räcker INTE (fryser
+   keyframes på slutläget), så bracket-rörelsen nollas EXPLICIT med `animation: none` vid
+   `prefers-reduced-motion: reduce`. Verifiera live: `getComputedStyle(...).animationName === 'none'`.
+5. SCROLL SOM FEATURE: trädet är brett, så mobil scrollar i sidled (seamens `overflow-x-auto`) med mjuka
+   edge-fade-masker (`mask-image: linear-gradient(...)` mot tema) + en "Svep i sidled →"-hint som döljs
+   `>= 1024px`. Verifiera 280/360/768/1024/1440px: NOLL sid-overflow (dokumentet scrollar aldrig
+   horisontellt, bara bracket-containern), ingen nod sticker ut förbi viewporten.
+6. AA UPPMÄTT, ALDRIG PÅSTÅTT, i BÅDA teman (canvas-komposit-metoden, lessons `aa-kontrast-pastad...`):
+   mät på faktiskt renderad yta (komposita halvgenomskinliga tints mot effektiv bakgrund). KÄND fälla:
+   guld-text på vit yta faller under AA i ljust tema (här 3.29:1). Motgift = en SOLID guld-bricka med
+   near-black ink (`#1c1403`), samma mönster som "Dagens match"-chippet (T7-pin), 5.03:1 ljust /
+   ~10.9:1 mörkt. När en framhävnings-roll bär liten text: solid bricka + kontrast-säker ink, aldrig
+   rollens hue i texten mot en svag tint.
+
+**Varför:** "Träd ska kännas designade, inte genererade" (SPEC §7), och det är skärmen folk visar för
+kompisar. Genom att styla på data-attribut-seamen kan trädet bli premium utan att riskera senior-devs
+härledning eller a11y, och genom att tvinga ut framhävning + animation i form/ikon/CSS (inte färg/JS)
+håller det läsbarheten helig i båda teman, för färgblinda och vid reducerad rörelse. Källa: T9 design-
+frontend (`src/features/bracket/bracket.css` + `BracketView.tsx`).

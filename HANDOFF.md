@@ -5,6 +5,111 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T9/#9 KLAR - PR #43 väntar på autonom merge
+
+**Branch:** `feature/T9-slutspelstrad` @ HEAD `3c1afe6`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/43 mot `develop` (Closes #9, state: OPEN)
+**Board:** issue #9 i "In Review" (korrekt). Dirigenten stänger issue #9 MANUELLT och flyttar kort #9 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt att merga, förbättra brister och mata på nya tasks.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `cd19d74` - straffläggning i slutspel (FIFA Art. 14, F1/penalties-pinnen LÖST)
+- `f380cdd` - trea-rankning (FIFA Art. 13, 8 bästa treorna)
+- `b57c61d` - deriveBracket, levande träd (möjliga lag, låst, vinnar-propagering)
+- `389b6d6` - BracketView + useBracketData + wiring i App
+- `c31790c` - docs: decisions.md + patterns.md + HANDOFF
+- `b1377d8` + `776de65` - design premium + AA-uppmätta värden (lägsta 5.03:1)
+- `70d2c08` + `ac27bb1` - lokal panel F1-F3 åtgärdade med negativa kontroller (mutations-bevis)
+- `4c6863e`, `220686a`, `2480ce7`, `21f4ed7`, `0e3c47c`, `872d666`, `5f2013d` - Copilot rundor 1-4
+- `73e4e63` - flaky-timeout fix
+- `79b62e3`, `3c1afe6` - Copilot runda 5 (HEAD)
+
+**Verifiering (dirigenten oberoende):** 488 tester gröna (47 filer), build/lint/format rent.
+**Copilot-loop:** 5 rundor, 14 fynd, alla åtgärdade. Exit <= 2 triviala nådd i runda 5.
+**Alla 6/6 acceptanskriterier bockade i issue #9** (journalisten 2026-06-10).
+
+**F1/penalties-pinnen: STÄNGD** (ägare senior-developer). Reducern bevarar nu `penalties`, acceptanstest grönt. Ta INTE med som öppen pin framåt.
+
+**PINNADE punkter (bär framåt):**
+- **T14-pin UTÖKAD:** flippa `LIVE_READY = true` + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion (inget test refererar "LIVE_READY=false"). Guard-testet BRYTS medvetet vid flip. Projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn (3 dagar framåt) tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+
+**"Behöver Daniel"-kö (han är borta):**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista. Alternativ: (a) visa meddelande "turneringen avslutad", (b) ankra fönstret till sista speldagen.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` i `memory/lessons/senior-developer.md` har nått Förekomst 3 (T4 + T8 + T9). Typ: korsar flera agenter (reviewer + senior-developer) -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` i `memory/lessons/journalist.md` har nått Förekomst 3 (T7 + HOTFIX #37 + T8). Typ: agent-beteende (journalist) -> permanent regel i journalistens fil. Väntar Daniels godkännande.
+
+**Nästa task:** #42 (T28, Daniels feedback 2 - datum/tid/grupp i matchlistan + lättåtkomlig ihopfällning). Beror på #39 (klar) och T9 (klar). Därefter T10-T13, sedan T14.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
+>
+> Om PR #43 (T9/#9, feature/T9-slutspelstrad) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 43 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #9 manuellt (`gh issue close 9`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #9 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar slutspelsträdet (WOW-skärm). Skicka demo till Daniel.
+>
+> Om PR #43 REDAN mergad:
+> T1-T9 + T4b + HOTFIX #37 + T27/#39 är klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: #42 (T28, Daniels feedback 2 - datum/tid/grupp i matchlistan + lättåtkomlig ihopfällning).**
+>
+> Bär framåt (alla tasks):
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion. Projekt kmzhyblzxangpxydufve.
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35), #39-F1-produktbeslut, 2 BEFORDRINGAR (reviewer + journalist, båda Förekomst 3, väntar Daniels godkännande).
+
+---
+
+## RESUME-HERE , 2026-06-10 , T9/#9 (slutspelsträdet) , senior-developer KLAR, väntar review + PR
+
+**Branch:** `feature/T9-slutspelstrad` (från develop HEAD). Ingen PR öppnad än.
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt att review:a/merga/mata på.
+
+**KLART med bevis (atomiska commits):**
+- `cd19d74` , feat(results): straffläggning i slutspel, F1/penalties-pinnen LÖST (FIFA Art. 14)
+- `f380cdd` , feat(domain): rangordna grupptreorna -> 8 bästa (FIFA Article 13)
+- `b57c61d` , feat(bracket): deriveBracket, levande träd (möjliga lag/låst/vinnar-propagering)
+- `389b6d6` , feat(bracket): BracketView + useBracketData + live-integrationstest, wirad i App
+- (docs-commit härnäst: decisions.md + patterns.md + denna HANDOFF)
+- Verifiering: **462 tester gröna (47 filer)** (baseline 406/43, +56), build + lint + format:check rent
+- Secret-skan av diffen: rent (bara test-fixtures `anon-key`, inga riktiga nycklar)
+
+**Alla 5 acceptanskriterier täckta:**
+1. Trädet byggs ur tabelläget, låses vid grupp-slut enligt T4-seedningen , `deriveBracket` + `isGroupStageComplete` + live-integrationstest.
+2. Slutspelsresultat för fram vinnaren (semantik/data; animation = design) , `winnerSlotId`/`data-winner` + propagering, integrationstest.
+3. Korrekt struktur sextondel->åttondel->kvart->semi->brons->final , `groupByRound` + struktur-test.
+4. Responsiv-förberedd (horisontell scroll) + a11y-semantik , `overflow-x-auto` + region/list-semantik + vy-test.
+5. Tester för uppbyggnad + låsning + avancering + edge-fall (oavgjort kräver seedning/straffar) , 20 derive-tester + 3 integ + penalties-tester.
+
+**F1/penalties-pinnen: LÖST** (ägare var senior-developer). Reducern bevarar nu `penalties`;
+acceptanstest grönt. Ta INTE med som öppen pin framåt.
+
+**KÄLLHÄNVISNING (HARD, för review-grinden):** två FIFA-regler committade verbatim i
+`src/domain/bracket/fifa-knockout-rules-source.txt` (pdftotext ur FWC2026-regelverket):
+Article 13 (trea-rankning, ENBART övergripande a-c, ej head-to-head) + Article 14 (straffar).
+Reviewern kan BEKRÄFTA mot källan. Beslut + tolkning i `docs/decisions.md` (T9-raden).
+
+**PINNADE punkter (bär framåt, oförändrade):**
+- **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion.
+- **T14-pin (Supabase):** projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad):** venue = platshållare tills verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+
+**Next:** lokal review-panel -> ev. åtgärder -> PR mot develop -> copilot-loop -> Daniel mergar.
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T27/#39 KLAR - PR #41 väntar på autonom merge
 
 **Branch:** `feature/T27-resultatlista-ux` @ HEAD `34fdd28`
