@@ -63,9 +63,19 @@ export function splitDuration(remainingMs: number): CountdownParts {
  * kommande tills dess avsparks-instant passerats (kickoff > nu). Exakt vid
  * avspark (kickoff === nu) räknas den INTE längre som kommande, så nedräkningen
  * inte fastnar på 0 utan går vidare till nästa match (eller sluttillståndet).
+ *
+ * Fail loud (PRINCIPLES §8, samma kontrakt som localDateKey/formatDayHeading i
+ * samma feature): en ogiltig kickoff (NaN-tidsstämpel) är ett DATAFEL. Att låta
+ * NaN-jämförelsen tyst bli `false` skulle dölja en datakorrupt match som "inte
+ * kommande", så nästa-avspark-valet hoppade tyst över den och hero:n kunde
+ * felaktigt landa i sluttillståndet (Copilot R1, C2). Vi kastar i stället.
  */
 function isUpcoming(match: Match, nowMs: number): boolean {
-  return new Date(match.kickoff).getTime() > nowMs;
+  const kickoffMs = new Date(match.kickoff).getTime();
+  if (Number.isNaN(kickoffMs)) {
+    throw new Error(`Ogiltig kickoff-tidsstämpel för match "${match.id}": "${match.kickoff}".`);
+  }
+  return kickoffMs > nowMs;
 }
 
 /**

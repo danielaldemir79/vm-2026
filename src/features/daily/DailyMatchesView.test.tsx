@@ -61,6 +61,44 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
       expect(cd).not.toBeNull();
     });
   });
+
+  it('flicker-visar ALDRIG tom-dag-panelen med matcher i schemat (Copilot R1, C1)', async () => {
+    // REGRESSION: startdagen härleds synkront i render (use-daily-matches), så det
+    // finns ingen ready-render där days>0 men selectedDay===null. Tidigare sattes
+    // startdagen via en useEffect och då kunde "Ingen match den här dagen" blinka
+    // till fast fixtures har matcher. Vi mäter genom att observera DOM:en från
+    // första render via en MutationObserver: dyker tom-dag-rubriken någonsin upp,
+    // failar testet. Sedan väntar vi tills matchkorten är på plats (ready+dagar).
+    let emptyPanelSeen = false;
+    const seesEmptyPanel = () =>
+      Array.from(document.querySelectorAll('p')).some(
+        (p) => p.textContent === 'Ingen match den här dagen'
+      );
+
+    const observer = new MutationObserver(() => {
+      if (seesEmptyPanel()) {
+        emptyPanelSeen = true;
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    try {
+      renderView(fixturesEnv(), <DailyMatchesView />);
+      // Synkront direkt efter mount (innan effekter flushats): inte heller då.
+      if (seesEmptyPanel()) emptyPanelSeen = true;
+
+      await waitSettled();
+      // Bekräfta att vi faktiskt nådde ready-läget MED matcher (annars vore
+      // frånvaron av panelen meningslös).
+      await waitFor(() => {
+        expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+      });
+    } finally {
+      observer.disconnect();
+    }
+
+    expect(emptyPanelSeen).toBe(false);
+  });
 });
 
 describe('DailyMatchesView, fel-väg (fail loud)', () => {

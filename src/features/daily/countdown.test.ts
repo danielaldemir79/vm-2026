@@ -80,6 +80,18 @@ describe('computeCountdown, nästa kommande avspark', () => {
     const asMs = computeCountdown(matches, Date.parse('2026-06-11T18:00:00.000Z'));
     expect(asDate).toEqual(asMs);
   });
+
+  it('FEL-VÄG: en ogiltig kickoff KASTAR (fail loud), tystas inte till "inte kommande"', () => {
+    // REGRESSION (Copilot R1, C2): en NaN-tidsstämpel jämfördes tyst som `false`
+    // och matchen hoppades över, så en datakorrupt match kunde få hero:n att
+    // felaktigt landa i sluttillståndet. Samma fail-loud-kontrakt som localDateKey
+    // /formatDayHeading i samma feature: ett datafel ska synas, inte maskeras.
+    const now = new Date('2026-06-11T10:00:00.000Z');
+    const matches = [sched('trasig', 'inte-ett-datum')];
+    expect(() => computeCountdown(matches, now)).toThrow(/Ogiltig kickoff-tidsstämpel/);
+    // Felmeddelandet pekar ut VILKEN match (spårbart vid datafel).
+    expect(() => computeCountdown(matches, now)).toThrow(/trasig/);
+  });
 });
 
 describe('selectMatchOfTheDay, deterministiskt val (tidigast, id som tie-break)', () => {

@@ -5,9 +5,12 @@
 // första sakerna en tittare letar efter ("var ser jag den?"), så den får ett
 // eget, igenkännbart märke med en liten "live-prick" och kanalens egen ton i
 // stället för att gömmas i metadata-raden. Tonerna är MEDVETET dämpade
-// färg-accenter ovanpå semantiska ytor (color-mix mot tokens, inga råa hex som
-// bryter temat), och kontrasten hålls på fg-nivå så texten är AA i båda teman,
-// kanalfärgen lever i kant + bakgrund, aldrig i själva texten.
+// färg-accenter: kanalens hue (en hex-literal, kanalens egen signaturfärg) bakas
+// alltid ihop med en semantisk yt-token via color-mix (14 % mot --color-surface
+// i bakgrunden, 38 % i kanten), så den RENDERADE färgen alltid är dämpad och
+// följer temat, hex:en lyser aldrig rå rakt ut. Kontrasten hålls på fg-nivå så
+// texten är AA i båda teman, kanalfärgen lever i kant + bakgrund + prick, aldrig
+// i själva texten.
 //
 // A11y: matchkortets aria-label bär redan kanalnamnet i sin sammanfattning, så
 // badgen är ett rent visuellt komplement. Den lilla pricken är aria-hidden.
@@ -15,10 +18,13 @@
 import type { CSSProperties } from 'react';
 
 /**
- * Kanal-ton per känd svensk kanal (SPEC §4: SVT + TV4). Tonen uttrycks som en
- * HUE mot en semantisk token via color-mix, så märket följer temat och aldrig
- * blir en rå, tema-blind hex. Okänd/ovanlig kanal faller tillbaka på en neutral
- * fg-ton, så en framtida kanal (t.ex. en strömningstjänst) ändå ser prydlig ut.
+ * Kanal-ton per känd svensk kanal (SPEC §4: SVT + TV4). Returnerar en HUE: för
+ * de kända kanalerna en hex-literal (kanalens egen signaturfärg), för okänt en
+ * semantisk token (--color-fg). Hue:n används ALDRIG rakt av som färg, den bakas
+ * alltid ihop med en semantisk yt-token via color-mix i TvBadge (se där), så den
+ * RENDERADE färgen är dämpad och följer temat även om hue:n är en rå hex. Den
+ * neutrala fallbacken gör att en framtida kanal (t.ex. en strömningstjänst) ändå
+ * ser prydlig ut.
  */
 function channelTone(channel: string): { hue: string } {
   const normalized = channel.toLowerCase();
