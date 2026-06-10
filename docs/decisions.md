@@ -5,6 +5,45 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T7 (issue #7): Copilot-review R2 (C5-C8)
+
+**Beslut (C5, reduced-motion stänger AV hero-animationerna helt):** Vid `prefers-reduced-motion: reduce`
+nollas de dekorativa hero-animationerna EXPLICIT med `animation: none` på `.vm-hero-sheen` och
+`.vm-live-dot` (`src/index.css`), utöver den svepande `animation-duration: 0.01ms`-regeln.
+**Varför:** Den svepande regeln (`duration: 0.01ms` + `iteration-count: 1`) kör animationen en gång
+till SLUT nästan momentant, så keyframsen landar på sitt 100 %-läge, inte sitt startläge. För
+`vm-sheen` är 100 % `background-position: 140% 0%`, dvs sveptet fryser mitt i/utanför fonden i stället
+för i ro, och den gamla kommentaren ("stannar på sitt första steg") var falsk. Designintentet (T7
+design-lager) är en HELT statisk hero vid reducerad rörelse; `animation: none` ger det och håller
+kommentaren sann (WCAG 2.3.3).
+
+**Beslut (C6, MatchCard-kommentar rättad till verkligheten):** Kommentaren i botten-raden sa att
+"dt:erna är visuellt dolda (sr-only)", men Arena-dt:n är SYNLIG (`font-semibold`). Rättad (minsta
+sanna ändring): de flesta dt:er är `sr-only` (värdet bär sin egen identitet, t.ex. TV-badgen och
+guld-chippet), men Arena-dt:n hålls synlig eftersom ett bart arena-/stadsnamn behöver en synlig
+"Arena"-etikett för att inte bli tvetydigt. Ingen funktionell ändring, bara doc-drift bort.
+
+**Beslut (C7, vilodagar inkluderas i dagslistan):** `groupMatchesByDay` returnerar nu en post för
+VARJE kalenderdag mellan turneringens första och sista speldag, även dagar utan matcher (`matches: []`).
+**Varför:** VM 2026 spelas 11 juni-19 juli och har vilodagar mellan ronderna (mellan gruppspelets slut
+och sextondelarna m.m.); med bara speldagar i listan hoppade datumnavigeringen rakt över dem och
+vilodags-panelen i vyn (lokala reviewens F4) var oåtkomlig. Issue #7:s DoD kräver "Datumnavigering
+bläddrar dag för dag, hanterar dagar utan matcher". Tomma dagar fylls med en ren datum-uppräkning i
+UTC-midnatt (`enumerateDateKeys`) så ingen DST-övergång i Europe/Stockholm kan hoppa över/upprepa ett
+datum (nycklarna är redan rena svenska kalenderdatum, det är bara kalender-aritmetik på dem).
+**Startdags-val (dokumenterat):** `initialDayIndex` landar på "idag" när idag ligger i spannet OAVSETT
+om det är en speldag eller vilodag (en vilodag som "idag" visar vilodags-panelen), annars premiären
+(idag före spannet) eller sista dagen (allt passerat). Mer intuitivt än att tvinga fram nästa speldag
+mitt under ett pågående mästerskap. Första/sista dag förblir kant-disabled i navigeringen.
+
+**Beslut (C8, kuriosa SCOPAS BORT från T7 -> T10):** "Kuriosa"-fältet på matchkortet renderas aldrig
+eftersom `matches.ts` inte bär verifierad trivia-data. Kuriosa flyttas till T10 (lag-profil-tasken)
+där en verifierad datakälla finns. **Varför:** Samma princip som arena-platshållaren (#35) och
+gissa-aldrig: en uppgift utan verifierad källa presenteras inte som data. Dirigenten uppdaterar
+issue #7:s DoD.
+
+---
+
 ## 2026-06-10 , T7 (issue #7): Copilot-review R1 (C1-C4)
 
 **Beslut (C1, startdag synkront):** Den valda startdagen i `useDailyMatches` härleds SYNKRONT i
@@ -61,8 +100,9 @@ arena-data finns. Design-frontend finputsar (dölj/dämpa) ovanpå.
 **Beslut (design-frontend, premium-lager):** Hero:n byggs som "arena i kvällsljus": en mörk yta med
 två radiella ljus (pitch-grön ur övre hörnet, varm guld ur det nedre) plus ett långsamt rörligt
 ljus-svep (`vm-sheen`) och en pulsande live-prick (`vm-pulse`). Båda CSS-animationerna är RENT
-dekorativa och nollas av den globala reduced-motion-regeln i `index.css` (de snappar till sitt
-statiska första steg), så WCAG 2.3.3 håller utan en egen JS-grind. Nedräkningen renderas som
+dekorativa och stängs AV explicit vid `prefers-reduced-motion` (`animation: none` på `.vm-hero-sheen`
+/ `.vm-live-dot` i `index.css`, se C5-beslutet 2026-06-10), så hero:n är helt statisk, WCAG 2.3.3
+håller utan en egen JS-grind. Nedräkningen renderas som
 upphöjda "tiles" med `tabular-nums` + fast min-bredd, så siffrorna aldrig ger layout-hopp när
 sekunderna tickar (ingen CLS).
 **Varför (featured-signal, T7-pin):** "Dagens match" framhävs FÄRG-OBEROENDE med GULD (chip + kant +
