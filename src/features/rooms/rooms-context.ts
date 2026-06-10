@@ -67,3 +67,49 @@ export function useRoomsStore(): RoomsStore {
   }
   return store;
 }
+
+/**
+ * Den DELMÄNGD av rums-storen som results-lagret behöver för att väva in delade
+ * resultat (T14, KA-F3). Skild från RoomsStore så ResultsProvider bara kopplas
+ * mot exakt det den behöver (lägsta koppling): vilket rum är aktivt, vilka delade
+ * resultat finns, och hur man sparar ett resultat till rummet.
+ */
+export interface RoomsSync {
+  /** Det aktiva rummets id, eller null (lokalt läge, inget delat). */
+  activeRoomId: string | null;
+  /** De delade resultaten i det aktiva rummet (tomt i lokalt läge). */
+  sharedResults: RoomMatchResult[];
+  /** Spara ett resultat till det aktiva rummet (no-op utan aktivt rum). */
+  saveResult: (input: RoomResultInput) => Promise<void>;
+}
+
+/** Inert rums-synk: inget aktivt rum, inga delade resultat, spar är en no-op. */
+const INERT_ROOMS_SYNC: RoomsSync = {
+  activeRoomId: null,
+  sharedResults: [],
+  saveResult: async () => {},
+};
+
+/**
+ * Läs rums-synk-delen TOLERANT mot en saknad provider (T14, KA-F3).
+ *
+ * VARFÖR tolerant (till skillnad från useRoomsStore som kastar): results-lagret
+ * (ResultsProvider) ligger NÄSTLAT inuti RoomsProvider i appen, men renderas i
+ * MÅNGA tester (och kan i princip återanvändas) UTAN en RoomsProvider. Det delade
+ * rums-lagret är ett ADDITIVT socialt lager: utan ett rum ska resultatinmatningen
+ * fungera precis som förr (lokalt). Därför faller hooken till en INERT synk utan
+ * provider, i stället för att tvinga varje results-konsument under en RoomsProvider
+ * (samma tolerans-mönster som useFeedbackSettings i app-settings). Det är just
+ * "lokal-läge utan rum = som idag"-kravet i KA-F3 punkt (c), uttryckt i typen.
+ */
+export function useRoomsSync(): RoomsSync {
+  const store = useContext(RoomsStoreContext);
+  if (store === null) {
+    return INERT_ROOMS_SYNC;
+  }
+  return {
+    activeRoomId: store.activeRoom?.id ?? null,
+    sharedResults: store.results,
+    saveResult: store.saveResult,
+  };
+}
