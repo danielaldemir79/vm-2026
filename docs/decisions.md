@@ -5,7 +5,23 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
-## 2026-06-10 , T10 (issue #10, Copilot C3/C4): profil-oberoende lag-bas bryter bootstrap-cykeln
+## 2026-06-10 , T10 (issue #10): flake-fix, vänta in passiva a11y-effekter i lag-profil-testet
+
+**Beslut:** Lag-profil-modalens a11y-tester väntar in dialogens passiva öppnings-effekter (fokus
+flyttas till stäng-knappen + Escape-lyssnaren registreras) med `await waitFor(() => expect(closeBtn)
+.toHaveFocus())` innan de assertar fokus/Escape, i stället för att läsa `activeElement` direkt efter
+`findByRole('dialog')`.
+
+**Varför:** ROTORSAK till flaken (#10): React 19 kör passiva `useEffect` ASYNKRONT, så
+`findByRole('dialog')` kan resolva i en poll-tick där dialog-noden är committad men fokus-/Escape-
+effekterna ännu inte körts (`activeElement` = body). Empiriskt bevisat med en instrumenterad probe
+(activeElement = BODY trots committad dialog) under full parallell svit-last (24 forks); rödnade
+~2/6 körningar, alltid grön isolerat. Det var INTE `document.hasFocus()` (verifierat: `.focus()`
+flyttar `activeElement` korrekt även när `hasFocus()` är false) och INTE userEvent-timing. Att vänta
+in fokus-flytten flushar BÅDA effekterna och testar SAMMA invariant utan effekt-flush-race. Negativ
+kontroll: med fokus-fällan urkopplad rödnar Tab-testerna fortfarande (2 failed), så de vaktar äkta.
+
+
 
 **Beslut:** Den RÅ lag-/grupp-datan (id/namn/kod/grupp + WC2026_GROUPS + WC2026_TEAM_REFS) flyttades
 till en egen modul `src/data/wc2026/team-refs.ts` som ALDRIG importerar `team-profiles.ts`. `teams.ts`

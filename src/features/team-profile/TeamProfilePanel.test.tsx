@@ -80,10 +80,25 @@ describe('TeamProfilePanel, stängning (a11y-dialog)', () => {
     (document.activeElement as HTMLElement | null)?.blur?.();
   });
 
+  // Öppna profilen OCH vänta in att dialogens öppnings-effekter har flushat.
+  //
+  // ROTORSAK till tidigare flake (#10): panelen flyttar fokus till stäng-knappen
+  // OCH registrerar Escape-lyssnaren i passiva useEffect:er. React 19 kör passiva
+  // effekter ASYNKRONT, så findByRole('dialog') kan resolva i en poll-tick där
+  // dialog-noden är committad men effekterna ännu INTE har körts (activeElement är
+  // då body). Under full parallell svit-last (24 forks) inträffar det glappet, och
+  // tester som direkt assertar toHaveFocus()/Escape-stängning rödnade ~2/6 körningar.
+  // Empiriskt bevisat: vid felet är activeElement = BODY trots committad dialog.
+  // Genom att vänta in fokus-flytten (findByRole hittar redan dialogen; vi pollar
+  // tills stäng-knappen FÅR fokus) garanterar vi att BÅDA öppnings-effekterna har
+  // flushat innan testet går vidare. Samma invariant testas, utan effekt-flush-race.
   async function openSweden() {
     renderWithProviders(<OpenButton teamId="swe" label="öppna" />);
     fireEvent.click(screen.getByText('öppna'));
-    return screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog');
+    const closeBtn = screen.getByRole('button', { name: /Stäng lagprofil/i });
+    await waitFor(() => expect(closeBtn).toHaveFocus());
+    return dialog;
   }
 
   it('stängs med stäng-knappen', async () => {
@@ -168,12 +183,14 @@ describe('TeamProfilePanel, stängning (a11y-dialog)', () => {
     expect(opener).toHaveFocus();
     fireEvent.click(opener); // öppnaren är activeElement vid öppning -> minns som opener
     await screen.findByRole('dialog');
-    // Fokus flyttades in i dialogen (stäng-knappen) vid öppning.
-    expect(screen.getByRole('button', { name: /Stäng lagprofil/i })).toHaveFocus();
+    // Vänta in fokus-flytten in i dialogen (passiv effekt, se openSweden:s rotorsak),
+    // annars kan assertion läsa activeElement INNAN effekten flushat under svit-last.
+    const closeBtn = screen.getByRole('button', { name: /Stäng lagprofil/i });
+    await waitFor(() => expect(closeBtn).toHaveFocus());
     // Stäng -> fokus ska återgå till öppnar-knappen (cleanup-effekten i panelen).
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
   });
 });
 
