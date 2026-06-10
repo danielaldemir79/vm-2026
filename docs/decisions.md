@@ -59,16 +59,28 @@ kopior, PRINCIPLES §4), och dagens hue = det **cirkulära medlet** (vektor-mede
 lagens hues. **Varför cirkulärt och inte aritmetiskt medel:** ett aritmetiskt medel av t.ex. hue 5
 och 355 ger 180 (fel sida av hjulet); vektor-medlet ger ~0 (rätt). Cirkulärt medel är dessutom
 ORDNINGS-OBEROENDE och deterministiskt, så en premiärdag med många lag (upp till 16) får en stabil,
-väldefinierad ton i stället för en godtycklig "första laget"-regel. Bevisat av test (ordnings-
-oberoende + wrap kring 0/360 + 16-lags-determinism).
+väldefinierad ton i stället för en godtycklig "första laget"-regel. **Degenererat randfall (F1):**
+om lagens hues tar exakt ut varandra (vektorsumma ~0, t.ex. CRO 85 mot QAT 265 som är precis
+antipodala) finns ingen medelriktning, då faller regeln tillbaka på den MINSTA hue:n i uppsättningen
+(`Math.min(hues)`). Det valdes för att fallbacken ska vara ORDNINGS-OBEROENDE: `hues[0]` (tidigare)
+gav olika ton beroende på hemma/borta-ordning för det antipodala paret och bröt ordnings-oberoendet
+nåbart med riktig speldata. Bevisat av test (ordnings-oberoende inkl. ett ANTIPODALT par i båda
+ordningarna + wrap kring 0/360 + 16-lags-determinism).
 
 **Beslut (KONTRAST-VAKT I KOD, acceptanskriterium 2, WCAG AA):** Den härledda hue:n får BARA väva in
 i DEKORATIVA ytor (hero-gradienter, glow), ALDRIG i text-, yt- eller kant-tokens som bär läsbarhet.
 Seamen (`use-day-theme.ts`) exponerar hue:n som CSS-variabeln `--vm-day-hue` (ett TAL, en hue-grad)
 plus data-attribut, och lägger den bara på hero:ns dekor-yta (`[data-daily-hero][data-day-theme]`).
 **Varför detta är vakten:** en hue som per konstruktion aldrig blir en text-/ytfärg kan inte sänka
-text-kontrasten under AA, det finns ingen text på den. Ett test bevisar att inget matchkort (som bär
-text) får en `--vm-day-hue` eller `data-day-theme` på sig, bara hero-dekoren gör. Design-frontend
+text-kontrasten under AA, det finns ingen text på den. **Vad vakten vilar på, två komplementära test
+(review F2):** (1) DOM-vakten (`DailyMatchesView.test.tsx`) bevisar att inget matchkort SÄTTER
+`--vm-day-hue`/`data-day-theme` inline, bara hero-dekoren gör. Den ensam räcker INTE: "Dagens match"-
+kortet renderas inne i `.vm-daily-hero` (som sätter variabeln inline) och CSS-custom-properties ÄRVS
+nedåt, så en framtida kort-CSS-regel som LÄSER `var(--vm-day-hue)` vore osynlig för en DOM-vakt som
+bara läser inline-style. (2) Käll-scannen (`day-theme-contrast-guard.test.ts`) stänger den luckan
+DOM-oberoende: den läser KÄLLFILERNA och failar om `var(--vm-day-hue)` KONSUMERAS utanför en
+`.vm-daily-hero*`-scopad CSS-regel (eller i någon annan källfil än `tokens.css`). Invarianten vilar
+alltså på SÄTTNING-vakt (DOM) + KONSUMTION-vakt (källa), inte på en enda DOM-koll. Design-frontend
 bygger den slutgiltiga dekoren ur hue:n i `tokens.css` sektion 6 (hsl()/color-mix), äger HUR det ser ut.
 
 **Beslut (edge-fall, alla explicita):**

@@ -354,14 +354,22 @@ kanal-igenkänning utan att riskera en låg färg-på-färg-kontrast. Källa: T7
    medel på färghjulet via `cos/sin` + `atan2`), INTE aritmetiskt medel, det senare wrappar fel kring
    0/360 (medel av hue 5 och 355 ska bli ~0, inte 180). Cirkulärt medel är dessutom ordnings-oberoende,
    så en stor uppsättning (premiärdag) ger en stabil ton utan en godtycklig "första elementet"-regel.
+   OBS det degenererade randfallet: tar bidragen exakt ut varandra (antipodala hues, vektorsumma ~0)
+   finns ingen medelriktning, välj en ORDNINGS-OBEROENDE tie-break (t.ex. `Math.min` av hues), INTE
+   `hues[0]` som beror på insamlingsordningen och bryter ordnings-oberoendet för just det paret.
    ÅTERANVÄND en redan etablerad härledningsregel om en finns (här `hueFromCode`, lyft ur TeamFlag till
    delade `team-hue.ts` så lag-färgen är EN sanning i både discen och dags-temat, inte två kopior).
 2. KONTRAST-VAKTEN ÄR ARKITEKTUREN, inte en efterkontroll: låt den härledda tonen BARA vara ett TAL
    (en hue-grad) i en CSS-variabel (`--vm-day-hue`) som uteslutande väver in i DEKORATIVA ytor
    (gradienter, glow). Den får ALDRIG bli en text-/yt-/kant-token. En ton som per konstruktion aldrig
    är en textfärg KAN inte sänka text-kontrasten under WCAG AA, det finns ingen text på den. Bevisa det
-   med ett test som assertar att läsbarhets-bärande element (matchkort) ALDRIG får variabeln/attributet,
-   bara dekor-ytan gör.
+   med TVÅ komplementära test: (a) en DOM-vakt som assertar att läsbarhets-bärande element (matchkort)
+   ALDRIG SÄTTER variabeln/attributet, bara dekor-ytan gör; (b) en DOM-OBEROENDE KÄLL-SCAN som läser
+   källfilerna och failar om `var(--vm-day-hue)` KONSUMERAS utanför dekor-ytans scope (`.vm-daily-hero*`).
+   DOM-vakten ensam räcker INTE: dekor-ytan sätter variabeln inline och CSS-custom-properties ÄRVS nedåt,
+   så ett kort som RENDERAS inuti dekor-ytan (här "Dagens match" inne i hero:n) skulle tyst ärva tonen
+   om en framtida kort-CSS-regel LÄSTE den, och en DOM-vakt som bara läser inline-style vore ändå grön.
+   Käll-scannen vaktar KONSUMTIONEN i koden, DOM-vakten vaktar SÄTTNINGEN i DOM.
 3. EDGE-FALL explicit, alla testade: tom indata (vilodag) -> default/ingen ton (ytan behåller bas-temat);
    data utan användbart bidrag (slutspel innan seedningen, bara okända lag) -> en dokumenterad fallback
    (här hue ur datum-nyckeln) så ytan ändå känns distinkt, ALDRIG en gissning om saknad data; ogiltig data
