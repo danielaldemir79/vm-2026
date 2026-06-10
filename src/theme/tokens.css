@@ -21,7 +21,9 @@
    - Brödtext (fg) mot bg/surface/surface-raised: 12.6:1 - 17.9:1 i båda teman.
    - Dämpad text (fg-muted) klarar AA som NORMAL text (>= 4.5:1) i båda teman.
    - Accent/guld/danger mot ytor: >= 3:1 (stor text / UI-komponenter), i ljust
-     tema klarar accenten dessutom AA som normal text (5.4:1).
+     tema klarar accenten (#0e7a44) dessutom AA som normal text på BÅDA ljusa
+     ytorna: 5.40:1 mot vit surface (#fff), 4.90:1 mot fond #f1f5f0 (uppmätt
+     relativ luminans, per yta, inte en enda generell siffra). Båda >= 4.5:1.
    - success har en EGEN ton i båda teman (T8-PIN, skild från accent): i ljust
      tema teal-grön #0f766e som klarar AA som normal text (>= 4.97:1 mot ytorna
      den används på), i mörkt tema mintgrön #5ad1a0 (7.4:1 - 9.9:1 mot ytorna).
@@ -101,7 +103,9 @@
   --vm-fg: #0c1a13;
   --vm-fg-muted: #4f6258;
 
-  /* Primär accent: djup skogsgrön (klarar AA som NORMAL text på vitt, 5.4:1).
+  /* Primär accent: djup skogsgrön. Klarar AA som NORMAL text på BÅDA ljusa ytorna,
+     uppmätt per yta (inte en enda generell siffra): 5.40:1 mot vit surface (#fff),
+     4.90:1 mot fond #f1f5f0. Båda >= 4.5:1. (5.40:1 gäller bara mot rent vitt.)
      Den elektriska gröna lever som dekorativ glow/gradient, inte som textfärg. */
   --vm-accent: #0e7a44;
   --vm-accent-fg: #ffffff;
