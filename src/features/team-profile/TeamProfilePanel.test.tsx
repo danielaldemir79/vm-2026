@@ -35,8 +35,13 @@ function OpenButton({ teamId, label }: { teamId: string; label: string }) {
 }
 
 describe('TeamProfilePanel, öppnas och visar källånkrad profil', () => {
-  it('är stängd som default (ingen dialog i DOM)', () => {
+  it('är stängd som default (ingen dialog i DOM)', async () => {
     renderWithProviders(<OpenButton teamId="swe" label="öppna" />);
+    // Vänta in ResultsProviderns async-seedning (fixtures laddas i en useEffect)
+    // INNAN vi assertar, annars läcker dess setState ut ur testet och triggar en
+    // act()-varning + en intermittent race under full svit-last (#10). findBy*
+    // re-queryar inuti act tills knappen finns, vilket flushar seedningen.
+    await screen.findByText('öppna');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -126,7 +131,7 @@ describe('TeamProfilePanel, navigering: öppnas från tabell och matchkort', () 
 });
 
 describe('TeamProfilePanel, edge-fall: data saknas (ärligt tomt, inte gissat)', () => {
-  it('visar "Data saknas" för stjärnspelare om laget saknar källbelagda namn', async () => {
+  it('visar "Data saknas" för stjärnspelare om laget saknar källbelagda namn (okänt id -> ingen dialog)', async () => {
     // Vi monterar modalen direkt med ett lag UTAN profil-fält (i en egen provider),
     // för att bevisa att tom data renderas ärligt, inte som en gissning. Vi använder
     // den fulla kedjan men ger storen ett lag utan stjärnspelare via en egen knapp.
@@ -140,8 +145,14 @@ describe('TeamProfilePanel, edge-fall: data saknas (ärligt tomt, inte gissat)',
       );
     }
     renderWithProviders(<Harness />);
-    // Ett id som inte finns i storen -> ingen dialog (inget lag att visa, fail-safe).
-    fireEvent.click(screen.getByText('öppna okänt'));
+    // Vänta in ResultsProviderns async-seedning INNAN klick/assert, så dess setState
+    // inte läcker ut ur testet (act()-varning + intermittent race under svit-last, #10).
+    // openProfile sätter ett okänt id; deriveTeamProfile får då ingen träff i storen,
+    // så modalen renderar null -> ingen dialog (fail-safe). Vi måste vänta in seedningen
+    // INNAN klicket, annars är storen tom enbart för att datan inte hunnit laddas (rätt
+    // svar av fel skäl).
+    const trigger = await screen.findByText('öppna okänt');
+    fireEvent.click(trigger);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
