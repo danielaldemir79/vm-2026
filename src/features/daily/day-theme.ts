@@ -99,8 +99,12 @@ function collectKnownTeams(
  * 10 blir 0, inte 180 som ett naivt aritmetiskt medel skulle ge).
  *
  * Förutsätter en icke-tom lista (anroparen gatar på det). Om vektorsumman är
- * (nära) noll (motsatta hues som tar ut varandra) faller vi tillbaka på den
- * FÖRSTA hue:n, ett deterministiskt val så resultatet aldrig blir NaN/godtyckligt.
+ * (nära) noll (exakt motsatta hues som tar ut varandra, t.ex. CRO 85 mot QAT 265
+ * som är precis antipodala) finns ingen meningsfull medelriktning. Då faller vi
+ * tillbaka på den MINSTA hue:n i uppsättningen. Det är ORDNINGS-OBEROENDE (min är
+ * oberoende av i vilken ordning lagen samlades in), till skillnad från `hues[0]`
+ * som skulle ge olika ton beroende på hemma/borta-ordning för just det antipodala
+ * paret. Deterministiskt och aldrig NaN/godtyckligt.
  */
 function circularMeanHue(hues: readonly number[]): number {
   let x = 0;
@@ -110,11 +114,13 @@ function circularMeanHue(hues: readonly number[]): number {
     x += Math.cos(rad);
     y += Math.sin(rad);
   }
-  // Degenererat fall (summan ~0): ingen meningsfull medelriktning. Deterministisk
-  // fallback till första hue:n i stället för atan2(0,0) -> 0 (godtyckligt).
+  // Degenererat fall (summan ~0): ingen meningsfull medelriktning. ORDNINGS-
+  // OBEROENDE fallback till den minsta hue:n (Math.min är oberoende av insamlings-
+  // ordningen) i stället för hues[0] (ordningsberoende) eller atan2(0,0) -> 0
+  // (godtyckligt). Nåbart med riktiga koder: ett exakt antipodalt par (CRO/QAT).
   const EPSILON = 1e-9;
   if (Math.abs(x) < EPSILON && Math.abs(y) < EPSILON) {
-    return hues[0];
+    return Math.min(...hues);
   }
   let deg = (Math.atan2(y, x) * 180) / Math.PI;
   if (deg < 0) {
