@@ -15,10 +15,11 @@
 // motion-primitiver, reducerad rörelse respekteras redan i kroken). Funktionellt
 // fungerar inmatningen helt utan firandet, det är ren glädje-yta.
 
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import type { Match, Team } from '../../domain/types';
-import { useTodayKey } from '../daily';
+import { formatDayHeading, useTodayKey } from '../daily';
 import { useGoalCelebration, type GoalCelebration } from './goal-celebration';
+import { groupMatchesForEntry } from './group-matches-for-entry';
 import { useResultsStore } from './results-context';
 import { ResultEntryForm } from './ResultEntryForm';
 import { windowMatches } from './result-window';
@@ -27,6 +28,83 @@ import type { ResultEntry } from './validate-result';
 /** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista). */
 function indexTeams(teams: readonly Team[]): Map<string, Team> {
   return new Map(teams.map((t) => [t.id, t]));
+}
+
+interface ExpandToggleProps {
+  /** true = listan är utfälld (knappen säger "Visa färre"). */
+  expanded: boolean;
+  /** Antal matcher som DÖLJS i ihopfällt läge (för etiketten). */
+  hiddenCount: number;
+  /** Id på listan knappen styr (aria-controls). */
+  controls: string;
+  /** Växla utfälld/ihopfälld. */
+  onToggle: () => void;
+  /** Ref till knappens DOM-element (för fokus-flytt vid ihopfällning, a11y). */
+  buttonRef?: Ref<HTMLButtonElement>;
+  /** Skiljer den DUBBLERADE kontrollens två instanser åt (top/bottom) i data-attr. */
+  position: 'top' | 'bottom';
+}
+
+/**
+ * Ihopfäll-/expandera-KONTROLLEN (T28/#42, "lättåtkomlig ihopfällning").
+ *
+ * VARFÖR en delad komponent (inte två handkopierade knappar): kontrollen är
+ * DUBBLERAD (en uppe + en nere) så användaren ALLTID når en toggle utan att
+ * skrolla till slutet av en utfälld 72-korts-lista. De två måste bära IDENTISK
+ * semantik (samma aria-expanded, samma aria-controls, samma etikett), annars
+ * driver de isär och en skärmläsare får motstridig info. Genom att de delar
+ * EN markup-källa kan de aldrig drifta (DRY, en sanning för kontrollen).
+ *
+ * Den visuella finishen (accent-tint + chevron) är #39:s, ÄRVD oförändrad så
+ * design-frontends premium-styling och de uppmätta AA-värdena gäller fortfarande.
+ */
+function ExpandToggle({
+  expanded,
+  hiddenCount,
+  controls,
+  onToggle,
+  buttonRef,
+  position,
+}: ExpandToggleProps) {
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-controls={controls}
+      data-results-toggle={expanded ? 'collapse' : 'expand'}
+      data-results-toggle-position={position}
+      className="group/toggle inline-flex items-center gap-2.5 self-center rounded-pill border border-[color-mix(in_srgb,var(--color-accent)_42%,var(--color-border))] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))] px-6 py-3 font-display text-sm font-semibold text-fg shadow-[var(--vm-shadow-card)] transition-[background-color,border-color,box-shadow] duration-200 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_60%,var(--color-border))] hover:bg-[color-mix(in_srgb,var(--color-accent)_20%,var(--color-surface))] hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+    >
+      <span>
+        {expanded
+          ? 'Visa färre'
+          : `Visa alla matcher (${hiddenCount} ${hiddenCount === 1 ? 'dold' : 'dolda'})`}
+      </span>
+      {/* Chevron: pekar ner = "det finns mer", vänds upp i utfällt läge.
+          aria-hidden (etiketten + aria-expanded bär betydelsen åt skärmläsare),
+          ren affordans. Accent-färgad så den drar ögat utan extra text. */}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        // Tailwind v4:s rotate-180 sätter CSS-egenskapen `rotate` (inte den
+        // gamla transform-axeln), så övergången måste rikta in sig på `rotate`
+        // för att animera mjukt i stället för att snappa. Reduced-motion nollar
+        // transition-duration globalt (index.css), så vridningen blir momentan
+        // men korrekt riktad för den som bett om minskad rörelse (WCAG 2.3.3).
+        className={`h-4 w-4 transition-[rotate] duration-200 ${expanded ? 'rotate-180' : ''}`}
+        style={{ color: 'var(--color-accent)' }}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.25}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M4 6l4 4 4-4" />
+      </svg>
+    </button>
+  );
 }
 
 export interface ResultEntryViewProps {
@@ -85,10 +163,47 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
   const visibleIds = useMemo(() => new Set(windowed.visible.map((m) => m.id)), [windowed]);
   const isInWindow = (matchId: string): boolean => expanded || visibleIds.has(matchId);
 
+  // DAG-GRUPPERING (T28/#42, Daniels feedback 2): gruppera de inmatningsbara
+  // matcherna per svensk speldag så listan får dag-rubriker (sammanhanget som
+  // tappades). Ren funktion (group-matches-for-entry.ts) som återanvänder daily/
+  // groupMatchesByDay (en sanning för svensk-dag-grupperingen, DRY). Beror BARA på
+  // `editable` (inte på fönster-/expandera-läget): ALLA dagar grupperas alltid,
+  // fönstret döljer sedan korten PER KORT (hidden), inte genom att klippa bort dem.
+  // Så samma dag-struktur används i både ihopfällt och utfällt läge, bara
+  // synligheten skiljer (kravet: rubriker korrekta även i ihopfällt läge).
+  const dayGroups = useMemo(() => groupMatchesForEntry(editable), [editable]);
+
+  // En dag-rubrik visas så länge dagen har MINST EN synlig (in-window) match i
+  // ihopfällt läge, annars vore rubriken en tom rad. I utfällt läge syns alla.
+  // (Kortens egna `hidden` skyddar fortfarande osparad inmatning per kort, C2.)
+  const dayHasVisible = (day: { matches: readonly Match[] }): boolean =>
+    expanded || day.matches.some((m) => visibleIds.has(m.id));
+
   // Knappen behövs bara när det FINNS något dolt (alla inom fönstret -> ingen knapp).
   const hasHidden = windowed.hiddenCount > 0;
   // Stabil id-koppling för aria-controls/aria-expanded mellan knappen och listan.
   const listId = useId();
+
+  // FOKUS-FLYTT vid ihopfällning (T28/#42, a11y, "tappa inte bort användaren"):
+  // den NEDRE toggeln kan ligga långt ner i en utfälld lista. Fäller användaren
+  // ihop därifrån ska fokus (och därmed vyporten) flyttas till den ÖVRE toggeln,
+  // så hen landar vid listans topp i stället för att bli kvar långt ner vid en
+  // kontroll som just försvann. Vi gör detta bara vid IHOPFÄLLNING (expand -> nej):
+  // vid utfällning är det rätt att fokus stannar där användaren var.
+  const topToggleRef = useRef<HTMLButtonElement>(null);
+  function toggleExpanded() {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (!next) {
+        // Ihopfällning: flytta fokus till den övre kontrollen (listans topp).
+        // requestAnimationFrame så fokus sätts EFTER att React renderat det
+        // ihopfällda läget (den nedre toggeln finns kvar, men användaren ska
+        // ändå föras upp till toppen).
+        requestAnimationFrame(() => topToggleRef.current?.focus());
+      }
+      return next;
+    });
+  }
 
   // Trigga målfirande EFTER ett lyckat sparande av en spelad match med mål.
   // Kroken hoppar själv reducerad rörelse + mållösa resultat (a11y), så vi
@@ -140,96 +255,94 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
         </p>
       ) : null}
 
+      {/* ÖVRE ihopfäll-/expandera-kontroll (T28/#42): DUBBLERAD (även nedanför
+          listan) så en toggle ALLTID nås utan att skrolla igenom en utfälld lista.
+          Den övre är dessutom fokus-MÅLET vid ihopfällning (se toggleExpanded), så
+          användaren förs upp till listans topp. Syns bara när fönstret döljer något.
+          Båda kontrollerna delar EN komponent (ExpandToggle), så deras semantik
+          (aria-expanded/-controls, etikett) aldrig kan drifta isär. */}
+      {status === 'ready' && editable.length > 0 && hasHidden ? (
+        <ExpandToggle
+          expanded={expanded}
+          hiddenCount={windowed.hiddenCount}
+          controls={listId}
+          onToggle={toggleExpanded}
+          buttonRef={topToggleRef}
+          position="top"
+        />
+      ) : null}
+
       {status === 'ready' && editable.length > 0 ? (
-        <ul id={listId} className="m-0 flex list-none flex-col gap-3 p-0">
-          {/* RENDERA ALLA matcher alltid, dölj de utanför fönstret med `hidden`
-              (Copilot R1, C2). Före #39 renderades alla 104 kort jämt, så att hålla
-              dem mounted är inte dyrare än den baseline. VARFÖR `hidden` i stället
-              för att FILTRERA bort dem ur listan: ett out-of-window-formulär kan ha
-              OSPARAD inmatning i sin lokala useState; filtrerar vi bort det vid
-              ihopfällning unmountas formuläret och inmatningen tappas. `hidden`
-              (= display:none + borttaget ur a11y-trädet) bevarar React-instansen,
-              så ett pågående edit överlever expandera/ihopfäll. Dolda kort nås inte
-              av tab eller skärmläsare (det sköter hidden-attributet), och
-              getAllByRole('group') räknar bara de synliga (fieldset i ett hidden-
-              träd är inte i a11y-trädet), så knapptextens hiddenCount stämmer. */}
-          {editable.map((match) => (
-            <li key={match.id} hidden={!isInWindow(match.id)}>
-              {/* STABIL key (match.id), INTE en data-beroende key (C7/C8): tidigare
-                  re-mountades formuläret när matchens status/mål ändrades externt,
-                  för att tvinga en re-seed. Men en re-mount KLOTTRAR ÖVER ett
-                  pågående osparat edit, och den gamla nyckeln saknade dessutom
-                  straffarna (de blev stale, C8). ResultEntryForm synkar nu sig
-                  själv mot matchens nuvarande värden via en DIRTY-medveten effekt:
-                  den re-seedar mål, status OCH straffar konsekvent när matchen
-                  uppdateras externt (realtid T18), men bara när formuläret är
-                  "rent" (inget osparat edit), så pågående inmatning bevaras. Därför
-                  behövs ingen re-mount-key längre, instansen lever kvar. */}
-              <ResultEntryForm
-                match={match}
-                teamsById={teamsById}
-                onSubmit={submitResult}
-                onSaved={handleSaved}
-              />
+        // DAG-GRUPPERAD lista (T28/#42): varje speldag är ett <li> med en rubrik
+        // (h3) + en nästlad <ul> av matchkort. Listans yttre id är aria-controls-
+        // målet för båda toggle-kontrollerna.
+        //
+        // BEVARAR #39-invarianten (C2): varje MATCHKORTS <li> behåller sitt egna
+        // `hidden`-attribut (out-of-window-kort döljs, men UNMOUNTAS inte, så
+        // osparad inmatning överlever expandera/ihopfäll). Dag-<li>:t döljs bara
+        // när HELA dagen är utanför fönstret (annars vore rubriken en tom rad),
+        // men kortens egna hidden står kvar oberoende, så closest('li')-haken i
+        // C2-testet (det innersta korts-<li>:t) fortsätter stämma.
+        <ul id={listId} className="m-0 flex list-none flex-col gap-6 p-0">
+          {dayGroups.map((day) => (
+            <li key={day.dateKey} data-result-day={day.dateKey} hidden={!dayHasVisible(day)}>
+              {/* Dag-rubrik: läsbar svensk dag ("torsdag 11 juni 2026") via daily/
+                  formatDayHeading (DRY, EN sanning för dag-rubriken). h3 under vyns
+                  h2, så rubrik-hierarkin är korrekt för skärmläsare. En diskret
+                  accent-list (border-l) ger den visuell tyngd utan att skrika;
+                  design-frontend finputsar via data-result-day-haken. */}
+              <h3
+                data-result-day-heading=""
+                className="mb-3 border-l-2 border-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] pl-3 font-display text-sm font-semibold capitalize tracking-tight text-fg"
+              >
+                {formatDayHeading(day.dateKey)}
+              </h3>
+              <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                {/* RENDERA ALLA dagens matcher alltid, dölj de utanför fönstret med
+                    `hidden` (Copilot R1, C2 från #39). VARFÖR `hidden` i stället för
+                    att FILTRERA bort dem: ett out-of-window-formulär kan ha OSPARAD
+                    inmatning i sin lokala useState; filtrerar vi bort det vid
+                    ihopfällning unmountas formuläret och inmatningen tappas. `hidden`
+                    (= display:none + borttaget ur a11y-trädet) bevarar React-instansen,
+                    så ett pågående edit överlever expandera/ihopfäll. Dolda kort nås
+                    inte av tab eller skärmläsare, och getAllByRole('group') räknar
+                    bara de synliga, så hiddenCount i knappen stämmer. */}
+                {day.matches.map((match) => (
+                  <li key={match.id} hidden={!isInWindow(match.id)}>
+                    {/* STABIL key (match.id), INTE en data-beroende key (C7/C8):
+                        ResultEntryForm synkar sig själv mot matchens nuvarande värden
+                        via en DIRTY-medveten effekt (mål/status/straffar konsekvent),
+                        men bara när formuläret är "rent", så pågående inmatning bevaras.
+                        Därför behövs ingen re-mount-key, instansen lever kvar. */}
+                    <ResultEntryForm
+                      match={match}
+                      teamsById={teamsById}
+                      onSubmit={submitResult}
+                      onSaved={handleSaved}
+                    />
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>
       ) : null}
 
-      {/* Expandera-KONTROLL (#39): syns BARA när fönstret döljer något (alla inom
-          fönstret -> ingen knapp). Tillgänglig: en riktig <button> som styr listan
-          via aria-controls + aria-expanded, så en skärmläsare vet att den fäller
-          ut/ihop just matchlistan ovanför. Antalet dolda står i etiketten så valet
-          är begripligt ("Visa alla matcher (101 dolda)"). data-attribut är seam för
-          design-frontends premium-styling.
-
-          VISUELL FINISH (#39, Daniels feedback "gör den TYDLIGT SYNLIG"): inte
-          längre en blek border-pill utan en INBJUDANDE, premium accent-kontroll,
-          en mjuk accent-tonad yta (color-mix mot --color-accent, följer temat),
-          accent-kant och accent-färgad text, plus en chevron som pekar NER när
-          mer finns att visa och vänds UPP i utfällt läge. Tydlig men inte skrikig:
-          tonen är en låg-alfa-tint, inte en fylld accent-knapp (den är reserverad
-          för primär-action Spara). Hover fördjupar tinten, fokus-ringen är kvar
-          (WCAG 2.4.7), och chevron-rotationen gatas av reduced-motion globalt
-          (index.css nollar transition-duration vid "minska rörelse"). Texten bärs
-          på --color-fg (full kontrast, uppmätt AA i båda teman, se handoff), inte
-          på accent-hue, så etiketten är skarp oavsett tema. */}
+      {/* NEDRE ihopfäll-/expandera-kontroll (T28/#42, dubblerad): i UTFÄLLT läge
+          ligger den efter hela listan, så användaren kan fälla ihop utan att skrolla
+          tillbaka upp. Identisk semantik som den övre (samma ExpandToggle), och vid
+          ihopfällning härifrån flyttas fokus upp till den ÖVRE toggeln (listans topp,
+          toggleExpanded). I ihopfällt läge ligger de två kontrollerna direkt ovanpå
+          varandra (kort lista), vilket är ofarligt och billigare än att villkora bort
+          den ena per läge (KISS), aria-haken hålls konsekvent på BÅDA. */}
       {status === 'ready' && editable.length > 0 && hasHidden ? (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          aria-controls={listId}
-          data-results-toggle={expanded ? 'collapse' : 'expand'}
-          className="group/toggle inline-flex items-center gap-2.5 self-center rounded-pill border border-[color-mix(in_srgb,var(--color-accent)_42%,var(--color-border))] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))] px-6 py-3 font-display text-sm font-semibold text-fg shadow-[var(--vm-shadow-card)] transition-[background-color,border-color,box-shadow] duration-200 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_60%,var(--color-border))] hover:bg-[color-mix(in_srgb,var(--color-accent)_20%,var(--color-surface))] hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
-        >
-          <span>
-            {expanded
-              ? 'Visa färre'
-              : `Visa alla matcher (${windowed.hiddenCount} ${windowed.hiddenCount === 1 ? 'dold' : 'dolda'})`}
-          </span>
-          {/* Chevron: pekar ner = "det finns mer", vänds upp i utfällt läge.
-              aria-hidden (etiketten + aria-expanded bär betydelsen åt skärmläsare),
-              ren affordans. Accent-färgad så den drar ögat utan extra text. */}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            // Tailwind v4:s rotate-180 sätter CSS-egenskapen `rotate` (inte den
-            // gamla transform-axeln), så övergången måste rikta in sig på `rotate`
-            // för att animera mjukt i stället för att snappa. Reduced-motion nollar
-            // transition-duration globalt (index.css), så vridningen blir momentan
-            // men korrekt riktad för den som bett om minskad rörelse (WCAG 2.3.3).
-            className={`h-4 w-4 transition-[rotate] duration-200 ${expanded ? 'rotate-180' : ''}`}
-            style={{ color: 'var(--color-accent)' }}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.25}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M4 6l4 4 4-4" />
-          </svg>
-        </button>
+        <ExpandToggle
+          expanded={expanded}
+          hiddenCount={windowed.hiddenCount}
+          controls={listId}
+          onToggle={toggleExpanded}
+          position="bottom"
+        />
       ) : null}
 
       {/* Målfirande-SEAM: aria-hidden (ren visuell glädje, dubblerar ingen info).
