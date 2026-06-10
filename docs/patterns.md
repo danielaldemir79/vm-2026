@@ -279,10 +279,15 @@ du fel ratio). Källa: T7 design-frontend (`src/features/daily/MatchCard.tsx`, f
    `color-mix`, aldrig rå hex, så stämningen följer temat.
 2. RÖRELSE som dekoration, INTE som JS: ett långsamt ljus-svep (`@keyframes` som flyttar
    `background-position`) på en `aria-hidden`-overlay + en pulsande "live"-prick (`@keyframes` på
-   opacity/scale). Lägg keyframes i `index.css`. De fångas AUTOMATISKT av den globala
-   `@media (prefers-reduced-motion: reduce)`-regeln (som nollar `animation-duration`/`iteration-count`),
-   så de snappar till sitt statiska första steg utan en egen JS-grind. Verifiera LIVE genom att
-   emulera reduced-motion och läsa `getComputedStyle(...).animationDuration` (ska bli ~0.01ms).
+   opacity/scale). Lägg keyframes i `index.css`. OBS: den globala
+   `@media (prefers-reduced-motion: reduce)`-regeln (`animation-duration: 0.01ms` +
+   `iteration-count: 1`) räcker INTE för hero-animationerna, den kör animationen en gång till SLUT
+   nästan momentant, så keyframesen landar på sitt 100 %-läge (slutläget), inte sitt första steg.
+   För `vm-sheen` är 100 % `background-position: 140% 0%`, dvs svepet fryser mitt i/utanför fonden i
+   stället för i ro. Designintentet är en HELT statisk hero, så de dekorativa hero-animationerna
+   nollas EXPLICIT med `animation: none` på `.vm-hero-sheen` / `.vm-live-dot` (se `src/index.css` +
+   decisions.md C5-blocket 2026-06-10), utan en egen JS-grind. Verifiera LIVE genom att emulera
+   reduced-motion och läsa `getComputedStyle(...).animationName` (ska bli `none` på hero-elementen).
 3. NEDRÄKNING utan layout-hopp (CLS=0): rendera siffror med `tabular-nums` OCH en fast `min-width` per
    enhet (en "tile"), så bredden aldrig ändras när 9 -> 10 eller sekunder tickar. Den rena
    tick-logiken (computeCountdown) ligger kvar i hooken; design rör bara presentationen.
@@ -292,8 +297,9 @@ du fel ratio). Källa: T7 design-frontend (`src/features/daily/MatchCard.tsx`, f
    sticker ut).
 
 **Varför:** "Levande" får aldrig betyda "rörig för den som valt minska rörelse" eller "hoppig LCP/CLS".
-Genom att uttrycka dekor-rörelsen som CSS-keyframes ärver den den globala reduced-motion-grinden gratis
-(en sanning, inget dubbelt skydd att hålla i synk), och `tabular-nums` + fast tile-bredd gör en
+Den svepande globala reduced-motion-regeln fryser keyframes på sitt slutläge (inte stänger av dem), så
+dekor-rörelsen måste nollas EXPLICIT med `animation: none` för att hero:n ska bli helt statisk (en
+sanning ägd av decisions.md C5), och `tabular-nums` + fast tile-bredd gör en
 sekund-tickande nedräkning till en nollkostnad för CLS. Återanvänds av kommande hero/levande vyer
 (slutspelsträd, topplista). Källa: T7 design-frontend (`src/features/daily/DailyMatchesView.tsx` +
 `vm-pulse`/`vm-sheen` i `src/index.css`).
