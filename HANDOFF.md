@@ -5,6 +5,46 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T9/#9 (slutspelsträdet) , senior-developer KLAR, väntar review + PR
+
+**Branch:** `feature/T9-slutspelstrad` (från develop HEAD). Ingen PR öppnad än.
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt att review:a/merga/mata på.
+
+**KLART med bevis (atomiska commits):**
+- `cd19d74` , feat(results): straffläggning i slutspel, F1/penalties-pinnen LÖST (FIFA Art. 14)
+- `f380cdd` , feat(domain): rangordna grupptreorna -> 8 bästa (FIFA Article 13)
+- `b57c61d` , feat(bracket): deriveBracket, levande träd (möjliga lag/låst/vinnar-propagering)
+- `389b6d6` , feat(bracket): BracketView + useBracketData + live-integrationstest, wirad i App
+- (docs-commit härnäst: decisions.md + patterns.md + denna HANDOFF)
+- Verifiering: **462 tester gröna (47 filer)** (baseline 406/43, +56), build + lint + format:check rent
+- Secret-skan av diffen: rent (bara test-fixtures `anon-key`, inga riktiga nycklar)
+
+**Alla 5 acceptanskriterier täckta:**
+1. Trädet byggs ur tabelläget, låses vid grupp-slut enligt T4-seedningen , `deriveBracket` + `isGroupStageComplete` + live-integrationstest.
+2. Slutspelsresultat för fram vinnaren (semantik/data; animation = design) , `winnerSlotId`/`data-winner` + propagering, integrationstest.
+3. Korrekt struktur sextondel->åttondel->kvart->semi->brons->final , `groupByRound` + struktur-test.
+4. Responsiv-förberedd (horisontell scroll) + a11y-semantik , `overflow-x-auto` + region/list-semantik + vy-test.
+5. Tester för uppbyggnad + låsning + avancering + edge-fall (oavgjort kräver seedning/straffar) , 20 derive-tester + 3 integ + penalties-tester.
+
+**F1/penalties-pinnen: LÖST** (ägare var senior-developer). Reducern bevarar nu `penalties`;
+acceptanstest grönt. Ta INTE med som öppen pin framåt.
+
+**KÄLLHÄNVISNING (HARD, för review-grinden):** två FIFA-regler committade verbatim i
+`src/domain/bracket/fifa-knockout-rules-source.txt` (pdftotext ur FWC2026-regelverket):
+Article 13 (trea-rankning, ENBART övergripande a-c, ej head-to-head) + Article 14 (straffar).
+Reviewern kan BEKRÄFTA mot källan. Beslut + tolkning i `docs/decisions.md` (T9-raden).
+
+**PINNADE punkter (bär framåt, oförändrade):**
+- **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion.
+- **T14-pin (Supabase):** projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad):** venue = platshållare tills verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+
+**Next:** lokal review-panel -> ev. åtgärder -> PR mot develop -> copilot-loop -> Daniel mergar.
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T27/#39 KLAR - PR #41 väntar på autonom merge
 
 **Branch:** `feature/T27-resultatlista-ux` @ HEAD `34fdd28`
