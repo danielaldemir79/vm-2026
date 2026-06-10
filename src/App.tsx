@@ -11,6 +11,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
 import { SwatchGrid } from './components/foundation/SwatchGrid';
 import { MotionDemo } from './components/foundation/MotionDemo';
+import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
 
@@ -119,6 +120,15 @@ export default function App() {
             strukturen byggs här; design-frontend ger premium-polish + den
             visuella målfirande-animationen ovanpå. */}
         <ResultsProvider>
+          {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
+              datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
+              SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA
+              + tillgängliga strukturen byggs här; design-frontend ger WOW-hero +
+              premium-matchkort + nedräknings-visual ovanpå. */}
+          <Slide direction="up">
+            <DailyMatchesView />
+          </Slide>
+
           <Slide direction="up">
             <GroupStageView />
           </Slide>
