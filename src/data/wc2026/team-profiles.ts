@@ -171,7 +171,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     fifaRanking: 2,
     starPlayers: ['Lamine Yamal', 'Rodri'],
     trivia:
-      '16 tidigare VM-slutspel. Bäst: VM-guld (2010), första titeln på hemma-kontinenten Afrika.',
+      '16 tidigare VM-slutspel. Bäst: VM-guld (2010), första VM-titeln vunnen av ett europeiskt lag utanför Europa.',
   },
   cpv: {
     fifaRanking: 69,

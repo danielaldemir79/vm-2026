@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { TeamProfileProvider } from './TeamProfileProvider';
@@ -71,6 +71,15 @@ describe('TeamProfilePanel, öppnas och visar källånkrad profil', () => {
 });
 
 describe('TeamProfilePanel, stängning (a11y-dialog)', () => {
+  // Fokus-testerna nedan flyttar document.activeElement (focus-fälla + fokus-retur).
+  // RTL:s auto-cleanup unmountar DOM:en men nollar INTE jsdom:s activeElement, så en
+  // kvardröjande fokus skulle kunna läcka in i nästa fils första panel-render (där
+  // closeButtonRef.focus() konkurrerar). Vi blurar därför aktivt element efter varje
+  // test i blocket, så fokus-baslinjen alltid är ren (ingen cross-fil-läcka).
+  afterEach(() => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+  });
+
   async function openSweden() {
     renderWithProviders(<OpenButton teamId="swe" label="öppna" />);
     fireEvent.click(screen.getByText('öppna'));
@@ -104,6 +113,67 @@ describe('TeamProfilePanel, stängning (a11y-dialog)', () => {
     const dialog = await openSweden();
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByRole('button', { name: /Stäng lagprofil/i })).toHaveFocus();
+  });
+
+  // F3 (a11y-fokus-fälla): Tab får aldrig vandra ut ur dialogen. Fälla-koden
+  // (onDialogKeyDown) cyklar Tab sista->första och Shift+Tab första->sista. Vi
+  // bevisar BÅDE det reella en-element-fallet (fokus stannar trappat, preventDefault
+  // hedras) OCH det genuina två-element-fallet (cykeln wrapar mellan DISTINKTA element).
+  it('Tab på det enda fokuserbara elementet håller fokus trappat i dialogen', async () => {
+    await openSweden();
+    const closeBtn = screen.getByRole('button', { name: /Stäng lagprofil/i });
+    expect(closeBtn).toHaveFocus(); // enda fokuserbara -> first === last
+    const dialog = screen.getByRole('dialog');
+    // Tab (active === last) ska cykla till first (samma element) och PREVENTA default,
+    // så fokus aldrig läcker till bakgrunden bakom modalen.
+    const tab = fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(tab).toBe(false); // preventDefault() anropades -> fokus-fällan grep in
+    expect(closeBtn).toHaveFocus();
+    // Shift+Tab (active === first) ska cykla till last (samma element), också preventat.
+    const shiftTab = fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    expect(shiftTab).toBe(false);
+    expect(closeBtn).toHaveFocus();
+  });
+
+  it('Tab på sista elementet cyklar till första (och Shift+Tab första->sista)', async () => {
+    const dialog = await openSweden();
+    const closeBtn = screen.getByRole('button', { name: /Stäng lagprofil/i });
+    // Injicera ett andra fokuserbart element i dialogen så first !== last, och cykeln
+    // mellan DISTINKTA element blir observerbar (fälla-koden querySelectar dialogens
+    // fokuserbara live, så en riktig knapp i DOM:en räcker). Städas efter testet.
+    const extra = document.createElement('button');
+    extra.textContent = 'extra';
+    dialog.appendChild(extra);
+    try {
+      // first = closeBtn (renderas först), last = extra. Tab från last (extra) -> first.
+      extra.focus();
+      expect(extra).toHaveFocus();
+      fireEvent.keyDown(dialog, { key: 'Tab' });
+      expect(closeBtn).toHaveFocus(); // wrap sista -> första
+      // Shift+Tab från first (closeBtn) -> last (extra), omvänt håll.
+      closeBtn.focus();
+      fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+      expect(extra).toHaveFocus(); // wrap första -> sista
+    } finally {
+      extra.remove();
+    }
+  });
+
+  // F3 (a11y-fokus-retur): när modalen stängs ska fokus återgå till elementet som
+  // öppnade den (openerRef), så tangentbordsanvändaren inte tappas ut i body.
+  it('återför fokus till öppnaren när modalen stängs', async () => {
+    renderWithProviders(<OpenButton teamId="swe" label="öppna Sverige" />);
+    const opener = screen.getByText('öppna Sverige');
+    opener.focus();
+    expect(opener).toHaveFocus();
+    fireEvent.click(opener); // öppnaren är activeElement vid öppning -> minns som opener
+    await screen.findByRole('dialog');
+    // Fokus flyttades in i dialogen (stäng-knappen) vid öppning.
+    expect(screen.getByRole('button', { name: /Stäng lagprofil/i })).toHaveFocus();
+    // Stäng -> fokus ska återgå till öppnar-knappen (cleanup-effekten i panelen).
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(opener).toHaveFocus();
   });
 });
 
