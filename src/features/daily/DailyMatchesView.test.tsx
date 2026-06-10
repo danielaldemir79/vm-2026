@@ -158,10 +158,19 @@ describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
   });
 
   it('dags-temat ändras INTE av matchkortens text-/yt-färger (rör bara dekor)', async () => {
-    // Kontrast-vakt: hero:ns dekor får en hue, men matchkorten (som bär text)
-    // ska ALDRIG få en inline text-/bakgrundsfärg från dags-temat. Vi bekräftar
-    // att inget matchkort har en --vm-day-hue-driven färg på sig (seamen sitter
-    // bara på hero-ytan, inte på läsbarhets-bärande element).
+    // Kontrast-vakt (DOM-lagret): hero:ns dekor får en hue, men matchkorten (som
+    // bär text) ska ALDRIG SÄTTA en inline --vm-day-hue själva. Vi bekräftar att
+    // inget matchkort SÄTTER variabeln/attributet (seamen sitter bara på hero-ytan).
+    //
+    // VAD DEN HÄR VAKTEN VILAR PÅ (F2): den läser bara kortets EGNA inline-style,
+    // alltså att kortet inte SÄTTER variabeln. Den kan INTE se ARV: "Dagens match"-
+    // kortet renderas inne i .vm-daily-hero (som sätter --vm-day-hue inline), och
+    // CSS-custom-properties ärvs nedåt, så en framtida kort-CSS-regel som LÄSER
+    // var(--vm-day-hue) skulle vara osynlig för det här testet. Den luckan täcks av
+    // den DOM-OBEROENDE käll-scannen i day-theme-contrast-guard.test.ts, som failar
+    // om var(--vm-day-hue) konsumeras utanför .vm-daily-hero*-scopet. De två testen
+    // är komplementära: detta vaktar SÄTTNING i DOM, käll-scannen vaktar KONSUMTION
+    // i källan.
     const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
     await waitSettled();
     await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
