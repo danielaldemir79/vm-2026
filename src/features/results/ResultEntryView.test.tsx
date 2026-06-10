@@ -104,10 +104,10 @@ describe('ResultEntryView + GroupStageView, inmatning uppdaterar tabellen (en sa
     expect(form).not.toBeNull();
     const scoped = within(form as HTMLFormElement);
 
-    // Mata in resultatet Sydafrika 0-5 och spara.
+    // Mata in resultatet Sydafrika 0-5 och spara. T31 (#51): att fylla i båda målen
+    // sätter statusen automatiskt till spelad, ingen status-väljare att röra.
     fireEvent.change(scoped.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '0' } });
     fireEvent.change(scoped.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '5' } });
-    fireEvent.change(scoped.getByLabelText(/Status/), { target: { value: 'finished' } });
     fireEvent.click(scoped.getByRole('button', { name: /Spara/ }));
 
     // Grupptabellen ska följa med: Sydafrika (rsa) har nu 3 poäng och leder, och
