@@ -41,6 +41,15 @@ export interface MatchCardProps {
    * statusfärg (T7-pin).
    */
   highlight?: boolean;
+  /**
+   * Texten i highlight-CHIPPET (guld-brickan) när highlight är satt. Default
+   * "Dagens match" (bakåtkompatibelt). DailyMatchesView skickar ner den DYNAMISKA
+   * hero-etiketten här så chip + etikett ALLTID säger samma sak: "Dagens match"
+   * när matchen spelas idag, annars matchens dag ("Torsdag 11 juni"). Tidigare
+   * sade chippet alltid "Dagens match" medan etiketten ovanför visade datumet, en
+   * inkonsekvent UI när turneringen låg dagar bort (#54, C3).
+   */
+  highlightLabel?: string;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -96,7 +105,12 @@ function TeamSide({
   );
 }
 
-export function MatchCard({ match, teamsById, highlight = false }: MatchCardProps) {
+export function MatchCard({
+  match,
+  teamsById,
+  highlight = false,
+  highlightLabel = 'Dagens match',
+}: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
   const away = teamDisplayName(match.awayTeamId, teamsById);
@@ -176,18 +190,24 @@ export function MatchCard({ match, teamsById, highlight = false }: MatchCardProp
           tvetydigt. Alla dt:er når ändå skärmläsare oavsett. */}
       <dl className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
         {highlight ? (
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1">
             <dt className="sr-only">Utvald</dt>
-            {/* "Dagens match"-chippet: en SOLID guld-bricka med mörk ink-text. Solid
+            {/* highlight-CHIPPET: en SOLID guld-bricka med mörk ink-text. Solid
                 fyllning + mörk text ger garanterad AA i BÅDA teman (guld är ljus/
                 mellanljus i båda, så near-black text klarar >= 4.5:1), till skillnad
                 från guld-text-på-tint som föll under AA på den ljusa ytan. Guld =
-                den färg-oberoende hero-signalen (T7-pin: inte accent/success). */}
+                den färg-oberoende hero-signalen (T7-pin: inte accent/success).
+                Texten är highlightLabel (default "Dagens match"); den följer hero-
+                etiketten så chip + etikett aldrig säger olika saker (#54, C3). En
+                längre datum-etikett ("Torsdag 11 juni") kapas med truncate +
+                min-w-0 så den aldrig spränger kortet på 280px (samma bricka, samma
+                AA-ton, bara annan text). title ger full text vid kapning. */}
             <dd
-              className="rounded-pill px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide"
+              title={highlightLabel}
+              className="min-w-0 truncate rounded-pill px-2 py-0.5 text-[0.6875rem] font-bold uppercase tracking-wide"
               style={{ backgroundColor: 'var(--vm-gold)', color: '#1c1403' }}
             >
-              Dagens match
+              {highlightLabel}
             </dd>
           </div>
         ) : null}

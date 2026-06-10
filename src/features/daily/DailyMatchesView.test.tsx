@@ -197,6 +197,18 @@ describe('DailyMatchesView, hero-etikett: "Dagens match" vs matchens datum (#54)
     return label?.textContent?.trim() ?? null;
   }
 
+  /**
+   * Texten i highlight-CHIPPET inne i hero:ns framträdande kort (#54, C3). Chippet
+   * är guld-brickan: en <dd> med title-attribut, hängd på <dt>Utvald</dt>. Den ska
+   * ALLTID säga samma sak som etiketten ovanför (featuredLabelText).
+   */
+  function featuredChipText(): string | null {
+    const chip = document.querySelector(
+      '[data-daily-hero] [data-match-card][data-highlight] dd[title]'
+    );
+    return chip?.textContent?.trim() ?? null;
+  }
+
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
   });
@@ -212,6 +224,8 @@ describe('DailyMatchesView, hero-etikett: "Dagens match" vs matchens datum (#54)
     await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
 
     expect(featuredLabelText()).toBe('Dagens match');
+    // Chippet inne i kortet säger SAMMA sak som etiketten (#54, C3).
+    expect(featuredChipText()).toBe('Dagens match');
   });
 
   it('visar matchens DATUM (inte "Dagens match") när matchen inte är idag', async () => {
@@ -229,6 +243,12 @@ describe('DailyMatchesView, hero-etikett: "Dagens match" vs matchens datum (#54)
     // delsträngar (ICU-versioner kan skilja i interpunktion/mellanslag), inte exakt match.
     expect(label?.toLowerCase()).toContain('torsdag');
     expect(label?.toLowerCase()).toContain('11 juni');
+
+    // Chippet inne i kortet följer etiketten: SAMMA datum-text, INTE "Dagens match"
+    // (#54, C3, hela poängen). De ska aldrig divergera.
+    const chip = featuredChipText();
+    expect(chip).not.toBe('Dagens match');
+    expect(chip).toBe(label);
   });
 });
 
