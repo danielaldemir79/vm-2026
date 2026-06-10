@@ -5,6 +5,35 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T14 COPILOT-RUNDA 1 (issue #14): 7 fynd åtgärdade (C1-C7)
+
+**Beslut (C1, DB-INTEGRITET, halv-straff-läcka i `rmr_penalties_paired`, KÄLLHÄNVISAT):** Den
+ursprungliga CHECK:en var `(home IS NULL AND away IS NULL) OR (home >= 0 AND away >= 0)`. Den
+SLÄPPER IGENOM ett halvt straff-par (t.ex. `home = NULL, away = 3`): gren 2 blir `(NULL >= 0) AND
+(3 >= 0)` = `NULL AND TRUE` = `NULL`, och en Postgres-CHECK avvisar BARA på `FALSE`, ett `NULL`-
+resultat behandlas som godkänt. **Källa:** PostgreSQL-dokumentationen "Constraints / Check
+Constraints" (en check är uppfylld när uttrycket är TRUE eller NULL; bara FALSE bryter den), +
+Copilot-fynd C1. **Fix:** ny migration `20260610190000_t14_rmr_penalties_paired_strict.sql` som
+ersätter constrainten så straff-grenen kräver BÅDA `IS NOT NULL` (och icke-negativa); då matchar
+ett halvt par varken "båda null"- eller "båda satta"-grenen och avvisas hårt. **Verifierat LIVE
+(kmzhyblzxangpxydufve)** via MCP: före fixen accepterades en `(NULL, 3)`-rad; efter fixen nekas den
+(check_violation), medan ett fullt par `(5, 4)` och ett `(NULL, NULL)`-par fortfarande accepteras.
+All proof-data städades (0 kvarvarande rader). Migration applicerad via `apply_migration`.
+
+**Beslut (C2-C7, övriga runda-1-fynd):** C2, stale schema-kommentar `(M1..M104)` rättad till den
+verkliga konventionen (`g-A-1..g-L-6` + `M73..M104`) i core-schema-filens kommentar (ingen live
+`COMMENT ON` fanns satt, så filen var hela ytan). C3/C4, `void selectRoom`/`void leaveRoom` i
+RoomPanel saknade catch (unhandled rejection + ingen UI-återkoppling); nu egna `handleSelect`/
+`handleLeave` som fångar och visar ett fel-notis (samma mönster som create/join, PRINCIPLES §8) +
+tester för fel-vägen. C5, ogiltig testdata `match_id: 'M1'` i `rooms-api.test.ts` bytt till giltigt
+`g-A-1` (konventionen). C6, docstring i `member-avatar.ts` rättad (implementationen tar första +
+SISTA ordets initial, inte "två första orden"). C7, den hårdkodade projekt-URL:en + publishable-
+nyckeln i `rooms-rls.integration.test.ts` borttagen ur repot; sviten kräver nu env
+(`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`), annars `describe.skipIf` (verifierat: skippar rent
+utan env, kör + grön med env).
+
+---
+
 ## 2026-06-10 , T14 PANEL-FIXAR (issue #14): KA-F2/KA-F3 wiring + KA-SA1/SA2 härdning
 
 **Beslut (KA-F3, delade rums-resultat vävs in end-to-end, "ni fyller i tillsammans"):** Rum-panelen
