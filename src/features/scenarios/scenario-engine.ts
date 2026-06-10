@@ -578,7 +578,20 @@ function buildCondition(
           : 'Vinst räcker för topp-2.'
       );
     } else {
-      parts.push('Måste vinna och hoppas på andra matcher för topp-2.');
+      // Varken vinst eller oavgjort GARANTERAR topp-2 (enumerationen hittade
+      // minst ett utfall där topp-2 ändå brister). Texten måste skilja på om
+      // det FINNS andra matcher att "hoppas på" (Copilot C4): står lagets egen
+      // match som den ENDA återstående i gruppen finns inga andra resultat att
+      // hoppas på, då hänger topp-2 på lagets eget resultat + målskillnad/tiebreak.
+      // "Hoppas på andra matcher" vore då objektivt falskt (det finns inga).
+      const hasOtherRemaining = remaining.some(
+        (rem) => rem.homeTeamId !== teamId && rem.awayTeamId !== teamId
+      );
+      parts.push(
+        hasOtherRemaining
+          ? 'Måste vinna och hoppas på andra matcher för topp-2.'
+          : 'Måste vinna, och då avgör målskillnad/tiebreak topp-2.'
+      );
     }
   }
 
