@@ -205,6 +205,23 @@ describe('ResultEntryForm, slutspels-straffar (FIFA Art. 14)', () => {
     expect(document.querySelector('[data-penalties-row]')).not.toBeNull();
   });
 
+  // C13: lika NEGATIVA heltal (t.ex. -1 mot -1) är inte ett giltigt slutspelsresultat
+  // och får INTE trigga straff-fälten. Number.isInteger ensamt godtog dem (de är ju
+  // heltal); icke-negativ-checken (>= 0) stänger den vägen.
+  it('SLUTSPEL: visar INTE straff-fält vid lika NEGATIVA mål (-1 mot -1)', () => {
+    render(
+      <ResultEntryForm
+        match={knockoutMatch()}
+        teamsById={teamsById}
+        onSubmit={() => ({ ok: true })}
+      />
+    );
+    fireEvent.change(screen.getByLabelText(/Status/), { target: { value: 'finished' } });
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '-1' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '-1' } });
+    expect(document.querySelector('[data-penalties-row]')).toBeNull();
+  });
+
   it('SLUTSPEL: submit bär straffarna när ställningen är lika', () => {
     const onSubmit = vi.fn(() => ({ ok: true }) as const);
     render(<ResultEntryForm match={knockoutMatch()} teamsById={teamsById} onSubmit={onSubmit} />);
