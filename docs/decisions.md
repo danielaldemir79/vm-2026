@@ -5,6 +5,40 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T10 (issue #10): lag-profil-data källånkrad (FIFA-ranking + stjärnspelare + kuriosa)
+
+**Beslut (källånkrad, gissas ALDRIG, samma mönster som T4/T4b):** Lag-profil-datan
+(FIFA-ranking, stjärnspelare, kuriosa per lag) genereras ur ett COMMITTAT källutdrag
+(`src/data/wc2026/team-profiles-source.txt`, med URL:er + hämtdatum + radvis data för alla 48 lag)
+via en ren parser/validator (`team-profiles-parser.ts`) till den genererade `team-profiles.ts`,
+VÄRDE-LÅST mot källan i CI (`team-profiles-source.test.ts`: regenerera-och-diffa + två
+mutationstest + 48/48-täckning åt båda håll). Profilerna vävs in i `WC2026_TEAMS`
+(`Team.fifaRanking/starPlayers/trivia`) via `enrichWithProfile`, en sanning, inget dubbellagrat.
+Reviewern kan BEKRÄFTA varje fält mot källan i stället för att jaga det.
+
+**Källor (hämtade 2026-06-10):**
+- **FIFA-ranking:** FIFA/Coca-Cola Men's World Ranking, OFFICIELLA aprilutgåvan (publicerad
+  2026-04-01, nästa officiella utgåva 2026-06-11, så aprilutgåvan är den senaste vid byggtillfället).
+  Position 1-50 verifierade mot ESPN:s återgivning, korskollade mot Wikipedia (topp 20) +
+  whereig.com (full tabell); 50-90 mot whereig.com korskollat mot ESPN + per-lag-sök (t.ex.
+  Uzbekistan #50 bekräftat av kun.uz). France 1:a (1877.32 p, tightaste topp-3 i historien).
+- **Stjärnspelare:** VM 2026:s slutgiltiga 26-mannatrupper (offentliggjorda 2026-06-02), bekräftade
+  mot Al Jazeeras samlade trupplista (alla 48 lag) + Wikipedia. REDAKTIONELLT urval av de mest
+  framträdande namnen, MEN varje spelare tillhör bevisligen truppen enligt källa (gissa aldrig). Vid
+  osäkerhet färre namn (1-2), aldrig gissade. Alla 48 lag fick minst en källbelagd spelare.
+- **Kuriosa:** verifierbara VM-fakta (antal tidigare VM-slutspel FÖRE 2026 + bästa placering), ur
+  Wikipedia "FIFA World Cup records and statistics". Tjeckien räknar Tjeckoslovakien; DR Kongo räknar
+  Zaire (1974). Debutanter (Uzbekistan, Jordanien, Kap Verde, Curaçao) markeras som VM-debut 2026.
+
+**Beslut ("BÄSTA SPELDRAGET" UTELÄMNAT, ärligt tomt över påhittat):** SPEC §6:s `bestPlay`-fält är
+subjektivt/redaktionellt utan källbar grund per lag. Per direktivet (gissa aldrig, HARD) lämnas det
+TOMT (`Team.bestPlay` förblir undefined för alla 48 lag, låst av test), i stället för att hitta på en
+"bästa speldrag"-text. Profil-vyn använder i stället den VERIFIERBARA FIFA-rankingen som styrke-signal
+(omdefinierat till något källbart, per direktivets alternativ). Hellre ärligt tomt än påhittat
+(PRINCIPLES §8). Fältet finns kvar i typen så en framtida källbar redaktionell text kan fyllas senare.
+
+---
+
 ## 2026-06-10 , T28 (issue #42, Daniels feedback 2): kontext per match + lättåtkomlig ihopfällning
 
 **Beslut (1, dag-rubriker + kontext per kort):** Resultatinmatningens lista (`ResultEntryView`)
