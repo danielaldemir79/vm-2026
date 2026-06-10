@@ -247,7 +247,9 @@ describe('listRoomResults', () => {
         data: [
           {
             room_id: 'r1',
-            match_id: 'M1',
+            // Giltigt gruppmatch-id ('g-A-1'); 'M1' finns inte i planen och nekas
+            // av rmr_match_id_format (gruppspel = g-...-id, slutspel = M73..M104).
+            match_id: 'g-A-1',
             home_goals: 2,
             away_goals: 0,
             penalties_home: null,
@@ -308,7 +310,8 @@ describe('upsertRoomResult', () => {
     const chain = builder({
       data: {
         room_id: 'r1',
-        match_id: 'M1',
+        // Gruppmatch -> giltigt 'g-A-1'-id (gruppspel bär g-...-id, inte 'M1').
+        match_id: 'g-A-1',
         home_goals: 2,
         away_goals: 0,
         penalties_home: null,
@@ -322,7 +325,7 @@ describe('upsertRoomResult', () => {
     const from = vi.fn().mockReturnValue(chain);
 
     await upsertRoomResult(mockClient({ from }), 'r1', {
-      matchId: 'M1',
+      matchId: 'g-A-1',
       homeGoals: 2,
       awayGoals: 0,
       status: 'finished',
@@ -338,7 +341,7 @@ describe('upsertRoomResult', () => {
 
     await expect(
       upsertRoomResult(mockClient({ from }), 'r1', {
-        matchId: 'M1',
+        matchId: 'g-A-1',
         homeGoals: 1,
         awayGoals: 0,
         status: 'finished',
