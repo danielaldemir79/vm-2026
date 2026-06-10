@@ -43,9 +43,12 @@ create table public.room_members (
 
 -- ROOM_MATCH_RESULTS ----------------------------------------------------------
 -- Delat matchresultat per rum. match_id refererar den STATISKA matchplanen i
--- klient-bundlen (M1..M104), därför ingen FK till någon match-tabell (det finns
--- ingen, matcherna är inte i DB). Sammansatt PK (room_id, match_id): ett resultat
--- per match och rum, redigeras på plats (upsert).
+-- klient-bundlen, därför ingen FK till någon match-tabell (det finns ingen,
+-- matcherna är inte i DB). Format-konventionen (verifierad mot getMatches(), 104
+-- matcher): 72 gruppmatcher 'g-A-1'..'g-L-6' + 32 slutspelsmatcher 'M73'..'M104'
+-- (FIFA-matchnummer; gruppspelet bär g-...-id, så M-prefixet börjar vid 73). Den
+-- är format-validerad av rmr_match_id_format (egen migration, KA-SA2). Sammansatt
+-- PK (room_id, match_id): ett resultat per match och rum, redigeras på plats (upsert).
 create table public.room_match_results (
   room_id uuid not null references public.rooms (id) on delete cascade,
   match_id text not null,
