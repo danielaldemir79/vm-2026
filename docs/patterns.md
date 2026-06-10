@@ -310,9 +310,9 @@ sekund-tickande nedräkning till en nollkostnad för CLS. Återanvänds av komma
 1. LAG-EMBLEM utan nätverk: generera en deterministisk tvåtons-disc ur lagets FIFA-landskod
    (en liten FNV-hash -> två hue-grader ~140 grader isär, HSL med MÅTTLIG mättnad/ljushet ~34-42% L).
    Inga flaggbilder (48 nät-hämtningar = LCP/CLS-risk) och inga emoji-flaggor (renderas inte på
-   Windows). Cappa ljusheten så vit text på discen håller AA (42% L -> >= ~5:1 även på den ljusaste
-   hue:n). Discen är `aria-hidden` (ren dekoration); lagnamnet bär a11y. Bytbar mot riktig flagg-data
-   senare utan att röra kortet.
+   Windows). Discen är `aria-hidden` (ren dekoration, redundant - lagnamnet finns som text bredvid),
+   så AA-krav gäller inte; uppmätt min-kontrast för vit text är ~2.7:1 vid ljusaste hue. Bytbar mot
+   riktig flagg-data senare utan att röra kortet.
 2. KANAL-BADGE som skummas: ge kanalen ett eget märke (prick + namn) med kanalens egen ton i
    BAKGRUND + KANT + PRICK, men håll TEXTEN på `var(--color-fg)` (uppmätt 15.10:1 ljust / 13.23:1
    mörkt), så badgen läses skarpt oavsett kanalfärg. Okänd kanal faller tillbaka på en neutral fg-ton.
