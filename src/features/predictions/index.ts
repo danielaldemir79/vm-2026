@@ -15,3 +15,4 @@ export {
   type PredictableMatch,
 } from './predictable-matches';
 export { usePredictableData, type PredictableData } from './use-predictable-matches';
+export { useDeadlineTick } from './use-deadline-tick';

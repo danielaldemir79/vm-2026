@@ -5,6 +5,20 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T15 (#15, Copilot C1): tips-låsets re-render kräver en MINUT-tick, inte useTodayKey
+
+**Beslut:** Tipsvyns deadline-lås (`locked = now >= kickoff`, `selectPredictableMatches`) räknas om
+via en egen minut-tick-hook (`features/predictions/use-deadline-tick.ts`), inte via `useTodayKey`.
+`evalNow` (det tickande nuet) ligger nu i `useMemo`-deps för `predictable`/`openCount`.
+**Varför:** `useTodayKey` är referens-STABIL inom en dag (den gatar på dagsbyte), men en avspark
+passerar MITT PÅ DAGEN. En dagsnyckel hade alltså aldrig flippat en match som låses kl 15:00, fältet
+hade frusit öppet tills manuell omladdning. Granulariteten som behövs är alltså minuten (avspark anges
+på hel minut), inte dygnet, men inte heller countdown:ens sekund-tick (overkill, listan ändras bara
+vid avsparks-minuter). Samma PWA-medvetna kadens som `useTodayKey` (minut-`setInterval` +
+`visibilitychange` så en återaktiverad bakgrunds-flik räknar om direkt). Server-RLS är fortfarande det
+RIKTIGA låset; detta gör bara VISNINGEN sann. Regression: PredictionsView.test.tsx (falska timers,
+öppen -> låst när tiden passerar avspark).
+
 ## 2026-06-11 , T15-visuellt (#15): tips-UI premium-finish, TIPS-KUPONG-identitet (design-frontend)
 
 Det visuella lagret ovanpå senior-devs funktionella tips-UI. Mål: en EGEN identitet för tips
