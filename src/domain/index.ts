@@ -41,6 +41,13 @@ export {
   COLUMN_MATCH_IDS,
   type ThirdPlaceAssignment,
 } from './bracket/seed-third-places';
+// FIFA Article 13: rangordna grupptreorna och välj de 8 bästa (T9).
+export {
+  rankThirdPlaces,
+  computeThirdPlaceRanking,
+  type ThirdPlaceTeam,
+  type ThirdPlaceRanking,
+} from './bracket/rank-third-places';
 export { buildBracket, slotId, type BracketNode, type SlotSide } from './bracket/build-bracket';
 export {
   BRACKET_MATCHES,
