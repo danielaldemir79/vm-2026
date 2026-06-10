@@ -27,15 +27,44 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../supabase-types';
 import type { VmSupabaseClient } from '../supabase-browser';
 import { createRoom, joinRoomByCode } from '../rooms/rooms-api';
+import { WC2026_MATCHES } from '../wc2026';
 import { listMyPredictions, listRoomPredictions, upsertMyPrediction } from './predictions-api';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const hasEnv = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-// En match LÅNGT i framtiden (g-L-5 = 27 juni 2026), så tips garanterat är ÖPPET
-// när testet körs. Ett riktigt id ur matchplanen (passerar rmr/predictions-format).
-const OPEN_MATCH = 'g-L-5';
+// VAL AV TESTMATCH (Copilot C13, tids-robusthet): hela sviten antar att matchen är
+// ÖPPEN (avspark ej passerad), annars börjar RLS dölja/avvisa och CI skulle falla
+// över tid. Vi väljer därför den SENASTE gruppspelsmatchen med KÄNDA lag och gatar
+// dessutom på dess avspark (skipIf nedan), så sviten skippar rent EFTER avspark i
+// stället för att falla.
+//
+// VARFÖR g-J-6 (inte t.ex. finalen M104 19 juli): finalen ligger längst fram men
+// har TBD-lag (homeTeamId/awayTeamId = null) och hör inte till tips-format-rymden på
+// samma sätt; en gruppspelsmatch har kända lag OCH ett giltigt predictions-match_id.
+// g-J-6 (Jordanien-Argentina) är den ALLRA sista gruppspelsmatchen: kickoff
+// 2026-06-28T02:00:00Z, ett dygn senare än g-L-5/g-L-6 (27 juni), vilket ger maximal
+// CI-marginal inom gruppspelet. Verifierat mot WC2026_MATCHES (matchplanen, källåkrad).
+const OPEN_MATCH = 'g-J-6';
+
+// Avsparken DÄRIVERAS ur matchplanen (EN sanning för tiderna), inte hårdkodad här,
+// så ett käll-uppdaterat schema aldrig kan drifta från denna grind (lärdomen om att
+// härleda värden ur källan, inte duplicera dem). En instant-jämförelse (UTC ms) är
+// rätt här: "har avsparken passerat NU?" är tidszons-oberoende.
+const OPEN_MATCH_KICKOFF_MS = (() => {
+  const m = WC2026_MATCHES.find((x) => x.id === OPEN_MATCH);
+  if (!m) {
+    // Fail loud: om matchplanen byter id ska detta SYNAS, inte tyst skippa allt.
+    throw new Error(`[VM2026] Testmatchen ${OPEN_MATCH} saknas i WC2026_MATCHES.`);
+  }
+  return new Date(m.kickoff).getTime();
+})();
+
+// Är testmatchen fortfarande öppen (avspark inte passerad)? Efter avspark börjar
+// RLS låsa/dölja, då skulle assertionerna nedan inte längre gälla -> skippa i stället
+// för att falla. (g-J-6 ligger 2026-06-28; denna grind aktiveras först efter VM:t.)
+const matchStillOpen = Date.now() < OPEN_MATCH_KICKOFF_MS;
 
 function freshClient(tag: string): VmSupabaseClient {
   return createClient<Database>(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
@@ -80,7 +109,9 @@ async function signInOrRateLimit(c: VmSupabaseClient): Promise<{ id: string }> {
   throw new Error('RATE_LIMIT');
 }
 
-const runnable = hasEnv && (await reachable());
+// Sviten körs bara med env + nåbart projekt OCH medan testmatchen ännu är öppen
+// (C13): efter avspark döljer/avvisar RLS, så assertionerna gäller inte längre.
+const runnable = hasEnv && matchStillOpen && (await reachable());
 
 describe.skipIf(!runnable)('RLS: tips, medlemskap + förfalskning (riktiga sessioner)', () => {
   let alice: VmSupabaseClient; // skapar rummet, lägger ett tips

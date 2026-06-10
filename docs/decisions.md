@@ -5,6 +5,43 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T15 (#15, Copilot C10-C13): fyra review-fynd, disposition
+
+**C10 (åtgärdad) , två tips-index var REDUNDANTA med PK:n, borttagna.** `predictions_room_idx
+(room_id)` och `predictions_room_match_idx (room_id, match_id)` är båda exakt LEDANDE PREFIX av
+primärnyckeln `(room_id, match_id, user_id)`. **KÄLLA (regeln gissas inte):** PostgreSQL
+"Multicolumn Indexes" (https://www.postgresql.org/docs/current/indexes-multicolumn.html) , ett
+btree-index servar sökningar på vilket ledande kolumn-prefix som helst, så PK:ns unika btree-index
+täcker redan de två query-formerna (`where room_id = ?` och `where room_id = ? and match_id = ?`).
+Tredje frågan, `listMyPredictions` (`where room_id = ? and user_id = ?`), servas också av PK:n
+(room_id-prefix + user_id-filter i samma scan), INTE av något av de borttagna indexen. **Bevisat
+mot live (kmzhyblzxangpxydufve) med EXPLAIN (enable_seqscan=off):** efter en DROP-i-transaktion-
+rollback valde planeraren `predictions_pkey` för ALLA tre formerna (Index Cond room_id / room_id+
+match_id / room_id+user_id). De redundanta indexen tillförde bara skriv-amplifiering + lagring.
+Droppade via migration `20260611120400_t15_predictions_drop_redundant_idx.sql` (applicerad via MCP,
+1:1 med filen, samma T15-mönster) + skema-kommentaren uppdaterad. Live har nu bara `predictions_pkey`.
+
+**C11 (åtgärdad) , `use-deadline-tick` räknar bara om vid SHOW, inte hide.** `visibilitychange`
+fyrar både när fliken döljs OCH visas; handlern gatar nu på `document.visibilityState === 'visible'`
+så en hide inte ger en onödig setState/re-render (en dold flik renderas ändå inte). SHOW-grenen
+(räkna om direkt efter strypt PWA-timer) är oförändrad. Test: `use-deadline-tick.test.ts` (hide ger
+INGEN omräkning, show ger det, minut-tick + unmount-städning).
+
+**C12 (åtgärdad) , fail-loud-felet i `PredictionsProvider.savePrediction` skiljer nu på rötterna.**
+Tidigare sa det alltid "inget aktivt rum" även när roten var "ingen Supabase-klient". Nu: `!supabase`
+-> "ingen Supabase-klient (live ej konfigurerat)" (kollas FÖRST, mer grundläggande brist), annars
+`activeRoomId === null` -> "inget aktivt rum". Felsökbart ur texten. Test för BÅDA grenarna.
+
+**C13 (åtgärdad) , RLS-integrationstestets öppna-match-antagande är nu tids-robust.** `OPEN_MATCH`
+flyttat från `g-L-5` (27 juni) till `g-J-6` (Jordanien-Argentina, 2026-06-28T02:00:00Z) , den ALLRA
+sista gruppspelsmatchen, med KÄNDA lag (grupp J fullständigt lottad) och ett giltigt predictions-
+match_id. (Finalen M104 19 juli ligger längre fram men har TBD-lag, därför vald bort.) Avsparken
+DÄRIVERAS ur `WC2026_MATCHES` (en sanning, inte hårdkodad här), och en `matchStillOpen`-grind
+(`Date.now() < kickoff`, instant-jämförelse = tidszons-oberoende) gör att sviten SKIPPAR rent efter
+avspark i stället för att börja falla när RLS låser/döljer matchen. Grinden aktiveras först efter VM:t.
+
+---
+
 ## 2026-06-11 , T15 (#15, Copilot C1): tips-låsets re-render kräver en MINUT-tick, inte useTodayKey
 
 **Beslut:** Tipsvyns deadline-lås (`locked = now >= kickoff`, `selectPredictableMatches`) räknas om

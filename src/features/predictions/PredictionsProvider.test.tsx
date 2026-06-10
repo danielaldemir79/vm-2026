@@ -125,10 +125,11 @@ describe('PredictionsProvider', () => {
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('error'));
   });
 
-  it('FAIL LOUD (C5): savePrediction utan aktivt rum KASTAR (ingen tyst no-op)', async () => {
-    // Inget rum -> savePrediction har inget att spara till. Kontraktet säger
-    // "Kastar vid fel"; en tyst return hade gett ett falskt "Sparat". Verifiera att
-    // löftet avvisas och att upsert ALDRIG anropas (ingen halv-väg-skrivning).
+  it('FAIL LOUD (C5/C12): savePrediction utan aktivt rum KASTAR med RUM-felet (ingen tyst no-op)', async () => {
+    // Inget rum (men klient finns) -> savePrediction har inget att spara till.
+    // Kontraktet säger "Kastar vid fel"; en tyst return hade gett ett falskt
+    // "Sparat". Verifiera att löftet avvisas med det SPECIFIKA rum-felet (C12: skilt
+    // från klient-felet) och att upsert ALDRIG anropas (ingen halv-väg-skrivning).
     render(
       <PredictionsProvider env={env} liveReady client={fakeClient} activeRoomId={null}>
         <Probe />
@@ -142,6 +143,30 @@ describe('PredictionsProvider', () => {
     await waitFor(() =>
       expect(screen.getByTestId('save-error').textContent).toMatch(/inget aktivt rum/)
     );
+    // Det är RUM-felet, INTE klient-felet (de skiljs åt, C12).
+    expect(screen.getByTestId('save-error').textContent).not.toMatch(/Supabase-klient/);
+    expect(api.upsertMyPrediction).not.toHaveBeenCalled();
+  });
+
+  it('FAIL LOUD (C12): savePrediction utan Supabase-klient KASTAR med KLIENT-felet', async () => {
+    // Ingen injicerad klient OCH live ej konfigurerat (liveReady=false) -> supabase
+    // blir null. Även MED ett rum-id ska savePrediction då kasta KLIENT-felet (den
+    // mer grundläggande bristen), skilt från rum-felet, så ett wiring-fel kan
+    // felsökas ur texten (C12). upsert ska aldrig anropas.
+    render(
+      <PredictionsProvider env={env} liveReady={false} activeRoomId="r1">
+        <Probe />
+      </PredictionsProvider>
+    );
+
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('save-error').textContent).toMatch(/ingen Supabase-klient/)
+    );
+    // Det är KLIENT-felet, INTE rum-felet (de skiljs åt, C12).
+    expect(screen.getByTestId('save-error').textContent).not.toMatch(/inget aktivt rum/);
     expect(api.upsertMyPrediction).not.toHaveBeenCalled();
   });
 });
