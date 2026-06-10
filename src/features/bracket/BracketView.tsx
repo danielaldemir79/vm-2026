@@ -39,8 +39,10 @@ const ROUND_STEP: Readonly<Record<string, number>> = {
   'round-of-16': 2,
   'quarter-final': 3,
   'semi-final': 4,
-  final: 5,
-  'third-place': 6,
+  // Bronsmatchen spelas FÖRE finalen (C4): brons=5, final=6, samma kalender-
+  // ordning som ROUND_ORDER i derive-bracket (källhänvisad mot T4:s tablå).
+  'third-place': 5,
+  final: 6,
 };
 
 /** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista). */

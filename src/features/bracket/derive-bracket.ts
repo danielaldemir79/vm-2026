@@ -476,14 +476,25 @@ function buildSlotState(
  * UI-hjälp: gruppera trädet i rundor (för en kolumn-per-runda-layout).
  * ------------------------------------------------------------------ */
 
-/** Rundornas ordning vänster -> höger i trädet (officiell progression). */
+/**
+ * Rundornas ordning vänster -> höger i trädet (officiell progression).
+ *
+ * Bronsmatchen (third-place, M103) står FÖRE finalen (final, M104), eftersom den
+ * SPELAS före finalen i FIFA:s schema: båda matas av semifinalerna (M101/M102),
+ * bronsmatchen av förlorarna och finalen av vinnarna, och bronsmatchen ligger
+ * tidigare i kalendern. KÄLLA (verifierad mot T4:s tablå, gissas inte): VM 2026:s
+ * svenska TV-tablå (tv-schedule-source.txt) anger BRONSMATCH lör 18 juli (M103)
+ * och FINAL sön 19 juli (M104), och matches.ts har kickoff M103
+ * 2026-07-18T21:00:00Z < M104 2026-07-19T19:00:00Z. Strukturen (bracket-
+ * structure.ts, FIFA Art. 12.10-12.11) bekräftar M103 = brons, M104 = final.
+ */
 export const ROUND_ORDER: ReadonlyArray<BracketNode['stage']> = [
   'round-of-32',
   'round-of-16',
   'quarter-final',
   'semi-final',
-  'final',
   'third-place',
+  'final',
 ];
 
 /** Svenska rubriker per runda (en sanning för UI:t). */
