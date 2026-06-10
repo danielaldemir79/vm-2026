@@ -184,15 +184,18 @@ describe.skipIf(!online)('RLS: rum, medlemmar och delade resultat (riktiga sessi
   });
 
   it('en medlem (Bob) kan skriva ett delat resultat, en annan medlem (Alice) läser det', async () => {
+    // Riktigt match-id ur planen (gruppmatch 'g-A-1'); 'M1' finns INTE och nekas
+    // dessutom av rmr_match_id_format-constrainten (KA-SA2), så testet speglar de
+    // faktiska id:na (gruppspel = g-...-id, slutspel = M73..M104).
     await upsertRoomResult(bob, roomId, {
-      matchId: 'M1',
+      matchId: 'g-A-1',
       homeGoals: 2,
       awayGoals: 1,
       status: 'finished',
     });
 
     const results = await listRoomResults(alice, roomId);
-    const m1 = results.find((r) => r.matchId === 'M1');
+    const m1 = results.find((r) => r.matchId === 'g-A-1');
     expect(m1).toMatchObject({ homeGoals: 2, awayGoals: 1, status: 'finished', updatedBy: bobUid });
   });
 
@@ -200,16 +203,36 @@ describe.skipIf(!online)('RLS: rum, medlemmar och delade resultat (riktiga sessi
     // RLS-avslag -> rooms-api fail-loud:ar. Vi bevisar att skrivningen NEKAS.
     await expect(
       upsertRoomResult(carol, roomId, {
-        matchId: 'M2',
+        matchId: 'g-A-2',
         homeGoals: 0,
         awayGoals: 0,
         status: 'finished',
       })
     ).rejects.toThrow(/Spara resultat misslyckades/);
 
-    // Och att inget faktiskt skrevs (Alice ser inte M2).
+    // Och att inget faktiskt skrevs (Alice ser inte g-A-2).
     const results = await listRoomResults(alice, roomId);
-    expect(results.find((r) => r.matchId === 'M2')).toBeUndefined();
+    expect(results.find((r) => r.matchId === 'g-A-2')).toBeUndefined();
+  });
+
+  it('en medlem kan INTE skriva ett match_id i fel format, t.ex. 10000 tecken (KA-SA2)', async () => {
+    // rmr_match_id_format-constrainten nekar godtycklig text. Ett orimligt långt
+    // match_id (10000 tecken) ska avvisas av DB:n (constraint-fel -> fail-loud), så
+    // kolumnen inte är en obegränsad text-yta. Bob är medlem, så RLS släpper igenom
+    // till constrainten (det är formatet, inte behörigheten, som stoppar här).
+    const garbage = 'x'.repeat(10000);
+    await expect(
+      upsertRoomResult(bob, roomId, {
+        matchId: garbage,
+        homeGoals: 0,
+        awayGoals: 0,
+        status: 'finished',
+      })
+    ).rejects.toThrow(/Spara resultat misslyckades/);
+
+    // Och inget skräp lagrades (Alice ser det inte).
+    const results = await listRoomResults(alice, roomId);
+    expect(results.find((r) => r.matchId === garbage)).toBeUndefined();
   });
 
   it('en UTOMSTÅENDE (Carol) ser inga resultat (RLS SELECT nekad)', async () => {
