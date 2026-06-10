@@ -5,6 +5,50 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T28 (issue #42, Daniels feedback 2): kontext per match + lättåtkomlig ihopfällning
+
+**Beslut (1, dag-rubriker + kontext per kort):** Resultatinmatningens lista (`ResultEntryView`)
+grupperas nu under DAG-RUBRIKER (en `<h3>` per svensk speldag, "torsdag 11 juni 2026"), och varje
+matchkort bär en KONTEXT-RAD med avsparkstid (svensk tid) + grupp/steg-etikett ("Grupp A" för
+gruppspel, rundnamn som "Kvartsfinal" för slutspel). **Varför:** i den långa listan (särskilt
+expanderad) såg man bara lagen, sammanhanget (vilken dag, tid, grupp/runda) tappades (Daniels
+feedback 2). **DRY (PRINCIPLES §4):** ingen ny datum-/etikett-logik, allt återanvänder daily-lagret,
+EN sanning: `groupMatchesByDay`/`localDateKey` (dag-grupperingen, off-by-one-säker),
+`formatDayHeading` (dag-rubriken), `formatKickoffTime` (svensk tid), `stageLabel` (grupp/runda). Ny
+ren modul `groupMatchesForEntry` (`src/features/results/group-matches-for-entry.ts`) är ett tunt lager
+ovanpå `groupMatchesByDay` som filtrerar bort TOMMA vilodagar (inmatningslistan vill inte ha tomma
+dag-rubriker, till skillnad från den dagliga vyns datumnavigering). Kontext-raden
+(`MatchContextRow.tsx`) ligger UTANFÖR matchkortets score-grid (`data-result-card-body`), så den kan
+ALDRIG bryta #39:s kolumn-linjering (Daniels FÖRSTA feedback). **Samspel med #39-fönstret:**
+dag-grupperingen beror BARA på `editable` (alla dagar grupperas alltid); fönstret döljer korten PER
+KORT (`hidden`), och ett dag-`<li>` döljs bara när HELA dagen är utanför fönstret, så dag-rubriker är
+korrekta även i ihopfällt läge (bara fönstrets dagar syns) och över fönster-gränsen vid utfällning.
+Kortens egna `hidden` står oberoende av dag-`<li>`:t, så #39:s C2-invariant (osparad inmatning
+överlever expandera/ihopfäll, instansen unmountas inte) är bevarad. Slutspelsmatcher visar rundnamn,
+aldrig grupp (de har `groupId` null -> `stageLabel` faller på rundnamnet, källtestat i
+`match-display.test.ts`).
+
+**Beslut (2, lättåtkomlig ihopfällning, DUBBLERAD kontroll + fokus-flytt):** Ihopfäll-/expandera-
+kontrollen är nu DUBBLERAD (en uppe + en nere om listan), så en toggle ALLTID nås utan att skrolla
+till slutet av en utfälld 72-korts-lista. Båda delar EN komponent (`ExpandToggle` i
+`ResultEntryView.tsx`), så deras semantik (samma `aria-expanded`, samma `aria-controls`, samma
+etikett) ALDRIG kan drifta isär (en sanning för kontrollen, kravet: konsekvent aria på BÅDA). Vid
+IHOPFÄLLNING flyttas fokus till den ÖVRE kontrollen (via `requestAnimationFrame` efter render), så
+användaren förs upp till listans topp i stället för att bli kvar långt ner vid en kontroll som just
+försvann (a11y: "tappa inte bort användaren"). Bara vid ihopfällning, vid utfällning stannar fokus
+där användaren var (rätt). Den visuella finishen (accent-tint + chevron, #39) ärvs oförändrad, så de
+uppmätta AA-värdena gäller fortfarande. Design-finishen lämnas till design-frontend via stabila
+data-attribut (`data-result-day`, `data-result-day-heading`, `data-match-context`, `data-result-time`,
+`data-result-stage`, `data-results-toggle-position`).
+
+**Spårbarhet:** detta är en UX-/produkt-regel (Daniels feedback), ingen extern auktoritativ källa att
+källhänvisa, spårbar via issue #42 + denna rad. Tester: `group-matches-for-entry.test.ts` (dag-gräns
+kring midnatt, vilodagar bort, tom indata), `MatchContextRow.test.tsx` (svensk tid, Grupp A vs
+rundnamn, aria-hidden avdelare), `ResultEntryView.test.tsx` T28-blocket (dag-rubriker i ihopfällt läge
++ över fönster-gränsen, dubblerad kontroll med identisk aria, fokus-flytt vid ihopfällning).
+
+---
+
 ## 2026-06-10 , T9 (issue #9): Copilot R3 (C9-C10), straff-gating + chip-böjning
 
 **Beslut (C9, `penalties-not-applicable` bara när det SÄKERT kan avgöras):** `validateResultEntry`
