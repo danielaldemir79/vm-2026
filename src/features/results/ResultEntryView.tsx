@@ -15,11 +15,12 @@
 // motion-primitiver, reducerad rörelse respekteras redan i kroken). Funktionellt
 // fungerar inmatningen helt utan firandet, det är ren glädje-yta.
 
-import { useMemo, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { useGoalCelebration, type GoalCelebration } from './goal-celebration';
 import { useResultsStore } from './results-context';
 import { ResultEntryForm } from './ResultEntryForm';
+import { windowMatches } from './result-window';
 import type { ResultEntry } from './validate-result';
 
 /** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista). */
@@ -60,6 +61,21 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
       ),
     [matches]
   );
+
+  // 3-DAGARS FÖNSTER (#39): hela VM:t är 104 matcher = en orimligt lång lista att
+  // skrolla. Default visar bara matcherna inom de närmaste 3 svenska dagarna (från
+  // idag, eller premiärdagen om turneringen inte börjat), resten fälls ut på begäran.
+  // Urvalet är en REN funktion (result-window.ts), testad fristående (edge-fall:
+  // ej börjad, slutet, allt inom fönstret, vilodag); här äger vyn bara expandera-
+  // tillståndet och den tillgängliga kontrollen.
+  const [expanded, setExpanded] = useState(false);
+  const windowed = useMemo(() => windowMatches(editable), [editable]);
+  // Vad som faktiskt renderas: hela listan när användaren fällt ut, annars fönstret.
+  const shownMatches = expanded ? editable : windowed.visible;
+  // Knappen behövs bara när det FINNS något dolt (alla inom fönstret -> ingen knapp).
+  const hasHidden = windowed.hiddenCount > 0;
+  // Stabil id-koppling för aria-controls/aria-expanded mellan knappen och listan.
+  const listId = useId();
 
   // Trigga målfirande EFTER ett lyckat sparande av en spelad match med mål.
   // Kroken hoppar själv reducerad rörelse + mållösa resultat (a11y), så vi
@@ -112,8 +128,8 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
       ) : null}
 
       {status === 'ready' && editable.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {editable.map((match) => (
+        <ul id={listId} className="m-0 flex list-none flex-col gap-3 p-0">
+          {shownMatches.map((match) => (
             <li key={match.id}>
               {/* key inkluderar matchens status + mål, inte bara match.id (C10):
                   ResultEntryForm seedar sin lokala useState EN gång vid mount.
@@ -137,6 +153,27 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {/* Expandera-KONTROLL (#39): syns BARA när fönstret döljer något (alla inom
+          fönstret -> ingen knapp). Tillgänglig: en riktig <button> som styr listan
+          via aria-controls + aria-expanded, så en skärmläsare vet att den fäller
+          ut/ihop just matchlistan ovanför. Antalet dolda står i etiketten så valet
+          är begripligt ("Visa alla matcher (101 dolda)"). data-attribut är seam för
+          design-frontends premium-styling. */}
+      {status === 'ready' && editable.length > 0 && hasHidden ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls={listId}
+          data-results-toggle={expanded ? 'collapse' : 'expand'}
+          className="self-center rounded-pill border border-border bg-surface px-5 py-2.5 font-display text-sm font-semibold text-fg shadow-[var(--vm-shadow-card)] transition-colors duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+        >
+          {expanded
+            ? 'Visa färre'
+            : `Visa alla matcher (${windowed.hiddenCount} ${windowed.hiddenCount === 1 ? 'dold' : 'dolda'})`}
+        </button>
       ) : null}
 
       {/* Målfirande-SEAM: aria-hidden (ren visuell glädje, dubblerar ingen info).

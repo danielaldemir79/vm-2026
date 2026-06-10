@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResultEntryView } from './ResultEntryView';
 import { ResultsProvider } from './ResultsProvider';
 import { GroupStageView } from '../groups/GroupStageView';
@@ -120,6 +120,85 @@ describe('ResultEntryView + GroupStageView, inmatning uppdaterar tabellen (en sa
       // Kolumnordning: [Placering, S, V, O, F, GM, IM, MS, P].
       expect(cells[8]).toHaveTextContent('3'); // P: 3 poäng
       expect(cells[7]).toHaveTextContent('5'); // MS: +5
+    });
+  });
+});
+
+// 3-DAGARS FÖNSTER + expandera (#39). Den rena fönster-funktionen är uttömmande
+// testad i result-window.test.ts; här bevisar vi att VYN tillämpar fönstret som
+// default och att expandera-kontrollen är tillgänglig och fungerar end-to-end.
+// Vi fryser systemklockan till premiärdagen (11 juni 2026) så urvalet är
+// deterministiskt oavsett när testet körs (annars styr verklig tid vad som syns).
+describe('ResultEntryView, 3-dagars fönster + expandera (#39)', () => {
+  beforeEach(() => {
+    // Faka BARA Date (inte setTimeout/microtasks), så providerns async-seedning och
+    // testing-librarys `waitFor` fortfarande kör på riktiga timers. Annars fryser
+    // fake-timers seed-flushen och waitFor:en når aldrig sitt villkor (timeout).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 2026-06-11 10:00 svensk tid: turneringen pågår (premiärdagen), så fönstret
+    // ankrar på idag (11 juni) och spänner 11-13 juni. Fixtures sträcker sig till
+    // 19 juli, så långt fler matcher ligger UTANFÖR fönstret än innanför.
+    vi.setSystemTime(new Date('2026-06-11T08:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function renderView() {
+    const utils = render(
+      <ResultsProvider env={fixturesEnv()}>
+        <ResultEntryView />
+      </ResultsProvider>
+    );
+    // Seedningen är async; vänta in att formulären finns. (Fake timers påverkar
+    // inte microtask-flushen som waitFor driver, men advance:a för säkerhets skull.)
+    await waitFor(() => {
+      expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+    });
+    return utils;
+  }
+
+  it('visar bara matcher inom fönstret som default (inte hela listan), med en expandera-knapp', async () => {
+    await renderView();
+    const windowedCount = screen.getAllByRole('group').length;
+    // Fönstret döljer matcher -> knappen finns och säger hur många som är dolda.
+    const toggle = screen.getByRole('button', { name: /Visa alla matcher \(\d+ dold/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // aria-controls pekar på listan (ul har samma id).
+    const listId = toggle.getAttribute('aria-controls');
+    expect(listId).toBeTruthy();
+    expect(document.getElementById(listId as string)?.tagName).toBe('UL');
+    // Default-fönstret är en ÄKTA delmängd: färre formulär än alla matcher.
+    expect(windowedCount).toBeGreaterThan(0);
+
+    // Fäll ut -> fler formulär än i fönstret, knappen blir "Visa färre".
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      expect(screen.getAllByRole('group').length).toBeGreaterThan(windowedCount);
+    });
+    const collapse = screen.getByRole('button', { name: /Visa färre/i });
+    expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    expect(collapse).toHaveAttribute('aria-controls', listId);
+
+    // Fäll ihop igen -> tillbaka till fönster-antalet.
+    fireEvent.click(collapse);
+    await waitFor(() => {
+      expect(screen.getAllByRole('group').length).toBe(windowedCount);
+    });
+    expect(screen.getByRole('button', { name: /Visa alla matcher/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('utfälld lista visar fler matcher än fönstret (ingen match går förlorad)', async () => {
+    await renderView();
+    const windowedCount = screen.getAllByRole('group').length;
+    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    await waitFor(() => {
+      // Hela fixtures-listan (104 matcher, alla med kända lag i gruppspelet) är
+      // strikt fler än fönstrets delmängd.
+      expect(screen.getAllByRole('group').length).toBeGreaterThan(windowedCount);
     });
   });
 });
