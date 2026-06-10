@@ -619,7 +619,7 @@ i koden (ren `readonly`-väv), och avstängning = töm overlay. Generaliserar T5
 state-vyer till ett HYPOTETISKT-DATA-lager på samma store. Källa: T12 (`src/features/simulation/`:
 `apply-simulation.ts` + `SimulationBanner.tsx`, sim-seamen i `results-context.ts`/`ResultsProvider.tsx`).
 
-### app-global-fargoberoende-lages-markering- for-ett-icke-permanent-tillstand (VM 2026)
+### app-global-fargoberoende-lages-markering-for-ett-icke-permanent-tillstand (VM 2026)
 
 **Recept (göra ett "läge" omisskännligt utan att förstöra läsbarhet eller a11y):** när appen kan
 gå in i ett icke-permanent tillstånd som ändrar vad siffrorna BETYDER (här: what-if-simulering,
