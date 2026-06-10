@@ -5,6 +5,18 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T31 (#51, Daniels feedback): "designfundament"-showcasen borttagen
+
+**Beslut:** T2:s showcase-block i `App.tsx` (Paletten/Rörelsen-griden under rubrikerna
+"Designfundament"/"Levande känsla" + Typografi-provet) togs bort ur den renderade vyn, och de
+nu föräldralösa komponenterna `src/components/foundation/SwatchGrid.tsx` + `MotionDemo.tsx`
+raderades (inga tester använde dem). Footer-prosan "Fundamentet är på plats: ..." (byggnadsställnings-
+text) ersattes med en färdig rad. Tema-TOGGLEN i headern är INTE showcasen och är kvar (riktig funktion).
+**Varför:** Showcasen var en byggnadsställning från T2 för att premium-känslan skulle synas på tidiga
+PR-förhandsvisningar. På den färdiga appen (riktiga matchvyer + tips-liga) blev den brus som drog
+fokus från innehållet. Daniels feedback (#51). Inga tester refererade showcase-texten, så App-smoke-
+testerna (h1 = "VM 2026", main-landmark, tema-toggle, 12 grupptabeller) förblir gröna oförändrade.
+
 ## 2026-06-10 , T14 COPILOT-RUNDA 1 (issue #14): 7 fynd åtgärdade (C1-C7)
 
 **Beslut (C1, DB-INTEGRITET, halv-straff-läcka i `rmr_penalties_paired`, KÄLLHÄNVISAT):** Den

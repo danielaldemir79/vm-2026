@@ -1,16 +1,16 @@
-// App-shell , branded "foundation showcase" (T2 design).
+// App-shell , den färdiga app-vyn.
 //
-// Detta är INTE de riktiga matchvyerna (de byggs i T7+). Syftet är en smakfull
-// landningsyta som visar VM 2026-wordmark, tema-toggle och demonstrerar paletten
-// + rörelse-känslan, så premium-kvaliteten KÄNNS live på PR-förhandsvisningen.
-// Fokuserad med flit: tillräckligt för att bevisa fundamentet, inte mer.
+// Headern bär wordmark + tema-toggle + nät-status, och main:en de RIKTIGA vyerna
+// (daglig matchvy, gruppspel, "vad krävs", slutspelsträd, resultatinmatning,
+// tips-ligan). T2:s "designfundament"-showcase (palett/rörelse/typografi-prov)
+// togs bort i T31 (#51, Daniels feedback): den var byggnadsställning som inte
+// hör hemma i den färdiga appen. Tema-TOGGLEN i headern är INTE showcasen och
+// är kvar, den är en riktig funktion.
 
 import type { ReactNode } from 'react';
 import { Fade, Slide } from './motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
-import { SwatchGrid } from './components/foundation/SwatchGrid';
-import { MotionDemo } from './components/foundation/MotionDemo';
 import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
@@ -26,19 +26,7 @@ import {
   SettingsControl,
 } from './features/app-settings';
 
-/** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
-function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
-  return (
-    <header className="mb-5">
-      <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-        {eyebrow}
-      </p>
-      <h2 className="mt-1 font-display text-xl font-bold sm:text-2xl">{title}</h2>
-    </header>
-  );
-}
-
-/** Ett innehållskort på en yt-token, samma form återanvänds i showcasen. */
+/** Ett innehållskort på en yt-token, delad yt-form för app-vyns sektioner. */
 function Panel({ children }: { children: ReactNode }) {
   return (
     <section className="rounded-card border border-border bg-surface p-5 shadow-[var(--vm-shadow-card)] sm:p-7">
@@ -139,32 +127,6 @@ function AppShell() {
           <InstallBanner />
         </Slide>
 
-        {/* Foundation-grid: palett + rörelse sida vid sida på stora skärmar,
-            staplade på mobil. Inga krockande element, kolumnerna bryts rent. */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Slide direction="up">
-            <Panel>
-              <SectionHeading eyebrow="Designfundament" title="Paletten" />
-              <p className="mb-5 text-sm text-fg-muted">
-                Arena i kvällsljus: djup grönsvart fond, elektrisk gräsplan-grön och pokal-guld.
-                Växla tema uppe till höger, färgerna följer med.
-              </p>
-              <SwatchGrid />
-            </Panel>
-          </Slide>
-
-          <Slide direction="up">
-            <Panel>
-              <SectionHeading eyebrow="Levande känsla" title="Rörelsen" />
-              <p className="mb-5 text-sm text-fg-muted">
-                Mjuka, självsäkra övergångar (respekterar alltid "minska rörelse"). Ett smakprov,
-                inte den riktiga matchvyn.
-              </p>
-              <MotionDemo />
-            </Panel>
-          </Slide>
-        </div>
-
         {/* Gruppspelsvyn (T5) + resultatinmatningen (T6) delar EN ResultsProvider
             (T6:s delade store): en inmatning i ResultEntryView uppdaterar samma
             matcher som gruppspelstabellerna härleds ur, så tabellerna räknas om
@@ -251,23 +213,8 @@ function AppShell() {
           <RoomSection surface={(children) => <Panel>{children}</Panel>} />
         </Slide>
 
-        {/* Typografi-prov: visar display- mot brödtext-stacken. */}
-        <Slide direction="up">
-          <Panel>
-            <SectionHeading eyebrow="Typografi" title="Display + brödtext" />
-            <div className="flex flex-col gap-3">
-              <p className="font-display text-4xl font-bold sm:text-5xl">Slutspelsträdet växer</p>
-              <p className="max-w-2xl text-fg-muted">
-                Rubriker i Space Grotesk (självhostad, lätt), brödtext i systemstacken för snabb
-                laddning. En distinkt, sportig ton, inte den generiska look:en.
-              </p>
-            </div>
-          </Panel>
-        </Slide>
-
         <footer className="border-t border-border pt-6 text-sm text-fg-muted">
-          Fundamentet är på plats: tema, rörelse, palett, gruppspelet och det levande
-          slutspelsträdet. Tips-ligan byggs härnäst.
+          VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med en länk.
         </footer>
       </main>
 
