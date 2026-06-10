@@ -49,6 +49,15 @@ function indexTeams(teams: readonly Team[]): Map<string, Team> {
 }
 
 /**
+ * Grammatiskt korrekt antals-text för skärmläsaren: "1 match", "16 matcher".
+ * Svenskt en-ord ("match") böjs i plural ("matcher"). Final/bronsmatch har
+ * exakt 1 match, så utan böjning läses "Final (1 matcher)" upp, grammatiskt fel.
+ */
+function matchCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'match' : 'matcher'}`;
+}
+
+/**
  * Visnings-texten för en slot, beroende på dess tillstånd:
  *   - resolved: lagets namn (gissas aldrig, "Ej klart" om uppslaget saknar det).
  *   - possible/tbd: positions-etiketten ("1:a grupp E", "3:a A/B/C/D/F",
@@ -179,7 +188,7 @@ function RoundColumn({
   return (
     <section
       data-bracket-round={stage}
-      aria-label={`${label} (${matchCount} matcher)`}
+      aria-label={`${label} (${matchCountLabel(matchCount)})`}
       className="vm-bracket-round flex w-60 shrink-0 flex-col gap-3"
     >
       {/* Rubrik-rad: numrerad marker (progression mot finalen) + runda-namn.

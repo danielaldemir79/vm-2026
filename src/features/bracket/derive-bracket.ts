@@ -28,6 +28,7 @@
 // HÄRLEDER bara lag-tillståndet ovanpå den, den definierar ingen ny slutspelsregel.
 
 import type { GroupId, GroupTable, Match } from '../../domain/types';
+import { GROUP_IDS } from '../../domain/types';
 import { buildBracket, type BracketNode } from '../../domain/bracket/build-bracket';
 import { seedThirdPlaces } from '../../domain/bracket/seed-third-places';
 import { computeThirdPlaceRanking } from '../../domain/bracket/rank-third-places';
@@ -118,21 +119,34 @@ function matchLoserLabel(matchId: string): string {
  * ------------------------------------------------------------------ */
 
 /**
- * Är gruppspelet klart? Sant när VARJE inskickad grupptabell har alla sina
- * matcher spelade (varje lag har spelat 3 matcher i VM 2026-formatet). Vi
- * härleder det ur tabellerna (played), inte ur ett separat flagg-fält, så det
- * är en ren funktion av sanningen. Kräver alla 12 grupperna OCH att var och en
- * är färdigspelad, annars är seedningen inte giltig att låsa.
+ * Är gruppspelet klart? Sant när ALLA 12 KANONISKA grupperna (A-L) finns OCH var
+ * och en är färdigspelad (varje lag har spelat 3 matcher i VM 2026-formatet). Vi
+ * härleder det ur tabellerna (played), inte ur ett separat flagg-fält, så det är
+ * en ren funktion av sanningen.
+ *
+ * Varför UNIKA groupId:n, inte bara `tables.length >= 12` (C3, Copilot runda 1):
+ * en längd-koll släpper igenom 12 tabeller som råkar ha en dubblett och saknar en
+ * grupp (t.ex. två A, ingen L). Då skulle gruppspelet låsas felaktigt, och slot-
+ * resolvern slår upp den saknade gruppen, får undefined och en `resolved` slot med
+ * teamId null (en låst plats utan lag). Vi kräver därför att Set:et av groupId:n
+ * täcker hela GROUP_IDS (en av varje), fail-safe: hellre fortsatt "pågår" än en
+ * felaktig låsning på ofullständig/dubblerad data.
+ *
+ * Grupp-mängden (alla 12, A-L) härleds ur GROUP_IDS, enda sanningen för giltiga
+ * grupper, så formatet har EN definition i stället för en lös 12:a.
  *
  * MATCHES_PER_TEAM = 3: i en grupp om 4 lag spelar varje lag 3 matcher (envars-
  * möte). Härleds inte ur datan (en ofullständig grupp har färre), utan är
  * formatets konstant (SPEC §5).
  */
-const GROUPS_TOTAL = 12;
 const MATCHES_PER_TEAM = 3;
 
 export function isGroupStageComplete(tables: readonly GroupTable[]): boolean {
-  if (tables.length < GROUPS_TOTAL) {
+  // Alla KANONISKA grupperna (GROUP_IDS, A-L) måste vara representerade (unika
+  // groupId:n), så en dubblett + saknad grupp inte låser seedningen felaktigt.
+  // När hela GROUP_IDS täcks är `tables.length >= 12` givet på köpet.
+  const presentGroups = new Set(tables.map((t) => t.groupId));
+  if (!GROUP_IDS.every((g) => presentGroups.has(g))) {
     return false;
   }
   return tables.every(
