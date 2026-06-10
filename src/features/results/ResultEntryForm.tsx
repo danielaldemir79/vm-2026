@@ -17,6 +17,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { Match, MatchStatus, Team } from '../../domain/types';
+import { MatchContextRow } from './MatchContextRow';
 import type { ResultEntry, ResultValidationError, ResultValidationField } from './validate-result';
 
 /**
@@ -303,6 +304,13 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
           />
           {matchLabel}
         </legend>
+
+        {/* Kontext-rad (T28/#42, Daniels feedback 2): avsparkstid + grupp/runda.
+            Ligger UTANFÖR score-grid:en nedan (egen rad, full bredd som legenden),
+            så den kan ALDRIG bryta #39:s kolumn-linjering (Daniels FÖRSTA feedback).
+            Den ger varje kort sitt sammanhang i den långa listan utan att plottra:
+            EN kompakt rad, dag-rubriken i listan bär själva datumet. */}
+        <MatchContextRow match={match} />
 
         {/* Kortets kropp som ett STABILT KOLUMN-RUTNÄT (#39, Daniels feedback).
             PROBLEMET som löses: med en flex-layout där lag-kolumnerna var `flex-1`

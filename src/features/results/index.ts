@@ -39,3 +39,9 @@ export { applyMatchResult } from './apply-match-result';
 // 3-dagars fönster-urval för inmatningslistan (#39): ren, testbar funktion.
 export { windowMatches, WINDOW_DAYS } from './result-window';
 export type { ResultWindow } from './result-window';
+
+// Dag-gruppering + kontext-rad för inmatningslistan (T28/#42, Daniels feedback 2).
+export { groupMatchesForEntry } from './group-matches-for-entry';
+export type { EntryMatchDay } from './group-matches-for-entry';
+export { MatchContextRow } from './MatchContextRow';
+export type { MatchContextRowProps } from './MatchContextRow';

@@ -163,11 +163,22 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     return utils;
   }
 
+  // ÖVRE toggeln. Kontrollen är DUBBLERAD (T28/#42: en uppe + en nere), så ett bart
+  // getByRole på toggle-namnet vore tvetydigt. Vi siktar på den övre (stabil hake
+  // data-results-toggle-position="top") för dessa #39-tester; T28-blocket nedan
+  // bevisar att den nedre bär identisk semantik.
+  function topToggle(): HTMLButtonElement {
+    return document.querySelector(
+      'button[data-results-toggle-position="top"]'
+    ) as HTMLButtonElement;
+  }
+
   it('visar bara matcher inom fönstret som default (inte hela listan), med en expandera-knapp', async () => {
     await renderView();
     const windowedCount = screen.getAllByRole('group').length;
     // Fönstret döljer matcher -> knappen finns och säger hur många som är dolda.
-    const toggle = screen.getByRole('button', { name: /Visa alla matcher \(\d+ dold/i });
+    const toggle = topToggle();
+    expect(toggle).toHaveAccessibleName(/Visa alla matcher \(\d+ dold/i);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     // aria-controls pekar på listan (ul har samma id).
     const listId = toggle.getAttribute('aria-controls');
@@ -181,7 +192,8 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     await waitFor(() => {
       expect(screen.getAllByRole('group').length).toBeGreaterThan(windowedCount);
     });
-    const collapse = screen.getByRole('button', { name: /Visa färre/i });
+    const collapse = topToggle();
+    expect(collapse).toHaveAccessibleName(/Visa färre/i);
     expect(collapse).toHaveAttribute('aria-expanded', 'true');
     expect(collapse).toHaveAttribute('aria-controls', listId);
 
@@ -190,16 +202,13 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     await waitFor(() => {
       expect(screen.getAllByRole('group').length).toBe(windowedCount);
     });
-    expect(screen.getByRole('button', { name: /Visa alla matcher/i })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
+    expect(topToggle()).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('utfälld lista visar fler matcher än fönstret (ingen match går förlorad)', async () => {
     await renderView();
     const windowedCount = screen.getAllByRole('group').length;
-    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    fireEvent.click(topToggle());
     await waitFor(() => {
       // Hela fixtures-listan (104 matcher, alla med kända lag i gruppspelet) är
       // strikt fler än fönstrets delmängd.
@@ -214,7 +223,7 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     await renderView();
 
     // Fäll ut så ALLA kort är synliga/interaktiva.
-    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    fireEvent.click(topToggle());
     await waitFor(() => {
       expect(document.querySelectorAll('li[hidden] form[data-match-id]').length).toBe(0);
     });
@@ -222,7 +231,7 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     // Hitta ett kort som ligger UTANFÖR fönstret: i ihopfällt läge är dess <li>
     // `hidden`. Vi fäller ihop, läser av ett dolt match-id, och fäller ut igen så
     // kortet är interaktivt men vi vet att det är ett out-of-window-kort.
-    fireEvent.click(screen.getByRole('button', { name: /Visa färre/i }));
+    fireEvent.click(topToggle());
     const hiddenForm = await waitFor(() => {
       const form = document.querySelector('li[hidden] form[data-match-id]');
       expect(form).not.toBeNull();
@@ -231,10 +240,12 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     const outOfWindowId = hiddenForm.getAttribute('data-match-id') as string;
 
     // Fäll ut igen och skriv en OSPARAD siffra i out-of-window-kortets hemma-fält.
-    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    fireEvent.click(topToggle());
     const formSelector = `form[data-match-id="${outOfWindowId}"]`;
     await waitFor(() => {
       // Kortet får inte vara dolt nu (utfällt), annars är inmatningen inte möjlig.
+      // closest('li') = det INNERSTA korts-<li>:t (#39-invarianten bevarad trots
+      // den nya dag-grupp-nivån: kortets egna hidden står oberoende av dag-<li>:t).
       const form = document.querySelector(formSelector) as HTMLFormElement | null;
       expect(form?.closest('li')?.hasAttribute('hidden')).toBe(false);
     });
@@ -245,12 +256,12 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     expect(homeInputBefore.value).toBe('7');
 
     // Fäll ihop (kortet blir hidden, men UNMOUNTAS inte) och fäll ut igen.
-    fireEvent.click(screen.getByRole('button', { name: /Visa färre/i }));
+    fireEvent.click(topToggle());
     await waitFor(() => {
       const form = document.querySelector(formSelector) as HTMLFormElement;
       expect(form.closest('li')?.hasAttribute('hidden')).toBe(true);
     });
-    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    fireEvent.click(topToggle());
     await waitFor(() => {
       const form = document.querySelector(formSelector) as HTMLFormElement;
       expect(form.closest('li')?.hasAttribute('hidden')).toBe(false);
@@ -288,8 +299,14 @@ describe('ResultEntryView, fönstret följer dagens datum (C1)', () => {
       expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
     });
     const ids = new Set<string>();
-    document.querySelectorAll('li:not([hidden]) form[data-match-id]').forEach((f) => {
-      ids.add((f as HTMLElement).getAttribute('data-match-id') as string);
+    // Ett kort är SYNLIGT när dess EGNA (innersta) <li> inte är hidden. Vi måste
+    // läsa closest('li') (inte en `li:not([hidden]) form`-selektor): med den nya
+    // dag-grupp-nivån (T28) är ett dolt kort-<li> fortfarande descendant av ett
+    // SYNLIGT dag-<li>, så den lösare selektorn skulle felaktigt räkna det som synligt.
+    document.querySelectorAll('form[data-match-id]').forEach((f) => {
+      if (!(f as HTMLElement).closest('li')?.hasAttribute('hidden')) {
+        ids.add((f as HTMLElement).getAttribute('data-match-id') as string);
+      }
     });
     unmount();
     vi.useRealTimers();
@@ -312,3 +329,130 @@ describe('ResultEntryView, fönstret följer dagens datum (C1)', () => {
     expect(premiereOnly.length).toBeGreaterThan(0);
   });
 });
+
+// T28 (#42, Daniels feedback 2): (1) dag-rubriker + kontext per kort, (2) lättåtkomlig
+// ihopfällning (dubblerad kontroll uppe+nere, konsekvent aria, fokus till toppen vid
+// ihopfällning). De rena modulerna är enhetstestade fristående (group-matches-for-entry,
+// MatchContextRow); här bevisar vi att VYN väver in dem korrekt, inkl. samspelet med
+// #39:s fönster (rubriker även i ihopfällt läge, korrekta över fönster-gränsen).
+describe(
+  'ResultEntryView, dag-rubriker + lättåtkomlig ihopfällning (T28)',
+  { timeout: 20000 },
+  () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      // Premiärdagen 2026-06-11: fönstret ankrar på 11 juni (spänner 11-13 juni).
+      vi.setSystemTime(new Date('2026-06-11T08:00:00.000Z'));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function renderView() {
+      const utils = render(
+        <ResultsProvider env={fixturesEnv()}>
+          <ResultEntryView />
+        </ResultsProvider>
+      );
+      await waitFor(() => {
+        expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+      });
+      return utils;
+    }
+
+    function topToggle(): HTMLButtonElement {
+      return document.querySelector(
+        'button[data-results-toggle-position="top"]'
+      ) as HTMLButtonElement;
+    }
+    function bottomToggle(): HTMLButtonElement {
+      return document.querySelector(
+        'button[data-results-toggle-position="bottom"]'
+      ) as HTMLButtonElement;
+    }
+
+    it('grupperar listan under dag-rubriker (h3), korrekt även i IHOPFÄLLT läge', async () => {
+      await renderView();
+      // I ihopfällt läge visas bara fönstrets dagar (11-13 juni). Premiärdagen ska
+      // ha en synlig dag-rubrik (kravet: rubriker korrekta även i ihopfällt läge).
+      const headings = screen.getAllByRole('heading', { level: 3 });
+      expect(headings.length).toBeGreaterThan(0);
+      // Premiärdagen 11 juni 2026 är en torsdag, dag-rubriken bär den svenska dagen.
+      const premiereDay = document.querySelector('[data-result-day="2026-06-11"]');
+      expect(premiereDay).not.toBeNull();
+      expect(premiereDay?.querySelector('[data-result-day-heading]')).toHaveTextContent(
+        /torsdag 11 juni 2026/i
+      );
+      // En dag-rubrik efter fönstret (16 juni, utanför 11-13-fönstret) finns i DOM:en
+      // men dess dag-<li> är dolt i ihopfällt läge (ingen tom rubrik utanför fönstret).
+      // (Slutspelsdagar saknas i editable tills lagen seedats; vi väljer en
+      // gruppspelsdag som säkert har inmatningsbara matcher men ligger utanför fönstret.)
+      const lateDay = document.querySelector('[data-result-day="2026-06-16"]');
+      expect(lateDay).not.toBeNull();
+      expect((lateDay as HTMLElement).hasAttribute('hidden')).toBe(true);
+    });
+
+    it('fäller ut -> dag-rubriker över HELA turneringen blir synliga (fönster-gränsen)', async () => {
+      await renderView();
+      // Innan utfällning: en sen dag (16 juni, utanför 11-13-fönstret) är dold.
+      const midDaySelector = '[data-result-day="2026-06-16"]';
+      const before = document.querySelector(midDaySelector) as HTMLElement | null;
+      expect(before).not.toBeNull();
+      expect(before?.hasAttribute('hidden')).toBe(true);
+
+      // Fäll ut: alla dag-rubriker blir synliga (inget dag-<li> är hidden längre),
+      // så rubrikerna är korrekta på BÅDA sidor om fönster-gränsen.
+      fireEvent.click(topToggle());
+      await waitFor(() => {
+        expect(document.querySelectorAll('li[data-result-day][hidden]').length).toBe(0);
+      });
+      expect((document.querySelector(midDaySelector) as HTMLElement).hasAttribute('hidden')).toBe(
+        false
+      );
+    });
+
+    it('kontrollen är DUBBLERAD (uppe + nere) med IDENTISK aria-semantik på båda', async () => {
+      await renderView();
+      const top = topToggle();
+      const bottom = bottomToggle();
+      expect(top).not.toBeNull();
+      expect(bottom).not.toBeNull();
+      // Samma lista styrs (aria-controls) och samma utfäll-läge (aria-expanded) på BÅDA.
+      const listId = top.getAttribute('aria-controls');
+      expect(listId).toBeTruthy();
+      expect(bottom).toHaveAttribute('aria-controls', listId);
+      expect(top).toHaveAttribute('aria-expanded', 'false');
+      expect(bottom).toHaveAttribute('aria-expanded', 'false');
+
+      // Klick på DEN NEDRE fäller ut -> BÅDA visar aria-expanded=true (konsekvent).
+      fireEvent.click(bottom);
+      await waitFor(() => {
+        expect(topToggle()).toHaveAttribute('aria-expanded', 'true');
+      });
+      expect(bottomToggle()).toHaveAttribute('aria-expanded', 'true');
+      // Etiketten byts på båda (delar EN komponent, kan inte drifta isär).
+      expect(topToggle()).toHaveAccessibleName(/Visa färre/i);
+      expect(bottomToggle()).toHaveAccessibleName(/Visa färre/i);
+    });
+
+    it('vid IHOPFÄLLNING flyttas fokus till den ÖVRE kontrollen (listans topp, a11y)', async () => {
+      await renderView();
+      // Fäll ut via den nedre kontrollen.
+      fireEvent.click(bottomToggle());
+      await waitFor(() => {
+        expect(bottomToggle()).toHaveAccessibleName(/Visa färre/i);
+      });
+      // Fäll ihop via den nedre kontrollen (den ligger långt ner i en utfälld lista).
+      fireEvent.click(bottomToggle());
+      await waitFor(() => {
+        expect(topToggle()).toHaveAccessibleName(/Visa alla matcher/i);
+      });
+      // Fokus ska ha flyttats till den ÖVRE kontrollen så användaren förs upp till
+      // listans topp i stället för att bli kvar där den nedre kontrollen försvann.
+      // requestAnimationFrame-callbacken körs av jsdom; vänta in att fokus landat.
+      await waitFor(() => {
+        expect(document.activeElement).toBe(topToggle());
+      });
+    });
+  }
+);
