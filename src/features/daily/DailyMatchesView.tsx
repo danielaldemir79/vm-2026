@@ -274,18 +274,30 @@ export function DailyMatchesView() {
                   <Countdown countdown={countdown} teamsById={teamsById} />
                 </div>
 
-                {matchOfTheDay ? (
-                  <div className="flex flex-col gap-2 lg:max-w-sm lg:flex-1">
-                    {/* "Dagens match" bara när matchen spelas IDAG; annars matchens
-                        dag ("TORSDAG 11 JUNI", versaliserat av uppercase-klassen),
-                        så etiketten aldrig ljuger när turneringen ligger dagar bort
-                        (#54, fynd 3). */}
-                    <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
-                      {featuredMatchLabel(matchOfTheDay, todayKey)}
-                    </p>
-                    <MatchCard match={matchOfTheDay} teamsById={teamsById} highlight />
-                  </div>
-                ) : null}
+                {matchOfTheDay
+                  ? (() => {
+                      // EN etikett, DELAD av hero-rubriken OCH kortets highlight-chip,
+                      // så de aldrig säger olika saker (datum ovanför men "Dagens match"
+                      // i chippet). "Dagens match" bara när matchen spelas IDAG; annars
+                      // matchens dag ("TORSDAG 11 JUNI", versaliserat av uppercase-
+                      // klassen), så etiketten aldrig ljuger när turneringen ligger
+                      // dagar bort (#54, fynd 3 + C3).
+                      const heroLabel = featuredMatchLabel(matchOfTheDay, todayKey);
+                      return (
+                        <div className="flex flex-col gap-2 lg:max-w-sm lg:flex-1">
+                          <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
+                            {heroLabel}
+                          </p>
+                          <MatchCard
+                            match={matchOfTheDay}
+                            teamsById={teamsById}
+                            highlight
+                            highlightLabel={heroLabel}
+                          />
+                        </div>
+                      );
+                    })()
+                  : null}
               </div>
             </div>
           </Slide>
