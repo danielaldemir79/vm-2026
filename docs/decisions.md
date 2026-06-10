@@ -160,6 +160,13 @@ DEFINER) är anropbar av anon/authenticated. Båda MEDVETNA: anonyma vänner ÄR
 `is_room_member`). `match_kickoffs` har INGEN skriv-policy (referensdata, bara migrationer seedar),
 så en klient kan aldrig flytta en deadline. Inga nya ERROR-nivå-fynd, inga "RLS disabled".
 
+**TYP-SANNING `match_kickoff` (#15, Copilot C7):** TS-typen i `supabase-types.ts` är
+`Returns: string | null`, INTE `string`. Källa: RPC:n är `select k.kickoff ... where match_id = ...`
+(`20260611120200_t15_predictions_rls.sql`), vilket ger NULL för en okänd match. Det NULL:et är
+fail-safe-regeln ovan (now() < NULL => skriv nekas, now() >= NULL => andras tips dolda), så typen
+MÅSTE tillåta null, annars antar framtida konsumenter non-null och tappar säkerhets-invariantens
+kontrakt.
+
 ---
 
 ## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 3): hero-etiketten "Dagens match" -> matchens datum när matchen inte är idag
