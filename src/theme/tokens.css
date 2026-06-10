@@ -199,9 +199,12 @@ body {
 
    Det funktionella lagret (senior-dev, src/features/daily/day-theme.ts +
    use-day-theme.ts) härleder en DETERMINISTISK accent-hue (0-359) ur dagens lag
-   och sätter den som CSS-variabeln `--vm-day-hue` på hero:ns dekor-yta
-   (`[data-day-theme='active']`). I default-läget (vilodag) saknas variabeln och
-   ytan behåller T2:s neutrala ton.
+   och lägger den som en INLINE-OVERRIDE av `--vm-day-hue` på hero:ns dekor-yta
+   (`[data-day-theme='active']`). `--vm-day-hue` deklareras alltid med en default i
+   `:root` (nedan), så `hsl(var(--vm-day-hue) ...)` ALLTID har en giltig grad att
+   läsa. I default-läget (vilodag) saknas alltså inte variabeln, det som saknas är
+   den dynamiska inline-override:n, så ytan tonas inte och behåller T2:s neutrala
+   ton; vilken gren som gäller styrs av `data-day-theme` (default vs active).
 
    KONTRAST-VAKT (acceptanskriterium 2, WCAG AA): `--vm-day-hue` är BARA ett tal
    (en hue-grad), aldrig en text-/yt-/kant-färg. Dagstonen får bara väva in i

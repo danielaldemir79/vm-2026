@@ -224,12 +224,16 @@ export function DailyMatchesView() {
               data-day-theme={dayThemeProps['data-day-theme']}
               data-day-theme-source={dayThemeProps['data-day-theme-source']}
               className="vm-daily-hero relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
-              // Dags-temats hue (--vm-day-hue) injiceras via seamen. Hero-dekoren
-              // (radiella ljus + sheen) byggs i .vm-daily-hero (tokens.css §6) och
-              // tonas mot hue:n när data-day-theme='active'. I default-läget saknas
-              // variabeln och dekoren faller på T2:s neutrala ton. Den dynamiska
-              // tonen lever BARA i background-image (dekor), aldrig i en text-/yt-
-              // token, så läsbarheten (WCAG AA) kan inte sänkas (kontrast-vakt).
+              // Dags-temats hue (--vm-day-hue) injiceras via seamen som en INLINE-
+              // OVERRIDE i style när dagen har lag. Hero-dekoren (radiella ljus +
+              // sheen) byggs i .vm-daily-hero (tokens.css §6) och tonas mot hue:n
+              // när data-day-theme='active'. --vm-day-hue har alltid en default i
+              // :root (tokens.css), så i default-läget saknas inte variabeln, det
+              // som saknas är den dynamiska inline-override:n: ingen ton-skiftning
+              // sker och dekoren faller på T2:s neutrala ton (default-grenen styrs
+              // av data-day-theme). Den dynamiska tonen lever BARA i background-image
+              // (dekor), aldrig i en text-/yt-token, så läsbarheten (WCAG AA) kan
+              // inte sänkas (kontrast-vakt).
               style={dayThemeProps.style}
             >
               {/* Rörligt ljus-svep: ett brett, mjukt sken som långsamt drar över
