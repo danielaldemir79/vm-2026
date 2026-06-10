@@ -21,6 +21,7 @@
 
 import type { CSSProperties } from 'react';
 import type { GroupStanding, GroupId, Team } from '../../domain/types';
+import { TeamNameButton } from '../team-profile/TeamNameButton';
 
 /** Hur många lag som går vidare DIREKT från gruppen (etta + tvåa, SPEC §5). */
 const DIRECT_ADVANCE_RANK = 2;
@@ -188,9 +189,11 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
               </td>
               <th scope="row" className="px-1.5 py-2 align-middle font-medium">
                 {/* min-w-0 låter namnet truncas i stället för att tvinga ut tabellen
-                    i sidled; kod-chippet (aria-hidden, FIFA-landskod) krymper aldrig. */}
+                    i sidled; kod-chippet (aria-hidden, FIFA-landskod) krymper aldrig.
+                    Lagnamnet är en KLICKBAR knapp som öppnar lagprofilen (T10): ett
+                    grupplag är alltid känt (teamId aldrig null), så knappen visas alltid. */}
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="min-w-0 truncate">{name}</span>
+                  <TeamNameButton teamId={row.teamId} name={name} className="min-w-0 truncate" />
                   <span
                     className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-semibold tracking-wider text-fg-muted"
                     style={{

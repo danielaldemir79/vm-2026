@@ -30,6 +30,7 @@ import { formatKickoffTime } from './format-datetime';
 import { isVenuePlaceholder, stageLabel, teamDisplayName } from './match-display';
 import { TeamFlag } from './TeamFlag';
 import { TvBadge } from './TvBadge';
+import { TeamNameButton } from '../team-profile/TeamNameButton';
 
 export interface MatchCardProps {
   match: Match;
@@ -50,12 +51,18 @@ function teamCode(teamId: string | null, teamsById: ReadonlyMap<string, Team>): 
   return teamsById.get(teamId)?.code ?? null;
 }
 
-/** En sida (hemma/borta): emblem + namn. Emblemet är dekoration, namnet bär a11y. */
+/**
+ * En sida (hemma/borta): emblem + KLICKBART namn (öppnar lagprofilen, T10).
+ * Emblemet är dekoration; namnet är en TeamNameButton som öppnar profilen, eller
+ * (för ett ännu okänt slutspelslag, teamId null) en ren text utan knapp.
+ */
 function TeamSide({
+  teamId,
   name,
   code,
   align,
 }: {
+  teamId: string | null;
   name: string;
   code: string | null;
   align: 'start' | 'end';
@@ -81,7 +88,10 @@ function TeamSide({
       }`}
     >
       {flag}
-      <span className="min-w-0 truncate">{name}</span>
+      {/* Lagnamnet öppnar profilen (T10). TeamNameButton blir en ren <span> när
+          teamId är null (okänt slutspelslag), så vi aldrig erbjuder en knapp utan
+          profil. truncate flyttas till knappen så namnet kapas inom kort-bredden. */}
+      <TeamNameButton teamId={teamId} name={name} className="min-w-0 truncate" />
     </span>
   );
 }
@@ -151,11 +161,11 @@ export function MatchCard({ match, teamsById, highlight = false }: MatchCardProp
       {/* Mitt-rad: lagen med emblem, speglade runt "mot". "mot" bär a11y-namnet
           redan, så separatorn är aria-hidden för att inte dubbel-läsas. */}
       <div className="flex items-center gap-2 text-base font-semibold">
-        <TeamSide name={home} code={homeCode} align="end" />
+        <TeamSide teamId={match.homeTeamId} name={home} code={homeCode} align="end" />
         <span aria-hidden="true" className="shrink-0 text-xs font-normal text-fg-muted">
           mot
         </span>
-        <TeamSide name={away} code={awayCode} align="start" />
+        <TeamSide teamId={match.awayTeamId} name={away} code={awayCode} align="start" />
       </div>
 
       {/* Botten-rad: metadata (TV-kanal-märke + ev. arena + featured-etikett).
