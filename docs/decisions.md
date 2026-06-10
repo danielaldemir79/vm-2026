@@ -55,6 +55,14 @@ mintnings-targetSdk (eller när Play Protects reputationssignal mognar för appe
    Android-varning för webb-appar, välj installera ändå. Detta är exakt vad Googles vägledning
    rekommenderar när varningen inte går att eliminera.
 
+**Play Protect-noten gate:as på Android (#50, C4):** Noten renderades i ALLA `mode === 'prompt'`,
+men desktop-Chrome fyrar samma `beforeinstallprompt`-event som Android, så på desktop var raden
+missvisande (Play Protect finns inte där). Ny `detectAndroid(nav)` i `install-prompt.ts` (UA-sniff av
+`android`-token, bredvid `detectIos`); `InstallBanner` visar noten bara när `mode === 'prompt'` OCH
+Android. Källa: MDN "Navigator.userAgent" (https://developer.mozilla.org/en-US/docs/Web/API/Navigator/userAgent),
+som varnar att UA-sniff är opålitlig, accepterat medvetet då fel bara ger en kosmetisk extra/saknad
+info-rad (install-knappen styrs av event:et, inte av detektionen).
+
 **iOS-vägen verifierad (samma task):** Safari-instruktionen "Tryck på Dela-knappen i Safari och välj
 Lägg till på hemskärmen" stämmer mot dagens flöde (iOS 16.4+ / iOS 18: Dela -> Lägg till på hemskärmen).
 Källa: MDN "Making PWAs installable"
