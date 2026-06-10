@@ -21,6 +21,14 @@
 // A11y: ett <time>-element bär den maskinläsbara UTC-instanten (datetime), den
 // synliga texten är svensk tid. Steg-etiketten är en vanlig text-span. Hela raden
 // är synlig (inte sr-only): det är information Daniel uttryckligen vill se i listan.
+//
+// VISUELL FINISH (design-frontend, T28/#42): tiden får en liten accent-färgad
+// klock-ikon (skumbar "tiden först"-affordans, samma tänk som daily-matchkortet)
+// och steg-etiketten blir ett CHIP som ekar TV-badge-/steg-pillen från daily
+// (samma rounded-pill-recept, delat designspråk, inte duplicerad komponent). Ingen
+// avdelar-prick längre: chip-gränsen skiljer tid och steg visuellt, så raden läses
+// rent som "21:00 Grupp A" utan ett uppläst skiljetecken. Chip-texten hålls på
+// fg-muted (AA-säker som normal text i båda teman, uppmätt, se decisions.md).
 
 import type { Match } from '../../domain/types';
 import { formatKickoffTime, stageLabel } from '../daily';
@@ -40,19 +48,42 @@ export function MatchContextRow({ match }: MatchContextRowProps) {
   const stage = stageLabel(match);
 
   return (
-    <div
-      data-match-context=""
-      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-fg-muted"
-    >
-      <time data-result-time="" dateTime={match.kickoff} className="tabular-nums">
+    <div data-match-context="" className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      {/* Avsparkstid: liten klock-ikon + tabulär siffra. Ikonen i accent-ton gör
+          tiden skumbar (samma "tiden först"-tänk som daily-matchkortet), siffran
+          bär full fg-kontrast så den läses skarpt. <time> bär UTC-instanten. */}
+      <time
+        data-result-time=""
+        dateTime={match.kickoff}
+        className="inline-flex items-center gap-1 font-display text-xs font-bold leading-none tabular-nums text-fg"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="h-3.5 w-3.5 shrink-0"
+          style={{ color: 'var(--color-accent)' }}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.75}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="8" cy="8" r="6.25" />
+          <path d="M8 4.75V8l2.25 1.5" />
+        </svg>
         {time}
       </time>
-      {/* Diskret avdelar-prick: ren dekoration, aria-hidden (raden läses ändå som
-          "HH:MM Grupp A" utan en uppläst punkt). */}
-      <span aria-hidden="true" className="text-fg-muted/60">
-        &middot;
+      {/* Grupp/steg-CHIP: ekar TV-badge-/steg-pillen från daily (samma pill-recept,
+          rounded-pill + border + dämpad fg-muted-text), så inmatningslistan talar
+          samma designspråk som matchvyn, utan duplicerad komponent. En diskret
+          accent-tint i bakgrunden + accent-kant binder den till kvällsljus-tonen;
+          texten hålls på fg-muted (AA-säker som normal text i båda teman). */}
+      <span
+        data-result-stage=""
+        className="inline-flex items-center rounded-pill border border-[color-mix(in_srgb,var(--color-accent)_28%,var(--color-border))] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-2 py-0.5 text-[0.625rem] font-semibold uppercase leading-none tracking-[0.1em] text-fg-muted"
+      >
+        {stage}
       </span>
-      <span data-result-stage="">{stage}</span>
     </div>
   );
 }

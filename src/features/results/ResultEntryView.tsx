@@ -288,15 +288,48 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
             <li key={day.dateKey} data-result-day={day.dateKey} hidden={!dayHasVisible(day)}>
               {/* Dag-rubrik: läsbar svensk dag ("torsdag 11 juni 2026") via daily/
                   formatDayHeading (DRY, EN sanning för dag-rubriken). h3 under vyns
-                  h2, så rubrik-hierarkin är korrekt för skärmläsare. En diskret
-                  accent-list (border-l) ger den visuell tyngd utan att skrika;
-                  design-frontend finputsar via data-result-day-haken. */}
-              <h3
-                data-result-day-heading=""
-                className="mb-3 border-l-2 border-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] pl-3 font-display text-sm font-semibold capitalize tracking-tight text-fg"
-              >
-                {formatDayHeading(day.dateKey)}
-              </h3>
+                  h2, så rubrik-hierarkin är korrekt för skärmläsare.
+
+                  VISUELL FINISH (design-frontend, T28/#42): en elegant AVDELARE som
+                  ger tydlig hierarki utan att stjäla fokus från korten. "Arena i
+                  kvällsljus"-tonen bärs av tre lager: en liten accent-"tändsticka"
+                  (en kort lodrät list som glöder grönt), datumet i display-fonten,
+                  och en hårfin horisont-linje som tonar ut åt höger (gräns mot guld),
+                  som en arena-tier-linje. Allt via color-mix mot tokens, så det följer
+                  temat och dämpas rent i ljust läge.
+
+                  STICKY (Daniels önskemål): rubriken klistrar inom listan så DAGEN
+                  man skrollar i alltid syns. top-16 (inte top-0) KLARAR den sticky
+                  sajt-headern (App.tsx, ~64px hög, sticky top-0 z-10): vid top-0
+                  skulle dag-rubriken glida in BAKOM headern och döljas. top-16
+                  pinnar den precis under headern så den förblir läsbar. En tonad,
+                  lätt blur:ad bakgrunds-platta gör att korten som glider under aldrig
+                  syns igenom texten (annars blir en sticky-rubrik oläslig); negativ
+                  x-marginal + px gör att plattan täcker hela list-gapet i sidled.
+                  z-10 lägger den över korten (men under/jämsides headern, ingen
+                  överlapp eftersom de inte delar y-rum). capitalize lyfter
+                  veckodags-initialen. */}
+              <div className="sticky top-16 z-10 -mx-1 mb-3 bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] px-1 py-2 backdrop-blur-sm">
+                <h3
+                  data-result-day-heading=""
+                  className="flex items-center gap-2.5 font-display text-sm font-semibold capitalize tracking-tight text-fg"
+                >
+                  {/* Accent-"tändsticka": en kort lodrät glöd-list (gräsplan-grön),
+                      den lilla kvällsljus-gnistan som markerar dagens start. */}
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-[3px] shrink-0 rounded-pill bg-[var(--color-accent)] shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
+                  />
+                  <span className="whitespace-nowrap">{formatDayHeading(day.dateKey)}</span>
+                  {/* Horisont-linje: en hårfin gradient som tonar ut åt höger (grön ->
+                      guld -> inget), arena-tier-linjen. Tar resten av bredden så
+                      rubriken fyller raden snyggt. aria-hidden (ren dekoration). */}
+                  <span
+                    aria-hidden="true"
+                    className="h-px min-w-6 flex-1 rounded-pill bg-[linear-gradient(90deg,color-mix(in_srgb,var(--color-accent)_45%,transparent),color-mix(in_srgb,var(--vm-gold)_30%,transparent)_45%,transparent)]"
+                  />
+                </h3>
+              </div>
               <ul className="m-0 flex list-none flex-col gap-3 p-0">
                 {/* RENDERA ALLA dagens matcher alltid, dölj de utanför fönstret med
                     `hidden` (Copilot R1, C2 från #39). VARFÖR `hidden` i stället för
