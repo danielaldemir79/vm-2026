@@ -1,7 +1,16 @@
 import { render, screen, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import type { Match, Team } from '../../domain/types';
 import { MatchCard } from './MatchCard';
+// Lagnamnen i kortet är klickbara (TeamNameButton -> useTeamProfile, T10), så
+// renderingen sker i en minimal profil-context-stub (utan den fulla modalen).
+import { TeamProfileStub } from '../../test/team-profile-stub';
+
+/** Rendera MatchCard i profil-context-stuben (klickbara lagnamn kräver den). */
+function renderCard(ui: ReactElement) {
+  return render(<TeamProfileStub>{ui}</TeamProfileStub>);
+}
 
 function team(id: string, name: string): Team {
   return { id, name, code: id.toUpperCase(), group: 'A' };
@@ -30,7 +39,7 @@ function groupMatch(overrides: Partial<Match> = {}): Match {
 
 describe('MatchCard, tillgänglig struktur + innehåll', () => {
   it('renderar tid (svensk), lag, steg och TV-kanal med ett tillgängligt namn', () => {
-    render(<MatchCard match={groupMatch()} teamsById={teamsById} />);
+    renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
 
     // <article> med ett sammanfattande tillgängligt namn (tid, lag, steg, kanal).
     const card = screen.getByRole('article');
@@ -42,7 +51,7 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
   });
 
   it('tiden bär ett <time>-element med maskinläsbar UTC-instant', () => {
-    const { container } = render(<MatchCard match={groupMatch()} teamsById={teamsById} />);
+    const { container } = renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
     const time = container.querySelector('time');
     expect(time).not.toBeNull();
     expect(time).toHaveAttribute('dateTime', '2026-06-11T19:00:00.000Z');
@@ -50,13 +59,13 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
   });
 
   it('DÖLJER arena-platshållaren (#35), visar inte "ej verifierad" som om det vore data', () => {
-    render(<MatchCard match={groupMatch()} teamsById={teamsById} />);
+    renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
     expect(screen.queryByText(/ej verifierad/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Arena')).not.toBeInTheDocument();
   });
 
   it('VISAR arena när den är riktig (verifierad data)', () => {
-    render(
+    renderCard(
       <MatchCard
         match={groupMatch({ venue: 'MetLife Stadium, East Rutherford' })}
         teamsById={teamsById}
@@ -66,7 +75,7 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
   });
 
   it('markerar "Dagens match" via textetikett + data-highlight (färg-oberoende, T7-pin)', () => {
-    render(<MatchCard match={groupMatch()} teamsById={teamsById} highlight />);
+    renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} highlight />);
     expect(screen.getByText('Dagens match')).toBeInTheDocument();
     expect(screen.getByRole('article')).toHaveAttribute('data-highlight', '');
   });
@@ -79,7 +88,7 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
       homeTeamId: null,
       awayTeamId: null,
     });
-    render(<MatchCard match={ko} teamsById={teamsById} />);
+    renderCard(<MatchCard match={ko} teamsById={teamsById} />);
     const card = screen.getByRole('article');
     expect(within(card).getAllByText('Ej klart')).toHaveLength(2);
     expect(within(card).getByText('Sextondelsfinal')).toBeInTheDocument();

@@ -15,6 +15,7 @@ import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
+import { TeamProfileProvider } from './features/team-profile';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -121,41 +122,48 @@ export default function App() {
             strukturen byggs här; design-frontend ger premium-polish + den
             visuella målfirande-animationen ovanpå. */}
         <ResultsProvider>
-          {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
+          {/* Lag-profiler (T10): klickbara lagnamn i matchkort + tabeller öppnar en
+              profil-modal (FIFA-ranking, stjärnspelare, kuriosa, lagets väg). Providern
+              ligger INNANFÖR ResultsProvider eftersom profil-modalen läser den delade
+              storen (lag/grupper/matcher), och OMSLUTER alla vyer med klickbara lagnamn
+              (daily, gruppspel, resultatinmatning) så profilen kan öppnas från dem alla. */}
+          <TeamProfileProvider>
+            {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
               datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
               SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA
               + tillgängliga strukturen byggs här; design-frontend ger WOW-hero +
               premium-matchkort + nedräknings-visual ovanpå. */}
-          <Slide direction="up">
-            <DailyMatchesView />
-          </Slide>
+            <Slide direction="up">
+              <DailyMatchesView />
+            </Slide>
 
-          <Slide direction="up">
-            <GroupStageView />
-          </Slide>
+            <Slide direction="up">
+              <GroupStageView />
+            </Slide>
 
-          {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. Läser
+            {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. Läser
               SAMMA delade store som gruppspelet, så det justeras under gruppspelet
               (möjliga lag), låses vid grupp-slut (FIFA-seedningen) och för fram
               vinnaren när ett slutspelsresultat matas in. Den FUNKTIONELLA +
               tillgängliga strukturen + data-seamen byggs här; design-frontend ger
               premium-trädet med kopplingslinjer + vinnar-animation ovanpå. */}
-          <Slide direction="up">
-            <BracketView />
-          </Slide>
+            <Slide direction="up">
+              <BracketView />
+            </Slide>
 
-          <Slide direction="up">
-            <Panel>
-              {/* Design-frontends premium-firande kopplas in via render-proppen.
+            <Slide direction="up">
+              <Panel>
+                {/* Design-frontends premium-firande kopplas in via render-proppen.
                   Kroken (i vyn) styr trigger/timing/reduced-motion, overlayn ritar
                   bara explosionen, en ren glädje-yta. */}
-              <ResultEntryView
-                renderCelebration={(celebration) => (
-                  <GoalCelebrationOverlay celebration={celebration} />
-                )}
-              />
-            </Panel>
-          </Slide>
+                <ResultEntryView
+                  renderCelebration={(celebration) => (
+                    <GoalCelebrationOverlay celebration={celebration} />
+                  )}
+                />
+              </Panel>
+            </Slide>
+          </TeamProfileProvider>
         </ResultsProvider>
 
         {/* Typografi-prov: visar display- mot brödtext-stacken. */}

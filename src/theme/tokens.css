@@ -315,3 +315,64 @@ body {
       background-image 0.4s ease;
   }
 }
+
+/* -----------------------------------------------------------------------------
+   7. LAG-PROFIL-MODALEN, dekorativ yta (T10, issue #10). [VÄRDE, ej @theme-kontrakt]
+
+   Samma "arena i kvällsljus"-språk som hero:n (SPEC §7), men byggt ur LAGETS egen
+   signaturfärg (`--vm-profile-hue`, satt inline av panelen ur TeamFlag-hue:n) i
+   stället för dagens hue. Så varje lags modal får sin egen ton: Brasilien tänds
+   annorlunda än Sverige, vilket gör profilen distinkt och igenkännbar, men alltid
+   inom appens gröna/guld-mästerskapsidentitet (lagstonen blandas till en bråkdel,
+   blir aldrig en grell färgklick).
+
+   KONTRAST-VAKT (samma arkitektur-invariant som dags-temat, decisions.md T8/T10):
+   `--vm-profile-hue` är BARA ett tal (en hue-grad) och väver in ENBART i den
+   dekorativa hero-bandets `background-image` (radiella ljus). Den blir aldrig en
+   text-/yt-/kant-token. All text i hero:n står på den ogenomskinliga surface-raised-
+   fonden under glow:en (fg/fg-muted, redan AA-mätta i sektion 0), så en hue som bara
+   lever i en dekor-gradient kan per konstruktion inte sänka text-kontrasten under AA.
+   Default-värdet i `:root` säkrar att hsl(var(--vm-profile-hue) ...) alltid har en
+   giltig grad även om panelen någon gång renderas utan inline-override. */
+:root {
+  /* Neutral default-hue (turneringens gröna ~152 grader) tills en profil öppnas. */
+  --vm-profile-hue: 152;
+}
+
+/* OVERLAY-BAKGRUNDEN: dimma + blur så vyn under modalen träder tillbaka (fokus på
+   profilen) utan att försvinna helt. Blur isolerat HÄR (en sanning) så panelen i
+   TSX bara bär klass-haken. backdrop-filter har bred stöd; faller den bort kvarstår
+   dimningen (color-mix-fonden i TSX) som fullgod kontrast-bakgrund (progressiv
+   förbättring, ingen funktion hänger på blur:en). */
+.vm-profile-overlay {
+  backdrop-filter: blur(6px) saturate(115%);
+}
+
+/* HERO-BANDET (toppen av panelen): lagets ton tänd ur två radiella ljus mot
+   surface-raised-fonden, plus ett varmt guld-ljus ur nedre hörnet (samma signatur
+   som hero:n). Lagstonen blandas till ~50 % med bas-grönen och dämpas till låg alfa,
+   så bandet känns som "arena-ljus i lagets färg", inte en fylld platta. Det nedre
+   guld-ljuset ligger fast (den varma mästerskaps-signaturen varje gång). */
+.vm-profile-hero {
+  /* GLOW-ALFAN ÄR KONTRAST-LÅST (mätt, inte gissat): muted-text (#9cb2a6) ovanpå
+     glow:ens PEAK i det LJUSASTE hue:t (gult ~58 grader, värsta fallet av alla 360)
+     håller >= 4.5:1 (normal text) bara om hue-glow:en hålls vid <= 0.14 alfa. Vald
+     0.13 -> 4.71:1 i värsta fallet (marginal), svept över ALLA hue:er (canvas-komposit,
+     decisions.md T10), inte ett typfall. Guld-ljuset på samma sätt <= 0.12 -> 4.79:1.
+     Så ingen lag-hue och ingen text-position i hero:n kan sänka text-kontrasten under
+     AA, även om texten skulle ligga rakt på en glow-topp (den gör det inte, topparna
+     sitter i hörnen, men gränsen håller ändå strukturellt). */
+  --vm-profile-glow: color-mix(
+    in srgb,
+    color-mix(in srgb, hsl(var(--vm-profile-hue) 64% 48%) 50%, rgb(var(--vm-glow-accent))) 13%,
+    transparent
+  );
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(125% 140% at 8% 0%, var(--vm-profile-glow), transparent 60%),
+    radial-gradient(
+      90% 130% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 12%, transparent),
+      transparent 58%
+    );
+}

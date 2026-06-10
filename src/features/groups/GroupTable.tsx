@@ -21,6 +21,7 @@
 
 import type { CSSProperties } from 'react';
 import type { GroupStanding, GroupId, Team } from '../../domain/types';
+import { TeamNameButton } from '../team-profile';
 
 /** Hur många lag som går vidare DIREKT från gruppen (etta + tvåa, SPEC §5). */
 const DIRECT_ADVANCE_RANK = 2;
@@ -68,11 +69,13 @@ function teamLabel(
 ): {
   name: string;
   code: string;
+  /** Är laget känt i uppslaget? Falskt = data-inkonsistens, då finns ingen profil. */
+  known: boolean;
 } {
   const team = teamsById.get(teamId);
   // Saknas laget i uppslaget är det en data-inkonsistens; visa id:t synligt i
   // stället för att tyst dölja det (fail loud light), så felet märks i UI:t.
-  return { name: team?.name ?? teamId, code: team?.code ?? '???' };
+  return { name: team?.name ?? teamId, code: team?.code ?? '???', known: team !== undefined };
 }
 
 /**
@@ -149,7 +152,7 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
       </thead>
       <tbody>
         {standings.map((row) => {
-          const { name, code } = teamLabel(row.teamId, teamsById);
+          const { name, code, known } = teamLabel(row.teamId, teamsById);
           // De direkt kvalificerade (etta + tvåa) markeras FÄRG-OBEROENDE
           // (se fil-headern, T7-pin): data-qualified-haken finns kvar för
           // styling/test, men den VISUELLA framhävningen bärs av medalj +
@@ -188,9 +191,19 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
               </td>
               <th scope="row" className="px-1.5 py-2 align-middle font-medium">
                 {/* min-w-0 låter namnet truncas i stället för att tvinga ut tabellen
-                    i sidled; kod-chippet (aria-hidden, FIFA-landskod) krymper aldrig. */}
+                    i sidled; kod-chippet (aria-hidden, FIFA-landskod) krymper aldrig.
+                    Lagnamnet är en KLICKBAR knapp som öppnar lagprofilen (T10) BARA när
+                    laget är känt i uppslaget. Saknas det (data-inkonsistens, fallback
+                    {namn: id, kod: '???'}) skickar vi teamId=null, så TeamNameButton
+                    degraderar till ren text: en klickbar knapp för ett okänt lag skulle
+                    öppna profilen på ett id som inte finns i teamsById, och modalen
+                    (TeamProfilePanel) hittar inget lag -> klicket gör tyst ingenting (C8). */}
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="min-w-0 truncate">{name}</span>
+                  <TeamNameButton
+                    teamId={known ? row.teamId : null}
+                    name={name}
+                    className="min-w-0 truncate"
+                  />
                   <span
                     className="shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-semibold tracking-wider text-fg-muted"
                     style={{
