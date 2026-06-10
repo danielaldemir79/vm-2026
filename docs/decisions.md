@@ -5,6 +5,231 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T14 COPILOT-RUNDA 1 (issue #14): 7 fynd åtgärdade (C1-C7)
+
+**Beslut (C1, DB-INTEGRITET, halv-straff-läcka i `rmr_penalties_paired`, KÄLLHÄNVISAT):** Den
+ursprungliga CHECK:en var `(home IS NULL AND away IS NULL) OR (home >= 0 AND away >= 0)`. Den
+SLÄPPER IGENOM ett halvt straff-par (t.ex. `home = NULL, away = 3`): gren 2 blir `(NULL >= 0) AND
+(3 >= 0)` = `NULL AND TRUE` = `NULL`, och en Postgres-CHECK avvisar BARA på `FALSE`, ett `NULL`-
+resultat behandlas som godkänt. **Källa:** PostgreSQL-dokumentationen "Constraints / Check
+Constraints" (en check är uppfylld när uttrycket är TRUE eller NULL; bara FALSE bryter den), +
+Copilot-fynd C1. **Fix:** ny migration `20260610190000_t14_rmr_penalties_paired_strict.sql` som
+ersätter constrainten så straff-grenen kräver BÅDA `IS NOT NULL` (och icke-negativa); då matchar
+ett halvt par varken "båda null"- eller "båda satta"-grenen och avvisas hårt. **Verifierat LIVE
+(kmzhyblzxangpxydufve)** via MCP: före fixen accepterades en `(NULL, 3)`-rad; efter fixen nekas den
+(check_violation), medan ett fullt par `(5, 4)` och ett `(NULL, NULL)`-par fortfarande accepteras.
+All proof-data städades (0 kvarvarande rader). Migration applicerad via `apply_migration`.
+
+**Beslut (C2-C7, övriga runda-1-fynd):** C2, stale schema-kommentar `(M1..M104)` rättad till den
+verkliga konventionen (`g-A-1..g-L-6` + `M73..M104`) i core-schema-filens kommentar (ingen live
+`COMMENT ON` fanns satt, så filen var hela ytan). C3/C4, `void selectRoom`/`void leaveRoom` i
+RoomPanel saknade catch (unhandled rejection + ingen UI-återkoppling); nu egna `handleSelect`/
+`handleLeave` som fångar och visar ett fel-notis (samma mönster som create/join, PRINCIPLES §8) +
+tester för fel-vägen. C5, ogiltig testdata `match_id: 'M1'` i `rooms-api.test.ts` bytt till giltigt
+`g-A-1` (konventionen). C6, docstring i `member-avatar.ts` rättad (implementationen tar första +
+SISTA ordets initial, inte "två första orden"). C7, den hårdkodade projekt-URL:en + publishable-
+nyckeln i `rooms-rls.integration.test.ts` borttagen ur repot; sviten kräver nu env
+(`VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`), annars `describe.skipIf` (verifierat: skippar rent
+utan env, kör + grön med env).
+
+---
+
+## 2026-06-10 , T14 PANEL-FIXAR (issue #14): KA-F2/KA-F3 wiring + KA-SA1/SA2 härdning
+
+**Beslut (KA-F3, delade rums-resultat vävs in end-to-end, "ni fyller i tillsammans"):** Rum-panelen
+LOVAR att medlemmar fyller i matchresultaten ihop, men `saveResult`/`room_match_results` hade ingen
+UI-anropare, inget delades. Wiringen sker på den BEFINTLIGA infrastrukturen utan ny apparat:
+ResultsProvider ligger NÄSTLAT inuti RoomsProvider (App.tsx), så den läser rums-synken via en NY
+tolerant hook `useRoomsSync` (inert utan provider, samma tolerans-mönster som `useFeedbackSettings`,
+så alla results-tester utan RoomsProvider är oförändrade). (a) En inmatning i `submitResult` sparas
+även till rummet (`upsertRoomResult`) när ett rum är aktivt, optimistiskt + fail-loud-men-icke-
+blockerande (ett spar-fel river inte den lokala inmatningen, nästa fokus/online-refetch återhämtar).
+(b) Rummets delade resultat vävs in i matchlistan via en REN funktion `applyRoomResults` (återanvänder
+`applyMatchResult`, så samma validering + immutabilitet, DRY) ovanpå den SEEDADE BASEN (bevarad
+separat så vävningen är idempotent och ett ändrat/borttaget delat resultat backar korrekt). (c) Utan
+aktivt rum är allt lokalt precis som förr. **Konflikt: SISTA-SKRIVET-VINNER** (`updated_at`, server-
+upsert på PK `(room_id, match_id)`), så den senaste skrivningen från valfri medlem är den delade
+sanningen; en refetch hämtar det vinnande tillståndet. **Bieffekt (medveten):** att gå med i ett rum
+gör rummets delade resultat till sanningen, en lokal-bara-inmatning gjord INNAN man gick med skrivs
+inte automatiskt upp till rummet (rummet är den delade källan; man matar in på nytt om man vill dela).
+
+**Beslut (KA-F2, cancellation-guard mot ur-synk rumsbyten):** `RoomsProvider.loadRoomData` saknade
+skydd mot att ett LÅNGSAMT svar för rum A landar EFTER att man bytt till rum B (A:s medlemmar/resultat
+skrev då över B:s). Fix: en monotont ökande request-token (epoch) per laddning, bara den SENAST
+startade laddningens svar tillämpas, äldre kastas tyst. Acceptanstest mockar `listMembers` med olika
+fördröjning, byter rum snabbt och assertar slutstate = senast valda rummet.
+
+**Beslut (KA-F1, rumskods-kombinatorik rättad till 32 tecken):** Alfabetet är 32 tecken (24 bokstäver
+a-z minus l/o + 8 siffror 2-9), inte 34. 6 tecken = 32^6 ~ 1,07 mrd kombinationer (inte 34^6 ~ 1,5
+mrd, ett räknefel som glömde l/o-uteslutningen). Rättat i `room-code.ts` + denna fil; verifierat
+`node -e "A.length=32, A.length**6=1073741824"`.
+
+**Beslut (KA-SA2, match_id-format härdat, KÄLLHÄNVISAT, avviker från direktivet):** `room_match_results.
+match_id` var obegränsad `text`. Ny migration lägger `check (match_id ~ '^(g-[A-L]-[1-6]|M(7[3-9]|
+8[0-9]|9[0-9]|10[0-4]))$')`. **Regeln är härledd ur de FAKTISKA match-id:na i klient-bundlen, inte
+gissad:** planen (`src/data/wc2026`, verifierat mot `getDataSource().getMatches()`, 104 matcher) har
+TVÅ id-format, 72 gruppmatcher `g-<A-L>-<1-6>` och 32 slutspel `M73..M104` (FIFA-matchnummer; gruppspelet
+bär g-...-id, så M-prefixet börjar vid 73). **Direktivets föreslagna `^M[0-9]{1,3}$` var FELAKTIGT för
+denna kodbas** (antog "M1..M104"), det hade NEKAT alla 72 gruppresultat och brutit delnings-funktionen.
+Constrainten matchar exakt de 104 giltiga id:na (0 av 104 omatchade) och nekar godtycklig/lång text
+(verifierat live: en 10000-teckens match_id nekas, M105/M1/M1-format nekas). Källa: match-schedule-
+parser.ts (`id: M${matchNumber}` rad ~475) + wc2026-id-konventionen + live-probe mot getMatches().
+Applicerad via MCP `apply_migration` (live-version 20260610184225) + committad fil
+`supabase/migrations/20260610160500_t14_room_match_id_format.sql` (konsoliderad slutform, se SA1-noten).
+
+**Beslut (KA-SA1, README-historik-not gjord ärlig):** `supabase/README.md` påstod att `list_migrations`
+"visar samma uppsättning" som filerna. Live har 9 migrationer (iterativ historik), committade filer är 4
+(konsoliderad slutform). Omformulerat ärligt: konsoliderad slutform, live byggdes via flera iterativa
+steg, sluttillstånd funktionellt identiskt verifierat mot `pg_proc`/`pg_policies`/`pg_constraint`,
+`list_migrations` är sanningen för exakt historik, inte filträdet (lärdomen committad-migration-pastar-
+spegla-live-men-ar-konsoliderad-historik).
+
+---
+
+## 2026-06-10 , T14 VISUELLT LAGER (issue #14): premium-finish på rum-UI:t, delnings-ögonblicket
+
+**Beslut (visuellt lager ovanpå senior-devs seam, rör ALDRIG datalogiken):** Premium-finishen
+byggs ENBART ovanpå senior-devs semantik + data-attribut (`data-rooms-*`, role/aria, fält-
+etiketter) via en dedikerad `src/features/rooms/rooms.css` + klass-hakar i `RoomPanel.tsx` (samma
+seam-princip som GroupTable/BracketView/ScenarioView). All a11y-semantik + alla RoomPanel-tester
+står kvar; RLS/auth/rooms-API rörs inte. Auth är anonym, så UI:t antyder ALDRIG lösenord/konto.
+
+**Beslut (rumskoden som stor, kopierbar "biljett", delnings-ögonblicket):** Det aktiva rummet är
+en biljett (`.vm-rooms-ticket`) vars huvud bär koden i `2-2.5rem` display-vikt + en KOPIERA-knapp
+med tydlig feedback (✓ "Kopierad!" + SR-uppläst, faller till "Markera koden själv" utan Clipboard-
+API) och en DELA-knapp (Web Share API på mobil -> systemets delnings-ark, annars kopieras hela
+inbjudnings-texten). Logiken bor i två RENA moduler: `share-room.ts` (inbjudnings-text + tunna
+clipboard/share-omslag, INGEN datalogik, INGEN auto-join-routing, den vore en data-/routing-ändring)
+och `member-avatar.ts`. Verifierat live: kopiera-knappen växlar idle -> copied och åter.
+
+**Beslut (medlemmar som monogram-avatarer, STABIL per-person färg, DRY):** Varje medlem är en chip
+med en monogram-bricka: initialer ur visningsnamnet + en hue härledd STABILT ur user-id (inte namn,
+så två "Daniel" skiljs åt och ett namnbyte inte byter färg). Hue:n återanvänder lag-färgernas hash
+(`hashCode` ur `team-hue.ts`, EN sanning för "sträng -> hue", PRINCIPLES §4, ingen parallell hash).
+Den egna medlemmen ("du") får en accent-kant så man hittar sig själv (form, inte enbart färg).
+
+**Beslut (formulären = #39-formspråket, vänliga fel):** Skapa-/gå-med-fälten bär SAMMA premium-
+formspråk som resultatinmatningen (#39 FIELD_BASE: stark accent-fokus-ring WCAG 2.4.7 + mjuk hover-
+lyft, placeholders), primärknapp = fylld accent (Skapa rum), sekundär = kant-knapp (Gå med). Lokala
+besked skiljs i TON: ett VÄNLIGT info-besked (✓, accent-tint) vs ett FEL (!, danger-tint), båda
+role="status"/alert (uppläst). Initierings-fel FAIL-LOUD:ar i en danger-tonad ruta (PRINCIPLES §8).
+
+**KONTRAST-VAKT (taskens punkt 4, VÄRSTA FALL, lessons aa-kontrast-pastad-pa-genererad-farg):**
+Två generErade/komponerade ytor mättes, inte ett typfall:
+- **Avatar-ink på hue-driven tint, svept över ALLA 360 hue:er.** En FAST vit/mörk ink på en
+  variabel-mättad yta FALLER vid gult (bevisat: vit ink på pastell = 3.78:1 ljust, under AA).
+  Därför är BÅDE ytan och ink:en hue-roterade med LÅST lightness per tema, så hue bara roterar tonen,
+  aldrig in i en kontrast-fälla. UPPMÄTT min-ratio över hela spannet (sweep + bekräftat på renderade
+  pixlar i webbläsaren): **mörkt 5.89:1 (vid hue 240), ljust 4.94:1 (vid hue 60, gult = värsta)**.
+  Initialerna är 12px bold = normal-text-tröskeln (4.5:1) gäller; båda klarar med marginal.
+- **Hero-/biljett-text på glow-yta, full komposit-stack.** Texten ligger på samma lager som de två
+  radiella glow:erna (grön i övre hörnet, guld i nedre), så en naiv komposit KAN sänka kontrasten
+  (grön glow lyfter luminansen -> mörkt tema fg-muted faller, exakt fällan lessons varnar för). En
+  rörlig sheen la +0.09 grön ovanpå och knäckte marginalen -> sheenen TOGS BORT (glow:en är helt
+  statisk). Glow-alforna är satta så ÄVEN den teoretiskt fulla stacken (grön 0.08 + guld 0.05 i samma
+  punkt) håller AA: **mörkt eyebrow 6.11 / rubrik+kod 9.61 / brödtext 4.73; ljust eyebrow 4.59 /
+  rubrik+kod 15.20 / brödtext 5.54** (alla >= 4.5:1). Övriga ytor (action-knappar fg på accent-tint
+  10.7-15.6:1, info-besked fg 13-16:1, medlems-namn/räknare på surface 6.5-17.9:1) ligger högt.
+
+**Beslut (responsivt + rörelse):** Verifierat live 280/760/1440 px, BÅDA teman: NOLL horisontell
+overflow vid 280 (vikbar cover), koden + action-knapparna wrappar rent, medlems-chips + formulär
+staplar. Panelen har INGEN egen animation (sheenen borttagen av kontrast-skäl), så reduced-motion
+kräver inget rums-specifikt motgift; den enda rörelsen är delade knapp-hover-övergångar (index.css-
+grinden nollar dem). **Spårbarhet:** #14 + denna rad + `rooms.css` + `member-avatar.ts`(+test) +
+`share-room.ts`(+test) + RoomPanel-testerna (oförändrade, semantiken bevarad).
+
+---
+
+## 2026-06-10 , T14 (issue #14): Supabase + anonym auth + rumskod + RLS, live-växlingen
+
+**Beslut (vad som lagras i molnet vs i bundlen, KÄLLHÄNVISAT VAL):** Bara DELAD/MUTERBAR
+state lagras i Supabase, tre tabeller: `rooms` (rum + kort delbar kod + skapare),
+`room_members` (medlemskap + visningsnamn), `room_match_results` (delade matchresultat per
+rum). Den STATISKA turneringsbasen (lag, grupper, hela spelschemat) STANNAR i klient-bundlen,
+den är källåkrad och verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare, och att
+spegla den i DB:n hade bara dubblerat en redan låst sanning (drift-risk). Därför returnerar
+live-datakällan (`createSupabaseDataSource`) SAMMA committade data som fixtures för
+getTeams/getGroups/getMatches; det delade tillståndet nås via ett SEPARAT, additivt rooms-API
+(`src/data/rooms/`), auth- + RLS-skyddat. Så fixtures-till-live-växlingen för tracker-basen
+sker UTAN kod-ändring i konsumenterna (kravet), och rums-lagret är ett nytt seam ovanpå.
+
+**Beslut (LIVE_READY flippad till true, #37-pinnen löst):** T14 byggde den riktiga klienten
+(`supabase-browser.ts` singleton + `supabase-client.ts` + rooms-lagret) och flippade
+`LIVE_READY = false -> true` i `data-source.ts`, tog bort interims-`console.warn`-grenen, och
+uppdaterade guard-testet (nu `LIVE_READY === true`) + de injicerade live-fel-vägs-testerna.
+Tvåstegs-gaten består som princip (env UTAN LIVE_READY hade fallit till fixtures). F2-kravet
+(hotfix-reviewen): en käll-scan (`data-source.ts?raw`) bevisar att strängen "LIVE_READY=false"
+inte finns kvar i koden. Fel-vägs-testerna injicerar nu en REJECTANDE datakälla
+(`ResultsProvider`s nya `dataSource`-test-seam + `createFailingDataSource`) i stället för den
+gamla kastande stubben, eftersom live-källan nu ger giltig data och inte längre kastar.
+
+**Beslut (anonym auth, friktionsfritt + STABIL identitet):** Inloggning är ANONYM
+(`signInAnonymously`, Daniels val: en vän klickar på länken och är inne utan e-post/lösenord).
+Visningsnamnet bärs av `room_members.display_name` (per rum), inte av auth-profilen.
+Sessionen PERSISTAS (`persistSession: true`, localStorage), så samma anonyma user-id (och
+rums-medlemskap) lever mellan sidladdningar, det är det som gör "gå med" beständigt.
+`ensureSession` är idempotent (återanvänder en befintlig session). Captcha: AV (Daniels val).
+
+**Beslut (RLS är ENDA skyddet, nycklat på auth.uid() + medlemskap), KÄLLHÄNVISAT till Supabase-
+modellen:** I Supabase har anon-rollen SAMMA rättigheter som `authenticated` (anonyma användare
+FÅR rollen `authenticated` med `is_anonymous: true`), så Row Level Security är det enda som
+skyddar datan. Modellen (migrationer i `supabase/migrations/`, speglade på projekt
+kmzhyblzxangpxydufve):
+- **rooms:** SELECT för medlemmar (`is_room_member(id)`); INSERT bara som sig själv
+  (`created_by = auth.uid()`); UPDATE/DELETE bara skaparen.
+- **room_members:** SELECT för medlemmar i samma rum; INSERT/DELETE bara sin egen rad
+  (`user_id = auth.uid()`) = "gå med"/"lämna".
+- **room_match_results:** SELECT/INSERT/UPDATE/DELETE bara medlemmar i rummet, och `updated_by`
+  måste vara `auth.uid()` (ingen förfalskning av vem som skrev).
+- **Medlemskaps-helper** `is_room_member(room_id)` är SECURITY DEFINER + `search_path=''` så
+  policyn på `room_members` kan fråga `room_members` utan rekursion ("infinite recursion in
+  policy"). Den MÅSTE ha EXECUTE för anon/authenticated, RLS-policy-uttryck evalueras i
+  ANROPARENS roll (empiriskt bevisat: utan grant -> "permission denied for function").
+- **Join-via-kod** (`join_room_by_code`) + **skapa-rum** (`create_room`) är SECURITY DEFINER-RPC:er.
+  Join låter ett icke-medlem slå upp EXAKT en kod för att gå med (utan att kunna rad-skanna alla
+  rum, ingen öppen SELECT-policy för icke-medlem). Create är ATOMISKT (rum + skaparens medlems-rad
+  i en transaktion), annars kan skaparen inte läsa sitt eget rum (select-policyn kräver medlemskap)
+  och en `return=representation`-insert nekas. En 42702-kolumn-ambiguitet (OUT `room_id` vs
+  `room_members.room_id` i `on conflict`) löstes med `#variable_conflict use_column` +
+  `return query select`.
+
+**Beslut (RLS BEVISAD, inte påstådd, med RIKTIGA sessioner):** RLS-modellen är bevisad end-to-end
+med TRE riktiga anonyma sessioner (Alice/Bob/Carol) mot det levande projektet, NEKAD OCH TILLÅTEN
+(`rooms-rls.integration.test.ts`, 11 fall: utomstående nekas läsa/skriva/skanna, medlem tillåts,
+ingen förfalskning av created_by/updated_by, bara skaparen raderar, lämna återkallar åtkomst). En
+mock kan inte bevisa RLS (den lever i DB:n); bara olika `auth.uid()` visar nekad vs tillåten
+(lärdomen `uttommande-test-vaktar-svagare-invariant`: testet når den gren garantin annars bryts).
+Testet skipIf:ar snyggt offline/rate-limitat (anonym sign-in är rate-limitad per IP) så sviten
+aldrig rödnar på en extern gräns. `get_advisors (security)` kördes efter migrationerna; alla WARN
+är MEDVETNA avvägningar (anonym åtkomst ÄR poängen, RPC:erna är gå-med/skapa-flödet, leaked-
+password gäller e-post-auth vi inte använder), se `supabase/README.md`.
+
+**Beslut (synk-status på online-seamen, T13):** Online-indikatorn speglar nu ÄRLIGT synk-läget när
+ett live-rum är aktivt (`live`-prop): "Online, synkad" / "Offline, ändringarna synkas när du är
+online igen". Utan aktivt rum (lokalt läge) faller den till T13:s "fungerar ändå" (det finns då
+ingen delad data att synka, vi lovar aldrig en mekanik som inte gäller). Om-hämtningen sker vid
+fokus + online-event (INGEN polling; T18 byter detta mot Supabase Realtime på samma refresh-seam).
+
+**Beslut (rumskods-alfabet, källhänvisat val):** Koden är gemener `a-z` (minus `l`/`o`) + siffror
+`2-9` (minus `0`/`1`), ett OTVETYDIGT teckenförråd (Crockford-andan: undvik tecken som förväxlas
+muntligt/i chatt). Samma teckenförråd vaktas av DB:ns check-constraint `^[a-z2-9]{4,12}$`, så klient
+och databas aldrig driver isär. Teckenförrådet är 32 tecken (24 bokstäver a-z minus l/o + 8 siffror
+2-9), så 6 tecken = 32^6 ~ 1,07 mrd kombinationer; UNIQUE i DB fångar den
+osannolika krocken (klienten genererar då en ny kod, gissar aldrig att en kod är unik).
+
+**Beslut (INGA secrets i repot, PRINCIPLES §7):** Supabase-URL + publik anon/publishable-nyckel läses
+ur env (`import.meta.env`, satta i `.env.local` gitignorad + Cloudflare). Den publika nyckeln är
+publik PER DESIGN (skyddad av just denna RLS) men hålls ändå i env, aldrig hårdkodad i källkoden,
+så koden inte binds till ett specifikt projekt. **Uppdaterat efter C7 (runda 1):** RLS-
+integrationstestet har INGEN hårdkodad fallback till projektets kända publika värden längre, det
+KRÄVER `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` ur miljön och `describe.skipIf`:ar hela sviten
+om de saknas (de är inga secrets, men behandlas som env-konfig). Se C7-blocket högre upp.
+
+**Spårbarhet:** #14 + denna rad + `supabase/migrations/` (speglade på kmzhyblzxangpxydufve) +
+`supabase/README.md` + testerna (RLS-integration, auth, rooms-api, room-code, data-source-flip).
+
+---
+
 ## 2026-06-10 , T13 VISUELLT LAGER (issue #13): premium-finish på onboarding/install/settings
 
 **Beslut (onboarding-touren får en "arena i kvällsljus"-hero-strip + CSS-illustrationer):**

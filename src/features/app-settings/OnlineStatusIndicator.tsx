@@ -1,24 +1,49 @@
-// Online/offline-indikator (PRESENTATION, T13): visar användaren om appen har nät.
+// Online/offline-indikator (PRESENTATION, T13 + synk-status T14): visar nät-läget.
 //
 // DESIGNVAL: i ONLINE-läge är indikatorn medvetet DISKRET (en liten, lugn prick +
 // "Online"), den ska inte skrika när allt är normalt. I OFFLINE-läge blir den
-// tydligare (varnings-ton + en ärlig förklaring att appen funkar ändå, eftersom
-// datan ligger lokalt). role="status" + aria-live="polite" så en skärmläsare hör
-// när läget växlar, utan att flytta fokus.
+// tydligare (varnings-ton + en ärlig förklaring). role="status" + aria-live="polite"
+// så en skärmläsare hör när läget växlar, utan att flytta fokus.
 //
-// ÄRLIGHET (T13): texten lovar ingen synk-mekanik som inte finns. Appen är
-// fixtures-driven, så den fungerar offline; "synk" blir relevant först med T14.
+// SYNK-STATUS (T14): innan T14 var "synk" en lögn (appen var ren fixtures, ingen
+// server-data fanns). NU finns delad rums-data i Supabase som faktiskt hämtas om
+// vid återuppkoppling (RoomsProvider lyssnar på online-event). Indikatorn kan
+// därför ÄRLIGT spegla synk-läget NÄR ett live-rum är aktivt (`live`-proppen):
+//   - online + live  -> "Online, synkad" (delad data är aktuell)
+//   - offline + live -> "Offline, ändringarna synkas när du är online igen"
+// Utan ett aktivt rum (live=false, t.ex. lokalt läge eller inget valt rum) faller
+// vi tillbaka på T13:s ärliga "appen fungerar ändå", eftersom det då inte finns
+// någon delad data att synka, vi lovar aldrig en mekanik som inte gäller.
 
 import { useOnlineStatus } from './use-online-status';
 
-export function OnlineStatusIndicator() {
+export interface OnlineStatusIndicatorProps {
+  /**
+   * Är ett live-rum aktivt (det finns delad server-data att synka)? När true
+   * speglar indikatorn synk-läget ärligt; när false (lokalt/inget rum) visas
+   * T13:s "fungerar ändå"-besked. Default false (bakåtkompatibelt).
+   */
+  live?: boolean;
+}
+
+export function OnlineStatusIndicator({ live = false }: OnlineStatusIndicatorProps) {
   const online = useOnlineStatus();
+
+  // Texten beror på BÅDE nät-läget och om det finns delad data att synka.
+  const label = online
+    ? live
+      ? 'Online, synkad'
+      : 'Online'
+    : live
+      ? 'Offline, ändringarna synkas när du är online igen'
+      : 'Offline, appen fungerar ändå';
 
   return (
     <div
       role="status"
       aria-live="polite"
       data-online-status={online ? 'online' : 'offline'}
+      data-sync-live={live ? 'true' : 'false'}
       className="inline-flex items-center gap-2 rounded-pill border px-3 py-1.5 text-xs font-medium"
       style={
         online
@@ -41,7 +66,7 @@ export function OnlineStatusIndicator() {
         className="h-2 w-2 shrink-0 rounded-pill"
         style={{ backgroundColor: online ? 'var(--color-accent)' : 'var(--vm-gold)' }}
       />
-      {online ? <span>Online</span> : <span>Offline, appen fungerar ändå</span>}
+      <span>{label}</span>
     </div>
   );
 }

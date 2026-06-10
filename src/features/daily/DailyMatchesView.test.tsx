@@ -4,23 +4,18 @@ import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { TeamProfileProvider } from '../team-profile';
 import { DailyMatchesView } from './DailyMatchesView';
+import type { DataSource } from '../../data';
+import { createFailingDataSource } from '../../test/failing-data-source';
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
 }
 
-function liveEnv(): ImportMetaEnv {
-  return {
-    VITE_SUPABASE_URL: 'https://x.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'anon-key',
-  } as ImportMetaEnv;
-}
-
-// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testet.
-// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
-function renderView(env: ImportMetaEnv, children: ReactNode, liveReady = false) {
+// Fel-vägs-testet injicerar en REJECTANDE datakälla (sedan T14 kastar live-källan
+// inte längre, så ett genuint datakälle-fel testas via dataSource-injektionen).
+function renderView(env: ImportMetaEnv, children: ReactNode, dataSource?: DataSource) {
   return render(
-    <ResultsProvider env={env} liveReady={liveReady}>
+    <ResultsProvider env={env} dataSource={dataSource}>
       <TeamProfileProvider>{children}</TeamProfileProvider>
     </ResultsProvider>
   );
@@ -184,8 +179,8 @@ describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
 });
 
 describe('DailyMatchesView, fel-väg (fail loud)', () => {
-  it('visar role=alert när datakällan kastar (live-stub före T14), inte en tyst tom vy', async () => {
-    renderView(liveEnv(), <DailyMatchesView />, true);
+  it('visar role=alert när datakällan rejectar (genuint datakälle-fel), inte en tyst tom vy', async () => {
+    renderView(fixturesEnv(), <DailyMatchesView />, createFailingDataSource());
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/Kunde inte ladda matcherna/i);
     // Ingen matchlista läcker fram i fel-läget.

@@ -13,12 +13,42 @@
 // detta seam, utan att röra konsumenterna.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getDataSource, getDataSourceMode, LIVE_READY } from '../../data';
+import { getDataSource, getDataSourceMode, LIVE_READY, type DataSource } from '../../data';
 import type { Group, Match, Team } from '../../domain/types';
+import { useRoomsSync } from '../rooms';
+import type { RoomResultInput } from '../../data/rooms';
 import { applySimulationOverlay, type SimulationOverlay } from '../simulation/apply-simulation';
 import { applyMatchResult } from './apply-match-result';
+import { applyRoomResults } from './apply-room-results';
 import { ResultsStoreContext, type ResultsLoadStatus, type ResultsStore } from './results-context';
 import { validateResultEntry, type ResultEntry, type ResultValidation } from './validate-result';
+
+/**
+ * Mappa en (validerad, applicerad) Match till en RoomResultInput för delning till
+ * rummet (T14, KA-F3). Härleder formen ur Match-unionen så den aldrig kan drifta:
+ * en FINISHED-match bär mål (+ ev. straffar i avgjort slutspel), en scheduled/live-
+ * match har inget resultat. DB-kolumnerna home_goals/away_goals är NOT NULL, så en
+ * ej spelad match delas med 0-0 + sin status (status är sanningen, inte målen då);
+ * vävningen tillbaka (apply-room-results.toEntry) nollar målen igen för icke-finished,
+ * så kontraktet hålls i båda riktningar.
+ */
+function toRoomResultInput(matchId: string, match: Match): RoomResultInput {
+  if (match.status === 'finished') {
+    return {
+      matchId,
+      homeGoals: match.result.homeGoals,
+      awayGoals: match.result.awayGoals,
+      status: 'finished',
+      penalties: match.result.penalties
+        ? {
+            homeGoals: match.result.penalties.homeGoals,
+            awayGoals: match.result.penalties.awayGoals,
+          }
+        : null,
+    };
+  }
+  return { matchId, homeGoals: 0, awayGoals: 0, status: match.status, penalties: null };
+}
 
 export interface ResultsProviderProps {
   children: ReactNode;
@@ -29,18 +59,27 @@ export interface ResultsProviderProps {
    */
   env?: ImportMetaEnv;
   /**
-   * Injicerbar live-flagga (testbarhet), default = LIVE_READY (false tills T14,
-   * se data-source.ts, #37). Tester som vill driva LIVE-grenen (stubben som
-   * kastar) sätter liveReady=true; produktion använder defaulten, så env satt
-   * utan byggd klient faller till fixtures i stället för fel-alerts.
+   * Injicerbar live-flagga (testbarhet), default = LIVE_READY (true sedan T14,
+   * se data-source.ts). Produktion använder defaulten; tester kan injicera false
+   * för att driva fixtures-grenen även med env satt (tvåstegs-gaten).
    */
   liveReady?: boolean;
+  /**
+   * Injicerbar datakälla (testbarhet), default = den env-gatade getDataSource.
+   * SAMMA seam-princip som env/liveReady: låter fel-vägs-tester injicera en
+   * datakälla som REJECTAR (utan att mocka import.meta), så provider:ns fail-loud-
+   * kontrakt (status error + meddelande, ingen tyst tom vy) kan bevisas. Sedan
+   * T14 returnerar live-källan giltig data (kastar inte längre), så ett genuint
+   * datakälle-fel (t.ex. nätfel) testas via denna injektion i stället.
+   */
+  dataSource?: DataSource;
 }
 
 export function ResultsProvider({
   children,
   env = import.meta.env,
   liveReady = LIVE_READY,
+  dataSource: injectedDataSource,
 }: ResultsProviderProps) {
   const [status, setStatus] = useState<ResultsLoadStatus>('loading');
   const [groups, setGroups] = useState<Group[]>([]);
@@ -51,6 +90,36 @@ export function ResultsProvider({
   // settern (setMatches nedan) wrappar den så reffen aldrig blir stale, se där.
   const [realMatches, setRealMatchesState] = useState<Match[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // DELAT RUMS-LAGER (T14, KA-F3): det aktiva rummet + dess delade resultat +
+  // spar-funktionen, läst TOLERANT (inert utan RoomsProvider, se useRoomsSync).
+  // Wiringen gör att (a) en inmatning i rum-läge även sparas till rummet, och
+  // (b) rummets delade resultat vävs in i matchlistan så ALLA medlemmar ser
+  // samma tabell/träd. Utan aktivt rum är detta inert -> lokalt läge precis som förr.
+  const { activeRoomId, sharedResults, saveResult: saveRoomResult } = useRoomsSync();
+
+  // Den SEEDADE BASEN (den statiska, källåkrade matchplanen från senaste seed),
+  // bevarad SEPARAT från realMatches. VARFÖR: rummets delade resultat vävs in OVANPÅ
+  // basen (applyRoomResults). Om vi i stället folda:de på den redan rum-vävda listan
+  // skulle ett borttaget/ändrat delat resultat aldrig kunna "backa" och gamla resultat
+  // skulle kompoundas. Genom att alltid väva från den rena basen är vävningen idempotent
+  // och speglar EXAKT rummets nuvarande delade tillstånd (sista-skrivet-vinner från servern).
+  const seededBaseRef = useRef<Match[]>([]);
+
+  // Ref till de delade resultaten så SEED-effekten kan väva in dem UTAN att lista
+  // sharedResults i sin dep-array (en ändring i delade resultat ska inte seeda om
+  // hela datakällan, bara väva om; det gör den separata effekten nedan). Synkas varje render.
+  const sharedResultsRef = useRef(sharedResults);
+  sharedResultsRef.current = sharedResults;
+
+  // Reffar till rum-id + spar-funktionen så den STABILA submitResult-callbacken
+  // (tom dep-array nedan) alltid läser det NUVARANDE aktiva rummet och senaste
+  // spar-funktionen, utan att binda mot en stale closure (samma ref-mönster som
+  // matchesRef). Så en inmatning persistas till det rum som är aktivt JUST DÅ.
+  const activeRoomIdRef = useRef(activeRoomId);
+  activeRoomIdRef.current = activeRoomId;
+  const saveRoomResultRef = useRef(saveRoomResult);
+  saveRoomResultRef.current = saveRoomResult;
 
   // SIMULERINGS-STATE (T12): är what-if-läget på, och det hypotetiska overlayt
   // (Map<matchId, Match>). När simulating=false ELLER overlayn är tom är de
@@ -115,7 +184,9 @@ export function ResultsProvider({
     // Avbryt-flagga: om providern unmountas (eller env byter) innan hämtningen
     // är klar sätter vi inte state på en avmonterad komponent.
     let cancelled = false;
-    const dataSource = getDataSource(env, liveReady);
+    // Injicerad datakälla (test) eller den env-gatade (produktion). Injektionen
+    // låter fel-vägs-tester ge en källa som rejectar utan att mocka import.meta.
+    const dataSource = injectedDataSource ?? getDataSource(env, liveReady);
 
     setStatus('loading');
     setError(null);
@@ -131,8 +202,14 @@ export function ResultsProvider({
         // läge: en (om)laddning är ny riktig data, inte en hypotetisk inmatning.
         // Vi går därför INTE via den läges-ruttande setMatches här. Reffen synkas
         // direkt (samma invariant som alla andra riktiga skrivvägar).
-        matchesRef.current = loadedMatches;
-        setRealMatchesState(loadedMatches);
+        //
+        // T14 (KA-F3): bevara den rena seedade BASEN och väv in rummets delade
+        // resultat ovanpå (idempotent, från basen). I lokalt läge är sharedResults
+        // tom -> woven === basen, så beteendet är oförändrat mot förr.
+        seededBaseRef.current = loadedMatches;
+        const woven = applyRoomResults(loadedMatches, sharedResultsRef.current);
+        matchesRef.current = woven;
+        setRealMatchesState(woven);
         // En (om)laddning byter ut datan sandlådan byggdes på, så ett kvarvarande
         // overlay vore byggt på gammal data. Lämna sim-läget och töm overlayn vid
         // (om)seedning, så det hypotetiska aldrig vävs mot fel riktig data.
@@ -147,7 +224,8 @@ export function ResultsProvider({
           return;
         }
         // Fail loud (PRINCIPLES §8): visa felet, maskera det inte som tom vy.
-        // Vanligast i live-läge innan T14 (stubben kastar med avsikt).
+        // Inträffar vid ett genuint datakälle-fel (t.ex. nätfel), eller i test via
+        // en injicerad datakälla som rejectar.
         setError(err instanceof Error ? err.message : 'Kunde inte ladda matchdata.');
         setStatus('error');
       });
@@ -157,9 +235,44 @@ export function ResultsProvider({
     };
     // setMatches är en stabil useCallback (tom dep-array), så den ändrar aldrig
     // identitet och triggar inte om-körning, den listas för exhaustive-deps-
-    // korrekthet (effekten anropar den vid seed). liveReady ingår: ändras gaten
-    // (t.ex. en test som driver live-grenen) ska källan väljas om.
-  }, [env, liveReady, setMatches]);
+    // korrekthet (effekten anropar den vid seed). liveReady + injectedDataSource
+    // ingår: ändras gaten eller den injicerade källan ska seedningen köras om.
+  }, [env, liveReady, injectedDataSource, setMatches]);
+
+  // VÄV OM vid ändrade DELADE RESULTAT (T14, KA-F3): när rummets delade resultat
+  // ändras (man väljer/byter rum, eller en refetch på fokus/online hämtar färska
+  // resultat en annan medlem skrivit), väv om från den rena seedade BASEN så ALLA
+  // medlemmar ser samma tabell/träd. Vi väver från basen (inte den nuvarande listan)
+  // så vävningen är idempotent och ett ändrat/borttaget delat resultat backar korrekt.
+  //
+  // KÖR BARA VID EN FAKTISK RUMS-ÄNDRING: vi jämför mot förra rendrets rum-id +
+  // delade-resultat-referens och hoppar om inget rums-relaterat ändrats. VARFÖR
+  // (kritiskt): seed-effekten gör redan den FÖRSTA vävningen, och setMatches-seamen
+  // (T18 realtid + test-harness) skriver den riktiga datan direkt. Skulle denna
+  // effekt köra på BLOTTA seed/mount (utan en verklig rums-ändring) skulle den väva
+  // om från den rena basen och STOMPA en setMatches som just körts (t.ex. en
+  // realtids-push eller ett test som setMatches:ar en färdig matchlista). Genom att
+  // bara reagera på en ÄKTA ändring av rums-tillståndet rör vi aldrig den lokala/
+  // setMatches-drivna vägen, bara när rummet faktiskt ger ny delad data (eller töms).
+  const prevRoomRef = useRef<{ roomId: string | null; results: typeof sharedResults }>({
+    roomId: activeRoomId,
+    results: sharedResults,
+  });
+  useEffect(() => {
+    const prev = prevRoomRef.current;
+    const roomChanged = prev.roomId !== activeRoomId;
+    const resultsChanged = prev.results !== sharedResults;
+    prevRoomRef.current = { roomId: activeRoomId, results: sharedResults };
+    if (!roomChanged && !resultsChanged) {
+      return; // inget rums-relaterat ändrades: rör inte den lokala/setMatches-vägen
+    }
+    if (status !== 'ready') {
+      return; // basen är inte seedad än; seed-effekten väver med sharedResultsRef
+    }
+    const woven = applyRoomResults(seededBaseRef.current, sharedResults);
+    matchesRef.current = woven;
+    setRealMatchesState(woven);
+  }, [status, sharedResults, activeRoomId]);
 
   // Mata in/redigera ETT resultat: validera, och vid ok uppdatera matchlistan
   // optimistiskt (direkt i minnet, vyerna räknar om reaktivt). Vid fel ändras
@@ -217,6 +330,26 @@ export function ResultsProvider({
       // Icke-sim: skriv den riktiga datan via den wrappade setMatches (uppdaterar
       // matchesRef SYNKRONT + state), så snabba submit i följd ser senaste listan.
       setMatches(next);
+
+      // DELA TILL RUMMET (T14, KA-F3 (a)): finns ett aktivt rum persistas resultatet
+      // även dit, så alla medlemmar ser samma tabell/träd. Optimistiskt: den lokala
+      // matchlistan är redan uppdaterad ovan (UI reagerar direkt), spar-anropet sker
+      // i bakgrunden. RoomsProvider.saveResult uppdaterar dessutom rummets egna
+      // delade resultat optimistiskt, så vävnings-effekten ovan håller listorna i synk.
+      // UTAN aktivt rum (activeRoomIdRef null, lokalt läge) hoppas detta helt -> som förr.
+      if (activeRoomIdRef.current) {
+        const persisted = next.find((m) => m.id === matchId);
+        if (persisted) {
+          // Spara FAIL-LOUD men ICKE-BLOCKERANDE: ett spar-fel (nätfel/RLS) får inte
+          // riva den redan gjorda lokala inmatningen (UX), men ska inte heller sväljas
+          // tyst. Vi loggar det; nästa fokus/online-refetch i RoomsProvider återhämtar
+          // den delade sanningen (sista-skrivet-vinner). Ett blockerande/återställande
+          // flöde vore mer påträngande än värdet för en vänkrets-app (KISS).
+          void saveRoomResultRef.current(toRoomResultInput(matchId, persisted)).catch((err) => {
+            console.error('[VM2026] Kunde inte dela resultatet till rummet:', err);
+          });
+        }
+      }
       return validation;
     },
     [setMatches]

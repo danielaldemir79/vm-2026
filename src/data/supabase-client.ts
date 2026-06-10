@@ -1,54 +1,49 @@
-// Live-Supabase-datakälla, TUNN STUB (byggs ut i T14).
+// Live-Supabase-datakälla (T14, #14).
 //
-// T3 lägger gaten och kontraktet (se data-source.ts), men Supabase-kontot och
-// @supabase/supabase-js installeras först i T14. Denna fil uppfyller redan
-// DataSource-kontraktet så call-sites och env-gaten är kompletta, men
-// metoderna FAIL LOUD i stället för att returnera tyst tom/fejkad data:
-// kör appen i live-läge innan T14 är klar ska det krascha högt och tydligt,
-// inte låtsas att en tom tabell är ett giltigt live-svar (PRINCIPLES §8).
+// VIKTIGT designval (dokumenterat i docs/decisions.md T14 + supabase/README.md):
+// DataSource-kontraktet (getTeams/getGroups/getMatches) bär den STATISKA
+// turneringsbasen, lag, grupper och hela spelschemat. Den datan är KÄLLÅKRAD och
+// verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare, och bor i
+// klient-bundlen. Att spegla den i Supabase hade bara dubblerat en redan låst
+// sanning (och skapat en drift-risk). Därför returnerar live-datakällan SAMMA
+// statiska data som fixtures-läget för dessa tre metoder.
 //
-// När T14 bygger detta: installera @supabase/supabase-js, skapa klienten med
-// env-värdena, och byt ut notImplemented-anropen mot riktiga frågor som
-// PROJICERAR Supabase-radernas fält till domäntyperna (Team/Group/Match).
-// Härled projektionen från Supabase-schemats FAKTISKA kolumnnamn, inte från
-// konsument-typen, annars göms en mappnings-drift (känd lärdom).
+// Det DELADE, MUTERBARA tillståndet (rum, medlemmar, delade matchresultat) går
+// INTE via DataSource utan via rooms-API:t (src/data/rooms/), som är auth- +
+// RLS-skyddat. Så fixtures-till-live-växlingen för tracker-basen sker UTAN
+// kod-ändring i konsumenterna (kravet): de anropar getTeams/getGroups/getMatches
+// som förr och får samma form, medan rums-lagret är ett separat, additivt seam.
+//
+// VARFÖR ändå en "live"-datakälla och inte bara fixtures: gaten (LIVE_READY +
+// env) ska vara ÄRLIG, i live-läge SKA en riktig Supabase-klient initieras (så
+// auth-sessionen + rums-lagret är på plats), även om bas-datan är statisk. Vi
+// rör därför klienten (getSupabaseClient) för att fail-loud:a tidigt om env är
+// trasig, men läser bas-datan ur den committade källan.
 
 import type { DataSource } from './data-source';
 import type { Group, Match, Team } from '../domain/types';
+import { fixtureGroups, fixtureMatches, fixtureTeams } from './fixtures';
+import { getSupabaseClient } from './supabase-browser';
 
 /**
- * Kastar ett tydligt fel för en ännu ej byggd live-metod. Fail loud: ett anrop
- * i live-läge före T14 ska smälla med ett begripligt meddelande, inte tyst ge
- * tom data som ser giltig ut.
- */
-function notImplemented(method: string): never {
-  throw new Error(
-    `[VM2026] Supabase-datakällan (${method}) är inte byggd än (T14). ` +
-      'Kör i fixtures-läge tills Supabase-klienten är på plats.'
-  );
-}
-
-/**
- * Skapa live-datakällan. Tar emot miljö-variablerna (URL + anon-key) som T14
- * använder för att initiera @supabase/supabase-js. Gaten (data-source.ts) har
- * redan verifierat att de finns, men vi läser dem här som ett explicit kontrakt
- * (och fail-loud-skydd) så att signaturen visar exakt vad T14:s implementation
- * behöver, och så att ett felaktigt direkt-anrop utan env smäller tydligt.
+ * Skapa live-datakällan. Initierar den riktiga Supabase-klienten ur env (fail
+ * loud om den saknas, gaten i data-source.ts har redan verifierat den men vi
+ * läser den här som explicit kontrakt + tidig smäll vid felanvändning).
+ *
+ * Bas-datan (lag/grupper/matcher) är statisk och källåkrad, så de tre metoderna
+ * returnerar den committade datan. Det delade/muterbara tillståndet (rum m.m.)
+ * nås via rooms-API:t med samma klient.
  */
 export function createSupabaseDataSource(env: ImportMetaEnv): DataSource {
-  const url = env.VITE_SUPABASE_URL?.trim();
-  const key = env.VITE_SUPABASE_ANON_KEY?.trim();
-  if (!url || !key) {
-    throw new Error(
-      '[VM2026] createSupabaseDataSource anropades utan giltig Supabase-env ' +
-        '(VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Gå via getDataSource som gatear detta.'
-    );
-  }
+  // Initiera (och validera) klienten tidigt. Kastar fail-loud om env är trasig.
+  // Vi behåller inte referensen här, rooms-API:t hämtar singletonen via
+  // getSupabaseClient(env) när det behövs (en sanning, en klient).
+  getSupabaseClient(env);
 
-  // T14: skapa klienten med url + key och projicera raderna till domäntyperna.
   return {
-    getTeams: (): Promise<Team[]> => notImplemented('getTeams'),
-    getGroups: (): Promise<Group[]> => notImplemented('getGroups'),
-    getMatches: (): Promise<Match[]> => notImplemented('getMatches'),
+    // Statisk, källåkrad bas-data, samma sanning i fixtures- och live-läge.
+    getTeams: (): Promise<Team[]> => Promise.resolve(fixtureTeams),
+    getGroups: (): Promise<Group[]> => Promise.resolve(fixtureGroups),
+    getMatches: (): Promise<Match[]> => Promise.resolve(fixtureMatches),
   };
 }

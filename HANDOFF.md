@@ -5,6 +5,79 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T14/#14 (Supabase live + auth + RLS + rumskod) KLAR - FAS 2 IGÅNG - PR #52 väntar på merge
+
+**Branch:** `feature/T14-supabase-live` @ HEAD `bfc05a9`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/52 mot `develop` (Closes #14, state: OPEN)
+**Board:** issue #14 i "In Review" (korrekt). Dirigenten stänger issue #14 MANUELLT och flyttar kort #14 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester/flyg), dirigenten har fullmakt hela vägen till slutet.
+
+**--- FAS 2 IGÅNG ---**
+T14 är klar och PR #52 väntar merge. Fas 1 (T1-T13 + hotfix + T27/#39 + T28/#42 + T4b) mergad dessförinnan. Nästa tasks: #50 (T30 Play Protect) + #51 (T31) FÖRE T15. Därefter T15->T25 i tur och ordning (T26 DR-webb-inbäddning skippad, stängd not planned - hemsidan hinner inte bli klar under VM).
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `c4cfdfc` - feat(supabase): schema + RLS + RPC (Supabase-schema, RLS-policies per auth.uid()+rum, RPC-funktion)
+- `e6f2660` - feat(live): live-klient + auth-flöde + LIVE_READY-flip (env-gating live, anon-auth, rumskod)
+- `8b08bb2` - feat(rooms): rum-UI + realtidssynk (rumskod-UI, Realtime-kanal, online-seam kopplad)
+- `bb85e92` - docs (decisions.md + patterns.md)
+- `0ccef05` - design: kod-biljett-komponent + avatarer (design-frontend premium-finish)
+- `7f11eab` + `f82a202` + `78166f4` + `055540e` - panel (KA-F1..F4 + SA1..SA4 ataerdade, saveResult wirat end-to-end)
+- `5dcf486` + `f60559d` + `661cb93` + `fcb947c` + `3fe6b68` + `c7ad536` + `bfc05a9` - Copilot 3 rundor (7->8->0 fynd, exit naedd, C15 avvisad husstils-kommat)
+
+**Verifiering:** 776 tester gröna + 12 skippade (RLS-integrationstest env-gatade, körda gröna mot live med env). Build/lint/format rent. RLS bevisad med riktiga Supabase-sessioner + adversariell live-granskning (pg_policies + pg_proc). Inga säkerhetsluckor.
+
+**ALLA T14-PINS STÄNGDA:**
+- LIVE_READY = true flippat (dokumenterad växel; call-sites orörda via injicerbar parameter med default-värde)
+- Interims-warn borttagen
+- Live-felvägstester uppdaterade
+- F2-assertion: inget test refererar "LIVE_READY=false"
+- RLS per auth.uid()+rum bevisad med riktiga sessioner
+- Online-seam-synk kopplad (Realtime-kanal från T13-seamen)
+
+**PINNADE punkter:**
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn (3 dagar framåt) tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **KA-F4-notering:** bundle 717 kB (gzip ~200 kB). Om LCP-problem uppstår: lägg till manualChunks i vite.config.ts för att splitta Supabase/Framer ur main-chunk.
+- **SA3-notering:** UUID = kapabilitet (den som vet rum-UUID:t kan gå med). Accepterat designval, dokumenterat. Om starkare access-kontroll behövs framöver: JWT-claims per rum.
+
+**"Behöver Daniel"-kö:**
+- Push-notiser T22: kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` i `memory/lessons/senior-developer.md` Förekomst 3 (T4 + T8 + T9). Typ: korsar flera agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` i `memory/lessons/journalist.md` Förekomst 3 (T7 + HOTFIX #37 + T8). Typ: agent-beteende -> permanent regel i journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - om den ska speglas: ändra rank-värden i källfilen + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista. Alternativ: (a) visa meddelande "turneringen avslutad", (b) ankra fönstret till sista speldagen.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #52 (T14/#14, feature/T14-supabase-live) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 52 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #14 manuellt (`gh issue close 14`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #14 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar anonym auth, rumskod-flöde, och att live-data synkar i realtid. Skicka demo till Daniel.
+>
+> Om PR #52 REDAN mergad:
+> Fas 2 är igång. T14 mergad, release-gränsen (develop -> main) väntar Daniels hemkomst-go - kör INTE den autonomt.
+> **Nästa tasks (i denna ordning):** #50 (T30 Play Protect-varning vid Android-install) + #51 (T31 ta bort designfundamentet + auto-spelad vid spara), SEDAN T15 (tips-logik).
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas upp som liten task.
+> - **KA-F4-notering:** bundle 717 kB - lägg till manualChunks om LCP-problem uppstår.
+> - **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+> - **"Behöver Daniel"-kön:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T13/#13 (Fas 1-deploy + installation/onboarding + offline) KLAR - FAS 1 KOMPLETT - PR #49 väntar på merge
 
 **Branch:** `feature/T13-install-offline` @ HEAD `1724080`

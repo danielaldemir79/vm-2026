@@ -4,6 +4,7 @@ import type { Match } from '../../domain/types';
 import { ScenarioView } from './ScenarioView';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { useResultsStore } from '../results/results-context';
+import { createFailingDataSource } from '../../test/failing-data-source';
 
 // ============================================================================
 // "Vad krävs"-vyn (T11): LIVE-scenarier härledda ur den delade storen. Den rena
@@ -15,13 +16,6 @@ import { useResultsStore } from '../results/results-context';
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
-}
-
-function liveEnv(): ImportMetaEnv {
-  return {
-    VITE_SUPABASE_URL: 'https://x.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'anon-key',
-  } as ImportMetaEnv;
 }
 
 /**
@@ -80,9 +74,9 @@ describe('ScenarioView, rendering + a11y', () => {
 });
 
 describe('ScenarioView, fel-väg (fail loud)', () => {
-  it('visar ett fel-meddelande när källan kastar (live-stub före T14)', async () => {
+  it('visar ett fel-meddelande när datakällan rejectar (genuint datakälle-fel)', async () => {
     render(
-      <ResultsProvider env={liveEnv()} liveReady={true}>
+      <ResultsProvider env={fixturesEnv()} dataSource={createFailingDataSource()}>
         <ScenarioView />
       </ResultsProvider>
     );
