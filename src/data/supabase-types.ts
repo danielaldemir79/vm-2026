@@ -17,6 +17,61 @@ export type Database = {
   };
   public: {
     Tables: {
+      // T15 (#15): referenstabell för avsparkstider (deadline-låsets klocka).
+      match_kickoffs: {
+        Row: {
+          kickoff: string;
+          match_id: string;
+        };
+        Insert: {
+          kickoff: string;
+          match_id: string;
+        };
+        Update: {
+          kickoff?: string;
+          match_id?: string;
+        };
+        Relationships: [];
+      };
+      // T15 (#15): tips (gissat resultat per rum/match/användare).
+      predictions: {
+        Row: {
+          away_goals: number;
+          created_at: string;
+          home_goals: number;
+          match_id: string;
+          room_id: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          away_goals: number;
+          created_at?: string;
+          home_goals: number;
+          match_id: string;
+          room_id: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          away_goals?: number;
+          created_at?: string;
+          home_goals?: number;
+          match_id?: string;
+          room_id?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'predictions_room_id_fkey';
+            columns: ['room_id'];
+            isOneToOne: false;
+            referencedRelation: 'rooms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       room_match_results: {
         Row: {
           away_goals: number;
@@ -136,6 +191,8 @@ export type Database = {
           room_name: string;
         }[];
       };
+      // T15 (#15): slå upp en matchs avsparkstid (deadline-låsets klocka).
+      match_kickoff: { Args: { p_match_id: string }; Returns: string };
     };
     Enums: {
       [_ in never]: never;
