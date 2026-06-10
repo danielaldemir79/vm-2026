@@ -5,6 +5,25 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 2): sim-KONTROLLEN flyttad till resultatinmatningen
+
+**Beslut:** `SimulationBanner` (what-if-kontrollen: Starta/Återställ/Avsluta + statusmeddelandet)
+flyttades från TOPPEN av sim-zonen till DIREKT ovanför resultatinmatnings-sektionen
+(`ResultEntryView`-panelen) i `App.tsx`. Bara banner-elementet flyttade; ordningen är nu
+daily -> gruppspel -> "Vad krävs" -> slutspelsträd -> **sim-banner -> Mata in resultat**.
+**Varför:** Daniels feedback ("har det med resultaten att göra? placera den över sektionen när man
+matar in resultat så den får tydlig koppling"). Sim-läget handlar om RESULTAT (man spelar ut tänkta
+resultat), så kontrollen får en tydligare mental koppling när den står vid inmatningen i stället för
+högst upp på sidan.
+**Bevarat oförändrat:** Sim-RAMEN (`SimulationFrame`) omsluter fortfarande ALLA påverkade vyer
+(daily, gruppspel, "Vad krävs", slutspelsträd, inmatning) och bär den app-globala "labbet"-
+markeringen (violett ram + tint) + den sticky "Simuleringsläge"-badge:n; ingen datalogik eller
+sim-mekanik rördes. Verifierat LIVE: banner-rubriken ("Vad-händer-om") sitter direkt ovanför "Mata
+in resultat", och sim-flödet är intakt (Starta -> frame+badge aktiva och omsluter daily + inmatning,
+Återställ + Avsluta finns, Avsluta -> neutralt läge igen). Spårbart: #54 + denna rad + `App.tsx`.
+
+---
+
 ## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 1): inställningspanelen hamnade BAKOM sidan, rotorsak + fix
 
 **Symptom (Daniels mobil):** Klick på kugghjulet öppnade inställningarna, men panelen lades
