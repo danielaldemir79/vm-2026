@@ -66,6 +66,60 @@ describe('Simulering, toggle + idempotens', () => {
     // Inga hypotetiska resultat än => effektiva matcher är värde-lika med riktiga.
     expect(result.current.matches).toEqual(realBefore);
   });
+
+  // Copilot C2: enterSimulation är dokumenterat idempotent men tömde förr ALLTID
+  // overlayn, så ett dubbel-enter raderade redan inmatade hypotetiska resultat.
+  it('C2: dubbel-enter BEVARAR overlayn (raderar inte de hypotetiska resultaten)', async () => {
+    const { result } = renderHook(() => useResultsStore(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const targetId = result.current.matches.find((m) => m.status === 'scheduled')!.id;
+
+    act(() => result.current.enterSimulation());
+    act(() => {
+      const v = result.current.submitResult(targetId, finishedEntry(3, 1));
+      expect(v.ok).toBe(true);
+    });
+    // Hypotetiskt resultat ligger i overlayn (effektivt finished 3-1).
+    expect(result.current.matches.find((m) => m.id === targetId)!.result).toEqual({
+      homeGoals: 3,
+      awayGoals: 1,
+    });
+
+    // Andra enterSimulation (t.ex. dubbelklickad knapp): overlayn ska INTE tömmas.
+    act(() => result.current.enterSimulation());
+    expect(result.current.simulating).toBe(true);
+    expect(result.current.matches.find((m) => m.id === targetId)!.result).toEqual({
+      homeGoals: 3,
+      awayGoals: 1,
+    });
+  });
+
+  // Copilot C3: exitSimulation skapade förr ALLTID en ny Map + state-set, så ett
+  // dubbel-exit (redan av + tom overlay) tvingade en onödig re-render. Guarden
+  // gör det till en no-op => store-referensen är stabil (ingen re-render).
+  it('C3: dubbel-exit är en no-op (ingen onödig re-render, stabil store-referens)', async () => {
+    let renderCount = 0;
+    const { result } = renderHook(
+      () => {
+        renderCount += 1;
+        return useResultsStore();
+      },
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    // Första exit (redan av + tom overlay från start): ska INTE byta state.
+    const storeBefore = result.current;
+    const rendersBefore = renderCount;
+    act(() => result.current.exitSimulation());
+
+    // Ingen state-ändring => samma store-objekt (memo räknas inte om) och ingen
+    // ny render triggad av exit-anropet.
+    expect(result.current).toBe(storeBefore);
+    expect(result.current.simulating).toBe(false);
+    expect(renderCount).toBe(rendersBefore);
+  });
 });
 
 describe('Simulering, ISOLERING (riktig data orörd)', () => {

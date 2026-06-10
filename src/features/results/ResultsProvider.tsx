@@ -226,9 +226,17 @@ export function ResultsProvider({
 
   // Slå PÅ what-if-läget med ett TOMT overlay (riktig data orörd, vyerna ser
   // exakt de riktiga matcherna tills man matar in ett hypotetiskt resultat).
-  // Idempotent. Refen synkas direkt så en omedelbart följande sim-skrivning ser
-  // det nya läget utan att vänta på re-render.
+  // Refen synkas direkt så en omedelbart följande sim-skrivning ser det nya
+  // läget utan att vänta på re-render.
+  // IDEMPOTENT (Copilot C2): no-op när läget redan är PÅ. Förr tömde anropet
+  // ALLTID overlayn, så ett dubbel-enter (t.ex. en dubbelklickad knapp) raderade
+  // tysta de hypotetiska resultat användaren redan matat in. Storens kontrakt
+  // säger uttryckligen "Idempotent", så vi gatar på simulatingRef och bevarar
+  // overlayn när vi redan är i sandlådan.
   const enterSimulation = useCallback(() => {
+    if (simulatingRef.current) {
+      return; // redan i sim-läge: bevara overlayn, ändra inget
+    }
     simulatingRef.current = true;
     overlayRef.current = new Map();
     setSimulating(true);
@@ -236,8 +244,16 @@ export function ResultsProvider({
   }, []);
 
   // Slå AV what-if-läget OCH töm overlayn ("Avsluta simulering"). Effektiva
-  // matcher faller tillbaka till riktig data direkt. Idempotent.
+  // matcher faller tillbaka till riktig data direkt.
+  // IDEMPOTENT (Copilot C3): no-op när det inte finns NÅGOT att ändra, dvs läget
+  // redan är AV och overlayn redan är tom. Förr skapade anropet ALLTID en ny Map
+  // + två state-set (setSimulating/setOverlay), så ett dubbel-exit (eller ett
+  // exit i redan-avstängt läge) tvingade en onödig re-render av hela trädet.
+  // Vi byter bara state när minst ett av fälten faktiskt skiljer sig.
   const exitSimulation = useCallback(() => {
+    if (!simulatingRef.current && overlayRef.current.size === 0) {
+      return; // redan av + tom overlay: inget att ändra, ingen re-render
+    }
     simulatingRef.current = false;
     overlayRef.current = new Map();
     setSimulating(false);
