@@ -213,13 +213,96 @@ body {
    -------------------------------------------------------------------------- */
 :root {
   /* Neutral default-hue (turneringens gröna ~152 grader) tills en dag valts /
-     vilodag. Design-frontend äger det slutgiltiga default-värdet + hur hue:n
-     används i hero-dekoren. */
+     vilodag. Används av .vm-daily-hero som BAS-hue, men i default-läget tonas
+     INGET mot den (active-grenen nedan styr den dynamiska skiftningen), den finns
+     bara så hsl(var(--vm-day-hue) ...) alltid har en giltig grad att läsa. */
   --vm-day-hue: 152;
 }
 
+/* HERO-DEKOREN, byggd ur dags-hue:n. [VÄRDE, ej @theme-kontrakt]
+   "Arena i kvällsljus" (SPEC §7, T7): en djup yta med två radiella ljus, ett
+   pitch-grönt ur övre hörnet och ett varmt guld ur det nedre, plus ett brett
+   ljus-svep (.vm-hero-sheen, index.css). Dekoren bor HÄR (inte inline i TSX) så
+   den kan villkoras på [data-day-theme]: en inline-style kan inte selektera på
+   ett attribut, och dags-tonen ska BARA tändas när dagen har lag.
+
+   DEFAULT / VILODAG ([data-day-theme='default'], ingen --vm-day-hue-skiftning):
+   exakt T2/T7:s neutrala ton, det ÖVRE ljuset är turneringens pitch-grön
+   (--vm-glow-accent), det NEDRE guld. Ingen dynamisk färg. */
+.vm-daily-hero {
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(110% 120% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 55%),
+    radial-gradient(
+      90% 120% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 12%, transparent),
+      transparent 55%
+    );
+}
+
+/* AKTIV SPELDAG ([data-day-theme='active'], --vm-day-hue satt av seamen):
+   det ÖVRE radiella ljuset tonas mot DAGENS hue, men SUBTILT, genom att blanda
+   dagens hsl-ton till ~55 % med turneringens bas-grön (--vm-glow-accent). Så
+   tonen SKIFTAR kännbart med lagen som spelar utan att bli en grell färgklick,
+   och utan att tappa appens gröna mästerskaps-identitet. Det NEDRE guld-ljuset
+   hålls oförändrat (den varma signaturen ligger fast varje dag), så bara en del
+   av dekoren rör sig = elegant, inte rörigt.
+
+   KONTRAST-VAKT (arkitektur-invariant, decisions.md T8): --vm-day-hue väver in
+   ENBART i background-image (dekor). Den blir aldrig en text-/yt-/kant-token,
+   och match-korten (som bär text) får aldrig variabeln (låst av test). En hue
+   som bara lever i en dekor-gradient kan inte sänka text-kontrasten under AA. */
+.vm-daily-hero[data-day-theme='active'] {
+  /* --vm-day-glow: dagens hue (~55 %) inblandad i bas-grönen, sen dämpad till
+     16 % alfa (mot transparent) så det blir en SVAG glow likt default-grönens
+     0.16-alfa, inte en fylld färgyta. Två steg eftersom color-mix ger en opak
+     ton; det andra steget sätter alfan. */
+  --vm-day-glow: color-mix(
+    in srgb,
+    color-mix(in srgb, hsl(var(--vm-day-hue) 70% 50%) 55%, rgb(var(--vm-glow-accent))) 16%,
+    transparent
+  );
+  background-image:
+    radial-gradient(110% 120% at 0% 0%, var(--vm-day-glow), transparent 55%),
+    radial-gradient(
+      90% 120% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 12%, transparent),
+      transparent 55%
+    );
+}
+
+/* Ljus-svepet (.vm-hero-sheen, animeras i index.css) tonas också mot dagens hue
+   i active-läget, samma subtila inblandning, så svepet känns som dagens ljus. */
+.vm-daily-hero-sheen {
+  background-image: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgb(var(--vm-glow-accent) / 0.1) 50%,
+    transparent 70%
+  );
+}
+
+.vm-daily-hero[data-day-theme='active'] .vm-daily-hero-sheen {
+  /* Samma dämpning som --vm-day-glow men på sheen-svepets 0.1-alfa-nivå. */
+  background-image: linear-gradient(
+    105deg,
+    transparent 30%,
+    color-mix(
+        in srgb,
+        color-mix(in srgb, hsl(var(--vm-day-hue) 70% 50%) 55%, rgb(var(--vm-glow-accent))) 10%,
+        transparent
+      )
+      50%,
+    transparent 70%
+  );
+}
+
+/* ÖVERGÅNGAR (acceptanskriterium 3): dag-bytet tonar mjukt på de dekorativa
+   egenskaperna, gatat på prefers-reduced-motion så den befintliga reduced-motion-
+   grinden (index.css) stänger av den för den som bett om minskad rörelse. */
 @media (prefers-reduced-motion: no-preference) {
-  [data-day-theme] {
+  .vm-daily-hero,
+  .vm-daily-hero-sheen {
     transition:
       background-color 0.4s ease,
       background-image 0.4s ease;

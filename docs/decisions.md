@@ -5,6 +5,49 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T8 (issue #8) design-frontend: dags-tonen vävd in i heron + T8-PIN löst (success-ton)
+
+**Beslut (T8-PIN LÖST, success får en egen AA-ton i ljust tema):** I ljust tema var
+`--vm-success` === `--vm-accent` (#0e7a44), pinnat olöst genom T2 -> T5 -> T7. success får nu en
+EGEN ton: **#0f766e** (Tailwind teal-700). Mörkt tema oförändrat (#5ad1a0, redan skild från
+accentens #1fe082).
+**Varför just #0f766e:** (a) tydligt skild från accentens skogsgrön, hue 175 mot 150 (deltaE76 ~28,
+en omisskännlig teal-skiftning, INTE bara en annan ljushet, ren luminans-separation hade varit
+otillräcklig eftersom forest och teal kan ha nära samma ljushet), (b) läses fortfarande som
+positivt/grönt (teal-grön, inte blå/gul), (c) klarar WCAG AA på alla ytor success faktiskt används på.
+**Var success används (grep:ad innan ändring, så AA verifieras på RIKTIGA ytor, inte ett typfall):**
+- `SwatchGrid.tsx`: `bg-success` med `text-bg` ovanpå (den enda TEXT-bärande ytan). I ljust tema är
+  text-bg = #f1f5f0 (nära-vitt) -> behöver AA som normal text mot success-bakgrunden.
+- `GoalCelebrationOverlay.tsx`: `var(--color-success)` som EN konfetti-färg (aria-hidden, ren dekor,
+  inget AA-krav, ingen text på den).
+- Inga `text-success`/`border-success` i kod (success används aldrig som ren textfärg i nuläget, men
+  tonen är ändå vald så den DÅ också klarar AA, för robusthet).
+**AA UPPMÄTT (relativ luminans, inte antaget, lessons `aa-kontrast-pastad...`):**
+- Ljust: text-bg (#f1f5f0) på success-bg #0f766e = **4.97:1** (>= 4.5, AA normal text). Vit text på
+  #0f766e = 5.47:1. success som textfärg på vit yta = 5.47:1, på fond #f1f5f0 = 4.97:1. Alla >= AA.
+- Mörkt (oförändrat #5ad1a0): som text på bg/surface/raised = 9.95 / 8.90 / 7.39:1; text-bg (#091310)
+  på success-bg = 9.95:1. Alla >= AA.
+
+**Beslut (dags-tonen vävd in i heron, dekorativt + subtilt):** Hero-dekoren (radiella ljus + sheen)
+flyttades från inline-style i `DailyMatchesView.tsx` till en CSS-klass `.vm-daily-hero` i `tokens.css`
+sektion 6, så den kan villkoras på `[data-day-theme='active']` (en inline-style kan inte selektera på
+attribut). I default/vilodag-läget (`[data-day-theme='default']`, ingen `--vm-day-hue`) ser hero:n
+EXAKT ut som T2/T7:s "arena i kvällsljus" (pitch-grön glow ur övre hörnet + guld ur nedre). När en dag
+har lag (`active`, hue satt) tonas det ÖVRE radiella ljuset + sheen-svepet mot dagens hue via
+`hsl(var(--vm-day-hue) ...)`, MJUKT inblandat (`color-mix`) med bas-grönt så tonen är en subtil
+skiftning, aldrig en grell färgklick. Det NEDRE guld-ljuset hålls oförändrat (turneringens varma
+signatur ligger fast oavsett dag), så bara en del av dekoren skiftar = elegant, inte rörigt.
+**Kontrast-vakten är ARKITEKTUR-INVARIANT (oförändrad):** `--vm-day-hue` väver BARA in i
+`background-image` på hero-dekoren, ALDRIG i en text-/yt-/kant-token. Match-korten (text) får aldrig
+variabeln (låst av befintligt test i `DailyMatchesView.test.tsx`). En hue som per konstruktion bara
+lever i en dekor-gradient kan inte sänka text-kontrast under AA, det finns ingen text på den.
+**Övergångar:** den befintliga `[data-day-theme]`-transitionen (background-color/-image, gatad på
+`prefers-reduced-motion: no-preference`) tonar dag-bytet mjukt; reduced-motion-grinden nollar den +
+`vm-hero-sheen` (animation: none) som förut. Verifierat live (Playwright): båda teman, speldag (active)
+mot vilodag (default), reduced-motion, 360-1440px.
+
+---
+
 ## 2026-06-10 , T8 (issue #8): dynamiskt dags-tema, deterministisk hue ur dagens lag, BARA dekor
 
 **Beslut (härlednings-regel, gissas inte):** Dags-temat (SPEC §7 "färg/motiv byter efter dagens
