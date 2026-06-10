@@ -284,4 +284,8 @@
   .vm-bracket-hint-arrow {
     animation: none !important;
   }
+  /* Även den mjuka scroll-glidningen tas bort (C11): snärtig scroll utan rörelse. */
+  .vm-bracket-scroll {
+    scroll-behavior: auto;
+  }
 }
