@@ -20,9 +20,15 @@ function liveEnv(): ImportMetaEnv {
 // wrappar i ResultsProvider. Env-injektionen flyttade till providern (den äger
 // seedningen), så vyn/hooken tar inga argument längre. En wrapper-fabrik ger en
 // STABIL provider per test (samma princip som T5: undvik ny referens per render).
-function wrapperFor(env: ImportMetaEnv) {
+// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testerna.
+// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
+function wrapperFor(env: ImportMetaEnv, liveReady = false) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <ResultsProvider env={env}>{children}</ResultsProvider>;
+    return (
+      <ResultsProvider env={env} liveReady={liveReady}>
+        {children}
+      </ResultsProvider>
+    );
   };
 }
 
@@ -117,7 +123,9 @@ describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i stat
 
 describe('useGroupData, fel-väg (fail loud)', () => {
   it('hamnar i error med ett meddelande när datakällan kastar (live-stub före T14)', async () => {
-    const { result } = renderHook(() => useGroupData(), { wrapper: wrapperFor(liveEnv()) });
+    const { result } = renderHook(() => useGroupData(), {
+      wrapper: wrapperFor(liveEnv(), true),
+    });
 
     await waitFor(() => {
       expect(result.current.status).toBe('error');
@@ -158,7 +166,7 @@ describe('useGroupData, kontrakt: tables är tomt utom vid ready (ingen stale da
     // säger att tables ska vara [] så fort status !== 'ready', annars skulle de
     // gamla fixtures-tabellerna läcka in i loading/error-läget (C8, kontraktsbrott).
     rerender(
-      <ResultsProvider env={liveEnv()}>
+      <ResultsProvider env={liveEnv()} liveReady={true}>
         <Probe />
       </ResultsProvider>
     );

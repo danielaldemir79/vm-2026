@@ -15,8 +15,14 @@ function liveEnv(): ImportMetaEnv {
   } as ImportMetaEnv;
 }
 
-function renderView(env: ImportMetaEnv, children: ReactNode) {
-  return render(<ResultsProvider env={env}>{children}</ResultsProvider>);
+// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testet.
+// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
+function renderView(env: ImportMetaEnv, children: ReactNode, liveReady = false) {
+  return render(
+    <ResultsProvider env={env} liveReady={liveReady}>
+      {children}
+    </ResultsProvider>
+  );
 }
 
 async function waitSettled() {
@@ -133,7 +139,7 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
 
 describe('DailyMatchesView, fel-väg (fail loud)', () => {
   it('visar role=alert när datakällan kastar (live-stub före T14), inte en tyst tom vy', async () => {
-    renderView(liveEnv(), <DailyMatchesView />);
+    renderView(liveEnv(), <DailyMatchesView />, true);
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/Kunde inte ladda matcherna/i);
     // Ingen matchlista läcker fram i fel-läget.

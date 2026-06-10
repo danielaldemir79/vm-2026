@@ -5,7 +5,34 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
-## 2026-06-10 , T7 (issue #7): Copilot-review R2 (C5-C8)
+## 2026-06-10 , HOTFIX (issue #37): datakälle-gaten kräver `LIVE_READY` utöver env
+
+**Beslut:** Gaten i `src/data/data-source.ts` väljer live-källan bara när BÅDA villkoren är sanna:
+(1) Supabase-env satt (`isSupabaseConfigured`) OCH (2) en in-kod-konstant `LIVE_READY === true`.
+`LIVE_READY` är `false` tills T14 byggt klienten. När env finns men `LIVE_READY` är false körs
+fixtures med en EGEN `console.warn` (skild från "env saknas") som förklarar att klienten väntar på
+T14. `getDataSource` och `getDataSourceMode` delar samma sammansatta gate (`isLiveActive`), så
+UI-märkningen (demo/live) aldrig kan säga emot den faktiska källan. Båda funktionerna + provider
+(`ResultsProvider`) tar en injicerbar `liveReady`-parameter (default `LIVE_READY`) så live-grenen
+kan testas utan att flippa den globala konstanten (KISS).
+
+**Varför (rotorsak):** Env-variablerna (`VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`) sattes i
+Cloudflare 2026-06-09 inför T14, men `supabase-client.ts` är en medveten fail-loud-stub som kastar
+tills T14 fyller den. En ren env-gate tände därför live-grenen i produktion (vm-2026.pages.dev) ->
+varje `getGroups/getMatches/getTeams` kastade -> alla vyer visade fel-alerts i stället för matchdata
+för Daniels vänner. Alternativ B (en `VITE_DATA_MODE`-env-flagga) valdes BORT: det hade krävt en
+Cloudflare-env-ändring vid T14, och Daniel är borta. En in-kod-konstant flyttar T14:s enda extra steg
+till en kod-ändring som ändå går genom review + bygge ihop med den riktiga klienten, så live aldrig
+tänds av enbart en miljö-konfiguration. Fail-loud-principen (PRINCIPLES §8) överlever: env utan byggd
+klient SKA inte tyst se ut som live, det syns nu i en console.warn i stället för som ett kast i
+användarens ansikte.
+
+**T14-PIN (får INTE missas):** När live-klienten är byggd, gör BÅDA stegen i samma ändring:
+1. Sätt `LIVE_READY = true` i `src/data/data-source.ts`.
+2. Ta bort interims-grenen (den `console.warn` som säger "LIVE_READY=false ... byggs i T14") i
+   `getDataSource`.
+Guard-testet `LIVE_READY ... är false` i `data-source.test.ts` BRYTS medvetet när konstanten flippas,
+så de två stegen inte glöms.
 
 **Beslut (C5, reduced-motion stänger AV hero-animationerna helt):** Vid `prefers-reduced-motion: reduce`
 nollas de dekorativa hero-animationerna EXPLICIT med `animation: none` på `.vm-hero-sheen` och
