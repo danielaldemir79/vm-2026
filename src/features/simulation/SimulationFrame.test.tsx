@@ -5,10 +5,13 @@ import { SimulationBanner } from './SimulationBanner';
 import { SimulationFrame } from './SimulationFrame';
 
 // Den app-globala sim-ramens UI (T12, visuellt lager): markeringen ska bara
-// finnas när sim-läget är PÅ, vara FÄRG-OBEROENDE (text + role="status", inte
-// bara en ton) och spegla storens läge till data-attributet som CSS hänger
+// finnas när sim-läget är PÅ, vara FÄRG-OBEROENDE (badge:n bär TEXT, inte bara
+// en ton) och spegla storens läge till data-attributet som CSS hänger
 // ringen/tinten på. Funktionellt testat mot den riktiga storen (banner-knappen
 // slår på/av läget), så ramen och kontrollen är i synk.
+//
+// EN live region (C4): badge:n är VISUELL förstärkning och aria-hidden, så bara
+// EN role="status" finns (bannerns announcement). Annars dubbel uppläsning.
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
@@ -40,7 +43,7 @@ describe('SimulationFrame, app-global markering', () => {
     expect(screen.queryByText(/^simuleringsläge$/i)).not.toBeInTheDocument();
   });
 
-  it('PÅ: visar en FÄRG-OBEROENDE markering (text + role=status) och flippar data-attributet', async () => {
+  it('PÅ: visar en FÄRG-OBEROENDE text-badge och flippar data-attributet', async () => {
     renderFramedApp();
     await waitFor(() => expect(frame()).toBeInTheDocument());
 
@@ -48,10 +51,26 @@ describe('SimulationFrame, app-global markering', () => {
 
     expect(frame()).toHaveAttribute('data-simulation-active', 'true');
 
-    // Markeringen bärs av TEXT (inte bara en ton), uppläst via role="status".
-    const statuses = screen.getAllByRole('status');
-    expect(statuses.some((el) => /simuleringsläge/i.test(el.textContent ?? ''))).toBe(true);
+    // Markeringen bärs av TEXT (inte bara en ton): badge:n syns visuellt.
     expect(screen.getByText(/^simuleringsläge$/i)).toBeInTheDocument();
+  });
+
+  it('PÅ: bara EN live region (bannern), badge:n är aria-hidden (C4, ingen dubbel uppläsning)', async () => {
+    renderFramedApp();
+    await waitFor(() => expect(frame()).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /starta simulering/i }));
+
+    // Exakt ett role="status" i hela trädet: bannerns announcement. Badge:n är
+    // aria-hidden => ingen egen live-roll, så skärmläsaren läser inte dubbelt.
+    const statuses = screen.getAllByRole('status');
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]).toHaveTextContent(/simulering pågår/i);
+    expect(statuses.some((el) => /simuleringsläge/i.test(el.textContent ?? ''))).toBe(false);
+
+    // Badge:n finns visuellt men ligger inuti ett aria-hidden-lager.
+    const badge = screen.getByText(/^simuleringsläge$/i);
+    expect(badge.closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
   it('AV igen: markeringen försvinner när läget stängs', async () => {
