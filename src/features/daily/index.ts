@@ -6,6 +6,7 @@ export { MatchCard } from './MatchCard';
 export type { MatchCardProps } from './MatchCard';
 export { useDailyMatches, initialDayIndex } from './use-daily-matches';
 export type { DailyMatchesData } from './use-daily-matches';
+export { useTodayKey, type TodayKey } from './use-today-key';
 export {
   groupMatchesByDay,
   localDateKey,
