@@ -5,6 +5,147 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T11 (issue #11): Copilot C2 + C3, doc-/text-ärlighet i "Vad krävs" (inga domänregler rörda)
+
+**Beslut (rätta två formuleringar så de matchar vad koden FAKTISKT gör):**
+- **C2 (doc-inkonsekvens):** kommentaren vid `resultForOutcome` påstod neutrala marginaler "(1-0 / 1-1 /
+  0-1)", men `draw`-grenen returnerar `0-0`, inte `1-1`. Kommentaren rättad till verkligheten
+  "(1-0 / 0-0 / 0-1)". `docs/patterns.md` beskrev redan rätt (`1-0/0-0/0-1`), så den lämnades orörd.
+- **C3 (vilseledande singular):** `ownResultGuarantees` låser ALLA lagets egna återstående matcher till
+  utfallet (vinst/oavgjort), men texterna "Vinst räcker"/"Oavgjort räcker" lät som EN match. Har laget
+  fler än en egen match kvar (n=3-fallet) väljs nu plural-text "Vinst i lagets matcher räcker"/"Oavgjort
+  i lagets matcher räcker"; singular-fallet behåller nuvarande text. KLASSNINGEN är oförändrad, bara den
+  svenska formuleringen. Plural-fallet är testat (lag med två egna matcher kvar -> plural-text, ej singular).
+
+Båda är ren text-/doc-ärlighet (`scenario-engine.ts`), ingen domänregel ändrad. Spårbar via #11 + denna rad + testerna.
+
+---
+
+## 2026-06-10 , T11 (issue #11): Copilot C1, åskådar-lag i "Vad krävs" får ärlig text, aldrig falskt "måste vinna"
+
+**Beslut (villkorstexten ljuger aldrig om eget agentskap):** i scenario-fasen kan ett lag ha spelat
+ALLA sina egna matcher medan bara andra lags match återstår (åskådare, t.ex. en grupp där bara A3-A4
+är kvar, eller en ofullständig matchlista). Då kan laget varken vinna eller spela oavgjort sig vidare.
+Tidigare föll ett sådant lag i `buildCondition`-grenens else och fick "Måste vinna och hoppas på andra
+matcher" = objektivt fel. Fix: `hasOwnRemaining(teamId, remaining)` gatar FÖRST i grenen och ger
+åskådar-texten "Kan inte påverka själv, avgörs av övriga matcher i gruppen.". KLASSNINGEN (qualified/
+eliminated/depends) var redan konservativt korrekt via enumerationen, det var bara TEXTEN som ljög;
+fixen rör därför ingen domänregel, bara den svenska formuleringen (`scenario-engine.ts`). Riktad:
+ett lag som FAKTISKT spelar i sista matchen behåller sitt egna krav-villkor (testat, båda riktningarna).
+
+---
+
+## 2026-06-10 , T11 (issue #11, design-frontend): premium-finish på "Vad krävs", FÄRG-OBEROENDE status-chips + AA UPPMÄTT i båda teman
+
+**Beslut (visuellt lager, rör ALDRIG semantiken):** Premium-finishen byggs ENBART ovanpå senior-devs
+data-attribut (`data-scenario-group/-team/-status/-phase`, `data-scenario-margin-dependent`,
+`data-scenario-decided`) via en dedikerad `src/features/scenarios/scenario.css` + klass-hakar i
+`ScenarioView.tsx` (samma seam-princip som GroupTable/BracketView, T5/T9). All a11y-semantik + alla
+577 tester står kvar. "Arena i kvällsljus" för sista gruppomgångens drama: varje grupp ett kort med
+mjuk topp-glow (grön i live-läget, guld när gruppen är färdigspelad), allt via `color-mix`/tema-token
+(aldrig rå hex), troget BÅDA teman.
+
+**Beslut (STATUS-CHIPEN färg-oberoende, T7/T8-pin):** Klar/Ute/Beror på skiljs med ett LAGER signaler,
+aldrig bara färg: egen GLYF (`✓` / `–` / `◆` via `::before` ur status-attributet) + egen ton + egen
+vikt + egen rad-markering. KLAR = succé (solid success-yta + bock + near-black ink = mest tyngd),
+UTE = dämpad och RESPEKTFULL (neutral fg-baserad kant-chip + minus-glyf, INTE ett hånfullt rött skrik,
++ raden tonas till 0.72 opacitet), BEROR PÅ = spänning (guld-kant + romb-glyf, glyfen pulserar svagt
+när utfallet är målskillnads-beroende). Verifierat live i reduced-motion att tonerna/listerna/glyferna
+STÅR KVAR medan rörelsen nollas, så status läses i gråskala/för färgblinda.
+
+**Beslut (KLAR-radens lyft färg-oberoende, exakt GroupTable-mönstret):** Den kvalificerade raden får
+vänster-list (`inset 3px box-shadow` mot success-ton) + upphöjd yt-ton + en guld rank-medalj, samma
+T7-pin-språk som kvalificeringszonen i grupptabellen, så "klar"-känslan inte hänger på en accent/success-
+färg (som sammanfaller i ljust tema). UTE-raden tonas diskret, BEROR PÅ får en subtilare guld-list.
+
+**Beslut (ny token `--vm-on-success`, EGEN mätning):** "Klar"-chip:ens ink på den fyllda success-ytan
+fick en egen token (mörkt `#04140b`, ljust `#ffffff`) i stället för återbruk av `--vm-accent-fg`, så ett
+framtida success-hue-byte TVINGAR en ny mätning här i stället för att tyst sänka kontrasten (lessons
+`aa-kontrast-pastad-pa-genererad-farg`). Mörkt 9.97:1, ljust 5.47:1 (UPPMÄTT).
+
+**Beslut (TOO-EARLY = elegant väntande-tillstånd, inte tom låda):** Fas 'too-early' visar ett lugnt
+platshållar-block (stiliserad arena-ring i ren CSS + en varm copy "När färre matcher återstår visar vi
+exakt vad varje lag behöver ...") i stället för en rad lag utan klassning. Copyn upprepar INTE frasen
+"Inför sista omgången" (den står i rubrik-etiketten, som senior-devs test pinnar exakt 12 gånger), utan
+utvecklar vad som väntar.
+
+**Beslut (responsiv korrigering, pre-existerande latent bugg):** Kort-rutnätet saknade `grid-cols-1`
+vid bas, så korten flödade i en implicit `auto`-kolumn (= max-content av bredaste kortet) som på 280px
+(vikbar cover) blev BREDARE än viewporten och klipptes av appens `overflow-x-clip` (tyst innehålls-
+klippning, ingen sid-scroll men avskuret innehåll). Lagt `grid-cols-1` (= `minmax(0,1fr)`) så kolumnen
+krymper till viewporten. Verifierat live 280/360/768/1024/1440px: NOLL horisontell overflow, inget
+klippt kort, kolumn-antal 1->2->3 (4 vid 2xl).
+
+**Beslut (AA UPPMÄTT, inte påstått, i BÅDA teman, canvas-komposit, lessons aa-kontrast):** All text +
+status-glyfer mätt på FAKTISKT renderad yta (komposit av halvgenomskinliga tints mot effektiv bakgrund),
+inte mot hex offline, svept mot värsta fallet. **Mörkt tema:** Klar-chip-text/✓ 9.97:1, Beror på-chip-text
+11.84:1, ◆-glyf 8.89:1, Ute-chip-text/–-glyf 6.48:1, Klar-rad lagnamn 13.2:1, Klar-rad villkorstext 6.50:1,
+fas-etikett (decided 6.45:1 / live 7.5:1), too-early-copy 7.5:1. **Ljust tema:** Klar-chip-text/✓ 5.47:1,
+Beror på-chip-text 15.63:1, ◆-glyf 5.17:1, Ute-chip-text/–-glyf 5.81:1, Klar-rad lagnamn 16.04:1, Klar-rad
+villkorstext 6.19:1, fas-etikett 5.99:1, too-early-copy 6.52:1. Alla >= 4.5:1 (AA normal text). **Fynd som
+rättades:** ◆-glyfen (rå `--vm-gold` #b07d10) föll på 3.17:1 i ljust tema (under AA); fixad till
+`color-mix(--vm-gold 70%, --color-fg 30%)` -> 5.17:1 ljust / 8.89:1 mörkt, behåller den varma pokal-tonen.
+Ingen AA-siffra här är antagen, varje är uppmätt i webbläsaren (canvas-komposit).
+
+**Beslut (rörelse = CSS, nollad EXPLICIT vid reduced-motion):** Live-pricken, ◆-glyf-pulsen (margin-
+beroende) och too-early-ringen är rena CSS-`@keyframes`. Den globala svepande reduced-motion-regeln räcker
+inte (fryser keyframes på slutläget), så scenario-rörelsen nollas EXPLICIT med `animation: none` (samma
+motgift som hero/bracket). Verifierat live (`emulateMedia reducedMotion: reduce`): `animationName` blir
+`none` på live-pricken, margin-glyfen och too-early-ringen, medan de statiska status-signalerna står kvar.
+
+## 2026-06-10 , T11 (issue #11): "Vad krävs"-kalkylatorn, enumererad scenario-motor + ärlig approximation
+
+**Beslut (arkitektur, härledd state + ÅTERANVÄND compute-standings):** "Vad krävs" är en REN funktion
+`computeGroupScenario(teamIds, matcher, groupId) -> GroupScenario`
+(`src/features/scenarios/scenario-engine.ts`), exakt som tabeller/träd (SPEC §6). För en grupp
+enumereras de 3^n W/D/L-utfallen av de ÅTERSTÅENDE matcherna; för VARJE utfall byggs syntetiska
+färdiga matcher och tabellen härleds av den redan verifierade `computeStandings` (FIFA-tiebreakers
+inkl. re-iteration, T3/T4). INGEN egen tabellogik. Hooken (`use-group-scenarios.ts`) är en tunn
+konsument av den delade results-storen (samma sanning som gruppspel/inmatning/träd), så scenarierna
+är "live": en inmatning -> ny matchlista -> useMemo räknar om. Vyn (`ScenarioView.tsx`) bär stabil
+semantik + data-attribut (`data-scenario-group/-team/-status/-phase/-margin-dependent/-decided`) som
+design-frontend stylar premium-finishen ovanpå.
+
+**Beslut (W/D/L-APPROXIMATIONEN, var den ligger + åt vilket håll den är konservativ, HARD):** en
+W/D/L-enumeration fixerar POÄNGEN exakt men INTE målsiffrorna, och exakta mål påverkar tiebreaks
+(målskillnad b, gjorda mål c). Därför klassas varje lag KONSERVATIVT, BARA på poäng:
+- **"Klar" (qualified)** påstås bara när laget är säkert topp-2 i ALLA 3^n utfall, oberoende av
+  målskillnad: högst 1 annat lag står >= dess poäng (`securelyTop2`). Även om varje sådant lag vinner
+  tiebreaken hamnar laget som värst på rank 2.
+- **"Ute" (eliminated)** påstås bara när laget i ALLA utfall har >= 2 lag STRIKT före på poäng
+  (`definitelyOutOfTop2`) OCH inte ens kan nå rank 3 med gynnsam marginal (`couldReachThird`, < 3 lag
+  strikt före). Ingen marginal kan rädda det.
+- **Allt målsiffer-känsligt blir "Beror på"** (med villkoret "i vissa fall avgör målskillnaden" där
+  det gäller, flaggat `marginDependent`). Approximationen lutar alltså ALLTID mot "beror på", ALDRIG
+  mot ett falskt "klart"/"ute". Bevisat av test: ett konstruerat målskillnads-gränsfall klassas
+  aldrig qualified/eliminated, och qualified och marginDependent kan aldrig vara sanna samtidigt
+  (`scenario-engine.test.ts`, KONSERVATIVITET-blocket).
+
+**Beslut (BÄSTA-TREA-VÄGEN, kopplad till T4, korsar grupper, uttryckt KVALITATIVT):** en trea
+kvalificerar om den rankas topp-8 av de 12 grupptreorna (FIFA Article 13, `rank-third-places.ts`),
+vilket beror på ALLA tolv gruppers resultat. Att simulera alla gruppers kombinationer är en
+kombinatorisk explosion, så trea-vägen uttrycks kvalitativt: "kan sluta trea, men om det räcker beror
+på de andra grupperna". Vi påstår ALDRIG att en viss poäng som trea "räcker" (går inte att bevisa utan
+de andra grupperna, gissa aldrig). En färdigspelad grupps trea klassas därför 'depends' (beror på andra
+grupper), inte qualified/eliminated.
+
+**Beslut (TRÖSKEL-GARANTI bor i funktionen + randtestad, lessons `uttommande-test-vaktar-svagare-
+invariant` Förekomst 3):** 3^n växer exponentiellt, så `MAX_REMAINING_MATCHES = 3` (3^3 = 27 utfall;
+VM-formatet har max 2 kvar i sista omgången). Vakten `assertEnumerable` (fail loud, kastar) bor i
+motorn och randtestas DIREKT n-1/n/n+1. Men det PUBLIKA `computeGroupScenario` gatar FÖRE vakten och
+returnerar fasen `'too-early'` (ett legitimt produkt-läge inför sista omgången, INTE ett fel) när n >
+MAX, så vyn aldrig kraschar tidigt i turneringen (där alla 6 gruppmatcher är ospelade, fixtures-läget).
+Likaså: en grupp UTAN matchdata (varken spelad eller schemalagd) klassas `'too-early'`, INTE 'decided',
+så vi aldrig ger facit på en tom tabell. Båda randfallen testade.
+
+**Spårbarhet:** FIFA-reglerna som motorn LUTAR sig på (tiebreak-ordningen, treplats-rankningen) är redan
+källhänvisade i `compute-standings.ts` / `rank-third-places.ts` (Article 13, committat i
+`fifa-knockout-rules-source.txt`); T11 definierar INGEN ny domänregel, bara den konservativa
+approximationen ovanpå. Approximationen + konservativitets-riktningen är en intern design-regel (gissa
+aldrig en garanti W/D/L inte avgör), spårbar via #11 + denna rad + testerna.
+
+---
+
 ## 2026-06-10 , T10 (issue #10): Copilot C10, fail-loud-light motståndare i lagets väg
 
 **Beslut (C10, TeamProfilePanel/`opponentName`):** När en match i lagets väg har ett `opponentId` som
