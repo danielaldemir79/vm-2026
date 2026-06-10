@@ -5,6 +5,60 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T14 VISUELLT LAGER (issue #14): premium-finish på rum-UI:t, delnings-ögonblicket
+
+**Beslut (visuellt lager ovanpå senior-devs seam, rör ALDRIG datalogiken):** Premium-finishen
+byggs ENBART ovanpå senior-devs semantik + data-attribut (`data-rooms-*`, role/aria, fält-
+etiketter) via en dedikerad `src/features/rooms/rooms.css` + klass-hakar i `RoomPanel.tsx` (samma
+seam-princip som GroupTable/BracketView/ScenarioView). All a11y-semantik + alla RoomPanel-tester
+står kvar; RLS/auth/rooms-API rörs inte. Auth är anonym, så UI:t antyder ALDRIG lösenord/konto.
+
+**Beslut (rumskoden som stor, kopierbar "biljett", delnings-ögonblicket):** Det aktiva rummet är
+en biljett (`.vm-rooms-ticket`) vars huvud bär koden i `2-2.5rem` display-vikt + en KOPIERA-knapp
+med tydlig feedback (✓ "Kopierad!" + SR-uppläst, faller till "Markera koden själv" utan Clipboard-
+API) och en DELA-knapp (Web Share API på mobil -> systemets delnings-ark, annars kopieras hela
+inbjudnings-texten). Logiken bor i två RENA moduler: `share-room.ts` (inbjudnings-text + tunna
+clipboard/share-omslag, INGEN datalogik, INGEN auto-join-routing, den vore en data-/routing-ändring)
+och `member-avatar.ts`. Verifierat live: kopiera-knappen växlar idle -> copied och åter.
+
+**Beslut (medlemmar som monogram-avatarer, STABIL per-person färg, DRY):** Varje medlem är en chip
+med en monogram-bricka: initialer ur visningsnamnet + en hue härledd STABILT ur user-id (inte namn,
+så två "Daniel" skiljs åt och ett namnbyte inte byter färg). Hue:n återanvänder lag-färgernas hash
+(`hashCode` ur `team-hue.ts`, EN sanning för "sträng -> hue", PRINCIPLES §4, ingen parallell hash).
+Den egna medlemmen ("du") får en accent-kant så man hittar sig själv (form, inte enbart färg).
+
+**Beslut (formulären = #39-formspråket, vänliga fel):** Skapa-/gå-med-fälten bär SAMMA premium-
+formspråk som resultatinmatningen (#39 FIELD_BASE: stark accent-fokus-ring WCAG 2.4.7 + mjuk hover-
+lyft, placeholders), primärknapp = fylld accent (Skapa rum), sekundär = kant-knapp (Gå med). Lokala
+besked skiljs i TON: ett VÄNLIGT info-besked (✓, accent-tint) vs ett FEL (!, danger-tint), båda
+role="status"/alert (uppläst). Initierings-fel FAIL-LOUD:ar i en danger-tonad ruta (PRINCIPLES §8).
+
+**KONTRAST-VAKT (taskens punkt 4, VÄRSTA FALL, lessons aa-kontrast-pastad-pa-genererad-farg):**
+Två generErade/komponerade ytor mättes, inte ett typfall:
+- **Avatar-ink på hue-driven tint, svept över ALLA 360 hue:er.** En FAST vit/mörk ink på en
+  variabel-mättad yta FALLER vid gult (bevisat: vit ink på pastell = 3.78:1 ljust, under AA).
+  Därför är BÅDE ytan och ink:en hue-roterade med LÅST lightness per tema, så hue bara roterar tonen,
+  aldrig in i en kontrast-fälla. UPPMÄTT min-ratio över hela spannet (sweep + bekräftat på renderade
+  pixlar i webbläsaren): **mörkt 5.89:1 (vid hue 240), ljust 4.94:1 (vid hue 60, gult = värsta)**.
+  Initialerna är 12px bold = normal-text-tröskeln (4.5:1) gäller; båda klarar med marginal.
+- **Hero-/biljett-text på glow-yta, full komposit-stack.** Texten ligger på samma lager som de två
+  radiella glow:erna (grön i övre hörnet, guld i nedre), så en naiv komposit KAN sänka kontrasten
+  (grön glow lyfter luminansen -> mörkt tema fg-muted faller, exakt fällan lessons varnar för). En
+  rörlig sheen la +0.09 grön ovanpå och knäckte marginalen -> sheenen TOGS BORT (glow:en är helt
+  statisk). Glow-alforna är satta så ÄVEN den teoretiskt fulla stacken (grön 0.08 + guld 0.05 i samma
+  punkt) håller AA: **mörkt eyebrow 6.11 / rubrik+kod 9.61 / brödtext 4.73; ljust eyebrow 4.59 /
+  rubrik+kod 15.20 / brödtext 5.54** (alla >= 4.5:1). Övriga ytor (action-knappar fg på accent-tint
+  10.7-15.6:1, info-besked fg 13-16:1, medlems-namn/räknare på surface 6.5-17.9:1) ligger högt.
+
+**Beslut (responsivt + rörelse):** Verifierat live 280/760/1440 px, BÅDA teman: NOLL horisontell
+overflow vid 280 (vikbar cover), koden + action-knapparna wrappar rent, medlems-chips + formulär
+staplar. Panelen har INGEN egen animation (sheenen borttagen av kontrast-skäl), så reduced-motion
+kräver inget rums-specifikt motgift; den enda rörelsen är delade knapp-hover-övergångar (index.css-
+grinden nollar dem). **Spårbarhet:** #14 + denna rad + `rooms.css` + `member-avatar.ts`(+test) +
+`share-room.ts`(+test) + RoomPanel-testerna (oförändrade, semantiken bevarad).
+
+---
+
 ## 2026-06-10 , T14 (issue #14): Supabase + anonym auth + rumskod + RLS, live-växlingen
 
 **Beslut (vad som lagras i molnet vs i bundlen, KÄLLHÄNVISAT VAL):** Bara DELAD/MUTERBAR
