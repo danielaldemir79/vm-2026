@@ -12,6 +12,8 @@ Bara **delad, muterbar** state ligger i Supabase:
 | `rooms` | Ett rum (mini-liga) med kort delbar kod, namn, skapare. |
 | `room_members` | Vem som är med i vilket rum + visningsnamn. |
 | `room_match_results` | Delade matchresultat per rum (vännerna fyller i ihop). |
+| `predictions` (T15) | Tips: en gissad målställning per (rum, match, användare). |
+| `match_kickoffs` (T15) | Referensdata: matchernas avsparkstider, deadline-låsets klocka. |
 
 **Statisk turneringsdata (lag, grupper, spelschema) stannar i klient-bundlen.**
 Den är källåkrad och verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare,
@@ -38,6 +40,35 @@ kan slå upp EXAKT en kod för att gå med, men aldrig rad-skanna alla rum.
 
 RLS-modellen är bevisad end-to-end med tre riktiga anonyma sessioner (nekad OCH
 tillåten) i `src/data/rooms/rooms-rls.integration.test.ts`.
+
+### Tips (T15): deadline-lås + sekretess SERVER-SIDE
+
+- **predictions:** ett tips (gissad målställning) per (rum, match, användare). RLS:
+  - **INSERT/UPDATE/DELETE nekas EFTER avspark** (deadline-lås, anti-fusk): policyn
+    kräver `now() < public.match_kickoff(match_id)`. Klockan är DB:ns `now()`, aldrig
+    klientens. `user_id = auth.uid()` (ingen förfalskning) + medlemskap krävs.
+  - **SELECT (sekretess):** eget tips ALLTID, andras BARA efter avspark (`now() >=
+    kickoff`) + medlemskap. Andras gissningar är dolda tills matchen sparkat igång.
+- **match_kickoffs:** referensdata (avsparkstider) som deadline-låset slår upp via
+  `match_kickoff(text)` (SECURITY DEFINER, samma härdning som `is_room_member`).
+  Läsbar för alla, men INGEN skriv-policy (bara migrationer seedar), så en klient
+  kan aldrig flytta en deadline. Tiderna är källåkrade ur `matches.ts` (genererade
+  av `scripts/generate-kickoff-seed.ts`, värde-låsta av `kickoff-seed.test.ts`), så
+  DB-tiden aldrig driftar från klient-bundlens.
+
+Bevisat SERVER-SIDE med riktiga roller (`set role authenticated` + JWT-claims, DO-block)
+av senior-developern (deadline-lås nekar efter avspark, sekretess döljer andras tips
+före avspark, avslöjar efter, förfalskning + utomstående nekas), se `docs/decisions.md`
+(T15). Klient-delarna som är bevisbara mot en öppen match: `predictions-rls.integration.test.ts`.
+
+**Migration-historik (T15):** till skillnad från T14:s konsoliderade slutform (se KA-SA1
+nedan) applicerades T15:s migrationer 1:1 från de committade filerna via `apply_migration`
+i samma ordning: `t15_match_kickoffs_ref`, `t15_predictions_schema`, `t15_predictions_rls`,
+`t15_match_kickoffs_seed` (samma fyra NAMN i `list_migrations`, samma SQL). En nyans:
+version-STÄMPLARNA skiljer (filerna har `20260611120000..120300`, live fick MCP-genererade
+`20260610220747..220908` vid apply), men namnen + innehållet är 1:1, så en fresh-replay av
+filträdet kör exakt samma fyra steg i samma ordning. Ingen konsolidering, ingen drift i
+slutläget (verifierat mot `list_tables` + RLS-proven).
 
 ## Migrationer
 

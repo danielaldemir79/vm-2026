@@ -5,6 +5,77 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T15 (#15): tips-motorn, poängregel + deadline-lås + tips-sekretess (SERVER-SIDE)
+
+Fas 2:s kärna. Vänner gissar resultat före avspark, poäng och (T17) topplista. Fyra beslut, alla
+med dataintegritet/anti-fusk i fokus (HARD).
+
+**1. POÄNGREGELN (SPEC tyst på detaljnivå -> vedertagen standard, dokumenterad):** SPEC §4/§12 säger
+bara "rätt utfall vs exakt resultat" på rubriknivå, inga exakta poängtal. Vi följer den vedertagna
+tips-standarden som ett MEDVETET val: **exakt resultat = 3p, rätt utfall (1X2) = 1p, annars 0p.**
+Exakt ger 3 (det inkluderar rätt utfall men dubbelräknas inte till 4). Ren funktion `scorePrediction`
+(`src/data/predictions/score.ts`), uttömmande testad (alla 1X2-kombinationer + edge-fall).
+**Källa:** vedertagen poolspel-standard (t.ex. svenska Stryktipset/europatips-pooler: exakt > utfall).
+SPEC anger ingen avvikande regel, så standarden är förvalet, inte en gissning om en specifik regel.
+
+**2. UTFALL (1X2) PÅ ORDINARIE MÅL, inkl. slutspel (källmedvetet val mot SPEC):** ett tips är en
+gissning på den ORDINARIE målställningen (home/away). Straffar tippas INTE (se beslut 4). Därför
+avgörs BÅDE tippets och det faktiska resultatets 1X2 på ORDINARIE mål. Konsekvens (medveten): en
+slutspelsmatch som slutar lika i ordinarie tid och avgörs på straffar räknas som 'draw' (X) i
+poängsättningen, även om FIFA Article 14:s straff-vinnare för fram laget i slutspelsTRÄDET. De är
+två skilda saker: trädet (vem avancerar) styrs av straffar (T9), tips-poängen av den ordinarie
+ställning tipset gällde. Alla tips bedöms på samma plan (ordinarie tid), grupp som slutspel. Detta
+är konsekvent och dokumenterat inline i `score.ts`, ingen gissning.
+
+**3. DEADLINE-LÅSET ÄR SERVER-SIDE (RLS), klockan = DB:ns now() (HARD anti-fusk):** ett klient-lås
+räcker INTE, en vän kan kringgå klienten och skriva rakt mot Supabase (anon-rollen är enda rollen,
+RLS är enda skyddet). Avsparkstiderna är annars STATISK klient-data (`matches.ts`), och en RLS-policy
+kan bara läsa data som finns i DATABASEN. **Val: en seedad referenstabell `match_kickoffs`
+(match_id -> kickoff), inte en RPC som bär tabellen.** Varför tabell+policy över RPC: det gör
+deadline-låset till en deklarativ RLS-invariant (`now() < public.match_kickoff(match_id)` i
+INSERT/UPDATE/DELETE-policyerna) som reviewern kan BEKRÄFTA mot källan, samma modell som resten av
+T14:s RLS, i stället för att gömma regeln i procedurkod. `match_kickoff(text)` är en SECURITY
+DEFINER-helper (samma härdning som `is_room_member`: `search_path=''`, EXECUTE för anon/authenticated
+eftersom RLS-uttryck evalueras i anroparens roll). Klockan är `now()` (transaction_timestamp), aldrig
+klientens, en klient kan ljuga om sin tid men inte om serverns. FAIL-SAFE: en match utan kickoff-rad
+ger NULL -> `now() < NULL` = NULL = skriv NEKAS, och `now() >= NULL` = NULL = andras tips DOLDA, ett
+saknat kickoff kan aldrig öppna ett fusk-fönster.
+
+**4. TIPS-SEKRETESS FÖRE LÅS (HARD, T15:s RLS-ansvar):** andra rumsmedlemmar får INTE läsa ditt tips
+före matchens avspark. SELECT-policyn: eget tips ALLTID, andras BARA efter avspark (`now() >=
+kickoff`) + medlemskap. Avslöjandets UI är T17, men sekretessen lever i T15:s RLS. Bevisat
+server-side (se nedan).
+
+**KÄLLÅNKRAD KICKOFF-SEED:** `match_kickoffs`-tiderna genereras 1:1 ur den redan källåkrade
+`matches.ts` (`scripts/generate-kickoff-seed.ts` -> `..._t15_match_kickoffs_seed.sql`), värde-låst i
+CI av `kickoff-seed.test.ts` (regenerera-och-diffa + mutationstest), så DB-tiden ALDRIG kan drifta
+från klient-bundlens tid (annars: match "öppen" i DB men "stängd" i klienten). Samma källåkrings-
+mönster som matchplanen. `match_id`-formatet återanvänder T14:s constraint (g-A-1..g-L-6 + M73..M104).
+
+**RLS BEVISAD SERVER-SIDE FÖRE KLIENT-KODEN (playbook-receptet):** senior-developern bevisade alla
+garantier med RIKTIGA roller (`set role authenticated` + JWT-claims `sub`/`role`, DO-block) mot det
+levande projektet, med en match vars kickoff tillfälligt sattes i det förflutna (alla riktiga VM-
+matcher ligger i framtiden) och återställdes efteråt. 7 prov, alla gröna: (1) medlem får tippa öppen
+match, (2) deadline-låset NEKAR tips efter avspark (insufficient_privilege), (3) utomstående nekas,
+(4) förfalskning (tips i annans namn) nekas, (5a) sekretess: medlem ser BARA sitt eget tips på en
+öppen match, (5b) avslöjande: efter avspark ser hen alla, (6) UPDATE efter avspark rör 0 rader (kan
+inte ändra ett låst tips), (7) utomstående ser inga tips. Proof-data städades, kickoff-tiderna
+återställdes (verifierat 104 rader, g-A-1/g-L-5 åter på sina riktiga värden). Klient-integrationstestet
+(`predictions-rls.integration.test.ts`) täcker de delar som är bevisbara via klient-API:t mot en öppen
+match (de skippas offline, env-gated, precis som T14).
+
+**PENALTIES UTANFÖR T15:** tips-tabellen bär bara home_goals/away_goals (ordinarie gissning). Slutspels-
+/bracket-tips (vem går vidare, straffar) är T16, out of scope här.
+
+**ADVISOR-NOTERINGAR (medvetna avvägningar, samma som T14):** `get_advisors (security)` flaggar WARN
+för (a) anonym åtkomst-policy på `predictions` + `match_kickoffs` och (b) att `match_kickoff` (SECURITY
+DEFINER) är anropbar av anon/authenticated. Båda MEDVETNA: anonyma vänner ÄR användarna, och
+`match_kickoff` MÅSTE vara körbar av anon/authenticated (RLS-uttryck i anroparens roll, samma som
+`is_room_member`). `match_kickoffs` har INGEN skriv-policy (referensdata, bara migrationer seedar),
+så en klient kan aldrig flytta en deadline. Inga nya ERROR-nivå-fynd, inga "RLS disabled".
+
+---
+
 ## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 3): hero-etiketten "Dagens match" -> matchens datum när matchen inte är idag
 
 **Beslut:** Etiketten ovanför hero:ns framträdande match (`DailyMatchesView`) säger "Dagens match"
