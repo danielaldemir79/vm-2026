@@ -183,4 +183,38 @@ describe('computeThirdPlaceRanking, qualifyingGroups-RANDEN (null tills KOMPLETT
     expect(qualifyingGroups).not.toContain('H');
     expect(qualifyingGroups).toHaveLength(8);
   });
+
+  // C6 (Copilot runda 2, samma klass som C3 i derive-bracket): en ren ANTALS-koll
+  // (`ranked.length === GROUP_IDS.length`) släpper igenom 12 treor med en DUBBLETT-
+  // grupp + en SAKNAD grupp. Då är `ranked.length === 12` sant fast täckningen är
+  // ofullständig, och en seedning skulle ske på fel/dubblerad gruppmängd. Garantin
+  // måste vila på UNIK gruppmängd, inte antal.
+  it('är null med 12 treor om en grupp är DUBBLERAD och en saknas (11 unika grupper)', () => {
+    // 12 tabeller, alla med en rank-3-rad, men L är utbytt mot ett andra A:
+    // 12 treor totalt (ranked.length === 12), men bara 11 UNIKA grupper.
+    const tables = GROUP_IDS.map((g, i) =>
+      g === 'L' ? tableWithThird('A', 20 - i, 0, 3) : tableWithThird(g, 20 - i, 0, 3)
+    );
+    const { ranked, qualifyingGroups } = computeThirdPlaceRanking(tables);
+    // ranked.length === 12: en ren antals-koll hade felaktigt sagt "komplett".
+    expect(ranked).toHaveLength(GROUP_IDS.length);
+    // ...men bara 11 unika grupper (A dubblerad, L saknas).
+    expect(new Set(ranked.map((t) => t.group)).size).toBe(GROUP_IDS.length - 1);
+    // Garantin (unik täckning) håller: ingen seedning på en ofullständig gruppmängd.
+    expect(qualifyingGroups).toBeNull();
+  });
+
+  it('är null med 13 tabeller om en kanonisk grupp saknas (antalet räcker inte)', () => {
+    // 13 treor: alla utom L (11) + två extra A. ranked.length (13) >= 12, men L
+    // saknas -> får inte seeda. Speglar derive-brackets C3-test på domän-nivå.
+    const tables = [
+      ...GROUP_IDS.filter((g) => g !== 'L').map((g, i) => tableWithThird(g, 20 - i, 0, 3)),
+      tableWithThird('A', 5, 0, 3),
+      tableWithThird('A', 4, 0, 3),
+    ];
+    const { ranked, qualifyingGroups } = computeThirdPlaceRanking(tables);
+    expect(ranked.length).toBeGreaterThan(GROUP_IDS.length);
+    expect(new Set(ranked.map((t) => t.group)).has('L')).toBe(false);
+    expect(qualifyingGroups).toBeNull();
+  });
 });
