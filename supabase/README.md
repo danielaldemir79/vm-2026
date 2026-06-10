@@ -43,8 +43,20 @@ tillåten) i `src/data/rooms/rooms-rls.integration.test.ts`.
 
 Migrationerna ligger i `supabase/migrations/` och är applicerade på projektet via
 Supabase MCP (`apply_migration`). De är versionerade här för spårbarhet och så att
-reviewern kan BEKRÄFTA RLS-reglerna mot källan. Filerna speglar det live-schemat
-(`list_migrations` på projektet visar samma uppsättning).
+reviewern kan BEKRÄFTA RLS-reglerna + constraints mot källan.
+
+**Ärlig not om historik (KA-SA1):** de committade filerna är en KONSOLIDERAD
+SLUTFORM, inte en 1:1-replay av live-historiken. Live byggdes via 8 iterativa
+`apply_migration`-steg (skapa RPC:er, fixa en 42702-kolumn-ambiguitet i
+`join_room_by_code`, döpa om OUT-params, låsa/återställa `is_room_member`-grant),
+medan de committade rums-RPC-filerna är konsoliderade till färre, renare filer (plus
+schema, RLS och `rmr_match_id_format`-härdningen). `list_migrations` på projektet
+visar därför 9 poster med andra namn/versioner än filerna, INTE samma uppsättning,
+en fresh-replay av repot kör den konsoliderade vägen, inte den exakta live-sekvensen.
+Sluttillståndet är funktionellt identiskt, verifierat mot `pg_proc`/`pg_policies`/
+`pg_constraint` (search_path, SECURITY DEFINER, grants, policyer och check-constraints
+matchar den konsoliderade SQL:en). Vill man reproducera EXAKT live-historiken är
+`list_migrations` sanningen, inte filträdet.
 
 ## Advisor-noteringar (medvetna avvägningar)
 
