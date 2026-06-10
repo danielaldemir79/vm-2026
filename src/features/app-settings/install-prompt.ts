@@ -14,6 +14,24 @@
 // "Patterns for promoting PWA installation" (egen diskret knapp i stället för
 // webbläsarens default). Källhänvisat i decisions.md (T13).
 
+/**
+ * Kort, ärlig info-rad om Play Protect-varningen vid Android-installation (T30/#50).
+ *
+ * BAKGRUND: På vissa Android-telefoner (särskilt Samsung, vars webbläsare har en
+ * egen WebAPK-pipeline) visar Google Play Protect "En osäker app har blockerats ...
+ * byggd för en äldre version av Android". Den varningen styrs av WebAPK:ns
+ * targetSdkVersion, som sätts av webbläsarens MINTNINGSSERVER (Chrome/Google eller
+ * Samsung Internet), INTE av vårt manifest. Vi kan alltså inte eliminera den från
+ * vår sida. Googles egen utvecklar-vägledning säger att i det läget är det enda
+ * man kan göra att INFORMERA användaren att appen är säker att installera.
+ *
+ * Därför en kort, lugnande mening (visas i prompt-läget). Källor i decisions.md (T30):
+ * Google "Developer Guidance for Play Protect Warnings" + Modern Web Weekly #69
+ * (Samsung-WebAPK + reputation, utanför utvecklarens kontroll).
+ */
+export const ANDROID_PLAY_PROTECT_NOTE =
+  'Visar telefonen en varning från Play Protect? Appen är säker, det är en känd Android-varning för webb-appar. Välj installera ändå.';
+
 /** Vad installations-ytan ska visa, härlett ur plattform + event + avfärdande. */
 export type InstallUiMode =
   | 'hidden' // redan installerad, avfärdad, eller ingen väg att installera än
