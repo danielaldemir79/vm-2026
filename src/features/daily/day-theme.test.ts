@@ -51,6 +51,22 @@ describe('deriveDayTheme: dag -> dekorativ accent-hue', () => {
     expect(deriveDayTheme(dayA, teams).hue).toBe(deriveDayTheme(dayB, teams).hue);
   });
 
+  it('ORDNINGS-OBEROENDE även vid exakt ANTIPODALA hues (degenererat fall, F1)', () => {
+    // REGRESSION (review F1): CRO (hue 85) och QAT (hue 265) är exakt motstående
+    // på färghjulet, så vektorsumman blir ~0 och circularMeanHue tar den
+    // degenererade grenen. Tidigare returnerade den hues[0] = ordningsberoende
+    // (85 om CRO hemma, 265 om QAT hemma) trots att doc/decisions.md påstod
+    // ordnings-oberoende. Vakta att BÅDA ordningarna nu ger SAMMA hue.
+    expect(hueFromCode('CRO')).toBe(85); // låser förutsättningen (antipodala)
+    expect(hueFromCode('QAT')).toBe(265);
+    const teams = teamsMap(team('cro', 'CRO'), team('qat', 'QAT'));
+    const croHome = deriveDayTheme([match('m1', 'cro', 'qat')], teams).hue;
+    const qatHome = deriveDayTheme([match('m1', 'qat', 'cro')], teams).hue;
+    expect(croHome).toBe(qatHome);
+    // Den dokumenterade regeln är "minsta hue:n" -> 85 oavsett ordning.
+    expect(croHome).toBe(85);
+  });
+
   it('samma lag som spelar TVÅ matcher räknas EN gång (unika lag)', () => {
     const teams = teamsMap(team('a', 'ARG'), team('b', 'FRA'), team('c', 'ESP'));
     // a möter b, sen a möter c -> 3 unika lag, inte 4.
