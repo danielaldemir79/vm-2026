@@ -5,6 +5,55 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T9 (issue #9): slutspelsträdet som härledd state + två källhänvisade FIFA-regler
+
+**Beslut (arkitektur, härledd state):** Slutspelsträdet LAGRAS aldrig, det är en REN funktion
+`deriveBracket(grupptabeller, matcher) -> BracketState` (`src/features/bracket/derive-bracket.ts`),
+exakt som grupptabellerna (SPEC §6). Tre datadrivna lägen, ingen gissning: (1) gruppspel pågår ->
+varje slot visar "möjliga lag" + en grupp-positions-etikett, (2) grupperna klara -> slotarna LÅSES
+till riktiga lag (gruppvinnare/tvåa ur tabellerna + de 8 bästa treorna seedade via FIFA Annexe C),
+(3) slutspelsresultat -> vinnaren propagerar till nästa slot (en passering i M73->M104-ordning
+räcker eftersom en match alltid kommer efter sina föregångare i FIFA-numreringen). Återanvänder HELA
+den verifierade T4-motorn (`bracket-structure.ts`, `build-bracket.ts`, `seedThirdPlaces`/Annexe C),
+definierar INGEN ny strukturell slutspelsregel. Vyn (`BracketView` + `useBracketData`) är en tunn
+konsument av den delade results-storen (samma sanning som gruppspel + inmatning), gatad på `ready`
+(samma stale-kontrakt som useGroupData, C8). Designseam: stabila data-attribut (`data-bracket-round/
+-match/-slot`, `data-slot-resolution`, `data-winner`, `data-bracket-locked`) så design-frontend bygger
+premium-trädet + vinnar-animationen utan att röra semantiken.
+
+**Beslut (KÄLLHÄNVISAD FIFA-REGEL 1, gissas ALDRIG): rankningen av grupptreorna -> de 8 bästa.**
+`rankThirdPlaces`/`computeThirdPlaceRanking` (`src/domain/bracket/rank-third-places.ts`) avgör VILKA 8
+av de 12 grupptreorna som kvalificerar. Regel: FIFA Article 13, "The eight best-ranked teams among
+those finishing third", kriterier a) flest poäng, b) total målskillnad, c) totalt gjorda mål, i ALLA
+gruppmatcher. **Viktig tolkning (källhänvisad):** detta är de ÖVERGRIPANDE kriterierna, INTE in-grupp-
+ordningens inbördes head-to-head (compute-standings steg 1), eftersom de tolv treorna kommer från
+olika grupper och ALDRIG mött varandra, det finns inget inbördes möte att räkna. Kriterium d (kort/
+disciplin) + e/f (FIFA-ranking) är inte deterministiskt beräkningsbara ur matchresultaten (samma
+avgränsning som compute-standings compareOverall), så vid exakt lika a-c används en stabil groupId-
+fallback, UTTRYCKLIGEN dokumenterad som EJ en FIFA-tiebreak. `qualifyingGroups` är null tills exakt 8
+treor finns, så ingen seedning sker på en gissning (fail-safe).
+**Källa:** Regulations for the FIFA World Cup 26 (May 2026), Article 13, sid. 27-28. Committat verbatim
+i `src/domain/bracket/fifa-knockout-rules-source.txt` (pdftotext-utdrag), så reviewern kan BEKRÄFTA
+regeln mot källan i stället för att jaga den.
+
+**Beslut (KÄLLHÄNVISAD FIFA-REGEL 2, F1/penalties-pinnen LÖST): straffar i slutspel.** En
+slutspelsmatch kan INTE sluta oavgjort (FIFA Article 14): vid lika ordinarie ställning avgör straffar.
+Förr tappade results-reducern `MatchResult.penalties` tyst. Nu: `ResultEntry` bär penalties,
+`validateResultEntry` tar matchens stage och KRÄVER en avgörande straff-vinnare för en lika
+slutspelsmatch (avvisar lika-straffar och straffar där de inte är tillämpliga), `toMatchResult`
+BEVARAR straffarna, och `ResultEntryForm` visar straff-fält (`data-penalties-row`) bara vid slutspel +
+finished + lika ställning. Vinnar-härledningen i `deriveBracket` läser penalties för att propagera rätt
+lag; en lika match UTAN avgörande straffar propagerar INGEN vinnare (fail-safe, ingen gissning).
+**Acceptanstest (uppfyllt):** redigera en finished slutspelsmatch med straffar -> penalties bevaras
+(`apply-match-result.test.ts` + `validate-result.test.ts`).
+**Källa:** FIFA Regulations FWC2026 Article 14, sid. 28, committat i samma källfil.
+
+**Låsnings-regeln (härledd, inte ett flagg-fält):** `isGroupStageComplete` är sann när alla 12 grupper
+har varje lag på 3 spelade matcher (`played >= 3`, formatets konstant SPEC §5), härlett ur tabellerna
+så det är en ren funktion av sanningen. Först då seedas treorna och slotarna låses.
+
+---
+
 ## 2026-06-10 , #39 (T27) senior-developer: Copilot R1, dag-medvetet fönster (C1) + dolt-ej-filtrerat (C2)
 
 **Beslut (C1, dag-medvetet 3-dagars fönster):** `ResultEntryView` läser inte längre "idag" via ett

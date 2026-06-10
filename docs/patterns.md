@@ -389,3 +389,50 @@ något som måste mätas om för varje genererad ton. Den rena härledningen är
 wrap, edge-fall, fail-loud), och seam:en låter design färglägga fritt utan att kunna bryta a11y. Källa: T8
 (`src/features/daily/team-hue.ts` + `day-theme.ts` + `use-day-theme.ts`, inkopplad på DailyMatchesView-hero:n,
 dekor-token i `tokens.css` sektion 6).
+
+### harlett-slutspelstrad-tre-lagen-ovanpa-en-verifierad-seednings-motor (VM 2026)
+
+**Recept (ett LEVANDE slutspelsträd som ren funktion av matchresultaten, utan att gissa en regel):**
+
+1. ÅTERANVÄND den verifierade strukturen + seedningen, bygg INTE om. En källhänvisad positions-struktur
+   (`bracket-structure.ts`, FIFA Article 12) + tree-grafen (`build-bracket.ts`) + treplats-seedningen
+   (`seedThirdPlaces`/Annexe C) finns redan (T4). Härledningen LIGGER OVANPÅ den och definierar ingen ny
+   strukturell slutspelsregel, den fyller bara lag-tillståndet (PRINCIPLES §4).
+2. HÄRLEDNINGEN i en REN modul (`derive-bracket.ts`): `(grupptabeller, matcher) => BracketState`. Tre
+   datadrivna lägen per slot, INGEN gissning: (a) gruppspel pågår -> `possible` + en positions-etikett
+   ("1:a grupp E", "3:a A/B/C/D/F" EXAKT ur strukturens eligibleGroups, inte spekulation om kvalificering);
+   (b) grupperna klara -> `resolved` till riktiga lag (gruppvinnare/tvåa ur tabellerna + de 8 bästa treorna
+   via seedningen); (c) slutspelsresultat -> vinnaren propagerar. Bygg slotarna i MATCH-ORDNING (M73->M104):
+   eftersom en match alltid kommer efter sina föregångare i FIFA-numreringen är föregångar-utfallet redan
+   beräknat när du når en match-progressions-slot, så EN passering propagerar vinnare genom hela trädet.
+3. LÅSNINGEN härleds, inte ur ett flagg-fält: `isGroupStageComplete` = alla 12 grupper har varje lag på 3
+   spelade matcher (`played >= 3`), en ren funktion av sanningen. Först då seedas treorna (annars stannar
+   bästa-trea-slotarna i `possible`-läget). `qualifyingGroups` är null tills exakt 8 treor finns, så
+   seedThirdPlaces (som fail-loud:ar på fel antal) aldrig anropas på en ofullständig gissning.
+4. VINNAR-PROPAGERING via en ren `outcomeOf(match, home, away)`: ordinarie mål avgör, vid lika avgör
+   straffar (FIFA Article 14); en lika match UTAN avgörande straffar ger INGEN vinnare (fail-safe, propagera
+   aldrig en gissning). Bronsmatchen matas av `match-loser` (semifinal-förlorarna), final av `match-winner`.
+5. SEAM: hooken (`use-bracket-data.ts`) är en tunn konsument av den DELADE results-storen (samma sanning som
+   gruppspel + inmatning), härleder via `useMemo` gatad på `status === 'ready'` (samma stale-kontrakt som
+   useGroupData, C8). Vyn (`BracketView`) renderar stabil semantik (region per runda, slot som list-rad) +
+   DATA-ATTRIBUT (`data-bracket-round/-match/-slot`, `data-slot-resolution`, `data-winner`,
+   `data-bracket-locked`, `data-bracket-scroll`) som design-frontend bygger premium-trädet + vinnar-
+   animationen ("drag fram vinnaren") ovanpå, utan att röra härledningen. Responsiv-förberedd:
+   `overflow-x-auto` + fasta rund-kolumner (horisontell scroll på mobil, inget kläms ihop).
+6. TÄCKNING: enhetstesta härledningen i alla tre lägen + fel-vägar (lika utan straffar, ofullständigt
+   gruppspel), OCH ett LIVE-integrationstest som monterar vyn under storen, seedar ett fullständigt
+   gruppspel (bevisar låsning + kollisionsfri Annexe C-seedning) och ett slutspelsresultat (bevisar att
+   vinnaren förs fram till nästa slot), allt via samma `setMatches`-seam som inmatningen.
+
+**Källhänvisnings-krav (HARD) för gissningskänslig data:** två FIFA-regler källhänvisades INNAN koden
+skrevs och committades verbatim i `src/domain/bracket/fifa-knockout-rules-source.txt` (pdftotext-utdrag ur
+FWC2026-regelverket): (1) rankningen av grupptreorna -> de 8 bästa (Article 13, ENBART övergripande a-c,
+INTE inbördes head-to-head eftersom treorna aldrig mötts), (2) straffar i slutspel (Article 14). Så
+reviewern kan BEKRÄFTA reglerna mot källan i stället för att jaga dem.
+
+**Varför:** SPEC §5+§6 kräver ett träd som justeras under gruppspelet, låses korrekt vid grupp-slut (den
+ökända felkänsliga seedningen) och för fram vinnaren. Genom att göra trädet till en ren funktion av en enda
+sanning (matchlistan) ovanpå den redan verifierade, källhänvisade seednings-motorn blir "live" gratis och
+korrekt, och den kritiska FIFA-regeln kan aldrig drifta isär från koden. Generaliserar T5/T6:s "härledd-
+state-vy" till en andra härledd vy på samma delade store. Källa: T9 (`src/features/bracket/` +
+`src/domain/bracket/rank-third-places.ts`).
