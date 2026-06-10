@@ -61,7 +61,10 @@ export function isMatchLocked(kickoffIso: string, now: Date = new Date()): boole
 /**
  * Lista de tips den inloggade användaren får SE i ett rum. RLS avgör synligheten:
  * det egna tipset alltid, andras BARA efter respektive matchs avspark (tips-
- * sekretessen). En icke-medlem ser inget. Tom session -> tom lista (ingen identitet).
+ * sekretessen). En icke-medlem ser inget. Anropet SÄKERSTÄLLER först en session
+ * (ensureSession skapar en anonym session om ingen finns), så en saknad session
+ * triggar auth i stället för att returnera tom lista; en anonym icke-medlem får
+ * sedan tom lista via RLS (ingen rumsmedlemskap), inte via avsaknad identitet.
  *
  * Konsumenten (T17 topplista / tips-avslöjande) kombinerar dessa med matchernas
  * resultat och poängsätter via scorePrediction. Detta API hämtar bara raderna.
