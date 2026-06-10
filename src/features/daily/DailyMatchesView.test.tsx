@@ -225,8 +225,10 @@ describe('DailyMatchesView, hero-etikett: "Dagens match" vs matchens datum (#54)
 
     const label = featuredLabelText();
     expect(label).not.toBe('Dagens match');
-    // Matchens dag, utan årtal (versaliseras av CSS, så jämför på gemener).
-    expect(label?.toLowerCase()).toBe('torsdag 11 juni');
+    // Matchens dag, utan årtal (versaliseras av CSS, så jämför på gemener). Asserta
+    // delsträngar (ICU-versioner kan skilja i interpunktion/mellanslag), inte exakt match.
+    expect(label?.toLowerCase()).toContain('torsdag');
+    expect(label?.toLowerCase()).toContain('11 juni');
   });
 });
 
