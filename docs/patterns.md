@@ -187,6 +187,58 @@ av `match-schedule-source.test.ts` med mutationstest). Två lärdomar värda att
   "(TV4)" -> "(SVT)") och bevisa att diffen failar. Det räcker som bevis att låset fångar fel; det
   behövs ingen behörighets-bevarande swap som i Annexe C (där den strukturella valideringen var stark).
 
+**Tredje användningen (T10, #10, lag-profiler):** samma recept tillämpat på lag-profil-datan
+(FIFA-ranking + stjärnspelare + kuriosa per lag): `src/data/wc2026/team-profiles-source.txt` (källutdrag
+med URL:er + hämtdatum + radvis data per lag) -> `team-profiles-parser.ts` -> `team-profiles.ts`,
+källankrat av `team-profiles-source.test.ts` (regenerera-och-diffa + 2 mutationstest + 48/48-täckning).
+Tre saker värda att lyfta för nästa data-task:
+- **Prettier-emit har FLER regler än bara quote-typ.** Utöver `tsString` (single quotes) krävde denna
+  tabell två till för att emit == `prettier --write` (annars bryts diff-låset): (a) OKVOTERADE objekt-
+  nycklar när nyckeln är ett giltigt JS-identifierare (Prettier skriver `mex:`, inte `'mex':`), och (b)
+  RADBRYTNING av ett `nyckel: 'långt värde',` som överskrider print-bredden (100) till `nyckel:\n
+  '...',`. Replikera den regeln i emit (`emitStringField`), och byt till DOUBLE quotes för en sträng som
+  innehåller apostrof men inget citationstecken (Prettiers val, t.ex. `"N'Golo Kanté"`). Verifiera alltid
+  med `prettier --check` på den genererade filen INNAN testet, så låset inte är fördröjt-rött.
+- **Drift-vakten ska gå åt BÅDA håll.** `buildProfileTable` failar både om ett lag i teams.ts saknar
+  profil OCH om en profil saknar lag (48/48), så datan aldrig tyst blir ofullständig eller föräldralös.
+  Profilerna vävs sedan in i `WC2026_TEAMS` (`enrichWithProfile`), en sanning, inget dubbellagrat.
+- **Källhänvisnings-krav (HARD) uppfyllt + ett ärligt-tomt-fält.** FIFA-rankingen (gissningskänslig)
+  verifierades mot flera källor (ESPN + Wikipedia + whereig, aprilutgåvan 2026), stjärnspelare mot de
+  släppta trupperna (redaktionellt urval men bevisligen i truppen). "Bästa speldraget" (SPEC §6:s
+  `bestPlay`) var subjektivt utan källa och LÄMNADES TOMT (låst av test), i stället för att gissas, med
+  FIFA-rankingen som verifierbar styrke-signal i profil-vyn. Se decisions.md T10.
+
+### klickbar-entitet-oeppnar-en-delad-modal-overlay-fran-var-som-helst (React, VM 2026)
+
+**Recept (ett element i flera vyer öppnar EN delad detalj-modal, utan prop-drilling):**
+1. LYFT "vad är öppet?" till en EGEN context (`team-profile-context.ts`: kontrakt + context +
+   `useTeamProfile`-hook), skild från data-storen. Hooken FAIL-LOUD:ar utan provider (ett klickbart
+   element utan provider är ett wiring-fel, inte ett tillstånd att maskera med tyst no-op, PRINCIPLES §8).
+2. En PROVIDER (`TeamProfileProvider.tsx`) håller `openId`-state + open/close OCH renderar modalen EN
+   gång i trädet, så vyerna bara wrappar sig själva en gång och får både "öppna"-seamen och overlayn
+   (samma form som ResultsProvider). Ligger INNANFÖR data-providern om modalen läser den delade storen.
+3. En ÅTERANVÄNDBAR TRIGGER-komponent (`TeamNameButton.tsx`): en RIKTIG `<button>` (inte en klickbar
+   `<span>`) med ett explicit `aria-label` ("Visa lagprofil för X"), så den nås med tangentbord och har
+   rätt roll. Degraderar till ren `<span>` när entiteten är okänd (id null), så vi aldrig erbjuder en
+   knapp som inte gör något. Inkopplad i flera vyer (matchkort + tabell) utan att de känner till modalen.
+4. MODALEN (`TeamProfilePanel.tsx`) är en KORREKT a11y-dialog: `role="dialog"` + `aria-modal` +
+   `aria-labelledby` (rubriken), Escape/stäng-knapp/bakgrundsklick stänger (panelen `stopPropagation`:ar
+   så ett klick i den inte bubblar till overlayns onClose), fokus flyttas IN vid öppning (stäng-knappen,
+   stabil startpunkt) och ÅTERSTÄLLS till öppnaren vid stängning, plus en enkel fokus-fälla (Tab cyklar
+   inom dialogen). Innehållet HÄRLEDS av en ren funktion (`deriveTeamProfile`) och saknad data visas
+   ärligt ("Data saknas"), aldrig gissat. Stabil semantik + data-attribut (`data-team-profile-panel/
+   -overlay/-trigger`, `data-profile-ranking/-stars/-trivia/-path`) som design-frontend stylar ovanpå.
+5. TÄCKNING: trigger (öppnar rätt id, null -> ej knapp), navigering (öppna från BÅDA vyerna), dialog
+   (stäng på 3 sätt, aria-modal + fokus-flytt), edge (okänt id -> ingen dialog, saknad data -> "Data
+   saknas"), och fail-loud utan provider. Isolerade komponent-tester (MatchCard/GroupTable) wrappas i en
+   minimal context-STUB (`src/test/team-profile-stub.tsx`) så de slipper montera hela modal-/store-kedjan.
+
+**Varför:** "Klicka på lag -> profil" (SPEC §4) ska nås från matchkort OCH tabeller utan att varje vy
+prop-drillar en callback. En delad context + en återanvändbar trigger + en modal-en-gång ger det med låg
+koppling, och fail-loud-hooken gör en glömd provider till ett synligt fel. En MODAL (inte en routad vy)
+är KISS i en router-lös PWA: en snabb titt ovanpå nuvarande vy, ingen URL-navigering att bygga. Källa:
+T10 (`src/features/team-profile/`).
+
 ### svensk-vaggklocka-till-utc-via-iana-zon-inte-hardkodad-offset (VM 2026)
 
 **Recept (lagra ett lokalt klockslag som rätt UTC-instant, off-by-one-säkert):**

@@ -5,6 +5,187 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T10 (issue #10): Copilot C10, fail-loud-light motståndare i lagets väg
+
+**Beslut (C10, TeamProfilePanel/`opponentName`):** När en match i lagets väg har ett `opponentId` som
+är ICKE-null men SAKNAS i `teamsById` (data-inkonsistens) visar panelen nu id-STRÄNGEN i stället för det
+maskerande `'Ej klart'`. Ett genuint `null`-motstånd (tomt slutspels-slot innan seedningen) behåller
+`'Ej klart'`. **Varför:** `'Ej klart'` betyder "motståndaren är obestämd än"; att återanvända samma text
+för ett trasigt uppslag DOLDE felet (såg ut som ett legitimt obestämt slot). Fail-loud-light: visa id:t så
+inkonsistensen syns för tittare OCH fångas vid review/test, utan att krascha vyn (KISS). Test:
+`TeamProfilePanel.test.tsx` C10-block (id-sträng visas vid miss, `null` visar fortsatt "Ej klart").
+**Spårbarhet:** intern UX/fail-loud-rule, ingen extern källa, spårbar via #10 + C10 + denna rad.
+
+---
+
+## 2026-06-10 , T10 (issue #10): Copilot C8+C9, okänt lag ej klickbart + Escape-effekt på stabilt id
+
+**Beslut (C8, GroupTable):** Ett lagnamn i grupptabellen är klickbart (öppnar lagprofilen via
+`TeamNameButton`) BARA när laget finns i `teamsById`. Saknas det (data-inkonsistens, `teamLabel`-
+fallbacken `{name: id, code: '???'}`) skickar `GroupTable` `teamId={null}`, så `TeamNameButton`
+degraderar till ren text. **Varför:** en klickbar knapp för ett okänt id öppnar profil-modalen på ett
+lag som `TeamProfilePanel` inte hittar i uppslaget -> `deriveTeamProfile` får ingen träff -> klicket gör
+TYST ingenting. Hellre icke-klickbar text (ärlig affordans) än en knapp som ser interaktiv ut men inte
+gör något. `teamLabel` returnerar nu även `known` (`team !== undefined`). Fail-loud-light bevarad: id:t
+visas fortfarande synligt. Test: `GroupTable.test.tsx` (okänt lag = ingen knapp, känt lag fortsatt klickbart).
+
+**Beslut (C9, TeamProfilePanel, samma fix som C7):** Escape-lyssnarens `useEffect` deps:ar nu på det
+STABILA `openProfileId` i stället för `profile`-objektet. **Varför:** `profile` är härlett
+(`deriveTeamProfile`) och får ny identitet vid varje store-uppdatering (live/realtid T18 -> `setMatches`),
+så `[profile]`-deps remove/add:ade keydown-lyssnaren i onödan vid varje datauppdatering medan modalen stod
+öppen (churn). Ofarligt för beteendet (Escape stängde ändå) men onödig avregistrering/registrering per
+tick, och inkonsekvent med C7 (fokus-effekten band redan till `openProfileId`). Test:
+`TeamProfilePanel.test.tsx` C9-block räknar keydown add/remove över en store-uppdatering (negativ kontroll:
+med `[profile]`-deps failar testet, churn fångad). **Spårbarhet:** intern UX/perf-rule, ingen extern källa,
+spårbar via #10 + C8/C9 + denna rad.
+
+---
+
+## 2026-06-10 , T10 (issue #10): flake-fix, vänta in passiva a11y-effekter i lag-profil-testet
+
+**Beslut:** Lag-profil-modalens a11y-tester väntar in dialogens passiva öppnings-effekter (fokus
+flyttas till stäng-knappen + Escape-lyssnaren registreras) med `await waitFor(() => expect(closeBtn)
+.toHaveFocus())` innan de assertar fokus/Escape, i stället för att läsa `activeElement` direkt efter
+`findByRole('dialog')`.
+
+**Varför:** ROTORSAK till flaken (#10): React 19 kör passiva `useEffect` ASYNKRONT, så
+`findByRole('dialog')` kan resolva i en poll-tick där dialog-noden är committad men fokus-/Escape-
+effekterna ännu inte körts (`activeElement` = body). Empiriskt bevisat med en instrumenterad probe
+(activeElement = BODY trots committad dialog) under full parallell svit-last (24 forks); rödnade
+~2/6 körningar, alltid grön isolerat. Det var INTE `document.hasFocus()` (verifierat: `.focus()`
+flyttar `activeElement` korrekt även när `hasFocus()` är false) och INTE userEvent-timing. Att vänta
+in fokus-flytten flushar BÅDA effekterna och testar SAMMA invariant utan effekt-flush-race. Negativ
+kontroll: med fokus-fällan urkopplad rödnar Tab-testerna fortfarande (2 failed), så de vaktar äkta.
+
+
+
+**Beslut:** Den RÅ lag-/grupp-datan (id/namn/kod/grupp + WC2026_GROUPS + WC2026_TEAM_REFS) flyttades
+till en egen modul `src/data/wc2026/team-refs.ts` som ALDRIG importerar `team-profiles.ts`. `teams.ts`
+importerar bas-listan därifrån och gör BARA profil-berikningen (enrichWithProfile). Profil-generatorn
+(`scripts/generate-team-profiles.ts`) och källankrings-testet (`team-profiles-source.test.ts`)
+konsumerar `WC2026_TEAM_REFS` DIREKT ur `team-refs.ts`, inte ur `teams.ts`. `teams.ts` återexporterar
+`WC2026_GROUPS`/`WC2026_TEAM_REFS` så den publika data-ytan är oförändrad för alla andra konsumenter.
+
+**Varför (det cirkulära bootstrap-beroendet, Copilot C3/C4):** Generatorn/testet läste tidigare
+`WC2026_TEAMS`, men den listan berikas på modul-toppnivå med den GENERERADE `team-profiles.ts`. Att
+importera `teams.ts` exekverar alltså berikningen, så om den genererade filen saknas eller är trasig
+(exakt det läge man vill kunna REGENERERA ur) kraschar import:en med `TypeError: Cannot read
+properties of undefined` FÖRE generatorn kört. Låset gav då ett import-fel i stället för det avsedda
+diff-felet och filen kunde inte återskapas (moment 22). En profil-oberoende bas-modul bryter cykeln.
+
+**Verifierat (negativ kontroll):** Tömde `team-profiles.ts` -> `npm run gen:team-profiles` lyckas
+ändå och återskapar filen VÄRDE-IDENTISK med originalet (48 profiler, 9387 byte). Med den gamla koden
+kraschade samma kontroll på `reading 'mex'` vid import. Build/test/lint/format gröna.
+
+---
+
+## 2026-06-10 , T10 (issue #10): lag-profil-modalen, premium-finish (design-frontend)
+
+**Beslut (visuellt lager ovanpå senior-devs funktionella dialog):** Lag-profil-modalen fick en
+"arena i kvällsljus"-finish (SPEC §7) UTAN att röra logik/semantik. All a11y-dialog-semantik
+(role/aria-modal/aria-labelledby, Escape, klick-utanför, fokus-in + fokus-retur, fokus-fälla) och
+alla data-attribut är oförändrade; bara presentation lades på via klass-/data-haken senior-dev lämnade.
+
+**Hero-bandet (per lag distinkt, men kontrast-säkert):** Toppen av panelen tänds med samma
+radiella ljus-språk som dags-hero:n, men ur LAGETS egen signaturfärg (`--vm-profile-hue`, samma
+hue som TeamFlag-discen via `hueFromCode`, en sanning). Så Brasiliens modal tänds annorlunda än
+Bosniens, men alltid inom appens gröna/guld-identitet. Dekoren bor i `tokens.css §7`
+(`.vm-profile-hero`), villkorad inline-hue precis som dags-temat.
+
+**KONTRAST-VAKT (UPPMÄTT över VÄRSTA fallet, inte ett typfall, lärdomen aa-...-varsta-fall):**
+`--vm-profile-hue` är BARA ett tal och väver in ENBART i hero-bandets `background-image` (dekor),
+aldrig i en text-/yt-/kant-token. Glow-alfan är dessutom KONTRAST-LÅST: muted-text (#9cb2a6) ovanpå
+glow:ens PEAK i det LJUSASTE hue:t (gult ~58 grader = värsta av alla 360, svept i canvas-komposit)
+håller >= 4.5:1 bara om hue-glow <= 0.14 alfa. Vald **0.13 -> 4.71:1** värsta fall (marginal),
+guld-ljuset **0.12 -> 4.79:1**. Så ingen lag-hue och ingen text-position kan sänka text-kontrasten
+under AA, även om texten låg rakt på en glow-topp (den gör inte det, topparna sitter i hörnen, men
+gränsen håller strukturellt). Ljust tema: glow över vitt mörknar pixeln -> höjer kontrast för mörk
+text; värsta muted 5.31:1, guld-zon 5.71:1.
+
+**UPPMÄTTA kontrastvärden (canvas-komposit mot FAKTISK renderad bakgrund, live i browser):**
+| Element | Mörkt tema | Ljust tema | Krav |
+|---|---|---|---|
+| Hero lagnamn (display, fg) | 12.66:1 (mätt) / 7.80:1 (värsta glow-topp) | 17.91:1 / 14.57:1 (värsta) | 4.5:1 (delvis large) |
+| Hero subline + ranking-etikett (muted, 12px) | 6.23:1 (mätt) / 4.71:1 (värsta glow-topp, alla hue:er) | 6.52:1 / 5.31:1 (värsta) | 4.5:1 (normal) |
+| Ranking-värde (#n, display) | 12.66:1 | 17.91:1 | 4.5:1 |
+| Stjärn-chip (på surface-raised) | 12.66:1 | 17.91:1 | 4.5:1 |
+| Kuriosa-text (muted) | 6.23:1 | 6.52:1 | 4.5:1 |
+| Sektionsrubrik (muted, 12px) | 7.5:1 | 6.52:1 | 4.5:1 |
+| Vägen: steg-etikett (muted) | 7.5:1 | 6.52:1 | 4.5:1 |
+| Vägen: resultat (accent) | #1fe082: 9.68:1 (surface) / 8.04:1 (raised, hover) | #0e7a44: 5.40:1 (surface + raised = vit) | 4.5:1 |
+| Stäng-knapp glyf (muted UI) | 7.5:1 | 6.52:1 | 3:1 (UI) |
+
+Alla >= AA som normal text, värsta fallet inräknat. (Accent-värdena i ljust tema är de redan
+T8-uppmätta per-yta-värdena från `tokens.css §0`.)
+
+**Responsivt (verifierat live, 280/360/768/1024/1440):** mobil = nästan-fullskärm bottom-sheet
+(rundade topphörn, `max-h: 92dvh`, intern scroll på kroppen), desktop (sm+) = centrerad panel
+(`max-w-lg`, alla hörn rundade, `max-h: 88dvh`). 280px: ingen horisontell scroll (docScrollW 265 <=
+280), panelen ryms i höjd, kroppen scrollar (742 > 597). Långt namn ("Bosnien och Hercegovina")
+radbryter snyggt utan att krocka med stäng-knappen (`pr-12`-reserv).
+
+**Rörelse (a11y, WCAG 2.3.3):** overlay tonar in (opacitet), panelen reser sig mjukt (spring
+"gentle", y 28->0 + scale 0.98->1). VID REDUCERAD RÖRELSE (eller innan preferensen är känd) reser
+panelen INTE alls, bara opacitet. Viktigt fynd: `useReducedMotion()` ger `null` på första
+renderingen; `?? false` gav då en 1-frames y=28-flash som en reduced-motion-användare hann se.
+Fixat genom att kräva ett EXPLICIT `=== false` (motion-grind), så vi startar i det säkra läget tills
+preferensen är känd. Verifierat frame-för-frame i browser: reducerad = `transform: none` varje frame
++ overlay-blur/dim aktiv; tillåten = mjuk y-glidning. Samma kontrakt som Slide/Spring-primitiverna.
+
+**TeamNameButton (klickbar-affordans):** en SUBTIL prickad understrykning som bara tänds på
+hover/fokus (`decoration-dotted`, `fg-muted/60`, `underline-offset-3`), så tabellernas lugn bevaras
+i vila men "klickbart" signaleras vid interaktion. :focus-visible-ringen (index.css) är fortsatt
+primär tangentbords-affordans; understrykningen tänds även där så mus + tangentbord får samma signal.
+
+---
+
+## 2026-06-10 , T10 (issue #10): lag-profil-data källånkrad (FIFA-ranking + stjärnspelare + kuriosa)
+
+**Beslut (källånkrad, gissas ALDRIG, samma mönster som T4/T4b):** Lag-profil-datan
+(FIFA-ranking, stjärnspelare, kuriosa per lag) genereras ur ett COMMITTAT källutdrag
+(`src/data/wc2026/team-profiles-source.txt`, med URL:er + hämtdatum + radvis data för alla 48 lag)
+via en ren parser/validator (`team-profiles-parser.ts`) till den genererade `team-profiles.ts`,
+VÄRDE-LÅST mot källan i CI (`team-profiles-source.test.ts`: regenerera-och-diffa + två
+mutationstest + 48/48-täckning åt båda håll). Profilerna vävs in i `WC2026_TEAMS`
+(`Team.fifaRanking/starPlayers/trivia`) via `enrichWithProfile`, en sanning, inget dubbellagrat.
+Reviewern kan BEKRÄFTA varje fält mot källan i stället för att jaga det.
+
+**Källor (hämtade 2026-06-10):**
+- **FIFA-ranking:** FIFA/Coca-Cola Men's World Ranking, OFFICIELLA aprilutgåvan (publicerad
+  2026-04-01, nästa officiella utgåva 2026-06-11, så aprilutgåvan är den senaste vid byggtillfället).
+  Position 1-50 verifierade mot ESPN:s återgivning, korskollade mot Wikipedia (topp 20) +
+  whereig.com (full tabell); 50-90 mot whereig.com korskollat mot ESPN + per-lag-sök (t.ex.
+  Uzbekistan #50 bekräftat av kun.uz). France 1:a (1877.32 p, tightaste topp-3 i historien).
+- **Stjärnspelare:** VM 2026:s slutgiltiga 26-mannatrupper (offentliggjorda 2026-06-02), bekräftade
+  mot Al Jazeeras samlade trupplista (alla 48 lag) + Wikipedia. REDAKTIONELLT urval av de mest
+  framträdande namnen, MEN varje spelare tillhör bevisligen truppen enligt källa (gissa aldrig). Vid
+  osäkerhet färre namn (1-2), aldrig gissade. Alla 48 lag fick minst en källbelagd spelare.
+- **Kuriosa:** verifierbara VM-fakta (antal tidigare VM-slutspel FÖRE 2026 + bästa placering), ur
+  Wikipedia "FIFA World Cup records and statistics". Tjeckien räknar Tjeckoslovakien; DR Kongo räknar
+  Zaire (1974). Debutanter (Uzbekistan, Jordanien, Kap Verde, Curaçao) markeras som VM-debut 2026.
+
+**Beslut ("BÄSTA SPELDRAGET" UTELÄMNAT, ärligt tomt över påhittat):** SPEC §6:s `bestPlay`-fält är
+subjektivt/redaktionellt utan källbar grund per lag. Per direktivet (gissa aldrig, HARD) lämnas det
+TOMT (`Team.bestPlay` förblir undefined för alla 48 lag, låst av test), i stället för att hitta på en
+"bästa speldrag"-text. Profil-vyn använder i stället den VERIFIERBARA FIFA-rankingen som styrke-signal
+(omdefinierat till något källbart, per direktivets alternativ). Hellre ärligt tomt än påhittat
+(PRINCIPLES §8). Fältet finns kvar i typen så en framtida källbar redaktionell text kan fyllas senare.
+
+**Faktarättning (F1, review 2026-06-10): Spanien-kuriosan var fel i gold-source.** ESP-raden angav
+"VM-guld (2010), första titeln på hemma-kontinenten Afrika", ett DUBBELFEL: Spanien är europeiskt och
+Sydafrika (VM-värd 2010) är inte dess hemkontinent. Verifierbar fakta: 2010 var den första VM-titeln
+vunnen av ett EUROPEISKT lag UTANFÖR Europa. Källraden rättad till "VM-guld (2010), första VM-titeln
+vunnen av ett europeiskt lag utanför Europa" och `team-profiles.ts` regenererad (källankrings-låset
+låser om grönt). **Varför fångades det inte av låset:** regenerera-och-diffa + mutationstest bevisar
+bara REPRODUKTIONS-trohet (`.ts` == källan), aldrig att källans VÄRDEN är sanna; ett faktafel i
+gold-source reproduceras troget och passerar grönt. Sanningshalten i varje lätt-gissad domän-fakta
+(vem/var/när, kontinent) måste fakta-kollas mot den citerade källan separat från låset.
+**Källa:** Wikipedia "2010 FIFA World Cup Final" + "Spain national football team" (web-verifierad
+2026-06-10). De ~7 andra stickprovade kuriosa-raderna (MEX/CZE/TUR/SWE/MAR/URU/EGY) var korrekta,
+isolerat faktafel, inte systemiskt.
+
+---
+
 ## 2026-06-10 , T28 (issue #42, Daniels feedback 2): kontext per match + lättåtkomlig ihopfällning
 
 **Beslut (1, dag-rubriker + kontext per kort):** Resultatinmatningens lista (`ResultEntryView`)

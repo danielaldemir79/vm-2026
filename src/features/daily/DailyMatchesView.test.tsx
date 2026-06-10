@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
+import { TeamProfileProvider } from '../team-profile';
 import { DailyMatchesView } from './DailyMatchesView';
 
 function fixturesEnv(): ImportMetaEnv {
@@ -20,7 +21,7 @@ function liveEnv(): ImportMetaEnv {
 function renderView(env: ImportMetaEnv, children: ReactNode, liveReady = false) {
   return render(
     <ResultsProvider env={env} liveReady={liveReady}>
-      {children}
+      <TeamProfileProvider>{children}</TeamProfileProvider>
     </ResultsProvider>
   );
 }
