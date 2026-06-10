@@ -16,6 +16,7 @@ import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
 import { ScenarioView } from './features/scenarios';
+import { SimulationBanner } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
@@ -129,6 +130,16 @@ export default function App() {
               storen (lag/grupper/matcher), och OMSLUTER alla vyer med klickbara lagnamn
               (daily, gruppspel, resultatinmatning) så profilen kan öppnas från dem alla. */}
           <TeamProfileProvider>
+            {/* What-if-simulatorn (T12): slå på sim-läget och spela ut tänkta
+              resultat, så tabell + slutspelsträd + "Vad krävs" ändras live UTAN
+              att de riktiga resultaten rörs. Markeringen ("Simulering pågår") +
+              Återställ/Avsluta bor här; eftersom läget bara är ett overlay i den
+              delade storen reagerar ALLA vyer nedanför automatiskt. Ligger överst
+              så markeringen syns innan man bläddrar i de simulerade vyerna. */}
+            <Slide direction="up">
+              <SimulationBanner />
+            </Slide>
+
             {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
               datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
               SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA

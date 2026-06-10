@@ -29,10 +29,22 @@ export type ResultsLoadStatus = 'loading' | 'ready' | 'error';
 /**
  * Det den delade storen exponerar. Matcherna är den enda sanningen; teams/groups
  * följer med för uppslag i UI:t. Mutatorerna är T6:s skriv-seam (och T14/T18:s).
+ *
+ * SIMULERINGS-LAGER (T12, what-if-sandbox): `matches` är EFFEKTIVA matcher. När
+ * `simulating` är false är de identiska med den riktiga datan. När `simulating`
+ * är true är de riktiga matcherna MED ett hypotetiskt overlay applicerat, så att
+ * ALLA härledda vyer (tabell, slutspelsträd, "Vad krävs") reagerar på de
+ * hypotetiska resultaten UTAN att den riktiga datan ändras. Skriv-seamen
+ * (`submitResult`/`setMatches`) ruttas av läget: i sim-läge går de till overlayn,
+ * annars till den riktiga datan. Konsumenterna är oförändrade, de läser bara
+ * `matches` som vanligt (SPEC §6, härledd state). Se decisions.md T12.
  */
 export interface ResultsStore {
   status: ResultsLoadStatus;
-  /** Matchlistan, den enda sanningen som tabeller/träd härleds ur. */
+  /**
+   * Matchlistan, den enda sanningen som tabeller/träd härleds ur. I sim-läge är
+   * detta de EFFEKTIVA matcherna (riktiga + overlay), annars den riktiga datan.
+   */
   matches: Match[];
   /** Lagen (uppslag namn/landskod i UI:t). */
   teams: Team[];
@@ -61,6 +73,38 @@ export interface ResultsStore {
     matchId: string,
     entry: ResultEntry
   ) => import('./validate-result').ResultValidation;
+
+  /* --------------------------------------------------------------- *
+   * Simulerings-seam (T12, what-if-sandbox)
+   * --------------------------------------------------------------- */
+
+  /**
+   * Är what-if-läget PÅ? När true bär `matches` det hypotetiska overlayt och
+   * skrivningar går till overlayn (inte den riktiga datan). UI:t använder detta
+   * för en tydlig "simulering"-markering (banner/badge) och för att veta att
+   * inmatning är hypotetisk.
+   */
+  simulating: boolean;
+
+  /**
+   * Slå PÅ what-if-läget. Den riktiga datan rörs inte, ett tomt overlay läggs
+   * ovanpå, så vyerna ser exakt de riktiga matcherna tills man matar in ett
+   * hypotetiskt resultat. Idempotent (att anropa i sim-läge gör inget).
+   */
+  enterSimulation: () => void;
+
+  /**
+   * Slå AV what-if-läget OCH töm overlayn (en knapp = "Avsluta simulering").
+   * Effektiva matcher faller tillbaka till den riktiga datan direkt. Idempotent.
+   */
+  exitSimulation: () => void;
+
+  /**
+   * Töm overlayn men STANNA kvar i sim-läge ("Återställ allt", börja om från de
+   * riktiga resultaten utan att lämna sandlådan). Ofarlig att anropa även när
+   * overlayn redan är tom.
+   */
+  resetSimulation: () => void;
 }
 
 /**

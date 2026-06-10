@@ -19,6 +19,19 @@ function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
 }
 
+// Sim-seamen (T12) ingår i ResultsStore men dessa profil-tester rör inte
+// what-if-läget; en delad no-op-stub håller store-objekten kompletta utan att
+// upprepa fyra identiska fält-block (DRY).
+const simStub = {
+  simulating: false,
+  enterSimulation: () => {},
+  exitSimulation: () => {},
+  resetSimulation: () => {},
+} satisfies Pick<
+  ResultsStore,
+  'simulating' | 'enterSimulation' | 'exitSimulation' | 'resetSimulation'
+>;
+
 function renderWithProviders(children: ReactNode) {
   return render(
     <ResultsProvider env={fixturesEnv()}>
@@ -254,6 +267,7 @@ describe('TeamProfilePanel, fokus stabilt vid store-uppdatering mitt under öppe
       error: null,
       setMatches,
       submitResult: () => ({ ok: true }),
+      ...simStub,
     };
     return (
       <ResultsStoreContext.Provider value={store}>
@@ -380,6 +394,7 @@ describe('TeamProfilePanel, Escape-lyssnaren churnar inte vid store-uppdatering 
       error: null,
       setMatches,
       submitResult: () => ({ ok: true }),
+      ...simStub,
     };
     return (
       <ResultsStoreContext.Provider value={store}>
@@ -470,6 +485,7 @@ describe('TeamProfilePanel, edge-fall: stjärnspelare saknas (ärligt tomt, inte
       error: null,
       setMatches: () => {},
       submitResult: () => ({ ok: true }),
+      ...simStub,
     };
   }
 
@@ -547,6 +563,7 @@ describe('TeamProfilePanel, lagets väg: motståndare saknas i uppslaget (fail-l
       error: null,
       setMatches: () => {},
       submitResult: () => ({ ok: true }),
+      ...simStub,
     };
   }
 
