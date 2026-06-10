@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { ResultsStoreContext, type ResultsStore } from '../results/results-context';
 import { TeamProfilePanel } from './TeamProfilePanel';
@@ -8,7 +8,7 @@ import { TeamProfileProvider } from './TeamProfileProvider';
 import { useTeamProfile } from './team-profile-context';
 import { GroupStageView } from '../groups/GroupStageView';
 import { DailyMatchesView } from '../daily/DailyMatchesView';
-import type { Group, Team } from '../../domain/types';
+import type { Group, Match, Team } from '../../domain/types';
 
 // Profil-modalen + navigeringen testas END-TO-END mot fixtures-datan (den verifierade
 // VM 2026-datan med profil-fälten invävda, T10), under samma delade store som resten
@@ -191,6 +191,131 @@ describe('TeamProfilePanel, stängning (a11y-dialog)', () => {
     const closeBtn = screen.getByRole('button', { name: /Stäng lagprofil/i });
     await waitFor(() => expect(closeBtn).toHaveFocus());
     // Stäng -> fokus ska återgå till öppnar-knappen (cleanup-effekten i panelen).
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+});
+
+describe('TeamProfilePanel, fokus stabilt vid store-uppdatering mitt under öppen modal (C7)', () => {
+  // ROTORSAK (C7): fokus-restore-effekten band tidigare till `profile`, ett HÄRLETT
+  // objekt (deriveTeamProfile). I live-/realtidsläge (T18) anropas setMatches medan
+  // modalen är öppen -> profile får NY identitet -> effektens cleanup körde mitt under
+  // öppen modal (ryckte fokus tillbaka till öppnaren) och openerRef skrevs över med fel
+  // element. Detta test driver just den seamen: vi uppdaterar matchlistan (ny identitet,
+  // samma sak setMatches gör) MEDAN dialogen är öppen och bevisar att fokus INTE flyttas
+  // och att dialogen förblir öppen med fokus intakt; sen stänger vi och bevisar att fokus
+  // ändå återförs korrekt till öppnaren. Med den gamla [profile]-bindningen FAILAR detta
+  // (cleanup yankar fokus ur dialogen vid store-uppdateringen); med [openProfileId] hålls
+  // fokus. afterEach blurar (samma cross-fil-läckskydd som a11y-blocket ovan).
+  afterEach(() => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+  });
+
+  // Ett känt lag (så deriveTeamProfile ger en icke-null profil och dialogen renderas).
+  const swedenTeam: Team = {
+    id: 'swe',
+    name: 'Sverige',
+    code: 'SWE',
+    group: 'A',
+    fifaRanking: 25,
+    starPlayers: ['Alexander Isak'],
+  };
+  const groups: Group[] = [{ id: 'A', teamIds: ['swe'] }];
+
+  /** En gruppmatch för Sverige (ger storen ett innehåll att byta identitet på). */
+  function swedenMatch(id: string): Match {
+    return {
+      id,
+      stage: 'group',
+      groupId: 'A',
+      homeTeamId: 'swe',
+      awayTeamId: null,
+      kickoff: '2026-06-12T18:00:00.000Z',
+      venue: 'Testarena',
+      status: 'scheduled',
+      result: null,
+    };
+  }
+
+  // Harness: håller matchlistan i state och bygger storen runt den (storen får ny
+  // identitet per render, precis som ResultsProvider efter en live-uppdatering). En
+  // knapp byter in en FÄRSK matchlista (ny array-identitet) = exakt det setMatches gör
+  // i T18:s realtids-seam. Öppnar-knappen styr openTeamId så vi kan öppna/stänga modalen.
+  function LiveUpdateHarness() {
+    const [openTeamId, setOpenTeamId] = useState<string | null>(null);
+    const [matches, setMatches] = useState<Match[]>([swedenMatch('m1')]);
+    const store: ResultsStore = {
+      status: 'ready',
+      matches,
+      teams: [swedenTeam],
+      groups,
+      mode: 'fixtures',
+      error: null,
+      setMatches,
+      submitResult: () => ({ ok: true }),
+    };
+    return (
+      <ResultsStoreContext.Provider value={store}>
+        <button type="button" onClick={() => setOpenTeamId('swe')}>
+          öppna Sverige
+        </button>
+        <button type="button" onClick={() => setMatches([swedenMatch('m2')])}>
+          live-uppdatera
+        </button>
+        <TeamProfilePanel openTeamId={openTeamId} onClose={() => setOpenTeamId(null)} />
+      </ResultsStoreContext.Provider>
+    );
+  }
+
+  it('behåller fokus i dialogen (och modalen öppen) när storen uppdateras, och återför fokus vid stäng', async () => {
+    render(<LiveUpdateHarness />);
+    const opener = screen.getByText('öppna Sverige');
+    opener.focus();
+    expect(opener).toHaveFocus(); // öppnaren är activeElement vid öppning -> minns som opener
+
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole('dialog');
+    const closeBtn = screen.getByRole('button', { name: /Stäng lagprofil/i });
+    // Vänta in fokus-flytten in i dialogen (passiv effekt, samma rotorsak som openSweden).
+    await waitFor(() => expect(closeBtn).toHaveFocus());
+
+    // Simulera att användaren INTERAGERAR i den öppna modalen: flytta fokus till ett
+    // annat element INUTI dialogen (en injicerad knapp, som en länk/knapp i innehållet).
+    // Detta är det avgörande draget för att skilja buggen från fixen: med [profile]-
+    // bindningen kör effektens re-run vid store-uppdateringen `closeButtonRef.focus()`
+    // igen och RYCKER fokus tillbaka till stäng-knappen, bort från där användaren står.
+    const inner = document.createElement('button');
+    inner.textContent = 'inre kontroll';
+    dialog.appendChild(inner);
+    try {
+      inner.focus();
+      expect(inner).toHaveFocus();
+
+      // KÄRN-ASSERTIONEN (C7): uppdatera storen MEDAN modalen är öppen (ny matchlista-
+      // identitet, exakt det setMatches gör i T18:s realtids-seam). Profile får ny
+      // identitet. Med den gamla [profile]-bindningen kör effekt-cleanup + re-run här
+      // mitt under öppen modal: fokus rycks bort från `inner` (cleanup yankar till
+      // öppnaren, re-run flyttar till stäng-knappen). Med [openProfileId] händer inget,
+      // fokus stannar där användaren satte den.
+      fireEvent.click(screen.getByText('live-uppdatera'));
+      // Vänta in att store-uppdateringen FAKTISKT slog igenom (profilens väg renderar nu
+      // den nya matchen m2, gamla m1 är borta), så vi vet att effekterna haft sin chans
+      // att (felaktigt) köra innan vi assertar fokus.
+      await waitFor(() =>
+        expect(dialog.querySelector('[data-profile-path-match="m2"]')).not.toBeNull()
+      );
+      expect(dialog.querySelector('[data-profile-path-match="m1"]')).toBeNull();
+      expect(inner).toHaveFocus(); // fokus rycktes INTE bort från den inre kontrollen
+      expect(closeBtn).not.toHaveFocus(); // re-run yankade INTE tillbaka till stäng-knappen
+      expect(opener).not.toHaveFocus(); // cleanup yankade INTE ut till öppnaren
+      expect(screen.getByRole('dialog')).toBeInTheDocument(); // modalen förblir öppen
+    } finally {
+      inner.remove();
+    }
+
+    // Och stängningen fungerar fortfarande: openerRef ska inte ha skrivits över av
+    // store-uppdateringen, så fokus återförs korrekt till den ursprungliga öppnaren.
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(opener).toHaveFocus());

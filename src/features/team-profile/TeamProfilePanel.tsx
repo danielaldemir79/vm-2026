@@ -135,6 +135,17 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
     [team, groups, matches, teamsById]
   );
 
+  // STABILT öppet-id för fokus-effekten (C7): profile är ett HÄRLETT objekt och får
+  // ny identitet varje gång storen uppdateras (live/realtidsläge T18 anropar setMatches
+  // -> deriveTeamProfile körs om -> nytt objekt). Binder vi fokus-restore-effekten till
+  // profile-identiteten kör dess cleanup mitt under en ÖPPEN modal vid varje store-
+  // uppdatering: fokus rycks tillbaka till öppnaren och openerRef skrivs över med fel
+  // element (det då-aktiva i den fortfarande öppna dialogen). Vi binder i stället till
+  // ÖPPET/STÄNGT-tillståndet, ett stabilt lag-id som bara ändras när modalen faktiskt
+  // öppnas för ett nytt lag eller stängs (null). Då löper öppnings-/stängnings-logiken
+  // exakt en gång per öppning, oberoende av hur ofta datan bakom uppdateras.
+  const openProfileId = profile === null ? null : team!.id;
+
   // Escape stänger. Lyssnaren läggs bara när modalen är öppen (städas vid stängning/
   // unmount), så den inte fångar Escape när inget är öppet.
   useEffect(() => {
@@ -155,7 +166,10 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
   // fokuserat innan, när den stängs. Vi minns det öppnande elementet i en ref.
   const openerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    if (profile === null) {
+    // Bind till ÖPPET-tillståndet (stabilt lag-id), inte profile-objektet (C7), så
+    // cleanup/re-run BARA sker när modalen faktiskt öppnas/stängs, aldrig mitt under
+    // en öppen modal när storen uppdateras och profile får ny identitet.
+    if (openProfileId === null) {
       return;
     }
     openerRef.current = document.activeElement as HTMLElement | null;
@@ -165,7 +179,7 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
       // Återställ fokus till öppnaren (t.ex. lag-knappen) när modalen stängs.
       openerRef.current?.focus?.();
     };
-  }, [profile]);
+  }, [openProfileId]);
 
   // Enkel fokus-fälla: håll Tab inom dialogen (a11y, modal). Vi cyklar mellan
   // dialogens fokuserbara element så fokus inte vandrar ut till bakgrunden.
