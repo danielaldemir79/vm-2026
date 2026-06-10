@@ -16,6 +16,7 @@ import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
 import { ScenarioView } from './features/scenarios';
+import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
@@ -129,50 +130,67 @@ export default function App() {
               storen (lag/grupper/matcher), och OMSLUTER alla vyer med klickbara lagnamn
               (daily, gruppspel, resultatinmatning) så profilen kan öppnas från dem alla. */}
           <TeamProfileProvider>
-            {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
-              datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
-              SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA
-              + tillgängliga strukturen byggs här; design-frontend ger WOW-hero +
-              premium-matchkort + nedräknings-visual ovanpå. */}
-            <Slide direction="up">
-              <DailyMatchesView />
-            </Slide>
+            {/* What-if-simulatorn (T12): slå på sim-läget och spela ut tänkta
+              resultat, så tabell + slutspelsträd + "Vad krävs" ändras live UTAN
+              att de riktiga resultaten rörs. SimulationFrame omsluter banner:n +
+              alla simulerade vyer och lägger, NÄR sim-läget är PÅ, en violett
+              ram + svag tint + en sticky "Simuleringsläge"-badge runt hela zonen,
+              så ingen förväxlar en simulering med de riktiga resultaten. Ramen är
+              en tunn wrapper som bara läser sim-seamen i storen (en sanning); i
+              vilo-läge är den helt neutral (ingen ram, ingen tint). */}
+            <SimulationFrame>
+              {/* Banner:n (kontrollen + markeringen) ligger överst i ramen så
+                Starta/Återställ/Avsluta + statusmeddelandet syns innan man
+                bläddrar i de simulerade vyerna. */}
+              <Slide direction="up">
+                <SimulationBanner />
+              </Slide>
 
-            <Slide direction="up">
-              <GroupStageView />
-            </Slide>
+              {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
+                datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
+                SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA
+                + tillgängliga strukturen byggs här; design-frontend ger WOW-hero +
+                premium-matchkort + nedräknings-visual ovanpå. */}
+              <Slide direction="up">
+                <DailyMatchesView />
+              </Slide>
 
-            {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista
-              gruppomgången, vad varje lag behöver för att gå vidare (Klar/Ute/
-              Beror på). Läser SAMMA delade store, så scenarierna räknas om när ett
-              resultat matas in. Den FUNKTIONELLA + tillgängliga strukturen +
-              data-seamen byggs här; design-frontend ger premium-finish ovanpå. */}
-            <Slide direction="up">
-              <ScenarioView />
-            </Slide>
+              <Slide direction="up">
+                <GroupStageView />
+              </Slide>
 
-            {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. Läser
-              SAMMA delade store som gruppspelet, så det justeras under gruppspelet
-              (möjliga lag), låses vid grupp-slut (FIFA-seedningen) och för fram
-              vinnaren när ett slutspelsresultat matas in. Den FUNKTIONELLA +
-              tillgängliga strukturen + data-seamen byggs här; design-frontend ger
-              premium-trädet med kopplingslinjer + vinnar-animation ovanpå. */}
-            <Slide direction="up">
-              <BracketView />
-            </Slide>
+              {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista
+                gruppomgången, vad varje lag behöver för att gå vidare (Klar/Ute/
+                Beror på). Läser SAMMA delade store, så scenarierna räknas om när ett
+                resultat matas in. Den FUNKTIONELLA + tillgängliga strukturen +
+                data-seamen byggs här; design-frontend ger premium-finish ovanpå. */}
+              <Slide direction="up">
+                <ScenarioView />
+              </Slide>
 
-            <Slide direction="up">
-              <Panel>
-                {/* Design-frontends premium-firande kopplas in via render-proppen.
-                  Kroken (i vyn) styr trigger/timing/reduced-motion, overlayn ritar
-                  bara explosionen, en ren glädje-yta. */}
-                <ResultEntryView
-                  renderCelebration={(celebration) => (
-                    <GoalCelebrationOverlay celebration={celebration} />
-                  )}
-                />
-              </Panel>
-            </Slide>
+              {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. Läser
+                SAMMA delade store som gruppspelet, så det justeras under gruppspelet
+                (möjliga lag), låses vid grupp-slut (FIFA-seedningen) och för fram
+                vinnaren när ett slutspelsresultat matas in. Den FUNKTIONELLA +
+                tillgängliga strukturen + data-seamen byggs här; design-frontend ger
+                premium-trädet med kopplingslinjer + vinnar-animation ovanpå. */}
+              <Slide direction="up">
+                <BracketView />
+              </Slide>
+
+              <Slide direction="up">
+                <Panel>
+                  {/* Design-frontends premium-firande kopplas in via render-proppen.
+                    Kroken (i vyn) styr trigger/timing/reduced-motion, overlayn ritar
+                    bara explosionen, en ren glädje-yta. */}
+                  <ResultEntryView
+                    renderCelebration={(celebration) => (
+                      <GoalCelebrationOverlay celebration={celebration} />
+                    )}
+                  />
+                </Panel>
+              </Slide>
+            </SimulationFrame>
           </TeamProfileProvider>
         </ResultsProvider>
 

@@ -574,3 +574,86 @@ tabellmotorn och klassa konservativt på poäng blir slutsatsen sann inom det en
 osäkert syns som "beror på" i stället för att maskeras. Generaliserar de tidigare härledda-state-vyerna
 (T5/T6/T9) till ett scenario-lager, och är basen för T12:s what-if-sandbox. Källa: T11
 (`src/features/scenarios/`: `scenario-engine.ts` + `use-group-scenarios.ts` + `ScenarioView.tsx`).
+
+### hypotetiskt-overlay-ovanpa-den-delade-storen-utan-att-rora-riktig-data (VM 2026)
+
+**Recept (en what-if-sandbox där ALLA vyer ändras live utan att skriva riktig data):**
+
+1. INGEN ny store, INGET dubbellager. What-if-läget är ett HYPOTETISKT OVERLAY
+   (`Map<matchId, Match>`) ovanpå SAMMA matchlista alla vyer redan härleder ur (SPEC §6). Lägg
+   overlayt + `simulating`-flaggan i den BEFINTLIGA storen som äger matchlist-seamen
+   (`ResultsProvider`), inte i en sido-provider. Storen exponerar `matches` som EFFEKTIVA
+   matcher: `simulating ? riktiga + overlay : riktiga`. Konsumenterna (tabell, träd, scenario,
+   inmatning) RÖRS INTE, de läser bara `matches` och reagerar automatiskt. Det är hela vinsten
+   med härledd-state-arkitekturen: en ny sanning-variant (riktig vs effektiv) i EN punkt.
+2. SAMMANVÄVNINGEN i en REN modul (`apply-simulation.ts`, `applySimulationOverlay(realMatches,
+   overlay)`), React-fri och fristående testbar, exakt som `applyMatchResult` är skrivlagret för
+   riktig data. ISOLERINGEN blir en KOD-INVARIANT: funktionen tar `realMatches` `readonly` och
+   muterar den ALDRIG (bygger ny array), så ett hypotetiskt resultat KAN inte ändra riktig data.
+3. SKRIV-SEAMEN ruttas av läget: `submitResult`/`setMatches` skriver OVERLAYT i sim-läge (riktig
+   data orörd), riktig data annars. Gör BÅDA skrivvägarna läges-medvetna (försvar på djupet). En
+   sim-skrivning validerar mot de EFFEKTIVA matcherna (riktig + overlay), så användaren matar mot
+   exakt det hen ser och SAMMA valideringsgrind (T9-straffar inkl. hypotetiska slutspel) gäller.
+4. BLANDA-FALLET faller ut gratis: matcher UTAN overlay-post behåller riktiga värden, matcher MED
+   visar hypotetiskt. Overlay har FÖRETRÄDE för en match som även har ett riktigt resultat (det
+   hypotetiska visas tills overlayn töms). Overlayt ÖVERRIDER bara existerande matcher (uppfinner
+   ingen ny fixtur); en overlay-nyckel utan riktig match FAIL-LOUD:ar (hela schemat finns redan).
+5. TÖM = AVSTÄNGNING/ÅTERSTÄLLNING. `exitSimulation` (av + töm), `resetSimulation` (töm, stanna i
+   sandlådan), och en (om)seedning lämnar sim-läget + tömmer overlayn (datan sandlådan byggdes på
+   byttes ut). Allt idempotent.
+6. MARKERING i en egen app-global komponent (sim-läget rör ALLA vyer): ett uppläst statusmeddelande
+   (`role="status"`) + ett `data-simulation-active`-attribut som design-frontend hänger en premium-
+   banner på. Toggle + "Återställ allt". Funktionellt komplett utan styling.
+7. TÄCKNING: ren overlay (tom -> kopia, isolering, blanda, företräde, ordning, fail-loud-nyckel),
+   store-seamen (toggle/idempotens, isolering riktig data orörd efter avsluta, blanda, reset,
+   validering av hypotetiskt resultat inkl. slutspels-straffar), HÄRLEDDA vyer reagerar (tabell
+   ändras + slutspelsträdet låses av ett hypotetiskt komplett gruppspel, exit släpper), och
+   markerings-UI:t (status syns/försvinner, toggle/reset). Negativ kontroll: stäng av sim-grenarna
+   och bevisa att isolerings-/blanda-testerna RÖDNAR (äkta skyddsräcken, inte gröna av slump).
+
+**Varför:** En what-if-sandbox (SPEC §5) ska låta vänner spela ut tänkta resultat och se tabell +
+träd + "Vad krävs" ändras live, UTAN att röra de riktiga resultaten. Genom att uttrycka läget som
+ett overlay ovanpå den enda sanningen (i stället för en parallell store) ärver sandlådan HELA den
+verifierade härlednings-kedjan (tabeller/seedning/scenarier) gratis, isoleringen blir en invariant
+i koden (ren `readonly`-väv), och avstängning = töm overlay. Generaliserar T5/T6/T9/T11:s härledda-
+state-vyer till ett HYPOTETISKT-DATA-lager på samma store. Källa: T12 (`src/features/simulation/`:
+`apply-simulation.ts` + `SimulationBanner.tsx`, sim-seamen i `results-context.ts`/`ResultsProvider.tsx`).
+
+### app-global-fargoberoende-lages-markering-for-ett-icke-permanent-tillstand (VM 2026)
+
+**Recept (göra ett "läge" omisskännligt utan att förstöra läsbarhet eller a11y):** när appen kan
+gå in i ett icke-permanent tillstånd som ändrar vad siffrorna BETYDER (här: what-if-simulering,
+där allt blir hypotetiskt), måste tillståndet kännas över HELA den påverkade ytan, annars
+förväxlas det med de riktiga resultaten.
+
+1. EN tunn wrapper (`SimulationFrame`) omsluter hela den påverkade zonen, läser läget ur den
+   delade storen och speglar det till ETT data-attribut (`data-simulation-active`) på sin rot.
+   CSS hänger all visuell markering på den haken, så JSX:en bara bär läget vidare (en sanning,
+   ingen styling-logik i komponenten). Wrappern är NEUTRAL i vilo-läge (ingen ram, ingen tint).
+2. MARKERINGEN ÄR FÄRG-OBEROENDE. En ton/ring ENSAM räcker aldrig (färgblind/färg-okänslig
+   användare). Bär signalen i TEXT + IKON: en sticky badge ("SIMULERINGSLÄGE" + kolv-ikon) som
+   FÖLJER MED vid bläddring (`position: sticky`, `top` under den sticky headern) så markeringen
+   aldrig hamnar utom synhåll, med `role="status"` så en skärmläsare hör att läget slogs på.
+   Tonen/ringen är bara FÖRSTÄRKNING ovanpå text-signalen.
+3. RAMEN bär INGEN text: en inset-ring + mjuk ytter-glow med `box-shadow` (inte border-width), så
+   den inte ändrar layout (ingen CLS), plus en SVAG tint på en pseudo-yta BAKOM innehållet
+   (`z-index: -1`), så tinten färgar mellanrummen men aldrig mörklägger läsbar text.
+4. VÄLJ EN TON UTANFÖR APPENS ROLLFÄRGER. Här violett (`--vm-sim`), medvetet skild från grön
+   accent / guld-warning / mint-teal success / korall danger, så läges-markeringen aldrig kan
+   läsas som "ett riktigt status-tillstånd". Egna tokens per tema (mörkt/ljust), mätta separat.
+5. KONTRAST mäts som CANVAS-KOMPOSIT, VÄRSTA FALL, BÅDA teman: tinten är en alfa-blend över
+   fonden, så muted-text rakt på den tintade fonden (ingen opak yta under = värsta fallet) mäts
+   genom att komponera tint-färgen över base-ytan, inte ett typfall. Håll tint-alfan vid den
+   uppmätta gränsen med marginal (här 6 % -> muted-text >= 5.5:1 i båda teman). Skriv bara det
+   UPPMÄTTA min-värdet i docs (lessons: fast alfa/HSL garanterar inte fast kontrast).
+6. RÖRELSE gatas (WCAG 2.3.3): en lugn puls på en status-prick nollas vid
+   `prefers-reduced-motion: reduce` (`animation: none`), ramen blir statisk. Markeringen
+   (text + ikon + ring + tint) står kvar, bara rörelsen tas bort.
+
+**Varför:** ett läge som ändrar betydelsen av det användaren ser MÅSTE vara omisskännligt över
+hela ytan och för ALLA användare (inkl. färgblinda och skärmläsar-användare), utan att sänka
+läsbarheten. Genom att binda all styling till EN data-hake på en neutral wrapper, bära signalen i
+text + ikon (inte bara ton), välja en ton utanför rollfärgerna och mäta tint-kontrasten som
+canvas-komposit i värsta fallet, blir markeringen både premium och tillgänglig per konstruktion.
+Generaliserar till vilket "utkast/förhandsgransknings/sandlåde"-läge som helst. Källa: T12-visuellt
+(`SimulationFrame.tsx` + `SimulationBanner.tsx`, tokens i `tokens.css` § SIM-TON + §8, `App.tsx`).

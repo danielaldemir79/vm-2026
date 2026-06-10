@@ -5,6 +5,106 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T12-visuellt (issue #12): sim-läget får en app-global, färg-oberoende "labbet"-markering
+
+**Beslut (HELA sim-zonen kläs i en markering, inte bara banner-kortet):** När what-if-läget är
+PÅ omsluts banner:n + alla simulerade vyer av en tunn wrapper, `SimulationFrame`
+(`src/features/simulation/SimulationFrame.tsx`), som läser `simulating` ur den delade storen och
+speglar den till `data-simulation-active` på sin rot. CSS-lagret (tokens.css §8) hänger en
+violett INRAMNING (inset-ring + mjuk ytterglow via box-shadow, ingen layout-påverkan / CLS) +
+en SVAG violett tint (pseudo-yta bakom innehållet) på den haken. Så markeringen täcker hela det
+hypotetiska området, inte bara kontrollen, och ingen kan bläddra in i tabell/träd och glömma att
+de spelar ut tänkta resultat. Vilo-läge = helt neutral wrapper (ingen ram, ingen tint).
+
+**Beslut (markeringen är FÄRG-OBEROENDE, tonen är bara förstärkning):** En sticky badge
+("SIMULERINGSLÄGE" + kolv-ikon + status-prick) följer med vid bläddring och bär signalen i TEXT
++ IKON (role="status", uppläst när läget slås på). Den violetta tonen/ringen ENSAM räcker
+aldrig (färgblind/färg-okänslig användare ser badge-texten). Banner-rubriken får dessutom en
+kolv-ikon. WCAG 2.3.3: en lugn andnings-puls på status-pricken nollas vid
+`prefers-reduced-motion: reduce` (verifierat: `animation-name` blir `none`), ramen blir statisk.
+
+**Beslut (VARFÖR violett, utanför appens rollfärger):** `--vm-sim` (mörkt `#b3a0ff`, ljust
+`#5b3bb8`) ligger med flit utanför grön accent / guld-warning / mint-teal success / korall
+danger, så sim-ramen aldrig kan läsas som "ett riktigt resultat-tillstånd". Indigo/violett läser
+kulturellt som "labb/utkast/hypotetiskt".
+
+**Beslut (KONTRAST mätt som canvas-komposit, värsta fall, BÅDA teman):** den violetta tinten är
+en alfa-blend (`--vm-sim` @ 6 %) över sidans fond, mätt genom att komponera färgen över base-ytan
+(inte ett typfall). Uppmätta värden (live-renderade pixlar bekräftade Node-alfa-blend):
+- Badge-ink PÅ den fyllda violett-pillen: **8.74:1 (mörkt) / 7.60:1 (ljust)**.
+- Banner-status (muted) på sitt kort i sim-läge: **7.50:1 (mörkt) / 6.52:1 (ljust)**.
+- Muted-text rakt på den 6 %-tintade FONDEN (värsta fall, ingen opak yta under):
+  **7.49:1 (mörkt) / 5.50:1 (ljust)**; brödtext (fg) **14.1:1 / 13.5:1**.
+- Alla >= 4.5:1 (normal text). Ringen + glow:en bär ALDRIG text, kan inte sänka kontrast.
+Mätmetod + lärdom (fast HSL/alfa garanterar inte fast kontrast, mät värsta fallet): lessons
+`design-frontend.md` (aa-kontrast-canvas-komposit). Verifierat 280-1440 px (ingen horisontell
+scroll vid 280) och i båda teman.
+
+**Spårbarhet:** UX/produkt + intern design-regel, ingen extern auktoritativ källa. Spårbar via
+#12 + denna rad + testerna (`SimulationFrame.test.tsx` markering finns bara i sim-läge + är
+text-buren/färg-oberoende, `SimulationBanner.test.tsx` oförändrad). Tokens i `tokens.css` (§
+SIM-TON + §8), wiring i `App.tsx`.
+
+**Beslut (sim-overlayt är medvetet icke-persistent):** Sim-läget nollställs vid sidladdning. En PWA-omladdning (eller "Återställ allt") ger alltid tillbaka den riktiga datan. Beteendet är korrekt och avsiktligt: sandlådan ska vara lätt att lämna och får aldrig riskera att hypotetiska resultat förväxlas med sparad verklig data efter en session.
+
+---
+
+## 2026-06-10 , T12 (issue #12): What-if-simulatorn = hypotetiskt overlay ovanpå den delade storen
+
+**Beslut (arkitektur, minsta sanna):** What-if-läget är INTE en egen datakälla eller en
+parallell store, det är ett HYPOTETISKT OVERLAY (`Map<matchId, Match>`) ovanpå SAMMA
+matchlista som alla vyer redan härleder ur (SPEC §6, härledd state). Overlayt + sim-läget bor
+i den befintliga `ResultsProvider` (den äger redan matchlist-seamen), så ingen ny provider och
+ingen dubbellagring behövs. Storen exponerar nu `matches` som EFFEKTIVA matcher
+(`simulating ? riktiga + overlay : riktiga`), plus `simulating` + `enterSimulation` /
+`exitSimulation` / `resetSimulation`. Sammanvävningen är en REN funktion
+(`src/features/simulation/apply-simulation.ts`, `applySimulationOverlay(realMatches, overlay)`),
+React-fri och fristående testad. **Konsumenterna (gruppspel, slutspelsträd, "Vad krävs",
+inmatning) är OFÖRÄNDRADE**, de läser bara storens `matches` som vanligt och reagerar därför
+automatiskt på sim-läget. Det är hela poängen med den härledda-state-arkitekturen.
+
+**Beslut (ISOLERINGEN är en kod-invariant, riktig data skrivs ALDRIG i sim-läge):** En intern
+`realMatches` är den enda sanningen. `applySimulationOverlay` tar den `readonly` och muterar
+den ALDRIG (bygger en ny array), så ett hypotetiskt resultat kan per konstruktion inte ändra
+den riktiga datan. Skriv-seamen ruttas av läget: `submitResult`/`setMatches` skriver OVERLAYT i
+sim-läge (riktig data orörd) och den riktiga datan annars. Båda skrivvägarna är läges-medvetna
+(försvar på djupet). Bevisat med negativ kontroll: stänger man av BÅDA sim-grenarna rödnar 6
+isolerings-/blanda-tester (de är alltså äkta skyddsräcken, inte gröna av slump).
+
+**Beslut (BLANDA-fallet, riktig + hypotetisk samtidigt):** Matcher UTAN overlay-post behåller
+sina RIKTIGA värden, matcher MED overlay-post visar det hypotetiska. Så en tabell/ett träd
+härlett ur de effektiva matcherna blandar riktiga och hypotetiska resultat korrekt. **Overlay
+har FÖRETRÄDE** för en match som även har ett riktigt resultat: i sim-läge är det hypotetiska
+det användaren spelar ut, så det visas tills overlayn töms. `resetSimulation` (eller en
+om-seedning) tömmer overlayn -> det riktiga resultatet syns igen. Overlayt ÖVERRIDER bara
+EXISTERANDE matcher (uppfinner ingen ny fixtur); en overlay-nyckel utan riktig match är ett
+programmeringsfel och `applySimulationOverlay` FAIL-LOUD:ar (PRINCIPLES §8), eftersom hela
+104-matchers-schemat redan finns i den riktiga datan och ett what-if bara spelar ut det.
+
+**Beslut ("Vad krävs"/ScenarioView LÄSER overlayn i sim-läge, medvetet JA):** ScenarioView är
+en konsument av samma store-`matches`, så den ser de effektiva matcherna. Det är önskat, hela
+poängen är att se vad som krävs i HYPOTETISKA lägen, inte bara i de riktiga. Samma för
+slutspelsträdet: ett hypotetiskt komplett gruppspel låser trädet (FIFA-seedningen) i sim-läge
+och släpper låset när man avslutar (riktig data tillbaka).
+
+**Beslut (validering gäller hypotetiska resultat, T9-grinden återanvänd):** Ett hypotetiskt
+resultat går genom EXAKT samma `validateResultEntry` som ett riktigt (en sanning för
+inmatnings-grinden), så T9:s straff-regel (FIFA Article 14: en slutspelsmatch som slutar lika
+KRÄVER straffar) gäller även hypotetiska slutspelsresultat. Ingen ny domänregel definieras i
+T12, bara overlay-mekaniken ovanpå.
+
+**Beslut (MARKERING + ÅTERSTÄLLNING, design-frontend tar visuell finish):** En egen
+`SimulationBanner` (app-globalt band, eftersom sim-läget rör ALLA vyer) bär den FUNKTIONELLA +
+tillgängliga markeringen: i sim-läge ett uppläst statusmeddelande (`role="status"`, "Simulering
+pågår, de riktiga resultaten påverkas inte") + ett `data-simulation-active`-attribut som
+design-frontend hänger en premium-banner/badge på. Toggle (Starta/Avsluta) + "Återställ allt"
+(töm overlayn, stanna i sandlådan). **Spårbarhet:** UX/produkt-regel + intern arkitektur,
+ingen extern auktoritativ källa, spårbar via #12 + denna rad + testerna (`apply-simulation.test.ts`
+isolering/blanda/fail-loud, `simulation-store.test.tsx` toggle/reset/isolering/blanda/validering
++ tabell+träd reagerar, `SimulationBanner.test.tsx` markering/toggle).
+
+---
+
 ## 2026-06-10 , T11 (issue #11): Copilot C2 + C3, doc-/text-ärlighet i "Vad krävs" (inga domänregler rörda)
 
 **Beslut (rätta två formuleringar så de matchar vad koden FAKTISKT gör):**
