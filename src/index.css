@@ -58,8 +58,17 @@ body {
    rörelse. Så vi nollställer dekorativa CSS-transitioner globalt när användaren
    bett om minskad rörelse (WCAG 2.3.3). Opacitets-/färg-övergångar är ofarliga
    och behöver inte nollas, men en svepande regel här är enklast och säkrast,
-   och vi behåller ändå smooth scroll-bortkoppling. Hero-pulsen/sveptet (vm-pulse,
-   vm-sheen) fångas av samma regel: de stannar på sitt första, statiska steg. */
+   och vi behåller ändå smooth scroll-bortkoppling.
+
+   VARFÖR den svepande regeln INTE räcker för hero-animationerna (Copilot R2, C5):
+   `animation-duration: 0.01ms` + `iteration-count: 1` kör animationen EN gång till
+   slut nästan momentant, så keyframsen landar på sitt SLUT-läge (100%), inte sitt
+   start-läge. För `vm-sheen` är 100 % `background-position: 140% 0%` -> sveptet
+   fryser mitt i/utanför fonden i stället för i ro. Designintentet (decisions.md,
+   T7 design-lager) är en HELT statisk hero vid reducerad rörelse. Därför nollas
+   de dekorativa hero-animationerna EXPLICIT med `animation: none` nedan, så de
+   inte renderas alls (varken start- eller slutläge), och kommentaren ovan om den
+   svepande regeln gäller bara de ofarliga övergångarna, inte dessa keyframes. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -68,5 +77,13 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Dekorativa hero-animationer stängs AV helt (inte snappas till slutläget),
+     så hero:n är fullständigt statisk vid prefers-reduced-motion (WCAG 2.3.3).
+     vm-live-dot blir en lugn, statisk prick; vm-hero-sheen ett stilla sken. */
+  .vm-live-dot,
+  .vm-hero-sheen {
+    animation: none !important;
   }
 }
