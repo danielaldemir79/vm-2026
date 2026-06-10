@@ -5,6 +5,21 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T31 (#51, C1): tomt Spara på en LIVE-match bevarar live (ingen statusregression)
+
+**Beslut:** `intendedStatus` tar nu emot matchens nuvarande status. Vid TOMMA mål bevaras
+`live` om matchen redan är live (annars `scheduled`). Ifyllda mål ger som förr `finished`.
+**Varför:** `ResultEntryForm` renderas även för en pågående match (`match.status === 'live'`).
+Med den gamla regeln (tomt -> alltid `scheduled`) backade ett tomt Spara en live-match till
+scheduled, en oavsiktlig statusregression. `live -> live` (utan resultat) är en validerad no-op
+enligt `validate-result.ts` `ALLOWED_TRANSITIONS` (live tillåter scheduled/live/finished, och
+`status !== 'finished' && hasAnyGoal` är falskt vid tomma mål -> inget result-fel). Nollställnings-
+vägen är ORÖRD: en `finished`-match med tömda fält + Spara ger fortsatt `scheduled` (avsiktlig
+reset), och "Rensa resultat"-knappen sätter `scheduled` direkt. Källa för övergångsreglerna:
+`src/features/results/validate-result.ts` (`ALLOWED_TRANSITIONS`, livscykel scheduled -> live -> finished).
+
+---
+
 ## 2026-06-10 , T31 (#51, F1): två likvärdiga vägar att nollställa en spelad match
 
 **Beslut:** En spelad match kan nollställas tillbaka till `scheduled` på två likvärdiga vägar,

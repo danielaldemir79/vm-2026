@@ -191,6 +191,49 @@ describe('ResultEntryForm, auto-spelad + Rensa resultat (T31, #51)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  // C1 (#51): formuläret renderas även för en LIVE-match. Ett tomt Spara (inga mål)
+  // får INTE backa en pågående match till scheduled (oavsiktlig statusregression).
+  // Tomma mål ska då BEVARA 'live' (en validerad no-op, live -> live tillåts), och
+  // för en LIVE-match gäller realSubmit (riktig validering) så det måste passera grön.
+  it('LIVE: ett tomt Spara bevarar status live (ingen regression till scheduled)', () => {
+    const live: Match = { ...scheduledMatch(), status: 'live' };
+    const onSubmit = vi.fn(realSubmit(live));
+    render(<ResultEntryForm match={live} teamsById={teamsById} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
+    // Status bevaras som 'live', inte 'scheduled': ingen oavsiktlig statusregression.
+    expect(onSubmit).toHaveBeenCalledWith('m1', {
+      homeGoals: null,
+      awayGoals: null,
+      status: 'live',
+    });
+    // Övergången live -> live (utan resultat) är validt: inget fel visas.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // C1 (#51): nollställnings-vägen via tömda fält + Spara MÅSTE fortsatt funka. En
+  // SPELAD (finished) match vars fält töms och sparas ska backa till scheduled
+  // (den avsiktliga reset:en), inte fastna i finished, så regeln "bevara live"
+  // inte råkar bevara finished också.
+  it('FINISHED: tömda fält + Spara nollställer tillbaka till scheduled (reset funkar)', () => {
+    const finished: Match = {
+      ...scheduledMatch(),
+      status: 'finished',
+      result: { homeGoals: 3, awayGoals: 2 },
+    };
+    const onSubmit = vi.fn(realSubmit(finished));
+    render(<ResultEntryForm match={finished} teamsById={teamsById} onSubmit={onSubmit} />);
+    // Töm båda målfälten och spara (samma väg som Rensa-knappen, men manuellt).
+    fireEvent.change(screen.getByLabelText(/Mexiko \(hemma\)/), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/Sydafrika \(borta\)/), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /Spara/ }));
+    expect(onSubmit).toHaveBeenCalledWith('m1', {
+      homeGoals: null,
+      awayGoals: null,
+      status: 'scheduled',
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('en SPELAD match visar "Rensa resultat" som nollställer tillbaka till ej spelad', () => {
     // En match som är spelad i storen (3-2) -> knappen finns och sparar en TOM
     // inmatning (status scheduled, inga mål), dvs ångrar resultatet.

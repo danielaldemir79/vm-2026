@@ -36,20 +36,32 @@ function isKnockout(match: Match): boolean {
  *   - något måltal ifyllt -> 'finished' (spelad). Är bara ETT mål ifyllt fångar
  *     valideringen det som 'finished-without-result' ("kräver både ... mål"), så
  *     den avsedda statusen är finished och felmeddelandet blir korrekt.
- *   - inga mål ifyllda -> 'scheduled' (ej spelad). Ett sådant spar är en no-op
- *     (validt: ingen status-övergång krävs, inget resultat sätts).
+ *   - inga mål ifyllda -> matchens NUVARANDE status BEVARAS om den är 'live'
+ *     (annars 'scheduled'). VARFÖR (C1, #51): formuläret renderas även för en
+ *     pågående match (status 'live'), och utan tömt resultat ska ett tomt Spara
+ *     INTE backa en live-match till 'scheduled' (oavsiktlig statusregression).
+ *     Att stanna i 'live' är en validerad no-op-övergång (live -> live tillåts,
+ *     inget resultat sätts, se validate-result ALLOWED_TRANSITIONS). En match
+ *     som ÄNNU inte börjat (scheduled) eller ska NOLLSTÄLLAS från spelad
+ *     (finished -> scheduled, den avsiktliga reset-vägen) ger som förr 'scheduled'.
  *
  * Att nollställa en spelad match tillbaka till 'scheduled' kan ske på TVÅ
  * likvärdiga vägar, båda producerar samma validerade back-övergång genom
- * denna härledning: (1) tömma båda mål-fälten och trycka Spara, och (2) den
- * explicita "Rensa resultat"-knappen nedan (som sparar en entry med tomma
- * mål). Rensa-knappen är alltså inte den enda vägen, bara en tydligare genväg
- * som syns först när matchen är spelad. Inget "tyst" sker: ett tömt-fält-spar
- * är en avsiktlig användarhandling och går genom samma validering.
+ * denna härledning: (1) tömma båda mål-fälten och trycka Spara (matchen är
+ * 'finished' -> tomt ger 'scheduled'), och (2) den explicita "Rensa
+ * resultat"-knappen nedan (som sparar en entry med tomma mål och status
+ * 'scheduled' direkt). Rensa-knappen är alltså inte den enda vägen, bara en
+ * tydligare genväg som syns först när matchen är spelad. Inget "tyst" sker: ett
+ * tömt-fält-spar är en avsiktlig användarhandling och går genom samma validering.
  */
-function intendedStatus(homeGoals: string, awayGoals: string): MatchStatus {
+function intendedStatus(homeGoals: string, awayGoals: string, current: MatchStatus): MatchStatus {
   const hasAnyGoal = homeGoals.trim() !== '' || awayGoals.trim() !== '';
-  return hasAnyGoal ? 'finished' : 'scheduled';
+  if (hasAnyGoal) {
+    return 'finished';
+  }
+  // Tomma mål: bevara 'live' (no-op för en pågående match), annars 'scheduled'
+  // (ej-startad no-op ELLER nollställning av en spelad match tillbaka till ej spelad).
+  return current === 'live' ? 'live' : 'scheduled';
 }
 
 // Delade fält-klasser: en stark, tema-trogen fokus-ring (WCAG 2.4.7, synlig i
@@ -164,8 +176,10 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
   // AVSEDD status (T31, #51): härledd ur målfälten, inte vald i en dropdown.
   // Driver både straff-fältens synlighet och submit-statusen, så de aldrig
   // kan säga emot varandra (EN sanning, samma som den gamla `status`-state-var
-  // gjorde, fast nu härledd i stället för manuellt vald).
-  const status = intendedStatus(homeGoals, awayGoals);
+  // gjorde, fast nu härledd i stället för manuellt vald). Matchens nuvarande
+  // status skickas med så ett tomt Spara på en LIVE-match inte backar den till
+  // scheduled (C1, #51): tomma mål bevarar 'live', annars 'scheduled'.
+  const status = intendedStatus(homeGoals, awayGoals, match.status);
 
   // DIRTY-flagga (C7/C8): true så fort användaren rört ETT fält och ännu inte
   // sparat. Den styr den externa synkningen nedan, så ett pågående lokalt edit
