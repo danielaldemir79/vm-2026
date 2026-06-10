@@ -23,6 +23,25 @@ import { Fade } from '../../motion';
 import { teamDisplayName } from '../daily/match-display';
 import { groupByRound, type BracketSlotState } from './derive-bracket';
 import { useBracketData } from './use-bracket-data';
+// Premium-trädets visuella lager (kopplings-affordans, vinnar-framhävning,
+// avancerings-animation, scroll-edges). Stylas ENBART via seamens data-attribut
+// + klass-hakar nedan, så senior-devs semantik + alla tester står kvar.
+import './bracket.css';
+
+/**
+ * Trädets stege, vänster -> höger, som ett litet ordningstal per runda. Ger
+ * varje runda-rubrik en redaktionell numrerad marker (1..6) så ögat följer
+ * progressionen mot finalen. En sanning, knyts till stage (inte till index, så
+ * ordningen är stabil oavsett ev. framtida filtrering).
+ */
+const ROUND_STEP: Readonly<Record<string, number>> = {
+  'round-of-32': 1,
+  'round-of-16': 2,
+  'quarter-final': 3,
+  'semi-final': 4,
+  final: 5,
+  'third-place': 6,
+};
 
 /** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista). */
 function indexTeams(teams: readonly Team[]): Map<string, Team> {
@@ -70,13 +89,17 @@ function SlotRow({
       data-bracket-slot=""
       data-slot-resolution={slot.resolution}
       data-winner={isWinner ? '' : undefined}
-      className="flex items-center justify-between gap-2 px-2.5 py-1.5"
+      className="vm-bracket-slot flex items-center justify-between gap-2 px-2.5 py-1.5"
     >
       <span className="min-w-0 truncate text-[0.8125rem] leading-tight" title={text}>
         {/* En resolved slot bär lagnamnet i full kontrast; en obestämd slot bär
-            sin positions-etikett dämpat, så hierarkin syns utan färg-beroende. */}
+            sin positions-etikett dämpat, så hierarkin syns utan färg-beroende.
+            .vm-bracket-slot-name bär den FÄRG-OBEROENDE vinnar-medaljens glyf
+            (CSS-pseudo ::after), så bocken syns i gråskala/för färgblinda. */}
         <span
-          className={slot.resolution === 'resolved' ? 'font-semibold text-fg' : 'text-fg-muted'}
+          className={`vm-bracket-slot-name ${
+            slot.resolution === 'resolved' ? 'font-semibold text-fg' : 'text-fg-muted'
+          }`}
         >
           {text}
         </span>
@@ -116,8 +139,17 @@ function MatchCard({
   return (
     <article
       data-bracket-match={matchId}
-      className="overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)]"
+      className="vm-bracket-match overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)]"
     >
+      {/* Match-nummer-cap: en diskret etikett (M73 ...) så ett kort kan placeras i
+          trädet med blicken (vilken match det är). aria-hidden: matchnumret är
+          orienterings-dekoration, slot-raderna nedan bär den tillgängliga datan. */}
+      <p
+        aria-hidden="true"
+        className="border-b border-border/60 px-2.5 py-1 font-display text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
+      >
+        {matchId}
+      </p>
       <ul className="m-0 flex list-none flex-col divide-y divide-border p-0">
         <SlotRow slot={home} teamsById={teamsById} isWinner={winnerSlotId === home.id} />
         <SlotRow slot={away} teamsById={teamsById} isWinner={winnerSlotId === away.id} />
@@ -142,14 +174,38 @@ function RoundColumn({
   stage: string;
   children: React.ReactNode;
 }) {
+  const step = ROUND_STEP[stage] ?? 0;
+  const isFinal = stage === 'final';
   return (
     <section
       data-bracket-round={stage}
       aria-label={`${label} (${matchCount} matcher)`}
-      className="flex w-60 shrink-0 flex-col gap-3"
+      className="vm-bracket-round flex w-60 shrink-0 flex-col gap-3"
     >
-      <h3 className="font-display text-sm font-bold uppercase tracking-wide text-fg-muted">
-        {label}
+      {/* Rubrik-rad: numrerad marker (progression mot finalen) + runda-namn.
+          Finalen får en guld-ton på markern + rubriken (FÄRG-OBEROENDE krona:
+          guld signalerar mästerskap, men formen/numret bär ändå hierarkin). */}
+      <h3 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide">
+        <span
+          aria-hidden="true"
+          className="vm-bracket-round-marker"
+          style={
+            // FINALEN: en SOLID guld-bricka med mörk ink-text (samma färg-oberoende
+            // AA-säkra mönster som "Dagens match"-chippet, T7-pin). Guld-text på vit
+            // yta föll under AA (uppmätt 3.29:1 i ljust tema); solid guld + near-black
+            // ink ger garanterad AA i BÅDA teman (guld är ljus/mellanljus i båda).
+            isFinal
+              ? {
+                  borderColor: 'transparent',
+                  backgroundColor: 'var(--vm-gold)',
+                  color: '#1c1403',
+                }
+              : undefined
+          }
+        >
+          {step}
+        </span>
+        <span className={isFinal ? 'text-fg' : 'text-fg-muted'}>{label}</span>
       </h3>
       <div className="flex flex-col gap-3">{children}</div>
     </section>
@@ -225,31 +281,46 @@ export function BracketView() {
       ) : null}
 
       {status === 'ready' && rounds.length > 0 ? (
-        // overflow-x-auto: trädet scrollas i sidled på smala skärmar i stället för
-        // att klämmas ihop (rundorna har fast bredd). Detta är den responsiva
-        // grunden, design-frontend bygger premium-layouten + kopplingslinjerna
-        // ovanpå data-bracket-round/-match/-slot-hakarna.
-        <div data-bracket-scroll="" className="-mx-1 overflow-x-auto px-1 pb-2">
-          <div className="flex min-w-max gap-5">
-            {rounds.map((round) => (
-              <RoundColumn
-                key={round.stage}
-                stage={round.stage}
-                label={round.label}
-                matchCount={round.matches.length}
-              >
-                {round.matches.map((match) => (
-                  <MatchCard
-                    key={match.matchId}
-                    matchId={match.matchId}
-                    home={match.home}
-                    away={match.away}
-                    winnerSlotId={match.winnerSlotId}
-                    teamsById={teamsById}
-                  />
-                ))}
-              </RoundColumn>
-            ))}
+        // vm-bracket: positions-kontext för scroll-edge-maskeringen + hinten.
+        // Trädet är brett till sin natur, så scrollen är en FEATURE (mjuka kant-
+        // toningar + en mobil scroll-hint), inte ett misslyckande.
+        <div className="vm-bracket flex flex-col gap-2">
+          {/* Scroll-hint: bara på smala skärmar (CSS döljer den >= 1024px), där
+              trädet garanterat svämmar över. En affordans, inte interaktiv. */}
+          <p
+            aria-hidden="true"
+            className="vm-bracket-hint self-end text-[0.6875rem] font-medium uppercase tracking-wide text-fg-muted"
+          >
+            Svep i sidled
+            <span className="vm-bracket-hint-arrow" aria-hidden="true">
+              →
+            </span>
+          </p>
+          {/* overflow-x-auto (seam): trädet scrollas i sidled på smala skärmar i
+              stället för att klämmas ihop (rundorna har fast bredd). Detta är den
+              responsiva grunden; vm-bracket-scroll lägger kant-maskeringen ovanpå. */}
+          <div data-bracket-scroll="" className="vm-bracket-scroll -mx-1 overflow-x-auto px-1 pb-2">
+            <div className="flex min-w-max gap-5">
+              {rounds.map((round) => (
+                <RoundColumn
+                  key={round.stage}
+                  stage={round.stage}
+                  label={round.label}
+                  matchCount={round.matches.length}
+                >
+                  {round.matches.map((match) => (
+                    <MatchCard
+                      key={match.matchId}
+                      matchId={match.matchId}
+                      home={match.home}
+                      away={match.away}
+                      winnerSlotId={match.winnerSlotId}
+                      teamsById={teamsById}
+                    />
+                  ))}
+                </RoundColumn>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
