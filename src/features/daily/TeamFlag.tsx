@@ -15,33 +15,10 @@
 // skärmläsare hör lagen utan att discen läses upp som en kryptisk kod.
 
 import type { CSSProperties } from 'react';
-
-/**
- * En liten, stabil hash ur en sträng (FNV-1a-aktig). Deterministisk: samma
- * landskod ger alltid samma tal, så ett lags disc-färg aldrig hoppar mellan
- * renderingar. Inte kryptografisk, den ska bara sprida koder jämnt över hjulet.
- */
-function hashCode(code: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < code.length; i += 1) {
-    hash ^= code.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  // Till ett positivt heltal.
-  return hash >>> 0;
-}
-
-/**
- * Två harmoniserande hue-grader (0-360) ur landskoden. Den andra ligger ett
- * stycke från den första (~140 grader) så discen får en tydlig men inte skrikig
- * tvåtons-lutning, en flagg-känsla utan att vara en riktig flagga.
- */
-function huesFor(code: string): { from: number; to: number } {
-  const h = hashCode(code);
-  const from = h % 360;
-  const to = (from + 140) % 360;
-  return { from, to };
-}
+// Hue-härledningen (FNV-1a-hash ur landskoden -> hue-grader) bor i team-hue.ts,
+// delad med dags-temat (T8) så ett lags signaturfärg är EN sanning, inte två
+// kopior som kan glida isär (PRINCIPLES §4).
+import { huesFor } from './team-hue';
 
 export interface TeamFlagProps {
   /** FIFA:s trebokstavs-landskod, t.ex. "BRA". Driver färg + text. */
