@@ -529,3 +529,48 @@ kompisar. Genom att styla på data-attribut-seamen kan trädet bli premium utan 
 härledning eller a11y, och genom att tvinga ut framhävning + animation i form/ikon/CSS (inte färg/JS)
 håller det läsbarheten helig i båda teman, för färgblinda och vid reducerad rörelse. Källa: T9 design-
 frontend (`src/features/bracket/bracket.css` + `BracketView.tsx`).
+
+### scenario-motor-enumererar-utfall-konservativt-ovanpa-verifierad-tabellmotor (VM 2026)
+
+**Recept (ett "vad krävs"/scenario-lager ovanpå härledd state, utan att gissa eller över-claima):**
+
+1. ENUMERERA utfallen, ÅTERANVÄND tabellmotorn. För n återstående matcher finns 3^n W/D/L-utfall
+   (vinst/oavgjort/förlust). För VARJE utfall: bygg SYNTETISKA färdiga matcher (neutrala marginaler
+   1-0/0-0/0-1) och låt den redan verifierade `computeStandings` (FIFA-tiebreakers) räkna tabellen.
+   Bygg ALDRIG egen tabellogik (DRY, PRINCIPLES §4).
+2. KÄNN APPROXIMATIONEN och var KONSERVATIV. En W/D/L-enumeration fixerar POÄNGEN exakt men INTE
+   målsiffrorna, och mål påverkar tiebreaks. Klassa därför BARA på poäng: "klar" bara om laget är
+   säkert i mål-positionen i ALLA utfall oberoende av marginal (`<= 1` annat lag med >= poäng för
+   topp-2), "ute" bara om ingen marginal kan rädda det (`>= k` lag STRIKT före), allt målsiffer-
+   känsligt -> "beror på" (+ en `marginDependent`-flagga som gör approximationens gräns SYNLIG).
+   Approximationen ska ALLTID luta mot "beror på", aldrig mot ett falskt "klart"/"ute" (HARD: gissa
+   aldrig en garanti enumeringen inte avgör). Använd POÄNG-konservativa "kan-nå"-signaler (inte den
+   neutrala-marginal-ranken) för UI-flaggor (`canFinishTop2/Third`), annars kan en godtyckligt vald
+   marginal ge en falsk negativ.
+3. TRÖSKEL-GARANTIN bor i FUNKTIONEN + randtesta n-1/n/n+1 (lessons `uttommande-test-vaktar-svagare-
+   invariant`). 3^n exploderar, så en `MAX`-vakt (`assertEnumerable`) FAIL-LOUD:ar (kastar) på oväntat
+   stort n och testas direkt på randen. Men det PUBLIKA API:t gatar FÖRE vakten och returnerar en FAS
+   (`'too-early'`) i stället för att kasta när det normala "för tidigt"-läget råder (många matcher kvar
+   tidigt i turneringen), så vyn aldrig kraschar. En modell-fas (`decided` | `scenarios` | `too-early`)
+   skiljer facit, det egentliga scenario-läget och det för-tidiga, och en tom grupp (ingen matchdata)
+   klassas `too-early`, INTE `decided` (annars facit på en tom tabell).
+4. CROSS-GRUPP-BEROENDE uttrycks KVALITATIVT, inte simulerat. Där utfallet beror på ANDRA gruppers
+   resultat (här bästa-trea-vägen, FIFA Art. 13), säg det ärligt ("beror på de andra grupperna") i
+   stället för att simulera en kombinatorisk explosion eller påstå en obevisbar tröskel ("X poäng
+   räcker som trea"). Gissa aldrig en garanti du inte kan bevisa lokalt.
+5. SEAM som de andra härledda vyerna: ren motor (testbar fristående) -> tunn hook på den DELADE storen
+   (`useMemo` gatad på `status === 'ready'`, C8-kontraktet) -> vy med stabil semantik + data-attribut
+   (`data-scenario-*`) för design-frontend. Färg-OBEROENDE status-chip (text + form, inte bara färg,
+   T7-pin).
+6. TÄCKNING: edge-fall (redan klart, omöjligt, beror på annan grupp, ej startad, tom grupp), tröskel-
+   randen (n-1/n/n+1 på vakten + mjuk too-early-degradering), OCH ett KONSERVATIVITETS-test (ett
+   konstruerat målskillnads-gränsfall klassas ALDRIG "klar"/"ute"; "klar" och `marginDependent` kan
+   aldrig vara sanna samtidigt). Hand-byggda standings-fixtures: verifiera de faktiska poängen med en
+   probe (`computeStandings`) INNAN du skriver assertions, annars testar du fel antagande.
+
+**Varför:** "Vad krävs"-scenarier (SPEC §5, de mest spännande VM-minuterna) ska vara KORREKTA och
+ÄRLIGA, aldrig ett falskt "klart" som målskillnad rubbar. Genom att enumerera ovanpå den verifierade
+tabellmotorn och klassa konservativt på poäng blir slutsatsen sann inom det enumeringen avgör, och allt
+osäkert syns som "beror på" i stället för att maskeras. Generaliserar de tidigare härledda-state-vyerna
+(T5/T6/T9) till ett scenario-lager, och är basen för T12:s what-if-sandbox. Källa: T11
+(`src/features/scenarios/`: `scenario-engine.ts` + `use-group-scenarios.ts` + `ScenarioView.tsx`).

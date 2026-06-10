@@ -5,6 +5,59 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T11 (issue #11): "Vad krävs"-kalkylatorn, enumererad scenario-motor + ärlig approximation
+
+**Beslut (arkitektur, härledd state + ÅTERANVÄND compute-standings):** "Vad krävs" är en REN funktion
+`computeGroupScenario(teamIds, matcher, groupId) -> GroupScenario`
+(`src/features/scenarios/scenario-engine.ts`), exakt som tabeller/träd (SPEC §6). För en grupp
+enumereras de 3^n W/D/L-utfallen av de ÅTERSTÅENDE matcherna; för VARJE utfall byggs syntetiska
+färdiga matcher och tabellen härleds av den redan verifierade `computeStandings` (FIFA-tiebreakers
+inkl. re-iteration, T3/T4). INGEN egen tabellogik. Hooken (`use-group-scenarios.ts`) är en tunn
+konsument av den delade results-storen (samma sanning som gruppspel/inmatning/träd), så scenarierna
+är "live": en inmatning -> ny matchlista -> useMemo räknar om. Vyn (`ScenarioView.tsx`) bär stabil
+semantik + data-attribut (`data-scenario-group/-team/-status/-phase/-margin-dependent/-decided`) som
+design-frontend stylar premium-finishen ovanpå.
+
+**Beslut (W/D/L-APPROXIMATIONEN, var den ligger + åt vilket håll den är konservativ, HARD):** en
+W/D/L-enumeration fixerar POÄNGEN exakt men INTE målsiffrorna, och exakta mål påverkar tiebreaks
+(målskillnad b, gjorda mål c). Därför klassas varje lag KONSERVATIVT, BARA på poäng:
+- **"Klar" (qualified)** påstås bara när laget är säkert topp-2 i ALLA 3^n utfall, oberoende av
+  målskillnad: högst 1 annat lag står >= dess poäng (`securelyTop2`). Även om varje sådant lag vinner
+  tiebreaken hamnar laget som värst på rank 2.
+- **"Ute" (eliminated)** påstås bara när laget i ALLA utfall har >= 2 lag STRIKT före på poäng
+  (`definitelyOutOfTop2`) OCH inte ens kan nå rank 3 med gynnsam marginal (`couldReachThird`, < 3 lag
+  strikt före). Ingen marginal kan rädda det.
+- **Allt målsiffer-känsligt blir "Beror på"** (med villkoret "i vissa fall avgör målskillnaden" där
+  det gäller, flaggat `marginDependent`). Approximationen lutar alltså ALLTID mot "beror på", ALDRIG
+  mot ett falskt "klart"/"ute". Bevisat av test: ett konstruerat målskillnads-gränsfall klassas
+  aldrig qualified/eliminated, och qualified och marginDependent kan aldrig vara sanna samtidigt
+  (`scenario-engine.test.ts`, KONSERVATIVITET-blocket).
+
+**Beslut (BÄSTA-TREA-VÄGEN, kopplad till T4, korsar grupper, uttryckt KVALITATIVT):** en trea
+kvalificerar om den rankas topp-8 av de 12 grupptreorna (FIFA Article 13, `rank-third-places.ts`),
+vilket beror på ALLA tolv gruppers resultat. Att simulera alla gruppers kombinationer är en
+kombinatorisk explosion, så trea-vägen uttrycks kvalitativt: "kan sluta trea, men om det räcker beror
+på de andra grupperna". Vi påstår ALDRIG att en viss poäng som trea "räcker" (går inte att bevisa utan
+de andra grupperna, gissa aldrig). En färdigspelad grupps trea klassas därför 'depends' (beror på andra
+grupper), inte qualified/eliminated.
+
+**Beslut (TRÖSKEL-GARANTI bor i funktionen + randtestad, lessons `uttommande-test-vaktar-svagare-
+invariant` Förekomst 3):** 3^n växer exponentiellt, så `MAX_REMAINING_MATCHES = 3` (3^3 = 27 utfall;
+VM-formatet har max 2 kvar i sista omgången). Vakten `assertEnumerable` (fail loud, kastar) bor i
+motorn och randtestas DIREKT n-1/n/n+1. Men det PUBLIKA `computeGroupScenario` gatar FÖRE vakten och
+returnerar fasen `'too-early'` (ett legitimt produkt-läge inför sista omgången, INTE ett fel) när n >
+MAX, så vyn aldrig kraschar tidigt i turneringen (där alla 6 gruppmatcher är ospelade, fixtures-läget).
+Likaså: en grupp UTAN matchdata (varken spelad eller schemalagd) klassas `'too-early'`, INTE 'decided',
+så vi aldrig ger facit på en tom tabell. Båda randfallen testade.
+
+**Spårbarhet:** FIFA-reglerna som motorn LUTAR sig på (tiebreak-ordningen, treplats-rankningen) är redan
+källhänvisade i `compute-standings.ts` / `rank-third-places.ts` (Article 13, committat i
+`fifa-knockout-rules-source.txt`); T11 definierar INGEN ny domänregel, bara den konservativa
+approximationen ovanpå. Approximationen + konservativitets-riktningen är en intern design-regel (gissa
+aldrig en garanti W/D/L inte avgör), spårbar via #11 + denna rad + testerna.
+
+---
+
 ## 2026-06-10 , T10 (issue #10): Copilot C10, fail-loud-light motståndare i lagets väg
 
 **Beslut (C10, TeamProfilePanel/`opponentName`):** När en match i lagets väg har ett `opponentId` som
