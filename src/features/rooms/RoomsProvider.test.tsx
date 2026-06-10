@@ -45,9 +45,14 @@ let store: ReturnType<typeof useRoomsStore>;
 function Probe() {
   store = useRoomsStore();
   return (
-    <output data-testid="probe" data-status={store.status} data-enabled={String(store.enabled)}>
+    <output
+      data-testid="probe"
+      data-status={store.status}
+      data-enabled={String(store.enabled)}
+      data-members={store.members.map((m) => m.displayName).join(',')}
+    >
       rooms:{store.myRooms.length} active:{store.activeRoom?.name ?? 'none'} members:
-      {store.members.length}
+      {store.members.length} results:{store.results.length}
     </output>
   );
 }
@@ -165,6 +170,114 @@ describe('RoomsProvider, handlingar', () => {
     await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:none'));
     expect(screen.getByTestId('probe')).toHaveTextContent('rooms:0');
     expect(api.leaveRoom).toHaveBeenCalledWith(fakeClient, 'r1');
+  });
+});
+
+describe('RoomsProvider, cancellation-guard vid snabba rumsbyten (KA-F2)', () => {
+  // En manuellt löst promise, så testet styr EXAKT när ett listMembers-svar landar.
+  function deferred<T>() {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  it('ignorerar ett FÖRÅLDRAT svar: slutstate speglar det SENAST valda rummet', async () => {
+    // Två rum man redan är med i (så selectRoom kan byta mellan dem).
+    api.listMyRooms.mockResolvedValue([
+      { id: 'rA', name: 'Rum A', code: 'aaa11' },
+      { id: 'rB', name: 'Rum B', code: 'bbb22' },
+    ]);
+
+    // listMembers för A är LÅNGSAM (löses manuellt EFTER B), B är snabb. Detta
+    // är race:t: väljer man A och sedan B snabbt får A:s sena svar ALDRIG skriva
+    // över B:s medlemmar. listRoomResults löser direkt för båda (vi mäter medlemmar).
+    const aMembers = deferred<{ userId: string; displayName: string }[]>();
+    api.listMembers.mockImplementation((_client: unknown, roomId: string) => {
+      if (roomId === 'rA') {
+        return aMembers.promise; // hänger tills vi löser den nedan
+      }
+      return Promise.resolve([{ userId: 'b1', displayName: 'Bertil-B' }]);
+    });
+
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+
+    // Välj A (svaret hänger), sedan B direkt (B:s svar landar först).
+    await act(async () => {
+      void store.selectRoom('rA');
+      await store.selectRoom('rB');
+    });
+
+    // B:s medlemmar ska synas (B valdes sist).
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-members', 'Bertil-B')
+    );
+
+    // NU landar A:s FÖRÅLDRADE svar. Cancellation-guarden ska kasta det, så
+    // medlemmarna FORTSÄTTER vara B:s, inte A:s (annars vore det A-svar-vinner-buggen).
+    await act(async () => {
+      aMembers.resolve([{ userId: 'a1', displayName: 'Anna-A' }]);
+      await aMembers.promise;
+    });
+
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-members', 'Bertil-B');
+    expect(screen.getByTestId('probe')).toHaveTextContent('active:Rum B');
+  });
+});
+
+describe('RoomsProvider, saveResult når rummet (KA-F3 (a))', () => {
+  it('skriver resultatet till det aktiva rummet och lägger det i delade resultat', async () => {
+    api.joinRoomByCode.mockResolvedValue({ id: 'r1', name: 'Vänner', code: 'aaa11' });
+    api.upsertRoomResult.mockResolvedValue({
+      matchId: 'M1',
+      homeGoals: 2,
+      awayGoals: 1,
+      penalties: null,
+      status: 'finished',
+      updatedBy: 'me',
+      updatedAt: '2026-06-11T10:00:00Z',
+    });
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+
+    await act(async () => {
+      await store.joinRoom('aaa11', 'Bob');
+    });
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:Vänner'));
+
+    await act(async () => {
+      await store.saveResult({ matchId: 'M1', homeGoals: 2, awayGoals: 1, status: 'finished' });
+    });
+
+    // API:t anropades med rummets id + inmatningen.
+    expect(api.upsertRoomResult).toHaveBeenCalledWith(fakeClient, 'r1', {
+      matchId: 'M1',
+      homeGoals: 2,
+      awayGoals: 1,
+      status: 'finished',
+    });
+    // Det sparade resultatet syns optimistiskt i de delade resultaten.
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('results:1'));
+  });
+
+  it('är en no-op (rör inte API:t) utan aktivt rum (lokalt läge)', async () => {
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+
+    await act(async () => {
+      await store.saveResult({ matchId: 'M1', homeGoals: 2, awayGoals: 1, status: 'finished' });
+    });
+
+    expect(api.upsertRoomResult).not.toHaveBeenCalled();
+    expect(screen.getByTestId('probe')).toHaveTextContent('results:0');
   });
 });
 

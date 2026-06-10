@@ -81,18 +81,38 @@ export function RoomsProvider({
   const activeRoomRef = useRef<RoomSummary | null>(null);
   activeRoomRef.current = activeRoom;
 
+  // CANCELLATION-GUARD för loadRoomData (KA-F2): ett snabbt rumsbyte (välj A, välj
+  // B innan A:s listMembers/listRoomResults hunnit svara) får ALDRIG låta A:s
+  // föråldrade svar skriva över B:s state. listMembers/listRoomResults är två
+  // oberoende nätanrop vars ordning inte är garanterad, så utan vakt kan A:s svar
+  // landa EFTER B:s och visa B:s rum med A:s medlemmar/resultat. Varje load tar en
+  // monotont ökande token; bara den SENAST startade laddningens svar får tillämpas
+  // (epoch-mönster), äldre svar kastas tyst (de är per definition inaktuella).
+  const loadTokenRef = useRef(0);
+
   /** Ladda om medlemmar + resultat för ett rum (eller det aktiva). Fail loud. */
   const loadRoomData = useCallback(
     async (room: RoomSummary | null) => {
+      // Boka denna laddning som den senaste; ett senare anrop ogiltigförklarar oss.
+      const token = ++loadTokenRef.current;
       if (!supabase || !room) {
-        setMembers([]);
-        setResults([]);
+        // Även den tomma vägen (lämna/inget rum) måste respektera token: ett
+        // senare riktigt rumsval ska inte nollas av ett tidigare "rensa".
+        if (token === loadTokenRef.current) {
+          setMembers([]);
+          setResults([]);
+        }
         return;
       }
       const [m, r] = await Promise.all([
         listMembers(supabase, room.id),
         listRoomResults(supabase, room.id),
       ]);
+      // Föråldrat svar (ett nyare rumsbyte hann starta): kasta det tyst, så
+      // slutstate alltid speglar det SENAST valda rummet, inte vem som svarade sist.
+      if (token !== loadTokenRef.current) {
+        return;
+      }
       setMembers(m);
       setResults(r);
     },
