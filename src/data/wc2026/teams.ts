@@ -18,11 +18,19 @@
 // Den FULLSTÄNDIGA matchplanen (72 gruppmatcher med exakta avsparkstider,
 // arenor och SVENSKA TV-kanaler) är INTE med här, den kräver en svensk
 // sändningsrätts-källa och är medvetet flaggad som en egen data-punkt (se T4
-// handoff Findings) i stället för att gissas. Lag-profil-fälten (fifaRanking,
-// trivia, starPlayers, bestPlay) lämnas tomma här, de fylls av lag-profil-tasken.
+// handoff Findings) i stället för att gissas.
+//
+// LAG-PROFIL-FÄLTEN (T10): fifaRanking, starPlayers och trivia fylls nu ur den
+// KÄLLÅNKRADE profil-tabellen (team-profiles.ts, genererad ur team-profiles-source.txt
+// och värde-låst i CI). De vävs in nedan (enrichWithProfile), så Team-objekten bär
+// den verifierade profildatan utan att profilerna och lagen lagras dubbelt. bestPlay
+// utelämnas med flit (subjektivt utan källa, se decisions.md T10). Drift mellan
+// profil-tabellen och lag-listan fail-loud:ar redan vid byggtid (buildProfileTable),
+// en sanning.
 
 import type { Group, GroupId, Team } from '../../domain/types';
 import { GROUP_IDS } from '../../domain/types';
+import { WC2026_TEAM_PROFILES } from './team-profiles';
 
 /**
  * De 48 lagen, grupperade A-L i lottnings-positionsordning (position 1-4).
@@ -113,9 +121,34 @@ function teamId(code: string): string {
 }
 
 /**
+ * Väv in den källånkrade profil-datan (FIFA-ranking, stjärnspelare, kuriosa) på
+ * ett bas-Team. Profilerna bor i en EGEN tabell (team-profiles.ts, värde-låst mot
+ * källan), och vävs in här så Team-objekten bär dem utan dubbellagring. Saknas en
+ * profil för ett lag är det en data-inkonsistens som redan fail-loud:ats vid
+ * profil-byggtid (buildProfileTable kräver 48/48), men vi gör en sista grind här
+ * också: ett känt lag utan profil är ett internt fel (fail loud, PRINCIPLES §8),
+ * inte ett tyst tomt fält. bestPlay sätts ALDRIG (utelämnat med flit, decisions.md T10).
+ */
+function enrichWithProfile(base: Team): Team {
+  const profile = WC2026_TEAM_PROFILES[base.id];
+  if (profile === undefined) {
+    throw new Error(
+      `Lag ${base.code} (${base.id}) saknar profil i team-profiles.ts (ska aldrig hända, 48/48-täckning krävs).`
+    );
+  }
+  return {
+    ...base,
+    fifaRanking: profile.fifaRanking,
+    starPlayers: profile.starPlayers,
+    trivia: profile.trivia,
+  };
+}
+
+/**
  * Alla 48 lag som en platt, typad lista. Lag-id härleds ur landskoden (stabil
  * nyckel som matcher/tabeller refererar, SPEC §6). group sätts ur indelningen
  * ovan så Team.group och Group.teamIds garanterat stämmer överens (en sanning).
+ * Profil-fälten (T10) vävs in ur den källånkrade profil-tabellen (enrichWithProfile).
  *
  * Gruppordningen härleds EXPLICIT ur den kanoniska `GROUP_IDS` (A-L, enda
  * sanningen för iteration, se domain/types.ts), inte ur `Object.keys`. Object-
@@ -124,12 +157,13 @@ function teamId(code: string): string {
  */
 export const WC2026_TEAMS: Team[] = GROUP_IDS.flatMap((group) =>
   TEAMS_BY_GROUP[group].map(
-    (t): Team => ({
-      id: teamId(t.code),
-      name: t.name,
-      code: t.code,
-      group,
-    })
+    (t): Team =>
+      enrichWithProfile({
+        id: teamId(t.code),
+        name: t.name,
+        code: t.code,
+        group,
+      })
   )
 );
 

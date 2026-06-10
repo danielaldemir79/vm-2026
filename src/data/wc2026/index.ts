@@ -7,5 +7,11 @@
 // värde-låst mot källan i CI. Arena/stad saknas ännu i källan (känd lucka,
 // venue = uttrycklig "ej verifierad"-platshållare, gissas aldrig), se matches.ts.
 
+// Lag-profiler (T10/#10): FIFA-ranking + stjärnspelare + kuriosa per lag, källånkrad
+// (genererad ur team-profiles-source.txt, värde-låst i CI). Vävs redan in i
+// WC2026_TEAMS (Team.fifaRanking/starPlayers/trivia), tabellen exponeras för
+// direktuppslag (t.ex. profil-vyn) och tester.
 export { WC2026_TEAMS, WC2026_GROUPS } from './teams';
 export { WC2026_MATCHES } from './matches';
+export { WC2026_TEAM_PROFILES } from './team-profiles';
+export type { TeamProfile, TeamProfileTable } from './team-profiles-parser';
