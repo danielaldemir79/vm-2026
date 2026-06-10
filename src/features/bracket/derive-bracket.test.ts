@@ -479,14 +479,16 @@ describe('groupByRound', () => {
   const state = deriveBracket(GROUP_IDS.map(inProgressTable), []);
   const rounds = groupByRound(state);
 
-  it('delar upp trädet i rundor i officiell progressions-ordning', () => {
+  it('delar upp trädet i rundor i officiell progressions-ordning (brons FÖRE final, C4)', () => {
+    // Bronsmatchen (M103) SPELAS före finalen (M104) i FIFA:s schema (verifierat
+    // mot T4:s tablå: brons 18 juli, final 19 juli), så third-place står före final.
     expect(rounds.map((r) => r.stage)).toEqual([
       'round-of-32',
       'round-of-16',
       'quarter-final',
       'semi-final',
-      'final',
       'third-place',
+      'final',
     ]);
   });
 

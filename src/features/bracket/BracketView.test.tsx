@@ -45,16 +45,26 @@ describe('BracketView, rendering + a11y', () => {
     // antalet matcher, så "Final (1 match)" inte krockar med "Semifinaler ...".
     // Antalet böjs grammatiskt: 1 -> "match", >1 -> "matcher" (C1/C2), så
     // skärmläsaren inte säger "Final (1 matcher)".
-    for (const name of [
+    // Ordningen speglar trädets kolumner vänster -> höger: bronsmatchen står
+    // FÖRE finalen (C4), eftersom den spelas före (verifierat mot T4:s tablå).
+    const expectedOrder = [
       'Sextondelsfinaler (16 matcher)',
       'Åttondelsfinaler (8 matcher)',
       'Kvartsfinaler (4 matcher)',
       'Semifinaler (2 matcher)',
-      'Final (1 match)',
       'Bronsmatch (1 match)',
-    ]) {
+      'Final (1 match)',
+    ];
+    for (const name of expectedOrder) {
       expect(screen.getByRole('region', { name })).toBeInTheDocument();
     }
+    // ...och i DOM-ordning (kolumnerna vänster -> höger), så bronsmatchen
+    // RENDERAS före finalen, inte bara existerar. Vaktar C4-ordningen i vyn.
+    const renderedOrder = screen
+      .getAllByRole('region')
+      .map((region) => region.getAttribute('aria-label'))
+      .filter((label): label is string => expectedOrder.includes(label ?? ''));
+    expect(renderedOrder).toEqual(expectedOrder);
   });
 
   it('visar 16 match-kort i sextondelsrundan (M73-M88)', async () => {
