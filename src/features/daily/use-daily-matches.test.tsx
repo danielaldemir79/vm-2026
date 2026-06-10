@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
@@ -75,6 +75,40 @@ describe('useDailyMatches, laddning + härledning ur den delade storen', () => {
     expect(result.current.selectedDay).not.toBeNull();
     // Dagens framträdande match är dagens tidigaste.
     expect(result.current.matchOfTheDay).not.toBeNull();
+  });
+});
+
+describe('useDailyMatches, startdagen härleds SYNKRONT (ingen tom-dag-flicker)', () => {
+  // REGRESSION (Copilot R1, C1): startdagen sattes tidigare via en useEffect, så
+  // det fanns en render där status==='ready' och days.length>0 men
+  // selectedDay===null -> vyn kunde flicker-visa tom-dag-panelen fast matcher
+  // fanns. Kravet: PÅ DEN ALLRA FÖRSTA ready-render:en (innan någon effekt hunnit
+  // köra) ska selectedDay redan peka på en dag. Vi mäter det genom att läsa
+  // hooken-värdet i exakt det ögonblick status blir 'ready', utan en mellanliggande
+  // act/flush som skulle dölja glipan.
+  it('har en vald dag REDAN i samma render som status blir ready (aldrig null med dagar)', async () => {
+    // Fånga varje render-snapshot, så vi kan inspektera den FÖRSTA ready-render:en.
+    const snapshots: Array<{ status: string; daysLen: number; hasSelectedDay: boolean }> = [];
+    function Probe() {
+      const d = useDailyMatches(new Date('2026-06-01T00:00:00.000Z'));
+      snapshots.push({
+        status: d.status,
+        daysLen: d.days.length,
+        hasSelectedDay: d.selectedDay !== null,
+      });
+      return null;
+    }
+    render(<Probe />, { wrapper: wrapperFor(fixturesEnv()) });
+
+    await waitFor(() => {
+      expect(snapshots.some((s) => s.status === 'ready' && s.daysLen > 0)).toBe(true);
+    });
+
+    // INVARIANT: i ingen render får det finnas dagar (ready) utan en vald dag.
+    const flickerRender = snapshots.find(
+      (s) => s.status === 'ready' && s.daysLen > 0 && !s.hasSelectedDay
+    );
+    expect(flickerRender).toBeUndefined();
   });
 });
 

@@ -91,32 +91,40 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
 
   // Vald dag som NYCKEL (inte index): index kan glida om dag-listan ändrar längd
   // (en framtida realtidskälla). Nyckeln är stabil; vi slår upp index ur den.
+  // `null` = ingen användare har valt än (då gäller den HÄRLEDDA startdagen nedan).
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  // Sätt/synka startdagen när dagarna blir redo (eller listan ändras så att den
-  // valda nyckeln inte längre finns). Körs bara när det behövs, inte varje render.
-  useEffect(() => {
+  // EFFEKTIVT index, härlett SYNKRONT i render (inte via en effekt): är den lagrade
+  // nyckeln satt och finns kvar i dagarna används den, annars faller vi tillbaka på
+  // den härledda startdagen (initialDayIndex). VARFÖR synkront: en useEffect körs
+  // FÖRST efter första commit, så en effekt-initierad nyckel ger en render där
+  // status==='ready' och days.length>0 men selectedDay===null -> vyn skulle
+  // flicker-visa tom-dag-panelen fast matcher finns (Copilot R1, C1). Genom att
+  // härleda i render finns den glipan aldrig: redan första ready-render har en dag.
+  const selectedIndex = useMemo(() => {
     if (days.length === 0) {
-      if (selectedKey !== null) {
-        setSelectedKey(null);
-      }
-      return;
+      return -1;
     }
-    const stillExists = selectedKey !== null && days.some((d) => d.dateKey === selectedKey);
-    if (!stillExists) {
-      const idx = initialDayIndex(days, now);
-      setSelectedKey(idx === -1 ? null : days[idx].dateKey);
-    }
-    // `now` läses bara vid (om)initiering av startdagen; vi vill INTE re-initiera
-    // varje sekund när tick-now ändras, så den ligger medvetet utanför deps.
+    const storedIdx = selectedKey === null ? -1 : days.findIndex((d) => d.dateKey === selectedKey);
+    return storedIdx !== -1 ? storedIdx : initialDayIndex(days, now);
+    // `now` läses bara för den härledda startdagen (inte varje tick), och fryses
+    // i praktiken så fort användaren navigerat (då vinner selectedKey). Utanför
+    // deps med flit: vi vill inte räkna om startdagen varje sekund när tick-now
+    // ändras (startdagen ska inte hoppa under användaren).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days, selectedKey]);
-
-  const selectedIndex = useMemo(
-    () => (selectedKey === null ? -1 : days.findIndex((d) => d.dateKey === selectedKey)),
-    [days, selectedKey]
-  );
   const selectedDay = selectedIndex === -1 ? null : days[selectedIndex];
+
+  // Synka tillbaka den härledda startnyckeln till state EN gång, så navigeringen
+  // (goPrev/goNext via setSelectedKey) har en stabil bas och en list-ändring som
+  // gör nyckeln ogiltig nollställs (då tar härledningen över igen). Detta är en
+  // ren spegling av render-härledningen ovan, inte källan till vad vyn visar.
+  useEffect(() => {
+    const effectiveKey = selectedIndex === -1 ? null : days[selectedIndex].dateKey;
+    if (effectiveKey !== selectedKey) {
+      setSelectedKey(effectiveKey);
+    }
+  }, [days, selectedIndex, selectedKey]);
 
   // Dagens framträdande match (ren, deterministisk regel).
   const matchOfTheDay = useMemo(
