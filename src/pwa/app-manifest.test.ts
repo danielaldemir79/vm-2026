@@ -12,6 +12,47 @@ import { VM_2026_MANIFEST } from './app-manifest';
 // Chrome Lighthouse "installable-manifest" / "maskable-icon" (192+512, maskable),
 // progressier/DEV "why an icon shouldn't be 'any maskable'" (separat maskable).
 
+// `sizes` är enligt W3C App Manifest en WHITESPACE-separerad mängd tokens (t.ex.
+// "192x192 512x512"), där varje token antingen är "any" eller WxH (case-insensitivt
+// x). En ENDA ikon kan alltså deklarera flera storlekar. Källa: W3C App Manifest,
+// "sizes member" (https://www.w3.org/TR/appmanifest/). Därför parsar vi varje
+// sizes-sträng spec-troget i stället för att jämföra hela strängen exakt, annars
+// vaktar testet en SVAGARE invariant än kravet (jfr senior-developer-lessons).
+
+/** En parsad WxH-storlek i råa pixlar (token "any" -> width/height = Infinity). */
+interface ParsedSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * Parsar en W3C `sizes`-sträng till dess enskilda storlekar. Splittar på godtycklig
+ * whitespace (spec: "space-separated tokens"), tål "any", och ignorerar tomma tokens.
+ */
+function parseSizes(sizes: string): ParsedSize[] {
+  return sizes
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 0)
+    .map((token) => {
+      if (token.toLowerCase() === 'any') {
+        return { width: Infinity, height: Infinity };
+      }
+      const [w, h] = token.toLowerCase().split('x');
+      return { width: Number(w), height: Number(h) };
+    });
+}
+
+/** Sant om någon av ikonens deklarerade storlekar är minst minPx x minPx. */
+function hasSizeAtLeast(icon: { sizes: string }, minPx: number): boolean {
+  return parseSizes(icon.sizes).some((size) => size.width >= minPx && size.height >= minPx);
+}
+
+/** Sant om någon av ikonens deklarerade storlekar är exakt px x px. */
+function hasExactSize(icon: { sizes: string }, px: number): boolean {
+  return parseSizes(icon.sizes).some((size) => size.width === px && size.height === px);
+}
+
 describe('VM_2026_MANIFEST, WebAPK-mintningskrav', () => {
   it('har en stabil app-identitet (id satt, inte tom)', () => {
     // id frikopplar app-identiteten från start_url. Utan id default:ar den till
@@ -33,16 +74,21 @@ describe('VM_2026_MANIFEST, WebAPK-mintningskrav', () => {
   });
 
   it('uppfyller Chromiums ikon-krav: minst en 192x192 OCH en 512x512', () => {
-    const sizes = VM_2026_MANIFEST.icons.map((icon) => icon.sizes);
-    expect(sizes).toContain('192x192');
-    expect(sizes).toContain('512x512');
+    // Spec-troget: en sizes-sträng kan lista FLERA storlekar ("192x192 512x512"),
+    // så vi parsar varje token i stället för att jämföra hela strängen exakt. En
+    // 192-storlek deklarerad i en multi-size-ikon räknas alltså, precis som Chrome
+    // tolkar den. (W3C App Manifest, sizes member.)
+    expect(VM_2026_MANIFEST.icons.some((icon) => hasExactSize(icon, 192))).toBe(true);
+    expect(VM_2026_MANIFEST.icons.some((icon) => hasExactSize(icon, 512))).toBe(true);
   });
 
   it('har EXAKT en maskable-ikon (adaptiv Android-ikon), minst 512x512', () => {
     const maskable = VM_2026_MANIFEST.icons.filter((icon) => icon.purpose === 'maskable');
     expect(maskable).toHaveLength(1);
-    // En maskable-ikon ska vara minst 512x512 (Lighthouse maskable-icon-audit).
-    expect(maskable[0].sizes).toBe('512x512');
+    // Kravet är MINST 512x512, inte exakt 512x512 (Lighthouse maskable-icon-audit).
+    // Vi parsar bredd/höjd numeriskt och assertar >= 512, så en större maskable-ikon
+    // (t.ex. 1024x1024) också passerar i stället för att felaktigt failas.
+    expect(hasSizeAtLeast(maskable[0], 512)).toBe(true);
   });
 
   it('använder ALDRIG den skadliga kombinerade purpose "any maskable"', () => {
