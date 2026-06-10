@@ -5,6 +5,52 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , #39 (T27) design-frontend: premium-finish på resultatinmatningen (kompakta kort + tydlig expandera)
+
+**Beslut (kompakta kort, "arena i kvällsljus"):** ResultEntryForm-kortet komprimerades ovanpå senior-devs
+stabila grid (seamen `data-result-card-body` orörd): padding 16 -> 14px (mobil), kort-gap + fieldset-gap
+16 -> 12px, body-grid-gap (10px kolumn / 12px rad), score-input 56 -> 48px hög (font 24 -> 22px, fortfarande
+ett bekvämt touch-mål >= 44px, WCAG 2.5.5), och en diskret varm topp-list (`inset 0 1px 0` i `--vm-gold`-mix)
+som premium-detalj. Lagnamn fick avsiktlig ellipsis-typografi (dämpad ton + tight tracking) och "mot"-
+avdelaren en guld-skiftad ton. Resultat: kort-höjden gick från 213 -> 192px (mobil) och 128px (desktop/
+vikbar inner), den "luftiga spill-ytan" i Daniels skärmdump är borta.
+**Varför:** Daniels mobil-feedback (#39): korten var luftiga med mycket död yta. Kompaktionen rör BARA
+spårbredder/typografi/spacing/dekor (design-frontends lager), aldrig grid-strukturen eller a11y-haken
+(`w-16`, `truncate`, `data-result-card-body` är låsta av strukturtesten och bevarade). Inga råa hex, allt
+via `color-mix` mot semantiska tokens (samma husstil som GroupTable), så det följer temat.
+
+**Beslut (expandera TYDLIGT SYNLIG):** "Visa alla matcher (N dolda)"-knappen gick från en blek border-pill
+till en INBJUDANDE accent-kontroll: en accent-tonad yta (`color-mix(accent 12%, surface)`, hover 20%),
+accent-kant (42% -> hover 60%) och en accent-färgad chevron som pekar ner (= mer finns) och vänds 180° i
+utfällt läge. Knapptexten + aria-attributen (`aria-expanded`/`aria-controls`/`data-results-toggle`) är
+OFÖRÄNDRADE (test-låsta). Chevron-vridningen animeras via `transition-[rotate]` (Tailwind v4:s `rotate-180`
+sätter CSS-`rotate`, inte transform, så övergången måste rikta `rotate` för att inte snappa) och nollas av
+den globala reduced-motion-regeln (index.css).
+**Varför:** Daniel bad uttryckligen att göra den "tydligt synlig, omöjlig att missa, men inte skrikig".
+En låg-alfa accent-tint + kant + chevron drar ögat utan att bli en fylld accent-knapp (den tonen är
+reserverad för primär-action Spara), så hierarkin hålls.
+
+**UPPMÄTTA kontraster (WCAG AA, canvas-komposit i webbläsaren, BÅDA teman, värsta uppmätta = min):**
+Endast uppmätta värden, inga antagna (lessons `aa-kontrast-pastad...`). Mätmetod: rendera elementets
+faktiska color över sin faktiska yt-färg på en 1x1-canvas, läs sRGB-byte, räkna WCAG-ratio.
+- Expandera-knappens text (`--color-fg`) på sin accent-tint-yta: **ljust 15.14:1**, **mörkt 11.85:1**.
+- Expandera-chevron (accent, dekorativ affordans): ljust 4.57:1, mörkt 7.53:1 (>= 4.5:1 i båda ändå).
+- Lagnamn (`--color-fg`) på kort-ytan: ljust 17.91:1, mörkt 15.24:1.
+- Status-etikett (`--color-fg-muted`) på kort-ytan: ljust 6.52:1, mörkt 7.50:1.
+- "mot"-avdelaren (guld-mix `gold 52% / fg-muted 48%`) på kort-ytan: **ljust 4.88:1**, **mörkt 8.67:1**
+  (mixet justerades från 72% guld till 52% just för att klara AA som normal text i ljust tema; aria-hidden
+  men hålls ändå >= 4.5:1).
+- Spara-text (`--accent-fg`) på accent: ljust 5.40:1, mörkt 10.85:1.
+Alla text-par >= 4.5:1 (AA normal text) i båda teman. Min uppmätt = 4.57 (chevron, dekorativ) / 4.88 ("mot").
+
+**Live-verifierat (dev-server, per bredd):** 280 (vikbar cover), 360, 768 (vikbar inner ~Daniels skärmdump),
+1024, 1440, i båda teman. Per bredd uppmätt: noll horisontell overflow (`scrollWidth === clientWidth`),
+score-kolumnerna linjerar IDENTISKT kort-till-kort (home/away-input + "mot"-center samma offset på alla
+kort, en enda unik offset-uppsättning), trunkering aktiv (`overflow:hidden` + ellipsis, namn inom kort-
+kanten), och layout-växeln (mobil-staplad < 640px -> desktop-inline >= 640px) korrekt. Expandera-knappen
+fäller ut 5 -> 72 kort och tillbaka, `aria-expanded` växlar, chevron vänds. Reduced-motion emulerad:
+chevron + kort-transition = 0.01ms (nollade), inga animationer.
+
 ## 2026-06-10 , #39 (T27) senior-developer: resultatinmatning, stabilt kolumn-grid + 3-dagars fönster
 
 **Beslut (stabil kolumn-layout):** ResultEntryForm-kortets kropp gick från en flex-layout med

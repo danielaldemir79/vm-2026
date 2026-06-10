@@ -160,7 +160,19 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
           via aria-controls + aria-expanded, så en skärmläsare vet att den fäller
           ut/ihop just matchlistan ovanför. Antalet dolda står i etiketten så valet
           är begripligt ("Visa alla matcher (101 dolda)"). data-attribut är seam för
-          design-frontends premium-styling. */}
+          design-frontends premium-styling.
+
+          VISUELL FINISH (#39, Daniels feedback "gör den TYDLIGT SYNLIG"): inte
+          längre en blek border-pill utan en INBJUDANDE, premium accent-kontroll,
+          en mjuk accent-tonad yta (color-mix mot --color-accent, följer temat),
+          accent-kant och accent-färgad text, plus en chevron som pekar NER när
+          mer finns att visa och vänds UPP i utfällt läge. Tydlig men inte skrikig:
+          tonen är en låg-alfa-tint, inte en fylld accent-knapp (den är reserverad
+          för primär-action Spara). Hover fördjupar tinten, fokus-ringen är kvar
+          (WCAG 2.4.7), och chevron-rotationen gatas av reduced-motion globalt
+          (index.css nollar transition-duration vid "minska rörelse"). Texten bärs
+          på --color-fg (full kontrast, uppmätt AA i båda teman, se handoff), inte
+          på accent-hue, så etiketten är skarp oavsett tema. */}
       {status === 'ready' && editable.length > 0 && hasHidden ? (
         <button
           type="button"
@@ -168,11 +180,34 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
           aria-expanded={expanded}
           aria-controls={listId}
           data-results-toggle={expanded ? 'collapse' : 'expand'}
-          className="self-center rounded-pill border border-border bg-surface px-5 py-2.5 font-display text-sm font-semibold text-fg shadow-[var(--vm-shadow-card)] transition-colors duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+          className="group/toggle inline-flex items-center gap-2.5 self-center rounded-pill border border-[color-mix(in_srgb,var(--color-accent)_42%,var(--color-border))] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))] px-6 py-3 font-display text-sm font-semibold text-fg shadow-[var(--vm-shadow-card)] transition-[background-color,border-color,box-shadow] duration-200 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_60%,var(--color-border))] hover:bg-[color-mix(in_srgb,var(--color-accent)_20%,var(--color-surface))] hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
         >
-          {expanded
-            ? 'Visa färre'
-            : `Visa alla matcher (${windowed.hiddenCount} ${windowed.hiddenCount === 1 ? 'dold' : 'dolda'})`}
+          <span>
+            {expanded
+              ? 'Visa färre'
+              : `Visa alla matcher (${windowed.hiddenCount} ${windowed.hiddenCount === 1 ? 'dold' : 'dolda'})`}
+          </span>
+          {/* Chevron: pekar ner = "det finns mer", vänds upp i utfällt läge.
+              aria-hidden (etiketten + aria-expanded bär betydelsen åt skärmläsare),
+              ren affordans. Accent-färgad så den drar ögat utan extra text. */}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            // Tailwind v4:s rotate-180 sätter CSS-egenskapen `rotate` (inte den
+            // gamla transform-axeln), så övergången måste rikta in sig på `rotate`
+            // för att animera mjukt i stället för att snappa. Reduced-motion nollar
+            // transition-duration globalt (index.css), så vridningen blir momentan
+            // men korrekt riktad för den som bett om minskad rörelse (WCAG 2.3.3).
+            className={`h-4 w-4 transition-[rotate] duration-200 ${expanded ? 'rotate-180' : ''}`}
+            style={{ color: 'var(--color-accent)' }}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.25}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 6l4 4 4-4" />
+          </svg>
         </button>
       ) : null}
 
