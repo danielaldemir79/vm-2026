@@ -61,7 +61,7 @@ kontext-elementen via seamarna, struktur orörd (samma seam-princip).
   STEG-CHIP som ekar TV-badge-/steg-pillen från daily (samma `rounded-pill`-recept, delat designspråk
   via delade klasser/tokens, INTE en duplicerad komponent). Avdelar-pricken togs bort: chip-gränsen
   skiljer tid och steg, så raden läses rent som "21:00 Grupp A".
-- *Toggeln* (dubblerad) behåller #39:s accent-pill + chevron oförändrad (kravet: konsekvent premium-stil
+- *Togglen* (dubblerad) behåller #39:s accent-pill + chevron oförändrad (kravet: konsekvent premium-stil
   uppe + nere). Båda delar `ExpandToggle`, så de är identiska per konstruktion (verifierat live:
   `className` byte-identisk på top + bottom).
 - *#39-kolumnerna:* kontext-raden ligger utanför score-grid:en, verifierat LIVE @ 768/1024px att
