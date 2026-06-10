@@ -15,6 +15,7 @@ import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
+import { ScenarioView } from './features/scenarios';
 import { TeamProfileProvider } from './features/team-profile';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
@@ -139,6 +140,15 @@ export default function App() {
 
             <Slide direction="up">
               <GroupStageView />
+            </Slide>
+
+            {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista
+              gruppomgången, vad varje lag behöver för att gå vidare (Klar/Ute/
+              Beror på). Läser SAMMA delade store, så scenarierna räknas om när ett
+              resultat matas in. Den FUNKTIONELLA + tillgängliga strukturen +
+              data-seamen byggs här; design-frontend ger premium-finish ovanpå. */}
+            <Slide direction="up">
+              <ScenarioView />
             </Slide>
 
             {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. Läser
