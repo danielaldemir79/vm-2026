@@ -22,7 +22,15 @@
 // över ALLA 360 hue:er, värsta fallet gult). Uppmätta AA-värden, svept över hela
 // hue-spannet + bekräftade på renderade pixlar (båda teman): docs/decisions.md.
 
-import { useId, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { useRoomsStore } from './rooms-context';
 import { avatarHueFromId, initialsFromName } from './member-avatar';
 import { buildInviteText, copyText, shareInvite } from './share-room';
@@ -105,7 +113,7 @@ function MemberChip({
       <span
         aria-hidden="true"
         className="vm-rooms-avatar flex h-7 w-7 shrink-0 items-center justify-center rounded-pill font-display text-xs font-bold leading-none"
-        style={{ '--vm-avatar-hue': hue } as React.CSSProperties}
+        style={{ '--vm-avatar-hue': hue } as CSSProperties}
       >
         {initials}
       </span>
@@ -117,6 +125,16 @@ function MemberChip({
   );
 }
 
+// Rensar en pågående återställnings-timeout och nollar reffen. Delas av CopyButton
+// och ShareButton (C12/C13), så cleanup-logiken är EN sanning på båda knapparna.
+type ResetTimerRef = { current: ReturnType<typeof window.setTimeout> | null };
+function clearResetTimer(ref: ResetTimerRef): void {
+  if (ref.current !== null) {
+    window.clearTimeout(ref.current);
+    ref.current = null;
+  }
+}
+
 /**
  * Kopiera-rumskoden-knappen med tydlig FEEDBACK: efter ett lyckat kopp byter den
  * till en bock + "Kopierad!" en kort stund (aria-live meddelar det åt skärm-
@@ -126,12 +144,19 @@ function MemberChip({
  */
 function CopyButton({ code }: { code: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  // Timeout-id i en ref så vi kan rensa en pågående återställning (C12): annars
+  // tickar setState efter unmount (React-varning + flaky test) eller en ny kopp
+  // staplar en andra timeout ovanpå den första.
+  const resetTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  useEffect(() => () => clearResetTimer(resetTimer), []);
 
   const handleCopy = async () => {
     const ok = await copyText(code);
     setState(ok ? 'copied' : 'failed');
     // Återställ etiketten efter en stund, så knappen är redo att kopieras igen.
-    window.setTimeout(() => setState('idle'), 2200);
+    // Rensa en ev. tidigare timeout först, så snabba kopp inte staplar dem.
+    clearResetTimer(resetTimer);
+    resetTimer.current = window.setTimeout(() => setState('idle'), 2200);
   };
 
   const label =
@@ -166,6 +191,10 @@ function CopyButton({ code }: { code: string }) {
  */
 function ShareButton({ roomName, code }: { roomName: string; code: string }) {
   const [hint, setHint] = useState<string | null>(null);
+  // Samma timeout-ref-städning som CopyButton (C13): hinten ska inte setState:a
+  // efter unmount, och en ny delning ska inte stapla en andra timeout.
+  const hintTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  useEffect(() => () => clearResetTimer(hintTimer), []);
 
   const handleShare = async () => {
     const text = buildInviteText(roomName, code);
@@ -176,7 +205,8 @@ function ShareButton({ roomName, code }: { roomName: string; code: string }) {
     // Inget delnings-ark (desktop) eller avbrutet: kopiera inbjudan i stället.
     const copied = await copyText(text);
     setHint(copied ? 'Inbjudan kopierad, klistra in och skicka.' : 'Kopiera koden och skicka den.');
-    window.setTimeout(() => setHint(null), 2600);
+    clearResetTimer(hintTimer);
+    hintTimer.current = window.setTimeout(() => setHint(null), 2600);
   };
 
   return (
@@ -222,7 +252,7 @@ export function RoomPanel() {
     return null;
   }
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setNotice(null);
     setBusy(true);
@@ -241,7 +271,7 @@ export function RoomPanel() {
     }
   };
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleJoin = async (e: FormEvent) => {
     e.preventDefault();
     setNotice(null);
     setBusy(true);
