@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { RoomPanel } from './RoomPanel';
 import { RoomsStoreContext, type RoomsStore } from './rooms-context';
@@ -98,6 +98,50 @@ describe('RoomPanel', () => {
     renderWith(stubStore({ status: 'error', error: 'Kunde inte ladda rummen.' }));
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(/Kunde inte ladda rummen/i);
+    });
+  });
+
+  // C3 (Copilot-runda 1): ett rumsbyte som FALLER (nät/RLS) får inte bli en tyst
+  // unhandled rejection. Klicket ska visa ett fel-notis (fail loud), inte svälja det.
+  it('visar ett fel-notis när byt-rum FALLER (C3, ingen tyst miss)', async () => {
+    const selectRoom = async () => {
+      throw new Error('Nätfel vid rumsbyte.');
+    };
+    renderWith(
+      stubStore({
+        myRooms: [{ id: 'r1', name: 'Vänner', code: 'aaa22' }],
+        selectRoom,
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Välj rummet Vänner/i }));
+
+    await waitFor(() => {
+      const notice = document.querySelector('[data-rooms-notice]');
+      expect(notice).toHaveTextContent(/Nätfel vid rumsbyte/i);
+      expect(notice).toHaveAttribute('data-rooms-notice-tone', 'error');
+    });
+  });
+
+  // C4 (Copilot-runda 1): att LÄMNA ett rum som faller ska likaså visa ett fel,
+  // inte bli en tyst unhandled rejection utan UI-återkoppling.
+  it('visar ett fel-notis när lämna-rum FALLER (C4, ingen tyst miss)', async () => {
+    const leaveRoom = async () => {
+      throw new Error('RLS nekade lämnandet.');
+    };
+    renderWith(
+      stubStore({
+        activeRoom: { id: 'r1', name: 'Vänner', code: 'aaa22' },
+        leaveRoom,
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Lämna rummet/i }));
+
+    await waitFor(() => {
+      const notice = document.querySelector('[data-rooms-notice]');
+      expect(notice).toHaveTextContent(/RLS nekade lämnandet/i);
+      expect(notice).toHaveAttribute('data-rooms-notice-tone', 'error');
     });
   });
 });

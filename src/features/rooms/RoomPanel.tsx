@@ -267,6 +267,35 @@ export function RoomPanel() {
     }
   };
 
+  // Byt aktivt rum. Fångar fel (nät/RLS) och visar dem (C3): annars blev det en
+  // unhandled rejection + tyst miss (klicket "tog inte"). Samma fel-mönster som
+  // handleCreate/handleJoin, så panelen fail-loud:ar konsekvent (PRINCIPLES §8).
+  const handleSelect = async (roomId: string) => {
+    setNotice(null);
+    try {
+      await store.selectRoom(roomId);
+    } catch (err) {
+      setNotice({
+        text: err instanceof Error ? err.message : 'Kunde inte byta rum.',
+        tone: 'error',
+      });
+    }
+  };
+
+  // Lämna det aktiva rummet. Fångar fel (nät/RLS) och visar dem (C4): annars blev
+  // det en unhandled rejection + ingen återkoppling när lämnandet misslyckas.
+  const handleLeave = async (roomId: string) => {
+    setNotice(null);
+    try {
+      await store.leaveRoom(roomId);
+    } catch (err) {
+      setNotice({
+        text: err instanceof Error ? err.message : 'Kunde inte lämna rummet.',
+        tone: 'error',
+      });
+    }
+  };
+
   return (
     <section
       aria-labelledby="rooms-heading"
@@ -323,7 +352,7 @@ export function RoomPanel() {
                 <li key={room.id} data-rooms-list-item data-rooms-active={isActive}>
                   <button
                     type="button"
-                    onClick={() => void store.selectRoom(room.id)}
+                    onClick={() => void handleSelect(room.id)}
                     aria-pressed={isActive}
                     aria-label={`Välj rummet ${room.name} (kod ${room.code})`}
                     className="vm-rooms-pick flex w-full items-center gap-3 rounded-card border border-border bg-surface px-3.5 py-2.5 text-left transition-[border-color,box-shadow,background-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_35%,var(--color-border))] hover:shadow-[var(--vm-shadow-card)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
@@ -436,7 +465,7 @@ export function RoomPanel() {
               </p>
               <button
                 type="button"
-                onClick={() => void store.leaveRoom(store.activeRoom!.id)}
+                onClick={() => void handleLeave(store.activeRoom!.id)}
                 className="inline-flex h-9 items-center rounded-pill border border-border px-4 text-sm font-medium text-fg-muted transition-colors duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-danger)_45%,var(--color-border))] hover:text-fg focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
                 data-rooms-leave
               >
