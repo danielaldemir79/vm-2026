@@ -2,10 +2,13 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
+import { ResultsStoreContext, type ResultsStore } from '../results/results-context';
+import { TeamProfilePanel } from './TeamProfilePanel';
 import { TeamProfileProvider } from './TeamProfileProvider';
 import { useTeamProfile } from './team-profile-context';
 import { GroupStageView } from '../groups/GroupStageView';
 import { DailyMatchesView } from '../daily/DailyMatchesView';
+import type { Group, Team } from '../../domain/types';
 
 // Profil-modalen + navigeringen testas END-TO-END mot fixtures-datan (den verifierade
 // VM 2026-datan med profil-fälten invävda, T10), under samma delade store som resten
@@ -217,12 +220,62 @@ describe('TeamProfilePanel, navigering: öppnas från tabell och matchkort', () 
   });
 });
 
-describe('TeamProfilePanel, edge-fall: data saknas (ärligt tomt, inte gissat)', () => {
-  it('visar "Data saknas" för stjärnspelare om laget saknar källbelagda namn (okänt id -> ingen dialog)', async () => {
-    // Vi monterar modalen direkt med ett lag UTAN profil-fält (i en egen provider),
-    // för att bevisa att tom data renderas ärligt, inte som en gissning. Vi använder
-    // den fulla kedjan men ger storen ett lag utan stjärnspelare via en egen knapp.
-    // (Alla fixtures-lag HAR data, så detta edge-fall testas via en konstruerad vy.)
+describe('TeamProfilePanel, edge-fall: stjärnspelare saknas (ärligt tomt, inte gissat)', () => {
+  // Bygg en delad results-store med ETT lag som finns men SAKNAR källbelagda
+  // stjärnspelare (starPlayers utelämnat). Alla riktiga fixtures-lag HAR
+  // stjärnspelare, så starPlayers.length === 0-grenen i panelen kan bara nås med
+  // en konstruerad store. Vi renderar panelen DIREKT mot denna store (ingen
+  // async-seedning), så grenen testas deterministiskt och utan race.
+  function storeWith(teams: Team[], groups: Group[]): ResultsStore {
+    return {
+      status: 'ready',
+      matches: [],
+      teams,
+      groups,
+      mode: 'fixtures',
+      error: null,
+      setMatches: () => {},
+      submitResult: () => ({ ok: true }),
+    };
+  }
+
+  it('visar "Data saknas" i stjärnspelar-sektionen när laget saknar källbelagda namn', () => {
+    // Laget finns i storen (så dialogen RENDERAS) men har inga starPlayers ->
+    // panelen ska ta den ärliga tom-grenen, inte gissa fram en spelare. Vi ger
+    // laget en fifaRanking så att ranking-badgen INTE också visar "Data saknas"
+    // (annars matchar texten två ställen), och isolerar assertionen till just
+    // stjärnspelar-sektionens tom-markör (data-profile-stars="empty").
+    const starless: Team = {
+      id: 'ghost',
+      name: 'Spöklandet',
+      code: 'GHO',
+      group: 'A',
+      fifaRanking: 99,
+    };
+    const groups: Group[] = [{ id: 'A', teamIds: ['ghost'] }];
+    const { container } = render(
+      <ResultsStoreContext.Provider value={storeWith([starless], groups)}>
+        <TeamProfilePanel openTeamId="ghost" onClose={() => {}} />
+      </ResultsStoreContext.Provider>
+    );
+
+    // Dialogen renderas (laget finns), märkt av lagnamnet.
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName(/Spöklandet/);
+    // Stjärnspelar-sektionen visar det ärliga tom-tillståndet: tom-markören
+    // data-profile-stars="empty" med texten "Data saknas", och INGEN spelar-lista.
+    const emptyStars = container.querySelector('[data-profile-stars="empty"]');
+    expect(emptyStars).not.toBeNull();
+    expect(emptyStars).toHaveTextContent('Data saknas');
+    expect(within(dialog).queryByRole('list', { name: /Stjärnspelare/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamProfilePanel, edge-fall: okänt lag-id (fail-safe, ingen dialog)', () => {
+  it('renderar ingen dialog för ett okänt lag-id (deriveTeamProfile får ingen träff -> null)', async () => {
+    // Här testas en ANNAN gren än tom-stjärnor ovan: ett id som inte finns i storen
+    // alls. deriveTeamProfile får då ingen träff, panelen renderar null -> ingen
+    // dialog (fail-safe, ingen krasch på okänt id).
     function Harness() {
       const { openProfile } = useTeamProfile();
       return (
@@ -234,10 +287,8 @@ describe('TeamProfilePanel, edge-fall: data saknas (ärligt tomt, inte gissat)',
     renderWithProviders(<Harness />);
     // Vänta in ResultsProviderns async-seedning INNAN klick/assert, så dess setState
     // inte läcker ut ur testet (act()-varning + intermittent race under svit-last, #10).
-    // openProfile sätter ett okänt id; deriveTeamProfile får då ingen träff i storen,
-    // så modalen renderar null -> ingen dialog (fail-safe). Vi måste vänta in seedningen
-    // INNAN klicket, annars är storen tom enbart för att datan inte hunnit laddas (rätt
-    // svar av fel skäl).
+    // Annars är storen tom enbart för att datan inte hunnit laddas (rätt svar av fel
+    // skäl); vi vill bevisa null-grenen för ett OKÄNT id mot en SEEDAD store.
     const trigger = await screen.findByText('öppna okänt');
     fireEvent.click(trigger);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

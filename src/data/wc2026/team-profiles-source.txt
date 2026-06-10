@@ -20,7 +20,7 @@ A. FIFA-RANKING (rank=): FIFA/Coca-Cola Men's World Ranking, OFFICIELL utgåva
    överlappar) + per-lag-sök (t.ex. Uzbekistan #50 bekräftat av kun.uz 2026-04-01).
    France 1:a med 1877.32 poäng (den tightaste topp-3 i rankningens historia).
 
-B. STJÄRNSPELARE (star=): VM 2026:s slutgiltiga 26-mannatruppter, inlämnade till
+B. STJÄRNSPELARE (star=): VM 2026:s slutgiltiga 26-mannatrupper, inlämnade till
    FIFA 1 juni 2026 och offentliggjorda 2 juni 2026. Spelarna är BEKRÄFTAT med i
    respektive trupp enligt Al Jazeeras samlade trupplista (alla 48 lag,
    https://www.aljazeera.com/sports/2026/6/2/fifa-world-cup-2026-full-squads-48-teams-players)
