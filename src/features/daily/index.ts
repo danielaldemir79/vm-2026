@@ -26,3 +26,6 @@ export {
   isVenuePlaceholder,
   UNKNOWN_TEAM_LABEL,
 } from './match-display';
+export { hashCode, hueFromCode, huesFor } from './team-hue';
+export { deriveDayTheme, type DayTheme } from './day-theme';
+export { useDayTheme, type DayThemeSeam } from './use-day-theme';

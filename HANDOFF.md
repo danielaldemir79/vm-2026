@@ -5,6 +5,69 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T8 KLAR - PR #40 väntar på autonom merge
+
+**Branch:** `feature/T8-dags-tema` @ HEAD `12cd8e9`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/40 mot `develop` (Closes #8, state: OPEN)
+**Board:** issue #8 i "In Review" (korrekt). Dirigenten stänger issue #8 MANUELLT och flyttar kort #8 till Done EFTER merge.
+
+**Autonomt läge: Daniel är borta ~1 vecka. Utökad fullmakt: dirigenten mergar, förbättrar brister den ser, och matar på nya tasks.**
+
+**KLART med bevis (SHA + verifiering):**
+- `38ecd8f` - DRY team-hue (refaktor, senior-developer)
+- `5832f86` - dags-tema-härledning + seam (senior-developer)
+- `47a017c` - success-ton #0f766e, T8-PIN LÖST (design-frontend) - 4.97:1 mot fond, 5.47:1 mot vit text, hue 175 vs accent 150
+- `2ee977f` - hero-dekor dags-ton (design-frontend)
+- `93931c3` + `9c6b6ec` + `fad54d6` + `eb7472d` + `2370226` - lokal panel F1-F3+F5 åtgärdade
+- `8a139d3` + `60700ec` - Copilot R1 C1-C4
+- `12cd8e9` - C5 typo (HEAD)
+- Verifiering (dirigenten + reviewer, oberoende): **382 tester gröna (41 filer)**, build/lint/format rent
+- Lokal panel: 1 runda, 5 fynd (F1 antipodal-fallback åtgärdad, F2 källskan-vakt byggd, F3+F5 doc åtgärdade, F4 FNV-dubblett avvisad YAGNI)
+- Copilot: 2 rundor (4 -> 1 -> 0), alla 5 trådar lösta
+- Alla 5/5 acceptanskriterier bockade i issue #8 (journalisten 2026-06-10)
+- **T8-PIN STÄNGD:** success ljust tema = #0f766e (hue 175, distinkt från accent hue 150). Ta INTE med som öppen pin framåt.
+
+**PINNADE punkter (bär framåt):**
+- **F4-notering (FNV-hash):** FNV-hash används på 2 ställen, avvisad konsolidering (YAGNI, regel-of-three). Konsolidera till delad hjälpare vid 3:e användning.
+- **F1/penalties-pin (T9, ägare senior-developer):** reducern hanterar inte `MatchResult.penalties`. T9 fixar. Acceptanstest: redigera finished slutspelsmatch med straff, penalties bevaras.
+- **T14-pin UTÖKAD:** När live-klienten byggs i T14, gör ALLA fyra stegen i SAMMA ändring:
+  (1) Sätt `LIVE_READY = true` i `src/data/data-source.ts`.
+  (2) Ta bort interims-warn (den `console.warn` med "LIVE_READY=false ... byggs i T14").
+  (3) Uppdatera live-felvägstester (de som assertar fixtures-fallback vid env+ej-live-ready).
+  (4) Lägg F2-assertion: inget test refererar strängen "LIVE_READY=false".
+  Guard-testet BRYTS medvetet vid flip - så stegen inte glöms.
+- **T14-pin (Supabase):** projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad, Backlog):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+
+**"Behöver Daniel"-kö (han är borta):**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
+>
+> Om PR #40 (T8, feature/T8-dags-tema) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 40 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #8 manuellt (`gh issue close 8`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #8 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar dags-tema, inga alerts. Skicka demo-länk till Daniel.
+>
+> Om PR #40 REDAN mergad:
+> T1-T8 + T4b + HOTFIX #37 är klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: #39 (T27, Daniels feedback - resultatinmatning kolumn-linjering + 3-dagars fönster, PRIORITERAD)**, därefter T9 (F1/penalties-pin!), T10-T13, T14.
+>
+> Bär framåt (alla tasks):
+> - **F4-notering:** FNV-hash 2 användningar, konsolidera vid 3:e.
+> - **F1/penalties-pin (T9):** reducern hanterar inte penalties. T9 fixar.
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion.
+> - **Supabase:** projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten.
+> - **#35 (arena/stad, Backlog):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35). Notifiera Daniel vid hemkomst.
+> - **Utökad fullmakt:** dirigenten får förbättra brister den ser och mata på nya tasks för att göra sidan bättre.
+
+---
+
 ## RESUME-HERE , 2026-06-10 , HOTFIX #37 KLAR - PR #38 väntar på autonom merge
 
 **Branch:** `feature/hotfix-37-fixtures-i-produktion` @ HEAD `6381761`

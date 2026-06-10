@@ -20,8 +20,13 @@
    WCAG AA (verifierat på dessa slutvärden, se handoff Verification):
    - Brödtext (fg) mot bg/surface/surface-raised: 12.6:1 - 17.9:1 i båda teman.
    - Dämpad text (fg-muted) klarar AA som NORMAL text (>= 4.5:1) i båda teman.
-   - Accent/guld/success/danger mot ytor: >= 3:1 (stor text / UI-komponenter),
-     i ljust tema klarar accenten dessutom AA som normal text (5.4:1).
+   - Accent/guld/danger mot ytor: >= 3:1 (stor text / UI-komponenter), i ljust
+     tema klarar accenten (#0e7a44) dessutom AA som normal text på BÅDA ljusa
+     ytorna: 5.40:1 mot vit surface (#fff), 4.90:1 mot fond #f1f5f0 (uppmätt
+     relativ luminans, per yta, inte en enda generell siffra). Båda >= 4.5:1.
+   - success har en EGEN ton i båda teman (T8-PIN, skild från accent): i ljust
+     tema teal-grön #0f766e som klarar AA som normal text (>= 4.97:1 mot ytorna
+     den används på), i mörkt tema mintgrön #5ad1a0 (7.4:1 - 9.9:1 mot ytorna).
    ========================================================================== */
 
 /* -----------------------------------------------------------------------------
@@ -98,13 +103,23 @@
   --vm-fg: #0c1a13;
   --vm-fg-muted: #4f6258;
 
-  /* Primär accent: djup skogsgrön (klarar AA som NORMAL text på vitt, 5.4:1).
+  /* Primär accent: djup skogsgrön. Klarar AA som NORMAL text på BÅDA ljusa ytorna,
+     uppmätt per yta (inte en enda generell siffra): 5.40:1 mot vit surface (#fff),
+     4.90:1 mot fond #f1f5f0. Båda >= 4.5:1. (5.40:1 gäller bara mot rent vitt.)
      Den elektriska gröna lever som dekorativ glow/gradient, inte som textfärg. */
   --vm-accent: #0e7a44;
   --vm-accent-fg: #ffffff;
 
-  /* Status: AA-säkra mörka toner för ljus yta. */
-  --vm-success: #0e7a44;
+  /* Status: AA-säkra mörka toner för ljus yta.
+     success = djup teal-grön (T8-PIN): tidigare var success === accent (#0e7a44)
+     i ljust tema, så de två rollerna var visuellt OMÖJLIGA att skilja (T5/T7-pin).
+     Nu en egen ton som (a) skiljer sig tydligt från accentens skogsgrön (hue 175
+     mot 150, deltaE76 ~28, en omisskännlig teal-skiftning), (b) fortfarande läses
+     som positivt/grönt, (c) klarar WCAG AA på ALLA ytor den faktiskt används på:
+     - bg-success med text-bg (#f1f5f0) ovanpå (SwatchGrid): 4.97:1 (normal text).
+     - success som textfärg på vit yta / på fond #f1f5f0: 5.47:1 / 4.97:1.
+     Värdena är UPPMÄTTA (relativ luminans), inte antagna (decisions.md T8-PIN). */
+  --vm-success: #0f766e;
   --vm-warning: #8a5a05;
   --vm-danger: #c4302c;
 
@@ -176,5 +191,127 @@ body {
     transition:
       background-color 0.25s ease,
       color 0.25s ease;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   6. DYNAMISKT DAGS-TEMA, dekorativ seam (T8, issue #8). [VÄRDE, ej @theme-kontrakt]
+
+   Det funktionella lagret (senior-dev, src/features/daily/day-theme.ts +
+   use-day-theme.ts) härleder en DETERMINISTISK accent-hue (0-359) ur dagens lag
+   och lägger den som en INLINE-OVERRIDE av `--vm-day-hue` på hero:ns dekor-yta
+   (`[data-day-theme='active']`). `--vm-day-hue` deklareras alltid med en default i
+   `:root` (nedan), så `hsl(var(--vm-day-hue) ...)` ALLTID har en giltig grad att
+   läsa. I default-läget (vilodag) saknas alltså inte variabeln, det som saknas är
+   den dynamiska inline-override:n, så ytan tonas inte och behåller T2:s neutrala
+   ton; vilken gren som gäller styrs av `data-day-theme` (default vs active).
+
+   KONTRAST-VAKT (acceptanskriterium 2, WCAG AA): `--vm-day-hue` är BARA ett tal
+   (en hue-grad), aldrig en text-/yt-/kant-färg. Dagstonen får bara väva in i
+   DEKORATIVA ytor (gradienter, glow), aldrig i något som bär läsbarhet, så den
+   kan per konstruktion inte sänka text-kontrasten. Design-frontend bygger den
+   slutgiltiga dekoren ur hue:n (hsl()/color-mix) HÄR i CSS-lagret. En default
+   sätts så dekoren har en giltig hue även innan en dag valts.
+
+   ÖVERGÅNGAR (acceptanskriterium 3): en mjuk transition på de dekorativa
+   egenskaperna (background) vid dag-byte läggs nedan, gatad på
+   prefers-reduced-motion (no-preference), så den befintliga reduced-motion-
+   grinden (index.css) stänger av den för den som bett om minskad rörelse.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Neutral default-hue (turneringens gröna ~152 grader) tills en dag valts /
+     vilodag. Används av .vm-daily-hero som BAS-hue, men i default-läget tonas
+     INGET mot den (active-grenen nedan styr den dynamiska skiftningen), den finns
+     bara så hsl(var(--vm-day-hue) ...) alltid har en giltig grad att läsa. */
+  --vm-day-hue: 152;
+}
+
+/* HERO-DEKOREN, byggd ur dags-hue:n. [VÄRDE, ej @theme-kontrakt]
+   "Arena i kvällsljus" (SPEC §7, T7): en djup yta med två radiella ljus, ett
+   pitch-grönt ur övre hörnet och ett varmt guld ur det nedre, plus ett brett
+   ljus-svep (.vm-hero-sheen, index.css). Dekoren bor HÄR (inte inline i TSX) så
+   den kan villkoras på [data-day-theme]: en inline-style kan inte selektera på
+   ett attribut, och dags-tonen ska BARA tändas när dagen har lag.
+
+   DEFAULT / VILODAG ([data-day-theme='default'], ingen --vm-day-hue-skiftning):
+   exakt T2/T7:s neutrala ton, det ÖVRE ljuset är turneringens pitch-grön
+   (--vm-glow-accent), det NEDRE guld. Ingen dynamisk färg. */
+.vm-daily-hero {
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(110% 120% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 55%),
+    radial-gradient(
+      90% 120% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 12%, transparent),
+      transparent 55%
+    );
+}
+
+/* AKTIV SPELDAG ([data-day-theme='active'], --vm-day-hue satt av seamen):
+   det ÖVRE radiella ljuset tonas mot DAGENS hue, men SUBTILT, genom att blanda
+   dagens hsl-ton till ~55 % med turneringens bas-grön (--vm-glow-accent). Så
+   tonen SKIFTAR kännbart med lagen som spelar utan att bli en grell färgklick,
+   och utan att tappa appens gröna mästerskaps-identitet. Det NEDRE guld-ljuset
+   hålls oförändrat (den varma signaturen ligger fast varje dag), så bara en del
+   av dekoren rör sig = elegant, inte rörigt.
+
+   KONTRAST-VAKT (arkitektur-invariant, decisions.md T8): --vm-day-hue väver in
+   ENBART i background-image (dekor). Den blir aldrig en text-/yt-/kant-token,
+   och match-korten (som bär text) får aldrig variabeln (låst av test). En hue
+   som bara lever i en dekor-gradient kan inte sänka text-kontrasten under AA. */
+.vm-daily-hero[data-day-theme='active'] {
+  /* --vm-day-glow: dagens hue (~55 %) inblandad i bas-grönen, sen dämpad till
+     16 % alfa (mot transparent) så det blir en SVAG glow likt default-grönens
+     0.16-alfa, inte en fylld färgyta. Två steg eftersom color-mix ger en opak
+     ton; det andra steget sätter alfan. */
+  --vm-day-glow: color-mix(
+    in srgb,
+    color-mix(in srgb, hsl(var(--vm-day-hue) 70% 50%) 55%, rgb(var(--vm-glow-accent))) 16%,
+    transparent
+  );
+  background-image:
+    radial-gradient(110% 120% at 0% 0%, var(--vm-day-glow), transparent 55%),
+    radial-gradient(
+      90% 120% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 12%, transparent),
+      transparent 55%
+    );
+}
+
+/* Ljus-svepet (.vm-hero-sheen, animeras i index.css) tonas också mot dagens hue
+   i active-läget, samma subtila inblandning, så svepet känns som dagens ljus. */
+.vm-daily-hero-sheen {
+  background-image: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgb(var(--vm-glow-accent) / 0.1) 50%,
+    transparent 70%
+  );
+}
+
+.vm-daily-hero[data-day-theme='active'] .vm-daily-hero-sheen {
+  /* Samma dämpning som --vm-day-glow men på sheen-svepets 0.1-alfa-nivå. */
+  background-image: linear-gradient(
+    105deg,
+    transparent 30%,
+    color-mix(
+        in srgb,
+        color-mix(in srgb, hsl(var(--vm-day-hue) 70% 50%) 55%, rgb(var(--vm-glow-accent))) 10%,
+        transparent
+      )
+      50%,
+    transparent 70%
+  );
+}
+
+/* ÖVERGÅNGAR (acceptanskriterium 3): dag-bytet tonar mjukt på de dekorativa
+   egenskaperna, gatat på prefers-reduced-motion så den befintliga reduced-motion-
+   grinden (index.css) stänger av den för den som bett om minskad rörelse. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-daily-hero,
+  .vm-daily-hero-sheen {
+    transition:
+      background-color 0.4s ease,
+      background-image 0.4s ease;
   }
 }
