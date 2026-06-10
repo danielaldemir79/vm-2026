@@ -111,14 +111,27 @@ export function PredictionsProvider({
 
   const savePrediction = useCallback(
     async (input: PredictionInput) => {
-      if (!supabase || activeRoomId === null) {
-        // Kontraktet (PredictionsStore.savePrediction) säger "Kastar vid fel".
-        // Utan klient/rum finns inget att spara till: KASTA (fail loud, PRINCIPLES
-        // §8) i stället för en tyst no-op som annars hade gett ett falskt "Sparat".
-        // UI:t gatar redan detta (formuläret renderas bara när store.enabled, dvs
-        // activeRoomId !== null), så detta nås bara via felaktig wiring, exakt det
-        // ett fail-loud-fel ska avslöja. Den legitima "inget rum"-vyn anropar aldrig
-        // savePrediction (PredictionsView visar då "gå med i rum"), så den kraschar inte.
+      // Kontraktet (PredictionsStore.savePrediction) säger "Kastar vid fel". Utan
+      // klient ELLER rum finns inget att spara till: KASTA (fail loud, PRINCIPLES
+      // §8) i stället för en tyst no-op som annars hade gett ett falskt "Sparat".
+      // UI:t gatar redan detta (formuläret renderas bara när store.enabled, dvs
+      // klient OCH activeRoomId !== null), så detta nås bara via felaktig wiring,
+      // exakt det ett fail-loud-fel ska avslöja. Den legitima "inget rum"-vyn anropar
+      // aldrig savePrediction (PredictionsView visar då "gå med i rum"), så den
+      // kraschar inte.
+      //
+      // SKILJ PÅ FALLEN (C12): de två rötterna ger olika felmeddelanden så ett
+      // wiring-fel kan FELSÖKAS direkt ur texten. "Ingen Supabase-klient" pekar mot
+      // env/live-gaten (liveConfigured falskt eller ingen injicerad klient); "inget
+      // aktivt rum" pekar mot rooms-synken (activeRoomId null). Klienten kollas
+      // FÖRST: utan klient spelar rummet ingen roll, och det är den mer grundläggande
+      // bristen (live ej konfigurerat).
+      if (!supabase) {
+        throw new Error(
+          '[VM2026] Spara tips misslyckades: ingen Supabase-klient (live ej konfigurerat).'
+        );
+      }
+      if (activeRoomId === null) {
         throw new Error('[VM2026] Spara tips misslyckades: inget aktivt rum att spara tipset i.');
       }
       // Kastar vid fel (UI fångar), inkl. RLS-avslag om matchen är låst (fail loud).

@@ -42,5 +42,11 @@ create table public.predictions (
 
 -- Index för de vanligaste uppslagen: alla tips i ett rum (topplista/avslöjande,
 -- T17), och alla tips på en match i ett rum (jämför vänners gissningar efter lås).
+--
+-- OBS (Copilot C10): dessa två index visade sig REDUNDANTA med PK:n
+-- (room_id, match_id, user_id), de är exakt dess ledande prefix och tillför ingen
+-- läsnytta (PostgreSQL "Multicolumn Indexes"). De DROPPAS därför i den efterföljande
+-- migrationen 20260611120400_t15_predictions_drop_redundant_idx.sql. Raderna nedan
+-- behålls för historik-trohet (replay skapar dem och nästa migration tar bort dem).
 create index predictions_room_idx on public.predictions (room_id);
 create index predictions_room_match_idx on public.predictions (room_id, match_id);

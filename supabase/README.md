@@ -64,11 +64,17 @@ före avspark, avslöjar efter, förfalskning + utomstående nekas), se `docs/de
 **Migration-historik (T15):** till skillnad från T14:s konsoliderade slutform (se KA-SA1
 nedan) applicerades T15:s migrationer 1:1 från de committade filerna via `apply_migration`
 i samma ordning: `t15_match_kickoffs_ref`, `t15_predictions_schema`, `t15_predictions_rls`,
-`t15_match_kickoffs_seed` (samma fyra NAMN i `list_migrations`, samma SQL). En nyans:
-version-STÄMPLARNA skiljer (filerna har `20260611120000..120300`, live fick MCP-genererade
-`20260610220747..220908` vid apply), men namnen + innehållet är 1:1, så en fresh-replay av
-filträdet kör exakt samma fyra steg i samma ordning. Ingen konsolidering, ingen drift i
-slutläget (verifierat mot `list_tables` + RLS-proven).
+`t15_match_kickoffs_seed`, och (Copilot C10) `t15_predictions_drop_redundant_idx` (samma fem
+NAMN i `list_migrations`, samma SQL). En nyans: version-STÄMPLARNA skiljer (filerna har
+`20260611120000..120400`, live fick MCP-genererade stämplar vid apply), men namnen + innehållet
+är 1:1, så en fresh-replay av filträdet kör exakt samma steg i samma ordning. Ingen konsolidering,
+ingen drift i slutläget (verifierat mot `list_tables`/`pg_indexes` + RLS-proven).
+
+**Index på `predictions` (Copilot C10):** bara primärnyckeln `predictions_pkey
+(room_id, match_id, user_id)` finns kvar. De ursprungliga `predictions_room_idx (room_id)` och
+`predictions_room_match_idx (room_id, match_id)` var REDUNDANTA (ledande PK-prefix, PostgreSQL
+"Multicolumn Indexes") och droppades, se `docs/decisions.md` T15 C10 (EXPLAIN-bevisat att PK:n
+servar alla tre query-formerna).
 
 ## Migrationer
 

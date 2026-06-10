@@ -22,7 +22,9 @@
 //  - PWA-fällan: en bakgrunds-flik får sina timers strypta/pausade, så minut-ticken
 //    kan ha "sovit" medan appen var dold. När fliken blir synlig igen
 //    (visibilitychange) räknar vi om OMEDELBART, så en återaktiverad flik genast
-//    ser rätt lås-läge, inte efter att ha väntat in nästa tick.
+//    ser rätt lås-läge, inte efter att ha väntat in nästa tick. Vi räknar BARA om
+//    vid SHOW (visibilityState === 'visible'), inte vid hide (C11): en dold flik
+//    renderas inte, så en omräkning där vore en onödig re-render.
 
 import { useEffect, useState } from 'react';
 
@@ -43,17 +45,27 @@ export function useDeadlineTick(now: Date | number = Date.now()): Date {
   const [nowMs, setNowMs] = useState(initialMs);
 
   useEffect(() => {
-    // Hämta aktuell tid vid varje tick OCH vid synlighets-återkomst. Till skillnad
-    // från useTodayKey gatar vi INTE på dagsbyte: varje minut är ett nytt "nu", så
-    // en avspark som passerar mitt på dagen fångas inom en minut.
+    // Hämta aktuell tid vid varje minut-tick. Till skillnad från useTodayKey gatar
+    // vi INTE på dagsbyte: varje minut är ett nytt "nu", så en avspark som passerar
+    // mitt på dagen fångas inom en minut.
     function tick() {
       setNowMs(Date.now());
     }
+    // Synlighets-handlern räknar BARA om när fliken blir SYNLIG igen (C11): en
+    // visibilitychange fyrar både vid hide OCH show, men ett dolt läge behöver inget
+    // omräknat "nu" (ingen renderas ändå). Att ticka vid hide vore en onödig
+    // state-uppdatering/re-render. Gata på visibilityState === 'visible' så bara
+    // återaktiveringen (där PWA-timern kan ha sovit) triggar omräkningen.
+    function tickOnVisible() {
+      if (document.visibilityState === 'visible') {
+        tick();
+      }
+    }
     const id = setInterval(tick, TICK_MS);
-    document.addEventListener('visibilitychange', tick);
+    document.addEventListener('visibilitychange', tickOnVisible);
     return () => {
       clearInterval(id);
-      document.removeEventListener('visibilitychange', tick);
+      document.removeEventListener('visibilitychange', tickOnVisible);
     };
   }, []);
 
