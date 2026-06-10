@@ -351,9 +351,14 @@ describe('deriveBracket, BRONS-/FINAL-propagering spelar HELA trädet (F2)', () 
 
   /** Sätt hemmavinst (1-0) på VARJE slutspelsmatch, så hemmalaget propagerar hela vägen. */
   function homeWinsEverywhere(): Match[] {
+    // Varje match får sin RIKTIGA runda ur strukturen (bm.stage), inte en
+    // hårdkodad 'round-of-32' på allt (C5): testdatan ska vara semantiskt korrekt
+    // (M103 är third-place, M104 final osv.). Härledningen läser stage ur
+    // strukturen, så detta påverkar inte utfallet, men datan ska inte ljuga om
+    // vilken runda en match tillhör.
     return BRACKET_MATCHES.map((bm) => ({
       id: bm.id,
-      stage: 'round-of-32',
+      stage: bm.stage,
       groupId: null,
       homeTeamId: null,
       awayTeamId: null,
