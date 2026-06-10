@@ -7,13 +7,13 @@
 // Live väljs bara när BÅDA är sanna. Annars fixtures, alltid med en synlig logg
 // (fail loud) så övergången till live aldrig glöms bort.
 //
-// Varför två villkor och inte bara env (#37, hotfix): supabase-client.ts är en
-// MEDVETEN fail-loud-stub tills T14 bygger den. Env-variablerna sattes redan i
-// Cloudflare (2026-06-09) inför T14, så enbart en env-gate tände live-grenen i
-// produktion -> stubben kastade i varje vy och Daniels vänner såg fel-alerts i
-// stället för matchdata. LIVE_READY behåller fail-loud-principen (env utan
-// fungerande klient SKA inte tyst se ut som live) men flyttar smällen från
-// användarens ansikte till en console.warn tills T14 tänder live på riktigt.
+// Varför två villkor och inte bara env (#37, hotfix): supabase-client.ts VAR en
+// MEDVETEN fail-loud-stub tills T14 byggde den. Env-variablerna sattes redan i
+// Cloudflare (2026-06-09) inför T14, så enbart en env-gate hade tänt live-grenen i
+// produktion mot stubben -> fel-alerts i varje vy. LIVE_READY-flaggan höll smällen
+// borta tills klienten fanns. T14 har nu byggt den riktiga klienten OCH flippat
+// LIVE_READY = true, så live tänds när env är satt (Cloudflare). Tvåstegs-gaten
+// finns kvar som princip: env utan LIVE_READY skulle fortfarande falla till fixtures.
 //
 // Samma kod tänds live UTAN ändring: konsumenter (T6-T11) anropar bara
 // getDataSource() och får samma kontrakt (DataSource) oavsett källa. Det är
@@ -29,16 +29,15 @@ import { fixtureGroups, fixtureMatches, fixtureTeams } from './fixtures';
 /**
  * Är live-Supabase-klienten byggd och redo att användas?
  *
- * `false` tills T14 fyller supabase-client.ts (stubben kastar fortfarande, se
- * den filen). Detta är T14:s ENDA extra kod-steg för att tända live:
- *   T14: sätt LIVE_READY = true OCH ta bort interims-varningen i getDataSource.
- * (Pinnat i docs/decisions.md, #37, så T14 inte missar det.)
+ * `true` sedan T14 byggt den riktiga Supabase-klienten (supabase-client.ts +
+ * supabase-browser.ts + rooms-lagret). Live tänds nu när env är satt (Cloudflare).
  *
  * Konstanten är en in-kod-flagga med FLIT (inte en env-variabel): att flippa
- * den till true kräver en kod-ändring som går genom review + bygge ihop med
- * T14:s faktiska klient, så live aldrig tänds av enbart en miljö-konfiguration.
+ * den krävde en kod-ändring som gick genom review + bygge ihop med T14:s faktiska
+ * klient, så live aldrig tändes av enbart en miljö-konfiguration (#37, hotfix-
+ * principen). Tvåstegs-gaten består: env UTAN LIVE_READY hade fallit till fixtures.
  */
-export const LIVE_READY = false;
+export const LIVE_READY = true;
 
 /**
  * Kontraktet varje datakälla (fixtures eller live) uppfyller. Async med flit:
@@ -123,16 +122,17 @@ function createLiveDataSource(env: ImportMetaEnv): DataSource {
 /**
  * Välj och returnera den aktiva datakällan utifrån gaten.
  *
- * Tre fall, alla fail-loud (PRINCIPLES §8, en synlig logg så ingen tyst kör fel
- * data, men en WARNING, inte error, eftersom fixtures är ett giltigt läge):
+ * Två fall (fail-loud, PRINCIPLES §8):
  *   - Live aktivt (env satt + LIVE_READY): live-källan, ingen logg behövs.
- *   - Env satt men LIVE_READY false (interims-läget, #37): fixtures + en EGEN
- *     varning som förklarar att env finns men klienten väntar på T14. T14 tar
- *     bort just denna varning när LIVE_READY flippas.
- *   - Env saknas: fixtures + den vanliga "env saknas"-varningen.
+ *   - Annars (env saknas): fixtures + en synlig "env saknas"-varning, så att man
+ *     inte tyst kör platshållar-data utan att märka det. (Interims-grenen från
+ *     #37, env satt men LIVE_READY false, togs bort i T14 när LIVE_READY flippades
+ *     till true; den är inte längre nåbar i produktion. Drivs den i test, t.ex.
+ *     liveReady=false med env satt, faller den hit och loggar "env saknas"-formen,
+ *     vilket är ett rimligt fixtures-besked.)
  *
  * @param env        import.meta.env (injiceras för testbarhet, default = riktiga).
- * @param liveReady  injicerbar live-flagga (default LIVE_READY), så live-grenen
+ * @param liveReady  injicerbar live-flagga (default LIVE_READY), så fixtures-grenen
  *                   kan testas utan att flippa den globala konstanten.
  */
 export function getDataSource(
@@ -142,22 +142,11 @@ export function getDataSource(
   if (isLiveActive(env, liveReady)) {
     return createLiveDataSource(env);
   }
-  if (isSupabaseConfigured(env)) {
-    // Interims-läget (#37): env satt, men klienten inte byggd än. Kör fixtures
-    // och förklara varför, så detta inte förväxlas med "env saknas".
-    // T14: ta bort denna gren när LIVE_READY blir true.
-    console.warn(
-      '[VM2026] Datalager kör i FIXTURES-läge trots att Supabase-env är satt. ' +
-        'Live-klienten är inte byggd än (LIVE_READY=false, byggs i T14). ' +
-        'Detta är avsiktligt tills T14 tänder live.'
-    );
-  } else {
-    console.warn(
-      '[VM2026] Datalager kör i FIXTURES-läge (platshållar-data). ' +
-        'Supabase-env saknas (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). ' +
-        'Sätt dem för att växla till live (Supabase byggs i T14).'
-    );
-  }
+  console.warn(
+    '[VM2026] Datalager kör i FIXTURES-läge (platshållar-data). ' +
+      'Supabase-env saknas eller är inte aktiv (VITE_SUPABASE_URL / ' +
+      'VITE_SUPABASE_ANON_KEY). Sätt dem för att växla till live.'
+  );
   return createFixtureDataSource();
 }
 

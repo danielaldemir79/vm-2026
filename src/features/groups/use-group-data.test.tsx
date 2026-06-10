@@ -3,29 +3,25 @@ import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 import { useGroupData } from './use-group-data';
 import { ResultsProvider } from '../results/ResultsProvider';
+import type { DataSource } from '../../data';
 import type { Match } from '../../domain/types';
+import { createFailingDataSource } from '../../test/failing-data-source';
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
-}
-
-function liveEnv(): ImportMetaEnv {
-  return {
-    VITE_SUPABASE_URL: 'https://x.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'anon-key',
-  } as ImportMetaEnv;
 }
 
 // useGroupData är nu en KONSUMENT av den delade results-storen (T6), så testet
 // wrappar i ResultsProvider. Env-injektionen flyttade till providern (den äger
 // seedningen), så vyn/hooken tar inga argument längre. En wrapper-fabrik ger en
 // STABIL provider per test (samma princip som T5: undvik ny referens per render).
-// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testerna.
-// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
-function wrapperFor(env: ImportMetaEnv, liveReady = false) {
+// Fel-vägs-testerna injicerar en REJECTANDE datakälla (createFailingDataSource):
+// sedan T14 kastar live-källan inte längre (den ger giltig data), så ett genuint
+// datakälle-fel testas via dataSource-injektionen i stället.
+function wrapperFor(env: ImportMetaEnv, dataSource?: DataSource) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ResultsProvider env={env} liveReady={liveReady}>
+      <ResultsProvider env={env} dataSource={dataSource}>
         {children}
       </ResultsProvider>
     );
@@ -122,16 +118,16 @@ describe('useGroupData, LIVE: tabellen räknas om reaktivt när matcherna i stat
 });
 
 describe('useGroupData, fel-väg (fail loud)', () => {
-  it('hamnar i error med ett meddelande när datakällan kastar (live-stub före T14)', async () => {
+  it('hamnar i error med ett meddelande när datakällan rejectar (genuint datakälle-fel)', async () => {
     const { result } = renderHook(() => useGroupData(), {
-      wrapper: wrapperFor(liveEnv(), true),
+      wrapper: wrapperFor(fixturesEnv(), createFailingDataSource()),
     });
 
     await waitFor(() => {
       expect(result.current.status).toBe('error');
     });
 
-    expect(result.current.error).toMatch(/inte byggd än \(T14\)/);
+    expect(result.current.error).toMatch(/Simulerat datakälle-fel/);
     // Kontraktet: tables är tomt när status === 'error', ingen stale data läcker.
     expect(result.current.tables).toHaveLength(0);
   });
@@ -150,7 +146,7 @@ describe('useGroupData, kontrakt: tables är tomt utom vid ready (ingen stale da
     );
   }
 
-  it('vid env-byte från ready till en felande källa läcker INTE de gamla tabellerna', async () => {
+  it('vid byte från ready till en felande källa läcker INTE de gamla tabellerna', async () => {
     // Ladda fixtures till ready: nu finns 12 fyllda tabeller i storen.
     const { rerender } = render(
       <ResultsProvider env={fixturesEnv()}>
@@ -162,11 +158,11 @@ describe('useGroupData, kontrakt: tables är tomt utom vid ready (ingen stale da
     );
     expect(screen.getByTestId('probe')).toHaveTextContent('12'); // gammal data i storen
 
-    // Byt env -> ny laddning startar (live-stubben kastar före T14). Kontraktet
+    // Byt till en REJECTANDE datakälla -> ny laddning startar och failar. Kontraktet
     // säger att tables ska vara [] så fort status !== 'ready', annars skulle de
     // gamla fixtures-tabellerna läcka in i loading/error-läget (C8, kontraktsbrott).
     rerender(
-      <ResultsProvider env={liveEnv()} liveReady={true}>
+      <ResultsProvider env={fixturesEnv()} dataSource={createFailingDataSource()}>
         <Probe />
       </ResultsProvider>
     );

@@ -13,7 +13,7 @@
 // detta seam, utan att röra konsumenterna.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getDataSource, getDataSourceMode, LIVE_READY } from '../../data';
+import { getDataSource, getDataSourceMode, LIVE_READY, type DataSource } from '../../data';
 import type { Group, Match, Team } from '../../domain/types';
 import { applySimulationOverlay, type SimulationOverlay } from '../simulation/apply-simulation';
 import { applyMatchResult } from './apply-match-result';
@@ -29,18 +29,27 @@ export interface ResultsProviderProps {
    */
   env?: ImportMetaEnv;
   /**
-   * Injicerbar live-flagga (testbarhet), default = LIVE_READY (false tills T14,
-   * se data-source.ts, #37). Tester som vill driva LIVE-grenen (stubben som
-   * kastar) sätter liveReady=true; produktion använder defaulten, så env satt
-   * utan byggd klient faller till fixtures i stället för fel-alerts.
+   * Injicerbar live-flagga (testbarhet), default = LIVE_READY (true sedan T14,
+   * se data-source.ts). Produktion använder defaulten; tester kan injicera false
+   * för att driva fixtures-grenen även med env satt (tvåstegs-gaten).
    */
   liveReady?: boolean;
+  /**
+   * Injicerbar datakälla (testbarhet), default = den env-gatade getDataSource.
+   * SAMMA seam-princip som env/liveReady: låter fel-vägs-tester injicera en
+   * datakälla som REJECTAR (utan att mocka import.meta), så provider:ns fail-loud-
+   * kontrakt (status error + meddelande, ingen tyst tom vy) kan bevisas. Sedan
+   * T14 returnerar live-källan giltig data (kastar inte längre), så ett genuint
+   * datakälle-fel (t.ex. nätfel) testas via denna injektion i stället.
+   */
+  dataSource?: DataSource;
 }
 
 export function ResultsProvider({
   children,
   env = import.meta.env,
   liveReady = LIVE_READY,
+  dataSource: injectedDataSource,
 }: ResultsProviderProps) {
   const [status, setStatus] = useState<ResultsLoadStatus>('loading');
   const [groups, setGroups] = useState<Group[]>([]);
@@ -115,7 +124,9 @@ export function ResultsProvider({
     // Avbryt-flagga: om providern unmountas (eller env byter) innan hämtningen
     // är klar sätter vi inte state på en avmonterad komponent.
     let cancelled = false;
-    const dataSource = getDataSource(env, liveReady);
+    // Injicerad datakälla (test) eller den env-gatade (produktion). Injektionen
+    // låter fel-vägs-tester ge en källa som rejectar utan att mocka import.meta.
+    const dataSource = injectedDataSource ?? getDataSource(env, liveReady);
 
     setStatus('loading');
     setError(null);
@@ -147,7 +158,8 @@ export function ResultsProvider({
           return;
         }
         // Fail loud (PRINCIPLES §8): visa felet, maskera det inte som tom vy.
-        // Vanligast i live-läge innan T14 (stubben kastar med avsikt).
+        // Inträffar vid ett genuint datakälle-fel (t.ex. nätfel), eller i test via
+        // en injicerad datakälla som rejectar.
         setError(err instanceof Error ? err.message : 'Kunde inte ladda matchdata.');
         setStatus('error');
       });
@@ -157,9 +169,9 @@ export function ResultsProvider({
     };
     // setMatches är en stabil useCallback (tom dep-array), så den ändrar aldrig
     // identitet och triggar inte om-körning, den listas för exhaustive-deps-
-    // korrekthet (effekten anropar den vid seed). liveReady ingår: ändras gaten
-    // (t.ex. en test som driver live-grenen) ska källan väljas om.
-  }, [env, liveReady, setMatches]);
+    // korrekthet (effekten anropar den vid seed). liveReady + injectedDataSource
+    // ingår: ändras gaten eller den injicerade källan ska seedningen köras om.
+  }, [env, liveReady, injectedDataSource, setMatches]);
 
   // Mata in/redigera ETT resultat: validera, och vid ok uppdatera matchlistan
   // optimistiskt (direkt i minnet, vyerna räknar om reaktivt). Vid fel ändras

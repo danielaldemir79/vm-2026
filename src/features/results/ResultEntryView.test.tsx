@@ -6,16 +6,10 @@ import { GroupStageView } from '../groups/GroupStageView';
 // GroupStageView har klickbara lagnamn (TeamNameButton, T10), så integrationstestet
 // som monterar den wrappas i TeamProfileProvider.
 import { TeamProfileProvider } from '../team-profile';
+import { createFailingDataSource } from '../../test/failing-data-source';
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
-}
-
-function liveEnv(): ImportMetaEnv {
-  return {
-    VITE_SUPABASE_URL: 'https://x.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'anon-key',
-  } as ImportMetaEnv;
 }
 
 describe('ResultEntryView, rendering + a11y', () => {
@@ -48,11 +42,11 @@ describe('ResultEntryView, rendering + a11y', () => {
 });
 
 describe('ResultEntryView, fel-väg (fail loud)', () => {
-  it('visar ett fel-meddelande när källan kastar (live-stub före T14)', async () => {
-    // liveReady=true driver LIVE-grenen (stubben som kastar). Produktion (#37)
-    // använder defaulten false, så env satt utan byggd klient ger fixtures.
+  it('visar ett fel-meddelande när datakällan rejectar (genuint datakälle-fel)', async () => {
+    // Sedan T14 kastar live-källan inte längre (ger giltig data), så ett genuint
+    // datakälle-fel injiceras via en rejectande datakälla.
     render(
-      <ResultsProvider env={liveEnv()} liveReady={true}>
+      <ResultsProvider env={fixturesEnv()} dataSource={createFailingDataSource()}>
         <ResultEntryView />
       </ResultsProvider>
     );
