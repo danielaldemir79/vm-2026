@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { PredictionsView } from './PredictionsView';
 import { PredictionsStoreContext, type PredictionsStore } from './predictions-context';
@@ -71,9 +71,9 @@ describe('PredictionsView', () => {
   it('UTAN aktivt rum: visar "gå med i ett rum för att tippa"', () => {
     renderView(store({ enabled: false, activeRoomId: null }), NOW);
     expect(screen.getByText(/Gå med i ett rum för att tippa/)).toBeInTheDocument();
-    // Ingen tips-lista i det läget.
-    expect(screen.queryByTestId).toBeDefined();
+    // Ingen tips-lista OCH inget tips-formulär i det läget (tips är per rum).
     expect(document.querySelector('[data-predictions-list]')).toBeNull();
+    expect(document.querySelectorAll('[data-prediction-form]')).toHaveLength(0);
   });
 
   it('READY: listar tippbara matcher (kommande överst), ett formulär per match', () => {
@@ -95,6 +95,41 @@ describe('PredictionsView', () => {
     const form = document.querySelector('[data-prediction-form]') as HTMLElement;
     expect(form.getAttribute('data-prediction-locked')).toBe('true');
     expect(screen.getByText(/Tipset är låst/)).toBeInTheDocument();
+  });
+
+  // C1-regression: låset räknas om NÄR TIDEN PASSERAR AVSPARK, utan omladdning. En
+  // avspark passerar mitt på dagen, så en stabil-inom-dagen-tick (useTodayKey) räcker
+  // inte; minut-ticken (use-deadline-tick) måste flippa låset. Vi använder falska
+  // timers + en styrd systemklocka och stegar fram förbi avspark.
+  it('LÅST räknas om när tiden passerar avspark (öppen -> låst utan omladdning)', () => {
+    vi.useFakeTimers();
+    try {
+      const kickoff = '2026-06-15T15:00:00.000Z';
+      const before = new Date('2026-06-15T14:59:00.000Z'); // en minut före avspark
+      vi.setSystemTime(before);
+      dataState.matches = [match('g-A-1', kickoff)];
+
+      renderView(store({}), before);
+      const formBefore = document.querySelector('[data-prediction-form]') as HTMLElement;
+      // Före avspark: öppen, dvs låst-attributet är FRÅNVARANDE (formuläret
+      // sätter bara data-prediction-locked="true" när det är låst). Räknaren
+      // säger 1 match öppen.
+      expect(formBefore.getAttribute('data-prediction-locked')).toBeNull();
+      expect(screen.getByText(/1 match öppna att tippa/)).toBeInTheDocument();
+
+      // Tiden passerar avspark; minut-ticken bumpar nu:et och låset ska räknas om.
+      act(() => {
+        vi.setSystemTime(new Date('2026-06-15T15:01:00.000Z'));
+        vi.advanceTimersByTime(60_000);
+      });
+
+      const formAfter = document.querySelector('[data-prediction-form]') as HTMLElement;
+      expect(formAfter.getAttribute('data-prediction-locked')).toBe('true');
+      // Inga öppna matcher kvar -> räknaren visas inte längre (den döljs vid 0).
+      expect(screen.queryByText(/öppna att tippa/)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('mitt tips syns: en redan tippad match seedar formuläret', () => {

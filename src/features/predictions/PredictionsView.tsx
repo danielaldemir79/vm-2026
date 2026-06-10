@@ -19,7 +19,7 @@ import { usePredictionsStore } from './predictions-context';
 import { usePredictableData } from './use-predictable-matches';
 import { selectPredictableMatches } from './predictable-matches';
 import { PredictionForm } from './PredictionForm';
-import { useTodayKey } from '../daily';
+import { useDeadlineTick } from './use-deadline-tick';
 
 export interface PredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -32,20 +32,18 @@ export function PredictionsView({ env, now }: PredictionsViewProps) {
   const store = usePredictionsStore();
   const { status, matches, teams, error } = usePredictableData(env);
 
-  // Dagsbyte-medveten re-render (samma hook som dagliga vyn): låst-statusen
-  // räknas om vid dagsbyte/återaktiverad flik så en match som passerat avspark
-  // syns som låst utan att användaren manuellt laddar om. Server-RLS är ändå låset.
-  useTodayKey();
-  const evalNow = now ?? new Date();
+  // Deadline-medveten re-render: låst-statusen (now >= kickoff) räknas om varje
+  // minut/vid återaktiverad flik så en match som passerat avspark syns som låst
+  // utan manuell omladdning. En avspark passerar MITT PÅ DAGEN, så useTodayKey
+  // (stabil inom en dag) räcker inte, det krävs en finare tick (use-deadline-tick).
+  // Server-RLS är ändå det riktiga låset; detta gör bara VISNINGEN sann.
+  const evalNow = useDeadlineTick(now);
 
   const teamsById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
-  const predictable = useMemo(
-    () => selectPredictableMatches(matches, evalNow),
-    // evalNow ingår inte i deps: en ny Date() per render skulle loopa. useTodayKey
-    // triggar re-render vid dagsbyte, vilket räcker för låst-visningen (servern är låset).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [matches]
-  );
+  // evalNow ingår i deps (det är HELA poängen, C1): hooken ger ett "nu" som tickar
+  // på en stabil minut-kadens, så detta räknas om när tiden passerar en avspark,
+  // inte en ny Date() per render (som skulle loopa).
+  const predictable = useMemo(() => selectPredictableMatches(matches, evalNow), [matches, evalNow]);
 
   // Hur många KOMMANDE (icke-låsta) matcher finns att tippa? Driver en liten,
   // motiverande räknare i rubriken ("3 matcher öppna att tippa"), så det känns
