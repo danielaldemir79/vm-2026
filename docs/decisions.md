@@ -5,6 +5,66 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T10 (issue #10): lag-profil-modalen, premium-finish (design-frontend)
+
+**Beslut (visuellt lager ovanpå senior-devs funktionella dialog):** Lag-profil-modalen fick en
+"arena i kvällsljus"-finish (SPEC §7) UTAN att röra logik/semantik. All a11y-dialog-semantik
+(role/aria-modal/aria-labelledby, Escape, klick-utanför, fokus-in + fokus-retur, fokus-fälla) och
+alla data-attribut är oförändrade; bara presentation lades på via klass-/data-haken senior-dev lämnade.
+
+**Hero-bandet (per lag distinkt, men kontrast-säkert):** Toppen av panelen tänds med samma
+radiella ljus-språk som dags-hero:n, men ur LAGETS egen signaturfärg (`--vm-profile-hue`, samma
+hue som TeamFlag-discen via `hueFromCode`, en sanning). Så Brasiliens modal tänds annorlunda än
+Bosniens, men alltid inom appens gröna/guld-identitet. Dekoren bor i `tokens.css §7`
+(`.vm-profile-hero`), villkorad inline-hue precis som dags-temat.
+
+**KONTRAST-VAKT (UPPMÄTT över VÄRSTA fallet, inte ett typfall, lärdomen aa-...-varsta-fall):**
+`--vm-profile-hue` är BARA ett tal och väver in ENBART i hero-bandets `background-image` (dekor),
+aldrig i en text-/yt-/kant-token. Glow-alfan är dessutom KONTRAST-LÅST: muted-text (#9cb2a6) ovanpå
+glow:ens PEAK i det LJUSASTE hue:t (gult ~58 grader = värsta av alla 360, svept i canvas-komposit)
+håller >= 4.5:1 bara om hue-glow <= 0.14 alfa. Vald **0.13 -> 4.71:1** värsta fall (marginal),
+guld-ljuset **0.12 -> 4.79:1**. Så ingen lag-hue och ingen text-position kan sänka text-kontrasten
+under AA, även om texten låg rakt på en glow-topp (den gör inte det, topparna sitter i hörnen, men
+gränsen håller strukturellt). Ljust tema: glow över vitt mörknar pixeln -> höjer kontrast för mörk
+text; värsta muted 5.31:1, guld-zon 5.71:1.
+
+**UPPMÄTTA kontrastvärden (canvas-komposit mot FAKTISK renderad bakgrund, live i browser):**
+| Element | Mörkt tema | Ljust tema | Krav |
+|---|---|---|---|
+| Hero lagnamn (display, fg) | 12.66:1 (mätt) / 7.80:1 (värsta glow-topp) | 17.91:1 / 14.57:1 (värsta) | 4.5:1 (delvis large) |
+| Hero subline + ranking-etikett (muted, 12px) | 6.23:1 (mätt) / 4.71:1 (värsta glow-topp, alla hue:er) | 6.52:1 / 5.31:1 (värsta) | 4.5:1 (normal) |
+| Ranking-värde (#n, display) | 12.66:1 | 17.91:1 | 4.5:1 |
+| Stjärn-chip (på surface-raised) | 12.66:1 | 17.91:1 | 4.5:1 |
+| Kuriosa-text (muted) | 6.23:1 | 6.52:1 | 4.5:1 |
+| Sektionsrubrik (muted, 12px) | 7.5:1 | 6.52:1 | 4.5:1 |
+| Vägen: steg-etikett (muted) | 7.5:1 | 6.52:1 | 4.5:1 |
+| Vägen: resultat (accent) | #1fe082: 9.68:1 (surface) / 8.04:1 (raised, hover) | #0e7a44: 5.40:1 (surface + raised = vit) | 4.5:1 |
+| Stäng-knapp glyf (muted UI) | 7.5:1 | 6.52:1 | 3:1 (UI) |
+
+Alla >= AA som normal text, värsta fallet inräknat. (Accent-värdena i ljust tema är de redan
+T8-uppmätta per-yta-värdena från `tokens.css §0`.)
+
+**Responsivt (verifierat live, 280/360/768/1024/1440):** mobil = nästan-fullskärm bottom-sheet
+(rundade topphörn, `max-h: 92dvh`, intern scroll på kroppen), desktop (sm+) = centrerad panel
+(`max-w-lg`, alla hörn rundade, `max-h: 88dvh`). 280px: ingen horisontell scroll (docScrollW 265 <=
+280), panelen ryms i höjd, kroppen scrollar (742 > 597). Långt namn ("Bosnien och Hercegovina")
+radbryter snyggt utan att krocka med stäng-knappen (`pr-12`-reserv).
+
+**Rörelse (a11y, WCAG 2.3.3):** overlay tonar in (opacitet), panelen reser sig mjukt (spring
+"gentle", y 28->0 + scale 0.98->1). VID REDUCERAD RÖRELSE (eller innan preferensen är känd) reser
+panelen INTE alls, bara opacitet. Viktigt fynd: `useReducedMotion()` ger `null` på första
+renderingen; `?? false` gav då en 1-frames y=28-flash som en reduced-motion-användare hann se.
+Fixat genom att kräva ett EXPLICIT `=== false` (motion-grind), så vi startar i det säkra läget tills
+preferensen är känd. Verifierat frame-för-frame i browser: reducerad = `transform: none` varje frame
++ overlay-blur/dim aktiv; tillåten = mjuk y-glidning. Samma kontrakt som Slide/Spring-primitiverna.
+
+**TeamNameButton (klickbar-affordans):** en SUBTIL prickad understrykning som bara tänds på
+hover/fokus (`decoration-dotted`, `fg-muted/60`, `underline-offset-3`), så tabellernas lugn bevaras
+i vila men "klickbart" signaleras vid interaktion. :focus-visible-ringen (index.css) är fortsatt
+primär tangentbords-affordans; understrykningen tänds även där så mus + tangentbord får samma signal.
+
+---
+
 ## 2026-06-10 , T10 (issue #10): lag-profil-data källånkrad (FIFA-ranking + stjärnspelare + kuriosa)
 
 **Beslut (källånkrad, gissas ALDRIG, samma mönster som T4/T4b):** Lag-profil-datan
