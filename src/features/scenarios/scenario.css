@@ -1,0 +1,330 @@
+/* =============================================================================
+   "VAD KRÄVS"-VYNS PREMIUM-VISUELLA LAGER (design-frontend, T11 / issue #11).
+   =============================================================================
+
+   "Arena i kvällsljus", men för dramat i sista gruppomgången: varje grupp är ett
+   kort i kvällsljus, och varje lag bär en STATUS-CHIP (Klar / Ute / Beror på) som
+   är FÄRG-OBEROENDE (form + glyf + vikt + färg, ALDRIG bara en färg, T7/T8-pin).
+   Klar = succé-känsla (bock, full ton), Ute = dämpad och respektfull (inte ett
+   hånfullt rött skrik), Beror på = spänning (guld-puls, det öppna ödet).
+
+   ÄGARSKAP (seam): senior-dev äger semantik + data-attribut i ScenarioView.tsx
+   (data-scenario-group/-team/-status/-phase, data-scenario-margin-dependent,
+   data-scenario-decided). Detta lager STYLAR ovanpå de hakarna och rör inte datan
+   eller a11y-semantiken, så alla tester + skärmläsar-strukturen står kvar
+   (PRINCIPLES §4, samma seam-princip som GroupTable/BracketView).
+
+   ALLT stylat via tema-token (color-mix / var(--vm-*)), aldrig rå hex i färg-
+   beslut, så vyn är trogen BÅDA teman (mörkt grund + ljust). Rörelse är RENT
+   dekorativ och nollas av den globala reduced-motion-grinden (index.css) PLUS en
+   explicit `animation: none`-regel här (samma motgift som hero:n/bracket:en,
+   patterns.md: den svepande regeln fryser annars keyframes på slutläget).
+
+   KONTRAST (WCAG AA, UPPMÄTT i båda teman, canvas-komposit, decisions.md T11):
+   chip-texten håller alltid full kontrast mot sin chip-yta; status-TONEN lever i
+   chip:ens bakgrund + kant + glyf, aldrig som enda läsbarhets-bärare. Mätvärden i
+   docs/decisions.md (svept över värsta fallet, inte ett typfall, lessons:
+   aa-kontrast-pastad-pa-genererad-farg).
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   1. GRUPP-KORTET: "arena i kvällsljus" i kompakt format. Kortet får en mjuk
+   topp-glow (samma gröna arena-ljus som hero:n) ur sitt övre hörn, så rutnätet av
+   grupper känns som upplysta arenor i kvällen, inte platta lådor. Glow:en bor i
+   en pseudo-yta (pointer-events: none) så den aldrig stör innehållet eller texten.
+   -------------------------------------------------------------------------- */
+.vm-scenario-card {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Topp-glow: ett diskret grönt arena-ljus ur övre vänstra hörnet, tonat mot
+   --vm-glow-accent (RGB-delar) så det fungerar i båda teman. Låg alfa = stämning,
+   inte en färgklick. Ligger BAKOM innehållet (z-index) och är ren dekoration. */
+.vm-scenario-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background-image: radial-gradient(
+    120% 80% at 0% 0%,
+    rgb(var(--vm-glow-accent) / 0.08),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* En färdigspelad grupp (facit) bär en lugn guld-signatur i topp-glow:en i
+   stället för grönt: gruppen är AVGJORD, den varma pokal-tonen markerar "klart"
+   utan att skrika. Bekvämligt knutet till seamens data-scenario-decided. */
+.vm-scenario-card[data-scenario-decided='true']::before {
+  background-image: radial-gradient(
+    120% 80% at 0% 0%,
+    color-mix(in srgb, var(--vm-gold) 10%, transparent),
+    transparent 60%
+  );
+}
+
+/* Kort-rubrikens fas-etikett (höger om "Grupp X"): en diskret pill som bär fasen.
+   Default = dämpad kant. "Färdigspelad" får en guld-ton (facit), live-läget
+   ("matcher kvar") en grön puls-prick som signalerar "det här lever just nu". */
+.vm-scenario-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  padding: 0.125rem 0.5rem;
+  white-space: nowrap;
+}
+
+.vm-scenario-phase[data-scenario-phase='decided'] {
+  border-color: color-mix(in srgb, var(--vm-gold) 40%, transparent);
+  background-color: color-mix(in srgb, var(--vm-gold) 8%, transparent);
+}
+
+/* Live-prick i "matcher kvar"-läget: en lugn andnings-puls (samma språk som
+   hero:ns live-dot), så ögat dras till de grupper där dramat pågår just nu. */
+.vm-scenario-live-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+  box-shadow: 0 0 0 0 rgb(var(--vm-glow-accent) / 0.5);
+  animation: vm-scenario-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes vm-scenario-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgb(var(--vm-glow-accent) / 0.45);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 0.1875rem rgb(var(--vm-glow-accent) / 0);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   2. LAG-RADEN: kompakt och skannbar. En kvalificerad rad (Klar) lyfts FÄRG-
+   OBEROENDE med en vänster-list + en diskret upphöjd yt-ton (exakt samma mönster
+   som GroupTable:s kvalificeringszon, T7-pin), så "klar"-känslan läses även i
+   gråskala och i ljust tema där accent === success kan sammanfalla.
+   -------------------------------------------------------------------------- */
+.vm-scenario-row {
+  position: relative;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.18s ease;
+}
+
+/* Klar-raden: upphöjd yt-ton + vänster accent-list. color-mix mot success-token
+   (lagets egen positiva ton, T8-pin), så raden känns som en seger utan att luta
+   sig BARA mot färgen, listen (form) + chip:en (glyf) bär den lika mycket. */
+.vm-scenario-row[data-scenario-status='qualified'] {
+  background-color: color-mix(in srgb, var(--color-success) 8%, transparent);
+  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--color-success) 70%, transparent);
+}
+
+/* Ute-raden: en HÖGST diskret nedtoning (lägre opacitet på radens helhet), så ett
+   utslaget lag träder respektfullt tillbaka utan att stämplas i grellt rött. Bara
+   en aning, raden ska fortfarande vara fullt läsbar (a11y: ingen text under AA). */
+.vm-scenario-row[data-scenario-status='eliminated'] {
+  opacity: 0.72;
+}
+
+/* Beror på-raden: en knappt skönjbar guld-list som signalerar "ödet är öppet",
+   spänningen i sista omgången. Subtilare än Klar-listen (det är inte avgjort än). */
+.vm-scenario-row[data-scenario-status='depends'] {
+  box-shadow: inset 2px 0 0 0 color-mix(in srgb, var(--vm-gold) 45%, transparent);
+}
+
+/* Hover: en mjuk yt-höjning på hela raden, så den känns "påtagbar" på desktop.
+   Ren känsla, ingen funktion hänger på den (touch-enheter berörs inte). */
+@media (hover: hover) {
+  .vm-scenario-row:hover {
+    background-color: color-mix(in srgb, var(--color-fg) 5%, transparent);
+  }
+  .vm-scenario-row[data-scenario-status='qualified']:hover {
+    background-color: color-mix(in srgb, var(--color-success) 12%, transparent);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   3. STATUS-CHIPEN: FÄRG-OBEROENDE (T7/T8-pin). Varje status bär en EGEN glyf
+   (form/ikon) + en egen ton + egen vikt, så de tre läges skiljs åt även i
+   gråskala, för färgblinda och i båda teman. Glyfen sätts som ett ::before ur
+   data-scenario-status, så ScenarioView inte behöver baka in ikon-markup (seamen
+   förblir ren semantik + data-attribut).
+
+   KONTRAST: chip-texten står alltid på chip:ens egen ton-yta (color-mix mot
+   token), och både text och glyf håller AA mot den ytan i BÅDA teman (uppmätt,
+   decisions.md T11). Tonen bär ALDRIG läsbarheten ensam, formen + glyfen gör det.
+   -------------------------------------------------------------------------- */
+.vm-scenario-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+}
+
+/* Glyfen: en liten form-markör FÖRE etiketten. Inte ett emoji (renderas olika
+   mellan plattformar) utan en geometrisk glyf som är stabil överallt och läses
+   som en distinkt form även utan färg. aria-hidden via CSS-content (dekorativ;
+   den läsbara statusen är chip-TEXTEN, som skärmläsaren redan läser). */
+.vm-scenario-chip::before {
+  font-size: 0.75em;
+  line-height: 1;
+  font-weight: 700;
+}
+
+/* KLAR (qualified): succé. Solid success-ton-yta + bock-glyf (✓) + mörk ink-text
+   så chip:en känns som en "avbockad" seger. Ink-texten (--color-bg i mörkt /
+   #fff-aktig i ljust via accent-fg-spåret) håller hög kontrast mot den fyllda
+   ytan. Den fyllda ytan (inte bara en kant) ger Klar mest visuell tyngd av de
+   tre, vilket är rätt: det är det starkaste utfallet. */
+.vm-scenario-chip[data-scenario-status='qualified'] {
+  border-color: transparent;
+  background-color: var(--color-success);
+  color: var(--vm-on-success);
+}
+.vm-scenario-chip[data-scenario-status='qualified']::before {
+  content: '\2713'; /* ✓ check mark */
+  color: var(--vm-on-success);
+}
+
+/* UTE (eliminated): dämpad, respektfull. INGEN fylld röd skräll, en lugn, neutral
+   kant-chip med en minus-glyf (–) som läser "ute ur leken" utan att håna. Tonen
+   är fg-muted-baserad (neutral grå-grön), inte danger-röd: ett utslaget lag ska
+   bemötas med respekt, inte ett rött utropstecken. */
+.vm-scenario-chip[data-scenario-status='eliminated'] {
+  border-color: color-mix(in srgb, var(--color-fg) 22%, transparent);
+  background-color: color-mix(in srgb, var(--color-fg) 6%, transparent);
+  color: var(--color-fg-muted);
+}
+.vm-scenario-chip[data-scenario-status='eliminated']::before {
+  content: '\2013'; /* – en-dash som "minus/ute"-markör */
+  color: var(--color-fg-muted);
+}
+
+/* BEROR PÅ (depends): spänning. En guld-kant-chip med en romb-glyf (◆) som
+   signalerar "det öppna, det som står på spel". Guld-tonen (pokal-färgen) bär
+   hejarklacks-spänningen. När utfallet hänger på MÅLSKILLNAD (data-scenario-
+   margin-dependent på RADEN) pulserar glyfen svagt = extra spänning. Texten är
+   fg (full kontrast), guld-tonen lever i kant + yta + glyf, aldrig i texten
+   (guld-på-yta som textfärg vore för svag, lessons aa-kontrast-pastad). */
+.vm-scenario-chip[data-scenario-status='depends'] {
+  border-color: color-mix(in srgb, var(--vm-gold) 50%, transparent);
+  background-color: color-mix(in srgb, var(--vm-gold) 12%, transparent);
+  color: var(--color-fg);
+}
+.vm-scenario-chip[data-scenario-status='depends']::before {
+  content: '\25C6'; /* ◆ romb, "öppet utfall" */
+  /* Glyfen är en del av den FÄRG-OBEROENDE signalen, så den måste läsas skarpt,
+     inte bara "vara guld". Rå --vm-gold (#b07d10 i ljust) på den ljusa guld-tinten
+     bottnar på 3.17:1 (UPPMÄTT, under AA-text). Vi drar gulden 30 % mot fg så den
+     behåller sin varma pokal-ton men håller >= 4.5:1 i BÅDA teman (ljust 5.17:1,
+     mörkt ~7:1, uppmätt canvas-komposit, decisions.md T11). */
+  color: color-mix(in srgb, var(--vm-gold) 70%, var(--color-fg) 30%);
+}
+
+/* Målskillnads-beroende: glyfen i Beror på-chip:en andas svagt, så de lag vars
+   öde avgörs på målskillnad (den vassaste spänningen) får en extra puls-signal.
+   Knutet till RADENS data-scenario-margin-dependent (seamen). Ren dekoration. */
+.vm-scenario-row[data-scenario-margin-dependent='true'] .vm-scenario-chip::before {
+  animation: vm-scenario-glyph-pulse 2s ease-in-out infinite;
+}
+
+@keyframes vm-scenario-glyph-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   4. PLACERINGS-DISCEN (rank): samma medalj-språk som GroupTable. Topp-2 i
+   live/decided-läget får en diskret guld/silver-ton (form + ton, inte bara färg),
+   resten neutral. Siffran håller alltid full fg-kontrast (tonen lever i kanten).
+   Knutet till radens status så den följer klassningen utan ny data.
+   -------------------------------------------------------------------------- */
+.vm-scenario-rank {
+  border-color: color-mix(in srgb, var(--color-fg) 18%, transparent);
+}
+
+/* Klar-radens disc: en lugn guld-kant (medalj-känsla), siffran kvar i full fg. */
+.vm-scenario-row[data-scenario-status='qualified'] .vm-scenario-rank {
+  border-color: color-mix(in srgb, var(--vm-gold) 55%, transparent);
+  background-color: color-mix(in srgb, var(--vm-gold) 14%, transparent);
+  color: var(--color-fg);
+}
+
+/* -----------------------------------------------------------------------------
+   5. TOO-EARLY: ett ELEGANT väntande-tillstånd, inte en tom låda. En centrerad
+   ikon (en stiliserad arena/krets) + den lugna copy:n. Ikonen tonas mot border/
+   muted så den känns som en platshållare i ro, inte ett fel. Hela blocket har
+   generös luft (premium) och en svag streckad ram som läser "kommer snart".
+   -------------------------------------------------------------------------- */
+.vm-scenario-tooearly {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.625rem;
+  padding: 1.5rem 1rem 1.75rem;
+}
+
+/* Väntar-ikonen: en dubbel-ring (arena sedd ovanifrån) ritad ur border-tonen, med
+   ett svagt grönt arena-ljus i mitten. Ren CSS (ingen extra asset), tonad mot
+   token så den lever i båda teman. En lugn, andande puls signalerar "snart". */
+.vm-scenario-tooearly-icon {
+  position: relative;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid color-mix(in srgb, var(--color-border) 90%, transparent);
+  background-image: radial-gradient(
+    closest-side,
+    rgb(var(--vm-glow-accent) / 0.16),
+    transparent 70%
+  );
+}
+.vm-scenario-tooearly-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0.5rem;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  animation: vm-scenario-ring 3s ease-in-out infinite;
+}
+
+@keyframes vm-scenario-ring {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   6. REDUCED MOTION: nollställ ALLA dekorativa keyframes EXPLICIT (inte snappa
+   till slutläget). Den globala svepande regeln (index.css) fryser keyframes på
+   100 %, så vi stänger av scenario-rörelsen helt (samma motgift som hero/bracket,
+   patterns.md). Tonerna, listerna och glyferna STÅR KVAR, bara rörelsen tas bort,
+   så hela den färg-oberoende status-läsningen är intakt vid reducerad rörelse.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .vm-scenario-live-dot,
+  .vm-scenario-row[data-scenario-margin-dependent='true'] .vm-scenario-chip::before,
+  .vm-scenario-tooearly-icon::after {
+    animation: none !important;
+  }
+}
