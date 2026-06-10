@@ -5,6 +5,35 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T10/#10 (lag-profiler) KLAR - väntar review + PR
+
+**Branch:** `feature/T10-lagprofiler` (= develop HEAD + T10-commits, EJ pushad)
+**Board:** issue #10. Dirigenten driver review-panel -> PR mot develop -> merge.
+
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `677c9a3` - källånkrad lag-profil-data (FIFA-ranking + stjärnspelare + kuriosa), generator + parser + 48/48-låst test + decisions.md
+- `b453a52` - UI: klickbara lag-profiler (modal) från matchkort + tabeller, derivation + provider + a11y-dialog + tester
+- (docs-commit: patterns.md + HANDOFF, denna)
+
+**Verifiering (senior-developer):** 545 tester gröna (53 filer, +21 nya: 7 derivation + 3 TeamNameButton + 11 panel/navigering), build grönt, lint rent, format:check rent. Baseline var 501; +23 data-tester (teams/källånkring) + 21 UI = 545.
+
+**T10 DATA-DELEN (källånkrad, gissa-aldrig HARD uppfylld):**
+- **FIFA-ranking:** OFFICIELLA aprilutgåvan 2026-04-01 (senaste vid bygget; nästa officiella 2026-06-11). Alla 48 lag, verifierad mot ESPN (1-50) + Wikipedia (topp 20) + whereig (50-90), korskollat. Committat utdrag: `src/data/wc2026/team-profiles-source.txt`.
+- **Stjärnspelare:** de släppta 26-mannatrupperna (offentliggjorda 2026-06-02), Al Jazeera + Wikipedia. Redaktionellt urval (1-2 per lag) MEN varje spelare bevisligen i truppen. Alla 48 lag fick minst en källbelagd spelare.
+- **Kuriosa:** verifierbara VM-fakta (tidigare slutspel + bästa placering, Wikipedia records).
+- **"Bästa speldraget" (bestPlay):** UTELÄMNAT med flit (subjektivt utan källa), `Team.bestPlay` tom för alla 48 (låst av test). FIFA-rankingen är styrke-signal i profil-vyn i stället. Se decisions.md T10.
+- **VAD SOM INTE KUNDE KÄLLBELÄGGAS:** inget profil-fält saknar källa. bestPlay är ENDA medvetet tomma fältet (designval, inte datalucka). FIFA-rankingen är aprilutgåvan (juni-utgåvan inte publicerad än vid bygget, 2026-06-11) - när juni-utgåvan kommer kan källfilen uppdateras + regenereras (en rad-ändring + `npm run gen:team-profiles`).
+
+**T10 UI-DELEN:** modal-overlay (KISS, router-lös PWA), nås via klickbara lagnamn i matchkort (daily) + gruppspelstabeller. a11y-dialog (role=dialog, aria-modal, Escape/stäng/bakgrund stänger, fokus-flytt). Visar ranking, stjärnor, kuriosa, grupp + lagets väg (matcher kronologiskt, återanvänder daily-helpers). Stabil semantik + data-attribut för design-frontend. Ny `team-profile`-feature + `TeamProfileProvider` i App (innanför ResultsProvider).
+
+**Findings (T10):**
+- **F1 (FIFA-ranking-utgåva):** datan är aprilutgåvan 2026 (officiell, senaste vid bygget). Juni-utgåvan publiceras 2026-06-11 (dagen turneringen startar). Uppdatering = ändra rank-värden i källfilen + `npm run gen:team-profiles`, källankrings-testet låser. Inte en bugg, en känd uppdaterings-punkt.
+- **F2 (design-finish pinnad till design-frontend):** modalen bär stabil semantik + data-attribut men ingen premium-visuell finish (overlay-blur, in-animation, layout-polish), det är design-frontends lager (samma seam-princip som T5/T7/T9).
+
+**Nästa:** review-panel på T10 -> PR mot develop -> merge. Därefter design-frontend på profil-modalen, sen T11-T13, sen T14 (Supabase live, T14-pin UTÖKAD).
+
 ## RESUME-HERE , 2026-06-10 , T28/#42 KLAR - PR #44 väntar på merge
 
 **Branch:** `feature/T28-matchlista-kontext` @ HEAD `b7ad6c2`
