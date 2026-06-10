@@ -436,3 +436,43 @@ sanning (matchlistan) ovanpå den redan verifierade, källhänvisade seednings-m
 korrekt, och den kritiska FIFA-regeln kan aldrig drifta isär från koden. Generaliserar T5/T6:s "härledd-
 state-vy" till en andra härledd vy på samma delade store. Källa: T9 (`src/features/bracket/` +
 `src/domain/bracket/rank-third-places.ts`).
+
+### premium-bracket-ovanpa-data-attribut-seam-med-intensitet-mot-finalen (design, VM 2026)
+
+**Recept (ett vackert, läsbart slutspelsträd som stylas ENBART via seamens data-attribut):**
+
+1. STYLA OVANPÅ SEAMEN, rör aldrig semantiken. En dedikerad feature-CSS (`bracket.css`) + klass-hakar i
+   vyn hänger ALLT på senior-devs stabila data-attribut (`data-bracket-round/-match/-slot`,
+   `data-slot-resolution`, `data-winner`, `data-bracket-scroll/-locked`). Resultat: alla regioner,
+   rubrik-hierarkin, `<ul>/<li>`-slots och aria-labels står kvar, alla tester gröna. Inga råa hex,
+   bara `color-mix`/tema-token, så trädet är troget BÅDA teman.
+2. INTENSITET SOM BYGGER MOT FINALEN ger trädet riktning: en numrerad runda-marker (1->6) i rubriken,
+   semifinalens kant tar lite accent, och FINALEN får en signatur (guld-kant + guld-tint + guld-glow
+   via `color-mix(... var(--vm-gold) ...)`). Vertikalt centrerade rund-kolumner (`justify-content:
+   center`) ger träd-känslan (senare rundor möter sina föregångare på mitten) + en subtil
+   kopplings-affordans (en `::after`-feeder-linje per kolumn, utom de yttersta). Ärlig: fejkar inte
+   exakt bezier-geometri som den platta kolumn-datan inte bär.
+3. VINNAR-FRAMHÄVNING FÄRG-OBEROENDE (T7/T8-pin): stapla form + yta + ikon + vikt, aldrig bara färg.
+   `[data-winner]` -> accent-kant-bar (`box-shadow: inset 3px 0 0`) + accent-tint-yta + en medalj-bock ✓
+   (CSS-pseudo `::after` på en namn-span, så TSX-semantiken inte rörs) + fet text. Bevisat i reduced-
+   motion att markörerna står kvar medan rörelsen nollas -> vinnaren syns i gråskala/för färgblinda.
+4. AVANCERINGS-ANIMATION = CSS, inte JS (samma motgift som hero:n): en engångs glow-puls + medalj-pop
+   (`@keyframes`), noll layout-påverkan (CLS=0). Den globala reduced-motion-regeln räcker INTE (fryser
+   keyframes på slutläget), så bracket-rörelsen nollas EXPLICIT med `animation: none` vid
+   `prefers-reduced-motion: reduce`. Verifiera live: `getComputedStyle(...).animationName === 'none'`.
+5. SCROLL SOM FEATURE: trädet är brett, så mobil scrollar i sidled (seamens `overflow-x-auto`) med mjuka
+   edge-fade-masker (`mask-image: linear-gradient(...)` mot tema) + en "Svep i sidled →"-hint som döljs
+   `>= 1024px`. Verifiera 280/360/768/1024/1440px: NOLL sid-overflow (dokumentet scrollar aldrig
+   horisontellt, bara bracket-containern), ingen nod sticker ut förbi viewporten.
+6. AA UPPMÄTT, ALDRIG PÅSTÅTT, i BÅDA teman (canvas-komposit-metoden, lessons `aa-kontrast-pastad...`):
+   mät på faktiskt renderad yta (komposita halvgenomskinliga tints mot effektiv bakgrund). KÄND fälla:
+   guld-text på vit yta faller under AA i ljust tema (här 3.29:1). Motgift = en SOLID guld-bricka med
+   near-black ink (`#1c1403`), samma mönster som "Dagens match"-chippet (T7-pin), 5.03:1 ljust /
+   ~10.9:1 mörkt. När en framhävnings-roll bär liten text: solid bricka + kontrast-säker ink, aldrig
+   rollens hue i texten mot en svag tint.
+
+**Varför:** "Träd ska kännas designade, inte genererade" (SPEC §7), och det är skärmen folk visar för
+kompisar. Genom att styla på data-attribut-seamen kan trädet bli premium utan att riskera senior-devs
+härledning eller a11y, och genom att tvinga ut framhävning + animation i form/ikon/CSS (inte färg/JS)
+håller det läsbarheten helig i båda teman, för färgblinda och vid reducerad rörelse. Källa: T9 design-
+frontend (`src/features/bracket/bracket.css` + `BracketView.tsx`).
