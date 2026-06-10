@@ -5,6 +5,62 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T12 (issue #12): What-if-simulatorn = hypotetiskt overlay ovanpå den delade storen
+
+**Beslut (arkitektur, minsta sanna):** What-if-läget är INTE en egen datakälla eller en
+parallell store, det är ett HYPOTETISKT OVERLAY (`Map<matchId, Match>`) ovanpå SAMMA
+matchlista som alla vyer redan härleder ur (SPEC §6, härledd state). Overlayt + sim-läget bor
+i den befintliga `ResultsProvider` (den äger redan matchlist-seamen), så ingen ny provider och
+ingen dubbellagring behövs. Storen exponerar nu `matches` som EFFEKTIVA matcher
+(`simulating ? riktiga + overlay : riktiga`), plus `simulating` + `enterSimulation` /
+`exitSimulation` / `resetSimulation`. Sammanvävningen är en REN funktion
+(`src/features/simulation/apply-simulation.ts`, `applySimulationOverlay(realMatches, overlay)`),
+React-fri och fristående testad. **Konsumenterna (gruppspel, slutspelsträd, "Vad krävs",
+inmatning) är OFÖRÄNDRADE**, de läser bara storens `matches` som vanligt och reagerar därför
+automatiskt på sim-läget. Det är hela poängen med den härledda-state-arkitekturen.
+
+**Beslut (ISOLERINGEN är en kod-invariant, riktig data skrivs ALDRIG i sim-läge):** En intern
+`realMatches` är den enda sanningen. `applySimulationOverlay` tar den `readonly` och muterar
+den ALDRIG (bygger en ny array), så ett hypotetiskt resultat kan per konstruktion inte ändra
+den riktiga datan. Skriv-seamen ruttas av läget: `submitResult`/`setMatches` skriver OVERLAYT i
+sim-läge (riktig data orörd) och den riktiga datan annars. Båda skrivvägarna är läges-medvetna
+(försvar på djupet). Bevisat med negativ kontroll: stänger man av BÅDA sim-grenarna rödnar 6
+isolerings-/blanda-tester (de är alltså äkta skyddsräcken, inte gröna av slump).
+
+**Beslut (BLANDA-fallet, riktig + hypotetisk samtidigt):** Matcher UTAN overlay-post behåller
+sina RIKTIGA värden, matcher MED overlay-post visar det hypotetiska. Så en tabell/ett träd
+härlett ur de effektiva matcherna blandar riktiga och hypotetiska resultat korrekt. **Overlay
+har FÖRETRÄDE** för en match som även har ett riktigt resultat: i sim-läge är det hypotetiska
+det användaren spelar ut, så det visas tills overlayn töms. `resetSimulation` (eller en
+om-seedning) tömmer overlayn -> det riktiga resultatet syns igen. Overlayt ÖVERRIDER bara
+EXISTERANDE matcher (uppfinner ingen ny fixtur); en overlay-nyckel utan riktig match är ett
+programmeringsfel och `applySimulationOverlay` FAIL-LOUD:ar (PRINCIPLES §8), eftersom hela
+104-matchers-schemat redan finns i den riktiga datan och ett what-if bara spelar ut det.
+
+**Beslut ("Vad krävs"/ScenarioView LÄSER overlayn i sim-läge, medvetet JA):** ScenarioView är
+en konsument av samma store-`matches`, så den ser de effektiva matcherna. Det är önskat, hela
+poängen är att se vad som krävs i HYPOTETISKA lägen, inte bara i de riktiga. Samma för
+slutspelsträdet: ett hypotetiskt komplett gruppspel låser trädet (FIFA-seedningen) i sim-läge
+och släpper låset när man avslutar (riktig data tillbaka).
+
+**Beslut (validering gäller hypotetiska resultat, T9-grinden återanvänd):** Ett hypotetiskt
+resultat går genom EXAKT samma `validateResultEntry` som ett riktigt (en sanning för
+inmatnings-grinden), så T9:s straff-regel (FIFA Article 14: en slutspelsmatch som slutar lika
+KRÄVER straffar) gäller även hypotetiska slutspelsresultat. Ingen ny domänregel definieras i
+T12, bara overlay-mekaniken ovanpå.
+
+**Beslut (MARKERING + ÅTERSTÄLLNING, design-frontend tar visuell finish):** En egen
+`SimulationBanner` (app-globalt band, eftersom sim-läget rör ALLA vyer) bär den FUNKTIONELLA +
+tillgängliga markeringen: i sim-läge ett uppläst statusmeddelande (`role="status"`, "Simulering
+pågår, de riktiga resultaten påverkas inte") + ett `data-simulation-active`-attribut som
+design-frontend hänger en premium-banner/badge på. Toggle (Starta/Avsluta) + "Återställ allt"
+(töm overlayn, stanna i sandlådan). **Spårbarhet:** UX/produkt-regel + intern arkitektur,
+ingen extern auktoritativ källa, spårbar via #12 + denna rad + testerna (`apply-simulation.test.ts`
+isolering/blanda/fail-loud, `simulation-store.test.tsx` toggle/reset/isolering/blanda/validering
++ tabell+träd reagerar, `SimulationBanner.test.tsx` markering/toggle).
+
+---
+
 ## 2026-06-10 , T11 (issue #11): Copilot C2 + C3, doc-/text-ärlighet i "Vad krävs" (inga domänregler rörda)
 
 **Beslut (rätta två formuleringar så de matchar vad koden FAKTISKT gör):**
