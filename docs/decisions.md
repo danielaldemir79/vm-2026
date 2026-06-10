@@ -5,6 +5,31 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T9 (issue #9): Copilot R3 (C9-C10), straff-gating + chip-böjning
+
+**Beslut (C9, `penalties-not-applicable` bara när det SÄKERT kan avgöras):** `validateResultEntry`
+(`validate-result.ts`) gav förr `penalties-not-applicable` så fort straffar var ifyllda men inte
+KRÄVDES, även när de ordinarie målen var ofullständiga/ogiltiga (finished utan bägge mål). Då är
+"Ta bort straffmålen" missvisande, för så snart målen rättas till en LIKA ställning blir straffarna
+i stället KRÄVDA (FIFA Article 14). Felet gatas nu bakom `penaltiesDefinitelyNotApplicable` =
+gruppspel (oavgjort står sig, straffar gäller aldrig) ELLER giltiga ordinarie mål som inte är lika
+(avgjord slutspelsmatch). I övriga "ej krävda"-fall bär de ordinarie målen redan sitt eget fel
+(`finished-without-result`/heltals-fel), och straffarnas relevans beror på att det felet rättas
+först, så straffarna flaggas inte då. **Källa för straff-regeln:** FIFA Article 14
+(`fifa-knockout-rules-source.txt`), oförändrad sedan F1/penalties-pinnen, gissas inte. Bevisat:
+slutspel finished utan/med-bara-ett/ogiltigt ordinarie mål + straffar -> målfelet, INTE
+`penalties-not-applicable`; gruppspel utan mål + straffar -> fortfarande `penalties-not-applicable`
+(gäller aldrig i grupp); slutspel med avgjorda mål + straffar -> fortfarande `penalties-not-applicable`.
+
+**Beslut (C10, möjliga-lag-chippet böjs grammatiskt):** Chippets text/aria i `SlotRow`
+(`BracketView.tsx`) var alltid plural ("möjliga"), så exakt 1 kvarvarande kandidat läste "1 möjliga
+lag", grammatiskt fel. Ny ren hjälpare `possibleTeamsLabel(count)` böjer som `matchCountLabel`:
+"lag" är neutrum, så adjektivet böjs "1 möjligt lag" / "n möjliga lag". Samma sträng driver nu både
+synlig text och aria-label (en sanning). `SlotRow` exporteras för enhetstest av böjningen (singular
++ plural).
+
+---
+
 ## 2026-06-10 , T9 (issue #9): Copilot R2 (C4-C8), bl.a. bronsmatch-ordning + form-synk
 
 **Beslut (C4, bronsmatch FÖRE final i visnings-ordningen):** `ROUND_ORDER` (derive-bracket.ts) och

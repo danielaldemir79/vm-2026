@@ -228,13 +228,18 @@ export function validateResultEntry(
     });
   }
 
-  // 4. Straffar (FIFA Article 14, bara slutspel). Tre fall, alla fail-loud:
+  // 4. Straffar (FIFA Article 14, bara slutspel). Tre lägen, alla fail-loud:
   //    - SLUTSPEL + finished + lika ordinarie ställning -> straffar KRÄVS (och
   //      måste utse en vinnare). Avgörs bara när bägge ordinarie mål är giltiga
   //      tal (annars rapporteras redan deras fel ovan, straff-kravet är då för
   //      tidigt att bedöma och skulle bara bruskaka fel-listan).
-  //    - Straffar angivna utan att de är tillämpliga (gruppspel, eller ej lika,
-  //      eller ej finished) -> 'penalties-not-applicable' (maskera inte tyst).
+  //    - Straffar angivna men det går SÄKERT att avgöra att de inte är
+  //      tillämpliga -> 'penalties-not-applicable' (maskera inte tyst).
+  //    - Straffar angivna men det går INTE att avgöra säkert ännu (slutspel,
+  //      finished, men ordinarie mål saknas/ogiltiga) -> säg INGET om straffar.
+  //      Felet bor då i de ordinarie målen (finished-without-result/heltals-fel
+  //      ovan), och straffarna kan bli KRÄVDA så snart målen rättas till lika.
+  //      Att då säga "Ta bort straffmålen" vore missvisande (C9, Copilot runda 3).
   const penaltiesProvided =
     entry.penalties != null &&
     (entry.penalties.homeGoals !== null || entry.penalties.awayGoals !== null);
@@ -246,11 +251,20 @@ export function validateResultEntry(
   const penaltiesRequired =
     isKnockoutStage(stage) && entry.status === 'finished' && isLevelOrdinary;
 
+  // Det går att SÄKERT avgöra att straffar inte är tillämpliga bara i två fall:
+  //   - gruppspel (oavgjort står sig, straffar gäller aldrig), eller
+  //   - slutspel med GILTIGA ordinarie mål som inte är lika (avgjord match).
+  // I övriga "ej krävda"-fall (ofullständiga/ogiltiga ordinarie mål, eller en
+  // ej-finished match) beror straffarnas relevans på att det ordinarie felet
+  // rättas först, så vi flaggar inte straffarna då (annars missvisande, C9).
+  const penaltiesDefinitelyNotApplicable =
+    !isKnockoutStage(stage) || (ordinaryGoalsValid && !isLevelOrdinary);
+
   if (penaltiesRequired) {
     validatePenaltiesRequired(entry, errors);
-  } else if (penaltiesProvided) {
-    // Straffar finns men matchen behöver dem inte: ett ledande resultat ska
-    // INTE bära en straffläggning, och gruppspel/oavslutad match aldrig.
+  } else if (penaltiesProvided && penaltiesDefinitelyNotApplicable) {
+    // Straffar finns men matchen behöver dem säkert inte: ett avgjort
+    // slutspelsresultat ska INTE bära en straffläggning, och gruppspel aldrig.
     errors.push({
       code: 'penalties-not-applicable',
       field: 'penalties',

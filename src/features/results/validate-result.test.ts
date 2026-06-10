@@ -198,6 +198,75 @@ describe('validateResultEntry, slutspels-straffar (FIFA Art. 14)', () => {
       )
     ).toContain('penalties-not-applicable');
   });
+
+  // C9 (Copilot runda 3): 'penalties-not-applicable' fick förr ges så fort
+  // straffar var ifyllda men inte krävdes, ÄVEN när ordinarie mål var
+  // ofullständiga/ogiltiga. Då är "Ta bort straffmålen" missvisande, för så
+  // snart målen rättas till en lika ställning blir straffarna i stället KRÄVDA.
+  // Felet ska bara ges när det SÄKERT går att avgöra att straffar inte gäller
+  // (gruppspel, eller giltiga ordinarie mål som inte är lika).
+  describe('C9: penalties-not-applicable bara när det säkert kan avgöras', () => {
+    it('SLUTSPEL finished UTAN ordinarie mål + straffar: målfelet, INTE penalties-not-applicable', () => {
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(null, null, { homeGoals: 4, awayGoals: 3 }),
+          'round-of-32'
+        )
+      );
+      expect(codes).toContain('finished-without-result');
+      expect(codes).not.toContain('penalties-not-applicable');
+    });
+
+    it('SLUTSPEL finished med BARA ETT ordinarie mål + straffar: målfelet, inte penalties-not-applicable', () => {
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(2, null, { homeGoals: 4, awayGoals: 3 }),
+          'round-of-32'
+        )
+      );
+      expect(codes).toContain('finished-without-result');
+      expect(codes).not.toContain('penalties-not-applicable');
+    });
+
+    it('SLUTSPEL finished med OGILTIGT ordinarie mål (decimal) + straffar: heltalsfelet, inte penalties-not-applicable', () => {
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(1.5, 1, { homeGoals: 4, awayGoals: 3 }),
+          'round-of-32'
+        )
+      );
+      expect(codes).toContain('home-not-integer');
+      expect(codes).not.toContain('penalties-not-applicable');
+    });
+
+    it('GRUPPSPEL utan ordinarie mål + straffar: fortfarande penalties-not-applicable (gäller aldrig i grupp)', () => {
+      // I gruppspel går det att avgöra säkert oavsett mål: straffar gäller aldrig.
+      const codes = codesOf(
+        validateResultEntry(
+          'live',
+          entryWithPens(null, null, { homeGoals: 4, awayGoals: 3 }),
+          'group'
+        )
+      );
+      expect(codes).toContain('penalties-not-applicable');
+    });
+
+    it('SLUTSPEL finished med giltiga ordinarie mål som inte är lika + straffar: fortfarande penalties-not-applicable', () => {
+      // Avgjord ordinarie tid -> säkert att straffar inte gäller (kontroll att
+      // gatingen inte tystade det legitima fallet).
+      const codes = codesOf(
+        validateResultEntry(
+          'scheduled',
+          entryWithPens(3, 1, { homeGoals: 4, awayGoals: 3 }),
+          'quarter-final'
+        )
+      );
+      expect(codes).toContain('penalties-not-applicable');
+    });
+  });
 });
 
 describe('toMatchResult', () => {
