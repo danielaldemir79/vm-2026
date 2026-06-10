@@ -3,12 +3,18 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import App from './App.tsx';
 import { ThemeProvider, THEME_ATTRIBUTE } from './theme';
 import { MotionProvider } from './motion';
+import { SettingsProvider } from './features/app-settings';
+import { ONBOARDING_DONE_KEY } from './features/app-settings';
 
 // Nollställ delat tema-tillstånd så default-temat (mörkt) gäller oavsett
 // testordning, annars kan ett tidigare tests sparade tema läcka in via localStorage.
 beforeEach(() => {
   window.localStorage.clear();
   document.documentElement.removeAttribute(THEME_ATTRIBUTE);
+  // Markera onboarding-touren som redan sedd (T13): annars öppnar App:n
+  // första-gångs-modalen ovanpå skalet, vilket inte är det dessa smoke-tester
+  // mäter. Onboardingen testas separat i app-settings/OnboardingDialog.test.tsx.
+  window.localStorage.setItem(ONBOARDING_DONE_KEY, '1');
 });
 
 // Smoke-test för app-skalet: bevisar att foundation-showcasen renderar utan att
@@ -18,9 +24,11 @@ beforeEach(() => {
 function renderApp() {
   return render(
     <ThemeProvider>
-      <MotionProvider>
-        <App />
-      </MotionProvider>
+      <SettingsProvider>
+        <MotionProvider>
+          <App />
+        </MotionProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 }
@@ -29,16 +37,16 @@ function renderApp() {
 // den delade storens async seedning. Vänta in att den SETTLAT innan testet
 // avslutas, annars sker ett state-update efter testet (act-varning + risk för flaky).
 //
-// VARFÖR loading-indikatorerna och inte rubriken: rubrikerna renderas redan i
-// loading-läget, så att vänta på dem bevisar inte att storen hunnit byta state.
-// Settled = laddnings-indikatorerna (role="status") har FÖRSVUNNIT, dvs storen
-// har gått till ready eller error. Det finns NU två status-element i loading
-// (gruppspel + resultatinmatning), så vi väntar tills BÅDA är borta via
-// queryAllByRole (queryByRole skulle kasta på flera träffar).
+// VARFÖR loading-TEXTEN och inte role="status" generellt: rubrikerna renderas
+// redan i loading-läget, så att vänta på dem bevisar inte att storen bytt state.
+// Settled = laddnings-TEXTERNA ("Laddar ...") har FÖRSVUNNIT, dvs storen har gått
+// till ready eller error. Vi matchar på texten i stället för role="status"
+// eftersom online/offline-indikatorn (T13) bär ett PERMANENT role="status" som
+// aldrig försvinner, så en "alla statuses borta"-koll skulle aldrig settla.
 async function waitForAppSettled() {
   await waitForElementToBeRemoved(() => {
-    const statuses = screen.queryAllByRole('status');
-    return statuses.length > 0 ? statuses : null;
+    const loading = screen.queryAllByText(/Laddar/i);
+    return loading.length > 0 ? loading : null;
   });
 }
 

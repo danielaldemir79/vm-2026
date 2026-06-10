@@ -521,3 +521,44 @@ body {
     animation: none !important;
   }
 }
+
+/* -----------------------------------------------------------------------------
+   9. ONBOARDING-TOURENS HERO-STRIP (T13, issue #13). [VÄRDE, ej @theme-kontrakt]
+
+   "Arena i kvällsljus" (SPEC §7), samma språk som dagliga hero:n (§6) och lag-
+   profilen (§7), men i en KOMPAKT strip ÖVANFÖR textblocket i onboarding-dialogen.
+   Strippen bär ENBART dekor: två radiella ljus (pitch-grön ur övre vänstra hörnet,
+   varm guld ur nedre högra) + ett långsamt ljus-svep (.vm-hero-sheen) + stegets
+   CSS-illustration (OnboardingArt.tsx). Ingen läsbar text bor på strippen.
+
+   KONTRAST-VAKT (taskens punkt 4, lessons aa-kontrast-...-varsta-fall): ALL
+   onboarding-TEXT (eyebrow, rubrik, brödtext, stegräknare, knappar) står på den
+   OPAKA surface-ytan UNDANFÖR strippen, inte på glow:en. Uppmätt på surface
+   (relativ luminans, .vmshots/contrast2.mjs, båda teman): accent-eyebrow 9.68:1
+   (mörkt) / 5.40:1 (ljust), rubrik (fg) 15.24 / 17.91, brödtext + stegräknare
+   (fg-muted) 7.50 / 6.52, primärknapp (accent-fg på accent) 10.85 / 5.40, alla
+   >= 4.5:1 (normal text). Glow:en kan per konstruktion inte sänka någon text-
+   kontrast eftersom ingen text ligger på den. Glow-alforna (grön 0.16 i hörnet,
+   guld 0.10) hålls ändå låga, så strippen är en lugn stämning, inte en färgklick. */
+.vm-onboarding-hero {
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(120% 140% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 60%),
+    radial-gradient(
+      100% 140% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 10%, transparent),
+      transparent 58%
+    );
+}
+
+/* Ljus-svepet i strippen: samma mjuka, breda sken som dagliga hero:n, drivet av
+   .vm-hero-sheen (index.css, stannar vid reducerad rörelse). Här bär det bara
+   gradienten (svepets rörelse + reduced-motion-grinden delas med hero:n). */
+.vm-onboarding-hero-sheen {
+  background-image: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgb(var(--vm-glow-accent) / 0.1) 50%,
+    transparent 68%
+  );
+}
