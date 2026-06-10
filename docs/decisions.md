@@ -44,8 +44,46 @@ data-attribut (`data-result-day`, `data-result-day-heading`, `data-match-context
 **Spårbarhet:** detta är en UX-/produkt-regel (Daniels feedback), ingen extern auktoritativ källa att
 källhänvisa, spårbar via issue #42 + denna rad. Tester: `group-matches-for-entry.test.ts` (dag-gräns
 kring midnatt, vilodagar bort, tom indata), `MatchContextRow.test.tsx` (svensk tid, Grupp A vs
-rundnamn, aria-hidden avdelare), `ResultEntryView.test.tsx` T28-blocket (dag-rubriker i ihopfällt läge
-+ över fönster-gränsen, dubblerad kontroll med identisk aria, fokus-flytt vid ihopfällning).
+rundnamn, ren rad utan uppläst prick, ikon/chip-a11y), `ResultEntryView.test.tsx` T28-blocket
+(dag-rubriker i ihopfällt läge + över fönster-gränsen, dubblerad kontroll med identisk aria, fokus-flytt
+vid ihopfällning).
+
+**Beslut (3, VISUELL FINISH, design-frontend-lagret ovanpå):** premium-finish på de tre
+kontext-elementen via seamarna, struktur orörd (samma seam-princip).
+
+- *Dag-rubriken* blev en ELEGANT, STICKY avdelare ("arena i kvällsljus"-tonen): en kort accent-glödande
+  "tändsticka" (lodrät list) + datumet i display-fonten + en hårfin horisont-linje som tonar grön ->
+  guld -> inget åt höger (arena-tier-linjen). Den klistrar inom listan men på `top-16` (inte `top-0`),
+  så den KLARAR den sticky sajt-headern (`App.tsx`, ~64px) i stället för att glida in bakom den och
+  döljas, då syns DAGEN man skrollar i alltid. En tonad, lätt blur:ad bakgrunds-platta (`--color-bg`
+  @ 82%) gör att korten som glider under aldrig syns igenom rubriktexten.
+- *Kontext-raden* fick en accent-färgad klock-ikon på tiden (skumbar "tiden först"-affordans) och ett
+  STEG-CHIP som ekar TV-badge-/steg-pillen från daily (samma `rounded-pill`-recept, delat designspråk
+  via delade klasser/tokens, INTE en duplicerad komponent). Avdelar-pricken togs bort: chip-gränsen
+  skiljer tid och steg, så raden läses rent som "21:00 Grupp A".
+- *Toggeln* (dubblerad) behåller #39:s accent-pill + chevron oförändrad (kravet: konsekvent premium-stil
+  uppe + nere). Båda delar `ExpandToggle`, så de är identiska per konstruktion (verifierat live:
+  `className` byte-identisk på top + bottom).
+- *#39-kolumnerna:* kontext-raden ligger utanför score-grid:en, verifierat LIVE @ 768/1024px att
+  hemma-/borta-rutorna, "mot" och Spara är PIXEL-identiska kort-för-kort över 6 kort med olika
+  lagnamns-längd.
+
+**Uppmätt text-kontrast (WCAG AA, canvas-komposit av de FAKTISKA renderade färgerna, värsta fall över
+båda teman OCH båda bakgrunds-kontexterna, inte ett typfall):**
+
+| Element (text mot komposit-bakgrund) | Mörkt tema | Ljust tema | AA-krav |
+|---|---|---|---|
+| Dag-rubrik (`fg`) på bandet, över `bg` / `surface` | 16.96 / 16.66 | 16.28 / 16.57 | >= 4.5 |
+| Kontext-tid (`fg`) på kort-`surface` | 15.24 | 17.91 | >= 4.5 |
+| Steg-chip (`fg-muted`) på chip-tint, över `surface` / `bg` | 6.38 / 7.32 | 5.87 / 5.35 | >= 4.5 |
+
+Lägsta uppmätta TEXT-ratio någonstans = **5.35:1** (steg-chipet, ljust tema, över `bg`), klart över AA:s
+4.5:1. De dekorativa (aria-hidden, non-text) elementen mättes också mot >= 3:1-tröskeln: klock-ikonen
+(accent) 5.40:1 mot `surface`, accent-"tändstickan" 4.91:1 mot bandet (ljust tema). Mätmetoden följer
+playbook-lärdomen: värsta fall över hela värde-spannet (båda teman, båda underliggande ytor), bara det
+uppmätta MIN-värdet påstås. Live-verifierat @ 280/360/768/1024/1440, båda teman, expandera/ihopfäll +
+fokus-flytt, och `prefers-reduced-motion` (chevron-rotationen blir momentan via index.css-grinden,
+inget nytt JS-driven rörelse-lager tillagt).
 
 ---
 
