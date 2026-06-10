@@ -13,7 +13,7 @@
 // detta seam, utan att röra konsumenterna.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getDataSource, getDataSourceMode } from '../../data';
+import { getDataSource, getDataSourceMode, LIVE_READY } from '../../data';
 import type { Group, Match, Team } from '../../domain/types';
 import { applyMatchResult } from './apply-match-result';
 import { ResultsStoreContext, type ResultsLoadStatus, type ResultsStore } from './results-context';
@@ -27,9 +27,20 @@ export interface ResultsProviderProps {
    * utan att mocka import.meta globalt.
    */
   env?: ImportMetaEnv;
+  /**
+   * Injicerbar live-flagga (testbarhet), default = LIVE_READY (false tills T14,
+   * se data-source.ts, #37). Tester som vill driva LIVE-grenen (stubben som
+   * kastar) sätter liveReady=true; produktion använder defaulten, så env satt
+   * utan byggd klient faller till fixtures i stället för fel-alerts.
+   */
+  liveReady?: boolean;
 }
 
-export function ResultsProvider({ children, env = import.meta.env }: ResultsProviderProps) {
+export function ResultsProvider({
+  children,
+  env = import.meta.env,
+  liveReady = LIVE_READY,
+}: ResultsProviderProps) {
   const [status, setStatus] = useState<ResultsLoadStatus>('loading');
   const [groups, setGroups] = useState<Group[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -38,8 +49,8 @@ export function ResultsProvider({ children, env = import.meta.env }: ResultsProv
   const [matches, setMatchesState] = useState<Match[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Läget (fixtures/live) beror bara på env, härled en gång.
-  const mode = useMemo(() => getDataSourceMode(env), [env]);
+  // Läget (fixtures/live) beror på env OCH live-flaggan, härled en gång.
+  const mode = useMemo(() => getDataSourceMode(env, liveReady), [env, liveReady]);
 
   // En ref med den senaste matchlistan, så submitResult kan validera mot
   // matchens NUVARANDE status utan att (a) binda mot en stale closure och (b)
@@ -67,7 +78,7 @@ export function ResultsProvider({ children, env = import.meta.env }: ResultsProv
     // Avbryt-flagga: om providern unmountas (eller env byter) innan hämtningen
     // är klar sätter vi inte state på en avmonterad komponent.
     let cancelled = false;
-    const dataSource = getDataSource(env);
+    const dataSource = getDataSource(env, liveReady);
 
     setStatus('loading');
     setError(null);
@@ -99,8 +110,9 @@ export function ResultsProvider({ children, env = import.meta.env }: ResultsProv
     };
     // setMatches är en stabil useCallback (tom dep-array), så den ändrar aldrig
     // identitet och triggar inte om-körning, den listas för exhaustive-deps-
-    // korrekthet (effekten anropar den vid seed).
-  }, [env, setMatches]);
+    // korrekthet (effekten anropar den vid seed). liveReady ingår: ändras gaten
+    // (t.ex. en test som driver live-grenen) ska källan väljas om.
+  }, [env, liveReady, setMatches]);
 
   // Mata in/redigera ETT resultat: validera, och vid ok uppdatera matchlistan
   // optimistiskt (direkt i minnet, vyerna räknar om reaktivt). Vid fel ändras
