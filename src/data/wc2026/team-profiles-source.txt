@@ -99,7 +99,11 @@ IRN | rank=21 | star=Alireza Jahanbakhsh | kuriosa=6 tidigare VM-slutspel. Bäst
 NZL | rank=85 | star=Chris Wood | kuriosa=2 tidigare VM-slutspel. Bäst: gruppspel (obesegrade 2010, tre kryss).
 
 # Grupp H
-ESP | rank=2 | star=Lamine Yamal; Rodri | kuriosa=16 tidigare VM-slutspel. Bäst: VM-guld (2010), första titeln på hemma-kontinenten Afrika.
+# ESP-kuriosan faktarättad (F1, T10-review): 2010 var första VM-titeln vunnen av ett EUROPEISKT
+# lag UTANFÖR Europa (i Sydafrika), INTE "på hemma-kontinenten Afrika" (Spanien är europeiskt och
+# Sydafrika är inte dess hemkontinent). Källa: Wikipedia "2010 FIFA World Cup Final" + "Spain national
+# football team" (web-verifierad 2026-06-10). Se docs/decisions.md (T10 F1).
+ESP | rank=2 | star=Lamine Yamal; Rodri | kuriosa=16 tidigare VM-slutspel. Bäst: VM-guld (2010), första VM-titeln vunnen av ett europeiskt lag utanför Europa.
 CPV | rank=69 | star=Jovane Cabral; Garry Rodrigues | kuriosa=VM-debut 2026. En av de minsta nationerna någonsin i ett VM-slutspel.
 KSA | rank=61 | star=Salem Al-Dawsari | kuriosa=6 tidigare VM-slutspel. Bäst: åttondelsfinal (1994). Slog Argentina i premiären 2022.
 URU | rank=17 | star=Federico Valverde; Darwin Núñez | kuriosa=14 tidigare VM-slutspel. Bäst: 2 VM-titlar (1930 som värd, 1950).
