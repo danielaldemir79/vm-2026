@@ -39,9 +39,13 @@ function isKnockout(match: Match): boolean {
  *   - inga mål ifyllda -> 'scheduled' (ej spelad). Ett sådant spar är en no-op
  *     (validt: ingen status-övergång krävs, inget resultat sätts).
  *
- * Att nollställa en spelad match tillbaka till 'scheduled' görs INTE via denna
- * härledning (då skulle ett rensat fält bli en tyst statusbackning), utan via
- * den explicita "Rensa resultat"-knappen nedan (entry med tomma mål).
+ * Att nollställa en spelad match tillbaka till 'scheduled' kan ske på TVÅ
+ * likvärdiga vägar, båda producerar samma validerade back-övergång genom
+ * denna härledning: (1) tömma båda mål-fälten och trycka Spara, och (2) den
+ * explicita "Rensa resultat"-knappen nedan (som sparar en entry med tomma
+ * mål). Rensa-knappen är alltså inte den enda vägen, bara en tydligare genväg
+ * som syns först när matchen är spelad. Inget "tyst" sker: ett tömt-fält-spar
+ * är en avsiktlig användarhandling och går genom samma validering.
  */
 function intendedStatus(homeGoals: string, awayGoals: string): MatchStatus {
   const hasAnyGoal = homeGoals.trim() !== '' || awayGoals.trim() !== '';

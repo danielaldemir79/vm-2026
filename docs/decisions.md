@@ -5,6 +5,18 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T31 (#51, F1): två likvärdiga vägar att nollställa en spelad match
+
+**Beslut:** En spelad match kan nollställas tillbaka till `scheduled` på två likvärdiga vägar,
+båda går genom `intendedStatus` och ger samma validerade back-övergång: (1) tömma båda målfälten
+och trycka Spara, (2) "Rensa resultat"-knappen (sparar en entry med tomma mål). Rensa-knappen är
+inte den enda vägen, bara en tydligare genväg som syns först när matchen är spelad.
+**Varför:** Tidigare docstring i `ResultEntryForm` påstod att nollställning ENBART skedde via
+Rensa-knappen. Det var falskt, töm-fält+Spara ger samma resultat. Raden gör beteendet ärligt och
+spårbart så nästa läsare inte tror Rensa är en spärr.
+
+---
+
 ## 2026-06-10 , T31 (#51, Daniels feedback): auto-spelad vid spar, status-väljaren borttagen
 
 **Beslut:** Statusväljaren ("Ej spelad"/"Pågår"/"Spelad"-dropdownen) togs bort ur
