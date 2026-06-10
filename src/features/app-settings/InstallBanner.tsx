@@ -5,6 +5,7 @@
 // useInstallPrompt; denna komponent renderar bara. Diskret = ett litet kort, inte
 // en påträngande overlay, och med en avfärda-knapp som respekteras permanent.
 
+import { ANDROID_PLAY_PROTECT_NOTE } from './install-prompt';
 import { useInstallPrompt } from './use-install-prompt';
 
 /**
@@ -62,9 +63,18 @@ export function InstallBanner() {
             Installera VM 2026
           </h2>
           {mode === 'prompt' ? (
-            <p className="text-sm text-fg-muted">
-              Lägg till appen på hemskärmen för helskärm, snabb start och offline-läge.
-            </p>
+            <>
+              <p className="text-sm text-fg-muted">
+                Lägg till appen på hemskärmen för helskärm, snabb start och offline-läge.
+              </p>
+              {/* Ärlig rad om Play Protect-varningen (T30/#50). Den kan inte
+                  elimineras från vår sida (WebAPK:ns targetSdk ägs av webbläsarens
+                  mintningsserver), så vi lugnar i stället för att förvirra. Diskret
+                  (mindre + dämpad) så den inte stjäl fokus från install-knappen. */}
+              <p data-install-play-protect-note="" className="text-xs text-fg-muted/80">
+                {ANDROID_PLAY_PROTECT_NOTE}
+              </p>
+            </>
           ) : (
             // iOS-instruktion: Safari saknar install-prompt, så vi visar vägen.
             <p data-install-ios-steps="" className="text-sm text-fg-muted">

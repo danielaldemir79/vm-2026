@@ -5,6 +5,64 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T30 (#50): Play Protect-varningen vid Android-install, rotorsak + vad vi kan/inte kan göra
+
+**Symptom (Daniels skärmdump):** Vid installation av PWA:n på Android visar Google Play Protect
+"En osäker app har blockerats. Den här appen gjordes för en äldre version av Android och har inte
+det senaste integritetsskyddet." Användaren måste klicka förbi, vilket dödar wow-känslan vid delning.
+
+**Rotorsak (researchad, källhänvisad, INTE gissad):** Det är Play Protects **targetSdk-varning**.
+Den triggas när en APK:s `targetSdkVersion` är mer än 2 nivåer under enhetens Android-API-nivå.
+Källa: Google, "Developer Guidance for Google Play Protect Warnings"
+(https://developers.google.com/android/play-protect/warning-dev-guidance), exakt text "This app was
+built for an older version of Android and does not include the latest privacy protections".
+- När en PWA installeras i Chrome på Android paketeras en **WebAPK** av en **mintningsserver**
+  (Chrome/Googles, eller Samsung Internets egen). Det är DEN serverns shell-APK som sätter
+  `targetSdkVersion`, inte vårt webmanifest. Chromiums WebAPK-shell deklarerade länge targetSdk 33
+  (chrome/android/webapk/shell_apk/AndroidManifest.xml,
+  https://chromium.googlesource.com/chromium/src/+/master/chrome/android/webapk/shell_apk/AndroidManifest.xml).
+  På Android 15 (API 35) / 16 (API 36) är 33 > 2 nivåer under -> varningen triggas. Play Store kräver
+  sedan 2025-08-31 targetSdk >= 35 för nya appar
+  (https://support.google.com/googleplay/android-developer/answer/11926878).
+- **Samsung-specifikt:** Samsung Internet har en EGEN WebAPK-pipeline (skild från Chrome/Googles), och
+  det är främst dessa Samsung-mintade WebAPK:er som Play Protect flaggar, dels på targetSdk, dels på
+  "reputation" (okänd app). Källa: Modern Web Weekly #69
+  (https://modernwebweekly.substack.com/p/modern-web-weekly-69): "If your PWA installs without
+  (technical) issues but is still flagged as unsafe ... the only thing you can basically do is inform
+  your users that there's nothing wrong with your PWA and they can safely install it." Daniels
+  skärmdump visar Chrome-flikar, men på en Samsung-telefon kan WebAPK:n ändå ha mintats av Samsung
+  Internet (ofta förvald webbläsare).
+
+**LIGGER HOS GOOGLE/webbläsaren (utanför vår kontroll, ärligt):** Själva `targetSdkVersion` i WebAPK:n
+sätts av mintningsservern, inte av oss. Vi kan inte höja den via manifestet. Det går alltså inte att
+garantera bort varningen från vår sida, den försvinner när webbläsar-leverantörerna bumpar sin
+mintnings-targetSdk (eller när Play Protects reputationssignal mognar för appen).
+
+**VAD VI ÅTGÄRDADE (det som ligger hos oss):**
+1. **Maximera chansen till en RIKTIG WebAPK** (i stället för en legacy genvägs-APK, som Play Protect
+   flaggar hårdare). Manifestet flyttades till `src/pwa/app-manifest.ts` och fick ett explicit `id: '/'`
+   (stabil app-identitet, frikopplad från start_url; rekommenderat av web.dev
+   https://web.dev/articles/add-manifest). Installerbarhets-/ikon-kraven var redan uppfyllda och hålls
+   nu källankrade av ett test: minst 192x192 + 512x512 (Chrome Lighthouse "installable-manifest"
+   https://developer.chrome.com/docs/lighthouse/pwa/installable-manifest/) och en SEPARAT `maskable`-ikon.
+2. **Behöll maskable SKILD från "any".** Den kombinerade `purpose: 'any maskable'` undviks medvetet,
+   en maskable-ikon har säkerhetszon-padding och ser för inzoomad ut som vanlig ikon. Källa:
+   progressier/DEV "Why a PWA app icon shouldn't have a purpose set to 'any maskable'"
+   (https://dev.to/progressier/why-a-pwa-app-icon-shouldnt-have-a-purpose-set-to-any-maskable-4c78).
+   `app-manifest.test.ts` failar om någon ikon får en kombinerad purpose.
+3. **Ärlig UX i stället för förvirring.** En kort, lugnande rad visas i Android-prompt-läget
+   (`ANDROID_PLAY_PROTECT_NOTE`, renderad i `InstallBanner`): appen är säker, varningen är en känd
+   Android-varning för webb-appar, välj installera ändå. Detta är exakt vad Googles vägledning
+   rekommenderar när varningen inte går att eliminera.
+
+**iOS-vägen verifierad (samma task):** Safari-instruktionen "Tryck på Dela-knappen i Safari och välj
+Lägg till på hemskärmen" stämmer mot dagens flöde (iOS 16.4+ / iOS 18: Dela -> Lägg till på hemskärmen).
+Källa: MDN "Making PWAs installable"
+(https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
+Ingen ändring behövdes.
+
+---
+
 ## 2026-06-10 , T31 (#51, C1): tomt Spara på en LIVE-match bevarar live (ingen statusregression)
 
 **Beslut:** `intendedStatus` tar nu emot matchens nuvarande status. Vid TOMMA mål bevaras
