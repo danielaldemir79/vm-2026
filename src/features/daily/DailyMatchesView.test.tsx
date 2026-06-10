@@ -137,6 +137,42 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
   });
 });
 
+describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
+  it('hero:n bär dags-temats data-attribut + en --vm-day-hue när en dag har lag', async () => {
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    const hero = container.querySelector<HTMLElement>('[data-daily-hero]');
+    expect(hero).not.toBeNull();
+    // Seamen är på plats: stabilt data-attribut för design-frontend/test.
+    expect(hero?.getAttribute('data-day-theme')).not.toBeNull();
+    // Fixtures startar på premiärdagen (matcher med kända lag) -> aktivt tema med
+    // en hue satt som inline CSS-variabel på hero:ns dekor-yta.
+    expect(hero?.getAttribute('data-day-theme')).toBe('active');
+    expect(hero?.getAttribute('data-day-theme-source')).toBe('teams');
+    const hue = hero?.style.getPropertyValue('--vm-day-hue');
+    expect(hue).toBeTruthy();
+    expect(Number(hue)).toBeGreaterThanOrEqual(0);
+    expect(Number(hue)).toBeLessThan(360);
+  });
+
+  it('dags-temat ändras INTE av matchkortens text-/yt-färger (rör bara dekor)', async () => {
+    // Kontrast-vakt: hero:ns dekor får en hue, men matchkorten (som bär text)
+    // ska ALDRIG få en inline text-/bakgrundsfärg från dags-temat. Vi bekräftar
+    // att inget matchkort har en --vm-day-hue-driven färg på sig (seamen sitter
+    // bara på hero-ytan, inte på läsbarhets-bärande element).
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    for (const card of Array.from(container.querySelectorAll<HTMLElement>('[data-match-card]'))) {
+      expect(card.style.getPropertyValue('--vm-day-hue')).toBe('');
+      expect(card.getAttribute('data-day-theme')).toBeNull();
+    }
+  });
+});
+
 describe('DailyMatchesView, fel-väg (fail loud)', () => {
   it('visar role=alert när datakällan kastar (live-stub före T14), inte en tyst tom vy', async () => {
     renderView(liveEnv(), <DailyMatchesView />, true);

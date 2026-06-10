@@ -343,3 +343,41 @@ sekund-tickande nedräkning till en nollkostnad för CLS. Återanvänds av komma
 igenkännbar signatur till noll prestanda-kostnad. Kanal-tonen i bakgrund/kant (inte i texten) ger
 kanal-igenkänning utan att riskera en låg färg-på-färg-kontrast. Källa: T7 design-frontend
 (`src/features/daily/TeamFlag.tsx` + `TvBadge.tsx`).
+
+### deterministiskt-haerlett-dekor-tema-som-seam-kontrast-saekert (VM 2026)
+
+**Recept (en datadriven färgton som ALDRIG kan sänka läsbarhet, med funktion och visuellt åtskilt):**
+
+1. HÄRLEDNINGEN i en REN modul (`src/features/<x>/<x>-theme.ts`): `(domändata, uppslag, ev. nyckel)
+   => { hue: number | null; source; ... }`. Deterministisk: samma indata ger alltid samma ton. När
+   tonen ska väga flera bidrag (här: alla lag som spelar dagen), använd **cirkulärt medel** (vektor-
+   medel på färghjulet via `cos/sin` + `atan2`), INTE aritmetiskt medel, det senare wrappar fel kring
+   0/360 (medel av hue 5 och 355 ska bli ~0, inte 180). Cirkulärt medel är dessutom ordnings-oberoende,
+   så en stor uppsättning (premiärdag) ger en stabil ton utan en godtycklig "första elementet"-regel.
+   ÅTERANVÄND en redan etablerad härledningsregel om en finns (här `hueFromCode`, lyft ur TeamFlag till
+   delade `team-hue.ts` så lag-färgen är EN sanning i både discen och dags-temat, inte två kopior).
+2. KONTRAST-VAKTEN ÄR ARKITEKTUREN, inte en efterkontroll: låt den härledda tonen BARA vara ett TAL
+   (en hue-grad) i en CSS-variabel (`--vm-day-hue`) som uteslutande väver in i DEKORATIVA ytor
+   (gradienter, glow). Den får ALDRIG bli en text-/yt-/kant-token. En ton som per konstruktion aldrig
+   är en textfärg KAN inte sänka text-kontrasten under WCAG AA, det finns ingen text på den. Bevisa det
+   med ett test som assertar att läsbarhets-bärande element (matchkort) ALDRIG får variabeln/attributet,
+   bara dekor-ytan gör.
+3. EDGE-FALL explicit, alla testade: tom indata (vilodag) -> default/ingen ton (ytan behåller bas-temat);
+   data utan användbart bidrag (slutspel innan seedningen, bara okända lag) -> en dokumenterad fallback
+   (här hue ur datum-nyckeln) så ytan ändå känns distinkt, ALDRIG en gissning om saknad data; ogiltig data
+   (brutet referens-kontrakt, ett satt id som saknas i uppslaget) -> FAIL LOUD (kasta med id i meddelandet),
+   maskera inte tyst (lessons `tyst-maskerande-fallback`).
+4. SEAMEN är en tunn hook (`use-<x>-theme.ts`): memoiserar härledningen och returnerar `style` (CSS-var)
+   + stabila data-attribut att SPREADA på dekor-ytan. Senior-dev äger NÄR/HUR tonen härleds (deterministiskt,
+   testbart, kontrast-säkert); design-frontend äger HUR den ser ut (bygger gradienten ur hue:n i CSS-tokens).
+   Samma lager-uppdelning som målfirande-kroken.
+5. ÖVERGÅNGAR via en CSS-transition på dekor-ytans `[data-*]`-hake, gatad på
+   `@media (prefers-reduced-motion: no-preference)`, så den befintliga reduced-motion-grinden nollar den.
+   Ingen egen JS-grind (WCAG 2.3.3 gratis).
+
+**Varför:** "Färg/motiv byter efter dagens lag" (SPEC §7) får ALDRIG bli läsbarhets-sänkande. Genom att
+tvinga ut den dynamiska tonen i en ren dekor-variabel är kontrast-säkerheten en INVARIANT i koden, inte
+något som måste mätas om för varje genererad ton. Den rena härledningen är fristående testbar (determinism,
+wrap, edge-fall, fail-loud), och seam:en låter design färglägga fritt utan att kunna bryta a11y. Källa: T8
+(`src/features/daily/team-hue.ts` + `day-theme.ts` + `use-day-theme.ts`, inkopplad på DailyMatchesView-hero:n,
+dekor-token i `tokens.css` sektion 6).

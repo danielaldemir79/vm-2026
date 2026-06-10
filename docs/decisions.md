@@ -5,6 +5,53 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T8 (issue #8): dynamiskt dags-tema, deterministisk hue ur dagens lag, BARA dekor
+
+**Beslut (härlednings-regel, gissas inte):** Dags-temat (SPEC §7 "färg/motiv byter efter dagens
+lag/värdstad") härleds av en REN funktion `deriveDayTheme(matches, teamsById, dateKey?)`
+(`src/features/daily/day-theme.ts`) till EN dekorativ accent-hue (0-359). Regeln:
+varje KÄNT lag som spelar dagen bidrar med sin hue (`hueFromCode`, samma FNV-1a-hash ur FIFA-koden
+som TeamFlag:s disc, lyft till delade `src/features/daily/team-hue.ts` så det är EN sanning, inte två
+kopior, PRINCIPLES §4), och dagens hue = det **cirkulära medlet** (vektor-medel på färghjulet) av
+lagens hues. **Varför cirkulärt och inte aritmetiskt medel:** ett aritmetiskt medel av t.ex. hue 5
+och 355 ger 180 (fel sida av hjulet); vektor-medlet ger ~0 (rätt). Cirkulärt medel är dessutom
+ORDNINGS-OBEROENDE och deterministiskt, så en premiärdag med många lag (upp till 16) får en stabil,
+väldefinierad ton i stället för en godtycklig "första laget"-regel. Bevisat av test (ordnings-
+oberoende + wrap kring 0/360 + 16-lags-determinism).
+
+**Beslut (KONTRAST-VAKT I KOD, acceptanskriterium 2, WCAG AA):** Den härledda hue:n får BARA väva in
+i DEKORATIVA ytor (hero-gradienter, glow), ALDRIG i text-, yt- eller kant-tokens som bär läsbarhet.
+Seamen (`use-day-theme.ts`) exponerar hue:n som CSS-variabeln `--vm-day-hue` (ett TAL, en hue-grad)
+plus data-attribut, och lägger den bara på hero:ns dekor-yta (`[data-daily-hero][data-day-theme]`).
+**Varför detta är vakten:** en hue som per konstruktion aldrig blir en text-/ytfärg kan inte sänka
+text-kontrasten under AA, det finns ingen text på den. Ett test bevisar att inget matchkort (som bär
+text) får en `--vm-day-hue` eller `data-day-theme` på sig, bara hero-dekoren gör. Design-frontend
+bygger den slutgiltiga dekoren ur hue:n i `tokens.css` sektion 6 (hsl()/color-mix), äger HUR det ser ut.
+
+**Beslut (edge-fall, alla explicita):**
+- VILODAG (matches=[]) -> neutralt DEFAULT-tema (ingen hue, `source: 'default'`); hero behåller T2:s ton.
+- Bara OKÄNDA lag den dagen (slutspel innan seedningen, `homeTeamId/awayTeamId` null) -> ingen lag-hue
+  finns; fall tillbaka på en hue härledd ur DAGENS DATUM-NYCKEL (`source: 'date'`), så slutspelsdagen
+  ändå känns distinkt. Dokumenterat val, inte en gissning om vilka lag som spelar. Utan datum -> default.
+- OGILTIG DATA (ett icke-null `teamId` som saknas i lag-uppslaget = brutet referens-kontrakt) ->
+  FAIL LOUD (kastar med match-id i meddelandet), maskeras inte tyst (PRINCIPLES §8, lessons
+  `tyst-maskerande-fallback`). Ett okänt LAG (teamId null) är ett giltigt slutspels-tillstånd, inte ett fel.
+
+**Beslut (mjuka övergångar, acceptanskriterium 3):** Dag-bytet tonar via en CSS-transition på
+`[data-day-theme]` (`tokens.css` sektion 6), gatad på `prefers-reduced-motion: no-preference`, så den
+befintliga reduced-motion-grinden (`index.css`) stänger av den för den som bett om minskad rörelse.
+Ingen egen JS-grind behövs (samma princip som body-färgövergången).
+
+**T8-PIN (success-token, ÄGARE design-frontend, EJ åtgärdad här):** I ljust tema är `--vm-success`
+fortfarande == `--vm-accent` (#0e7a44, `tokens.css` rad 103/107). Det funktionella dags-tema-lagret
+RÖR INTE den krocken (dags-temat ligger helt i dekor, inte i success-tokenet), så ingen del av T8:s
+funktion beror på separationen. Att VÄLJA det nya success-färgvärdet är ett design-authored token-värde
+(mönstret `tema-tokens-som-kontrakt`: senior-dev gissar inte färgvärden), så det lämnas distinkt till
+design-frontend i `tokens.css`. Acceptanstest design-frontend: i ljust tema ska `--vm-success` skilja
+sig från `--vm-accent` och klara AA mot ytorna.
+
+---
+
 ## 2026-06-10 , HOTFIX (issue #37): datakälla-gaten kräver `LIVE_READY` utöver env
 
 **Beslut:** Gaten i `src/data/data-source.ts` väljer live-källan bara när BÅDA villkoren är sanna:

@@ -178,3 +178,39 @@ body {
       color 0.25s ease;
   }
 }
+
+/* -----------------------------------------------------------------------------
+   6. DYNAMISKT DAGS-TEMA, dekorativ seam (T8, issue #8). [VÄRDE, ej @theme-kontrakt]
+
+   Det funktionella lagret (senior-dev, src/features/daily/day-theme.ts +
+   use-day-theme.ts) härleder en DETERMINISTISK accent-hue (0-359) ur dagens lag
+   och sätter den som CSS-variabeln `--vm-day-hue` på hero:ns dekor-yta
+   (`[data-day-theme='active']`). I default-läget (vilodag) saknas variabeln och
+   ytan behåller T2:s neutrala ton.
+
+   KONTRAST-VAKT (acceptanskriterium 2, WCAG AA): `--vm-day-hue` är BARA ett tal
+   (en hue-grad), aldrig en text-/yt-/kant-färg. Dagstonen får bara väka in i
+   DEKORATIVA ytor (gradienter, glow), aldrig i något som bär läsbarhet, så den
+   kan per konstruktion inte sänka text-kontrasten. Design-frontend bygger den
+   slutgiltiga dekoren ur hue:n (hsl()/color-mix) HÄR i CSS-lagret. En default
+   sätts så dekoren har en giltig hue även innan en dag valts.
+
+   ÖVERGÅNGAR (acceptanskriterium 3): en mjuk transition på de dekorativa
+   egenskaperna (background) vid dag-byte läggs nedan, gatad på
+   prefers-reduced-motion (no-preference), så den befintliga reduced-motion-
+   grinden (index.css) stänger av den för den som bett om minskad rörelse.
+   -------------------------------------------------------------------------- */
+:root {
+  /* Neutral default-hue (turneringens gröna ~152 grader) tills en dag valts /
+     vilodag. Design-frontend äger det slutgiltiga default-värdet + hur hue:n
+     används i hero-dekoren. */
+  --vm-day-hue: 152;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-day-theme] {
+    transition:
+      background-color 0.4s ease,
+      background-image 0.4s ease;
+  }
+}
