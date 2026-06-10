@@ -5,6 +5,93 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T14 (issue #14): Supabase + anonym auth + rumskod + RLS, live-växlingen
+
+**Beslut (vad som lagras i molnet vs i bundlen, KÄLLHÄNVISAT VAL):** Bara DELAD/MUTERBAR
+state lagras i Supabase, tre tabeller: `rooms` (rum + kort delbar kod + skapare),
+`room_members` (medlemskap + visningsnamn), `room_match_results` (delade matchresultat per
+rum). Den STATISKA turneringsbasen (lag, grupper, hela spelschemat) STANNAR i klient-bundlen,
+den är källåkrad och verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare, och att
+spegla den i DB:n hade bara dubblerat en redan låst sanning (drift-risk). Därför returnerar
+live-datakällan (`createSupabaseDataSource`) SAMMA committade data som fixtures för
+getTeams/getGroups/getMatches; det delade tillståndet nås via ett SEPARAT, additivt rooms-API
+(`src/data/rooms/`), auth- + RLS-skyddat. Så fixtures-till-live-växlingen för tracker-basen
+sker UTAN kod-ändring i konsumenterna (kravet), och rums-lagret är ett nytt seam ovanpå.
+
+**Beslut (LIVE_READY flippad till true, #37-pinnen löst):** T14 byggde den riktiga klienten
+(`supabase-browser.ts` singleton + `supabase-client.ts` + rooms-lagret) och flippade
+`LIVE_READY = false -> true` i `data-source.ts`, tog bort interims-`console.warn`-grenen, och
+uppdaterade guard-testet (nu `LIVE_READY === true`) + de injicerade live-fel-vägs-testerna.
+Tvåstegs-gaten består som princip (env UTAN LIVE_READY hade fallit till fixtures). F2-kravet
+(hotfix-reviewen): en käll-scan (`data-source.ts?raw`) bevisar att strängen "LIVE_READY=false"
+inte finns kvar i koden. Fel-vägs-testerna injicerar nu en REJECTANDE datakälla
+(`ResultsProvider`s nya `dataSource`-test-seam + `createFailingDataSource`) i stället för den
+gamla kastande stubben, eftersom live-källan nu ger giltig data och inte längre kastar.
+
+**Beslut (anonym auth, friktionsfritt + STABIL identitet):** Inloggning är ANONYM
+(`signInAnonymously`, Daniels val: en vän klickar på länken och är inne utan e-post/lösenord).
+Visningsnamnet bärs av `room_members.display_name` (per rum), inte av auth-profilen.
+Sessionen PERSISTAS (`persistSession: true`, localStorage), så samma anonyma user-id (och
+rums-medlemskap) lever mellan sidladdningar, det är det som gör "gå med" beständigt.
+`ensureSession` är idempotent (återanvänder en befintlig session). Captcha: AV (Daniels val).
+
+**Beslut (RLS är ENDA skyddet, nycklat på auth.uid() + medlemskap), KÄLLHÄNVISAT till Supabase-
+modellen:** I Supabase har anon-rollen SAMMA rättigheter som `authenticated` (anonyma användare
+FÅR rollen `authenticated` med `is_anonymous: true`), så Row Level Security är det enda som
+skyddar datan. Modellen (migrationer i `supabase/migrations/`, speglade på projekt
+kmzhyblzxangpxydufve):
+- **rooms:** SELECT för medlemmar (`is_room_member(id)`); INSERT bara som sig själv
+  (`created_by = auth.uid()`); UPDATE/DELETE bara skaparen.
+- **room_members:** SELECT för medlemmar i samma rum; INSERT/DELETE bara sin egen rad
+  (`user_id = auth.uid()`) = "gå med"/"lämna".
+- **room_match_results:** SELECT/INSERT/UPDATE/DELETE bara medlemmar i rummet, och `updated_by`
+  måste vara `auth.uid()` (ingen förfalskning av vem som skrev).
+- **Medlemskaps-helper** `is_room_member(room_id)` är SECURITY DEFINER + `search_path=''` så
+  policyn på `room_members` kan fråga `room_members` utan rekursion ("infinite recursion in
+  policy"). Den MÅSTE ha EXECUTE för anon/authenticated, RLS-policy-uttryck evalueras i
+  ANROPARENS roll (empiriskt bevisat: utan grant -> "permission denied for function").
+- **Join-via-kod** (`join_room_by_code`) + **skapa-rum** (`create_room`) är SECURITY DEFINER-RPC:er.
+  Join låter ett icke-medlem slå upp EXAKT en kod för att gå med (utan att kunna rad-skanna alla
+  rum, ingen öppen SELECT-policy för icke-medlem). Create är ATOMISKT (rum + skaparens medlems-rad
+  i en transaktion), annars kan skaparen inte läsa sitt eget rum (select-policyn kräver medlemskap)
+  och en `return=representation`-insert nekas. En 42702-kolumn-ambiguitet (OUT `room_id` vs
+  `room_members.room_id` i `on conflict`) löstes med `#variable_conflict use_column` +
+  `return query select`.
+
+**Beslut (RLS BEVISAD, inte påstådd, med RIKTIGA sessioner):** RLS-modellen är bevisad end-to-end
+med TRE riktiga anonyma sessioner (Alice/Bob/Carol) mot det levande projektet, NEKAD OCH TILLÅTEN
+(`rooms-rls.integration.test.ts`, 11 fall: utomstående nekas läsa/skriva/skanna, medlem tillåts,
+ingen förfalskning av created_by/updated_by, bara skaparen raderar, lämna återkallar åtkomst). En
+mock kan inte bevisa RLS (den lever i DB:n); bara olika `auth.uid()` visar nekad vs tillåten
+(lärdomen `uttommande-test-vaktar-svagare-invariant`: testet når den gren garantin annars bryts).
+Testet skipIf:ar snyggt offline/rate-limitat (anonym sign-in är rate-limitad per IP) så sviten
+aldrig rödnar på en extern gräns. `get_advisors (security)` kördes efter migrationerna; alla WARN
+är MEDVETNA avvägningar (anonym åtkomst ÄR poängen, RPC:erna är gå-med/skapa-flödet, leaked-
+password gäller e-post-auth vi inte använder), se `supabase/README.md`.
+
+**Beslut (synk-status på online-seamen, T13):** Online-indikatorn speglar nu ÄRLIGT synk-läget när
+ett live-rum är aktivt (`live`-prop): "Online, synkad" / "Offline, ändringarna synkas när du är
+online igen". Utan aktivt rum (lokalt läge) faller den till T13:s "fungerar ändå" (det finns då
+ingen delad data att synka, vi lovar aldrig en mekanik som inte gäller). Om-hämtningen sker vid
+fokus + online-event (INGEN polling; T18 byter detta mot Supabase Realtime på samma refresh-seam).
+
+**Beslut (rumskods-alfabet, källhänvisat val):** Koden är gemener `a-z` (minus `l`/`o`) + siffror
+`2-9` (minus `0`/`1`), ett OTVETYDIGT teckenförråd (Crockford-andan: undvik tecken som förväxlas
+muntligt/i chatt). Samma teckenförråd vaktas av DB:ns check-constraint `^[a-z2-9]{4,12}$`, så klient
+och databas aldrig driver isär. 6 tecken = 34^6 ~ 1,5 mrd kombinationer; UNIQUE i DB fångar den
+osannolika krocken (klienten genererar då en ny kod, gissar aldrig att en kod är unik).
+
+**Beslut (INGA secrets i repot, PRINCIPLES §7):** Supabase-URL + publik anon/publishable-nyckel läses
+ur env (`import.meta.env`, satta i `.env.local` gitignorad + Cloudflare). Den publika nyckeln är
+publik PER DESIGN (skyddad av just denna RLS) men hålls ändå i env, aldrig hårdkodad i källkoden,
+så koden inte binds till ett specifikt projekt. Integrationstestet faller till projektets KÄNDA
+publika värden bara som sista utväg (de är inga secrets, men behandlas som env-konfig).
+
+**Spårbarhet:** #14 + denna rad + `supabase/migrations/` (speglade på kmzhyblzxangpxydufve) +
+`supabase/README.md` + testerna (RLS-integration, auth, rooms-api, room-code, data-source-flip).
+
+---
+
 ## 2026-06-10 , T13 VISUELLT LAGER (issue #13): premium-finish på onboarding/install/settings
 
 **Beslut (onboarding-touren får en "arena i kvällsljus"-hero-strip + CSS-illustrationer):**

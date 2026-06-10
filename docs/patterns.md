@@ -9,6 +9,55 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### delad-rums-data-med-rls-pa-auth-uid-bevisad-med-riktiga-sessioner (Supabase, VM 2026)
+
+**Recept (delad, muterbar state bakom anonym auth + RLS, säkerhet BEVISAD inte påstådd):**
+
+1. **Lagra bara DELAD/MUTERBAR state i molnet.** Statisk, källåkrad data (här lag/grupper/schema)
+   STANNAR i klient-bundlen, spegla den inte i DB:n (dubbel sanning + drift-risk). Live-datakällan
+   returnerar samma committade statiska data; det delade tillståndet nås via ett SEPARAT API. Så
+   `DataSource`-kontraktet är oförändrat och växlingen sker utan konsument-ändring.
+2. **Anonym auth för friktionsfrihet + STABIL identitet.** `signInAnonymously` med
+   `persistSession: true` (localStorage), så samma `auth.uid()` (och medlemskap) lever mellan
+   sidladdningar. En idempotent `ensureSession` (återanvänd befintlig session, skapa annars en).
+   Visningsnamnet bärs av medlems-raden (per rum), inte auth-profilen.
+3. **RLS är ENDA skyddet, nycklat på `auth.uid()` + medlemskap.** I Supabase har anon-rollen samma
+   rättigheter som `authenticated`, så varje tabell måste låsas i RLS: SELECT för medlemmar, INSERT/
+   DELETE bara sin egen rad (`= auth.uid()`), skriv-`with check` binder ägar-/skribent-kolumnen till
+   `auth.uid()` (ingen förfalskning). En medlemskaps-helper (`is_room_member`) är **SECURITY DEFINER
+   + `search_path=''`** så en policy på medlems-tabellen kan fråga medlems-tabellen UTAN rekursion;
+   den MÅSTE ha EXECUTE för anon/authenticated (RLS-uttryck evalueras i ANROPARENS roll, empiriskt
+   bevisat: utan grant -> "permission denied for function").
+4. **Join-via-kod + skapa-rum via SECURITY DEFINER-RPC.** Join låter ett icke-medlem slå upp EXAKT
+   en kod (utan att kunna rad-skanna alla rum, ingen öppen SELECT-policy för icke-medlem). Skapa är
+   ATOMISKT (rum + skaparens medlems-rad i en transaktion), annars kan skaparen inte läsa sitt eget
+   rum (select-policyn kräver medlemskap) och `return=representation` nekas. Gotcha: en OUT-parameter
+   som heter som en kolumn (`room_id`) ger 42702 ("column reference is ambiguous") i `on conflict`,
+   lös med `#variable_conflict use_column` + `return query select <lokala variabler>`.
+5. **BEVISA RLS med RIKTIGA sessioner, inte en mock.** RLS lever i DB:n, bara olika `auth.uid()`
+   visar nekad vs tillåten. Ett integrationstest skapar 2-3 riktiga anonyma sessioner (medlem,
+   medlem, utomstående) och asserterar BÅDE nekad (utomstående: tom lista / fail-loud-kast på skriv)
+   OCH tillåten (medlem: läser/skriver), plus ingen förfalskning (created_by/updated_by), bara
+   skaparen raderar, och att "lämna" återkallar åtkomst. `describe.skipIf(!reachable)` (en LÄTT
+   health-probe som inte bränner en sign-in) håller sviten grön offline/rate-limitat (anonym sign-in
+   är rate-limitad per IP); ett `beforeEach(ctx => !setupOk && ctx.skip())` skippar snyggt om setup
+   rate-limitas. Kör `get_advisors (security)` efter migrationerna och dokumentera varje WARN som
+   antingen åtgärdad eller en MEDVETEN avvägning (anonym åtkomst ÄR poängen i en vänapp).
+6. **Härled klient-typerna ur DB-schemat** (`generate_typescript_types` -> `supabase-types.ts`), inte
+   ur konsument-typen, så en schema-drift blir ett kompileringsfel (lärdomen
+   `mock-foljer-konsumenttyp-doljer-mappnings-drift`). Projicera DB-raderna till klient-vänliga former
+   i API-lagret, fail-loud på varje Supabase-fel (RLS-avslag/nätfel ska synas, inte tyst tom data).
+7. **INGA secrets i repot:** URL + publik anon-nyckel i env (`.env.local` gitignorad + Cloudflare).
+   Den publika nyckeln är publik per design (RLS är skyddet) men hålls ändå i env, aldrig hårdkodad.
+
+**Varför:** En delad vänapp kräver att RLS (inte klient-koden) garanterar att en användare bara når
+sina egna rum/data, och det måste BEVISAS mot den faktiska databasen, inte mockas. Anonym auth ger
+friktionsfrihet utan att offra identitet (persistad session). SECURITY DEFINER-RPC:erna är det enda
+sättet att (a) gå med via kod utan att läcka rumslistan och (b) skapa ett rum atomiskt med medlemskap.
+Recept för T15 (tips: predictions per rum, samma `auth.uid() + medlemskap`-RLS) och T18 (realtid på
+samma refresh-seam). Källa: T14 (`supabase/migrations/`, `src/data/rooms/`, `src/features/rooms/`,
+`rooms-rls.integration.test.ts`).
+
 ### no-flash-tema-i-react-vite-utan-duplicerade-strängar
 
 **Recept (en sanning, ingen FOUC):**
