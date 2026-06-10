@@ -20,6 +20,7 @@ import { useMemo } from 'react';
 import type { Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { useDailyMatches } from './use-daily-matches';
+import { useDayTheme } from './use-day-theme';
 import { MatchCard } from './MatchCard';
 import { formatDayHeading, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
@@ -137,6 +138,19 @@ export function DailyMatchesView() {
   } = useDailyMatches();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
 
+  // Dynamiskt DAGS-TEMA (T8): härled en subtil, deterministisk accent-hue ur den
+  // valda dagens lag och lägg den som en CSS-variabel + stabilt data-attribut på
+  // hero:ns dekor-yta. Påverkar BARA dekorativa ytor (design-frontend väver in
+  // hue:n i gradienter/glow), aldrig text-/yt-tokens, så läsbarheten (WCAG AA)
+  // aldrig sänks (kontrast-vakt, decisions.md T8). Mjuka övergångar vid dag-byte
+  // sköts av en CSS-transition på ytan (design-frontend), som reduced-motion-
+  // grinden i index.css nollar. Tom/ingen vald dag -> default-tema (ingen hue).
+  const { dayThemeProps } = useDayTheme(
+    selectedDay?.matches ?? [],
+    teamsById,
+    selectedDay?.dateKey
+  );
+
   return (
     <section aria-labelledby="dagens-matcher-rubrik" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -207,23 +221,29 @@ export function DailyMatchesView() {
           <Slide direction="up">
             <div
               data-daily-hero=""
-              className="relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
-              style={{
-                backgroundColor: 'var(--color-surface-raised)',
-                backgroundImage:
-                  'radial-gradient(110% 120% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 55%), radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--vm-gold) 12%, transparent), transparent 55%)',
-              }}
+              data-day-theme={dayThemeProps['data-day-theme']}
+              data-day-theme-source={dayThemeProps['data-day-theme-source']}
+              className="vm-daily-hero relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
+              // Dags-temats hue (--vm-day-hue) injiceras via seamen som en INLINE-
+              // OVERRIDE i style när dagen har lag. Hero-dekoren (radiella ljus +
+              // sheen) byggs i .vm-daily-hero (tokens.css §6) och tonas mot hue:n
+              // när data-day-theme='active'. --vm-day-hue har alltid en default i
+              // :root (tokens.css), så i default-läget saknas inte variabeln, det
+              // som saknas är den dynamiska inline-override:n: ingen ton-skiftning
+              // sker och dekoren faller på T2:s neutrala ton (default-grenen styrs
+              // av data-day-theme). Den dynamiska tonen lever BARA i background-image
+              // (dekor), aldrig i en text-/yt-token, så läsbarheten (WCAG AA) kan
+              // inte sänkas (kontrast-vakt).
+              style={dayThemeProps.style}
             >
               {/* Rörligt ljus-svep: ett brett, mjukt sken som långsamt drar över
-                  fonden (arena-strålkastare). Rent dekorativt, aria-hidden, och
-                  vm-hero-sheen stannar vid reducerad rörelse (index.css). */}
+                  fonden (arena-strålkastare). Rent dekorativt, aria-hidden.
+                  vm-hero-sheen driver animationen (index.css, stannar vid reducerad
+                  rörelse); vm-daily-hero-sheen bär själva gradienten (tonas mot
+                  dagens hue i active-läget, tokens.css §6). */}
               <div
                 aria-hidden="true"
-                className="vm-hero-sheen pointer-events-none absolute inset-0 -z-10 opacity-70"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(105deg, transparent 30%, rgb(var(--vm-glow-accent) / 0.10) 50%, transparent 70%)',
-                }}
+                className="vm-hero-sheen vm-daily-hero-sheen pointer-events-none absolute inset-0 -z-10 opacity-70"
               />
 
               <div className="flex flex-col gap-7 p-5 sm:p-7 lg:flex-row lg:items-stretch lg:gap-10 lg:p-8">

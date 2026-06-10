@@ -137,6 +137,51 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
   });
 });
 
+describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
+  it('hero:n bär dags-temats data-attribut + en --vm-day-hue när en dag har lag', async () => {
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    const hero = container.querySelector<HTMLElement>('[data-daily-hero]');
+    expect(hero).not.toBeNull();
+    // Seamen är på plats: stabilt data-attribut för design-frontend/test.
+    expect(hero?.getAttribute('data-day-theme')).not.toBeNull();
+    // Fixtures startar på premiärdagen (matcher med kända lag) -> aktivt tema med
+    // en hue satt som inline CSS-variabel på hero:ns dekor-yta.
+    expect(hero?.getAttribute('data-day-theme')).toBe('active');
+    expect(hero?.getAttribute('data-day-theme-source')).toBe('teams');
+    const hue = hero?.style.getPropertyValue('--vm-day-hue');
+    expect(hue).toBeTruthy();
+    expect(Number(hue)).toBeGreaterThanOrEqual(0);
+    expect(Number(hue)).toBeLessThan(360);
+  });
+
+  it('dags-temat ändras INTE av matchkortens text-/yt-färger (rör bara dekor)', async () => {
+    // Kontrast-vakt (DOM-lagret): hero:ns dekor får en hue, men matchkorten (som
+    // bär text) ska ALDRIG SÄTTA en inline --vm-day-hue själva. Vi bekräftar att
+    // inget matchkort SÄTTER variabeln/attributet (seamen sitter bara på hero-ytan).
+    //
+    // VAD DEN HÄR VAKTEN VILAR PÅ (F2): den läser bara kortets EGNA inline-style,
+    // alltså att kortet inte SÄTTER variabeln. Den kan INTE se ARV: "Dagens match"-
+    // kortet renderas inne i .vm-daily-hero (som sätter --vm-day-hue inline), och
+    // CSS-custom-properties ärvs nedåt, så en framtida kort-CSS-regel som LÄSER
+    // var(--vm-day-hue) skulle vara osynlig för det här testet. Den luckan täcks av
+    // den DOM-OBEROENDE käll-scannen i day-theme-contrast-guard.test.ts, som failar
+    // om var(--vm-day-hue) konsumeras utanför .vm-daily-hero*-scopet. De två testen
+    // är komplementära: detta vaktar SÄTTNING i DOM, käll-scannen vaktar KONSUMTION
+    // i källan.
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    for (const card of Array.from(container.querySelectorAll<HTMLElement>('[data-match-card]'))) {
+      expect(card.style.getPropertyValue('--vm-day-hue')).toBe('');
+      expect(card.getAttribute('data-day-theme')).toBeNull();
+    }
+  });
+});
+
 describe('DailyMatchesView, fel-väg (fail loud)', () => {
   it('visar role=alert när datakällan kastar (live-stub före T14), inte en tyst tom vy', async () => {
     renderView(liveEnv(), <DailyMatchesView />, true);
