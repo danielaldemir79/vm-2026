@@ -37,4 +37,30 @@ describe('OnlineStatusIndicator', () => {
     });
     expect(screen.getByRole('status')).toHaveAttribute('data-online-status', 'offline');
   });
+
+  // SYNK-STATUS (T14): med ett aktivt live-rum (live=true) speglar indikatorn
+  // synk-läget ärligt, eftersom det nu FINNS delad server-data att synka.
+  it('visar "synkad" i online-läge när ett live-rum är aktivt (live=true)', () => {
+    setOnLine(true);
+    render(<OnlineStatusIndicator live />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveAttribute('data-sync-live', 'true');
+    expect(status).toHaveTextContent(/Online, synkad/);
+  });
+
+  it('lovar synk vid återuppkoppling i offline-läge när ett live-rum är aktivt', () => {
+    setOnLine(false);
+    render(<OnlineStatusIndicator live />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveAttribute('data-online-status', 'offline');
+    // Ärligt löfte: ändringarna synkas NÄR man är online igen (T14 refetchar då).
+    expect(status).toHaveTextContent(/synkas när du är online igen/);
+  });
+
+  it('faller till T13:s "fungerar ändå" utan aktivt rum (live=false), inget falskt synk-löfte', () => {
+    setOnLine(false);
+    render(<OnlineStatusIndicator live={false} />);
+    // Utan delad data finns inget att synka, så vi lovar ingen synk-mekanik.
+    expect(screen.getByRole('status')).toHaveTextContent(/fungerar ändå/);
+  });
 });

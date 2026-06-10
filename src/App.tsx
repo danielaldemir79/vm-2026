@@ -18,6 +18,7 @@ import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './feat
 import { ScenarioView } from './features/scenarios';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
+import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
 import {
   InstallBanner,
   OnboardingDialog,
@@ -46,7 +47,30 @@ function Panel({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Online-indikatorn KOPPLAD till rums-synk-läget (T14). `live` är true när det
+ * finns ett aktivt rum med delad server-data, då speglar indikatorn synk-status
+ * ärligt; annars (lokalt läge / inget rum) faller den till T13:s "fungerar ändå".
+ * Wiringen bor här (inte i app-settings) så app-settings slipper ett beroende till
+ * rums-feature:n (undviker cirkulärt beroende).
+ */
+function SyncAwareOnlineStatus() {
+  const rooms = useRoomsStore();
+  return <OnlineStatusIndicator live={rooms.enabled && rooms.activeRoom !== null} />;
+}
+
 export default function App() {
+  return (
+    // RoomsProvider omsluter hela appen (T14): det sociala rums-lagret + auth.
+    // Är Supabase inte konfigurerat är det inaktivt (enabled=false) och appen
+    // fungerar lokalt precis som förr. Online-indikatorn läser dess synk-läge.
+    <RoomsProvider>
+      <AppShell />
+    </RoomsProvider>
+  );
+}
+
+function AppShell() {
   return (
     // min-h-dvh + overflow-x-clip = aldrig horisontell scroll på någon skärm.
     // Den dekorativa gröna glow-fonden ligger bakom innehållet via en pseudo-yta.
@@ -75,7 +99,7 @@ export default function App() {
               trängs; offline-läget syns ändå tydligt via offline-bannern nedan. */}
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden sm:inline-flex">
-              <OnlineStatusIndicator />
+              <SyncAwareOnlineStatus />
             </span>
             <SettingsControl />
             <ThemeToggle />
@@ -217,6 +241,15 @@ export default function App() {
             </SimulationFrame>
           </TeamProfileProvider>
         </ResultsProvider>
+
+        {/* Tips-ligan (T14): skapa/gå med i ett rum, se medlemmar, dela koden.
+            Det FUNKTIONELLA + tillgängliga rums-UI:t byggs här (stabil semantik +
+            data-attribut); design-frontend ger premium-finish ovanpå. RoomSection
+            renderar HELA kortet bara när Supabase är konfigurerat (live-läge), i
+            lokalt läge syns ingenting, så appen fungerar precis som förr. */}
+        <Slide direction="up">
+          <RoomSection surface={(children) => <Panel>{children}</Panel>} />
+        </Slide>
 
         {/* Typografi-prov: visar display- mot brödtext-stacken. */}
         <Slide direction="up">
