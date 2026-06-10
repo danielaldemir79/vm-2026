@@ -5,6 +5,29 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T10 (issue #10): Copilot C8+C9, okänt lag ej klickbart + Escape-effekt på stabilt id
+
+**Beslut (C8, GroupTable):** Ett lagnamn i grupptabellen är klickbart (öppnar lagprofilen via
+`TeamNameButton`) BARA när laget finns i `teamsById`. Saknas det (data-inkonsistens, `teamLabel`-
+fallbacken `{name: id, code: '???'}`) skickar `GroupTable` `teamId={null}`, så `TeamNameButton`
+degraderar till ren text. **Varför:** en klickbar knapp för ett okänt id öppnar profil-modalen på ett
+lag som `TeamProfilePanel` inte hittar i uppslaget -> `deriveTeamProfile` får ingen träff -> klicket gör
+TYST ingenting. Hellre icke-klickbar text (ärlig affordans) än en knapp som ser interaktiv ut men inte
+gör något. `teamLabel` returnerar nu även `known` (`team !== undefined`). Fail-loud-light bevarad: id:t
+visas fortfarande synligt. Test: `GroupTable.test.tsx` (okänt lag = ingen knapp, känt lag fortsatt klickbart).
+
+**Beslut (C9, TeamProfilePanel, samma fix som C7):** Escape-lyssnarens `useEffect` deps:ar nu på det
+STABILA `openProfileId` i stället för `profile`-objektet. **Varför:** `profile` är härlett
+(`deriveTeamProfile`) och får ny identitet vid varje store-uppdatering (live/realtid T18 -> `setMatches`),
+så `[profile]`-deps remove/add:ade keydown-lyssnaren i onödan vid varje datauppdatering medan modalen stod
+öppen (churn). Ofarligt för beteendet (Escape stängde ändå) men onödig avregistrering/registrering per
+tick, och inkonsekvent med C7 (fokus-effekten band redan till `openProfileId`). Test:
+`TeamProfilePanel.test.tsx` C9-block räknar keydown add/remove över en store-uppdatering (negativ kontroll:
+med `[profile]`-deps failar testet, churn fångad). **Spårbarhet:** intern UX/perf-rule, ingen extern källa,
+spårbar via #10 + C8/C9 + denna rad.
+
+---
+
 ## 2026-06-10 , T10 (issue #10): flake-fix, vänta in passiva a11y-effekter i lag-profil-testet
 
 **Beslut:** Lag-profil-modalens a11y-tester väntar in dialogens passiva öppnings-effekter (fokus

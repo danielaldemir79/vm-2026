@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { useState, type ReactNode } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useCallback, useState, type ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { ResultsStoreContext, type ResultsStore } from '../results/results-context';
 import { TeamProfilePanel } from './TeamProfilePanel';
@@ -319,6 +319,115 @@ describe('TeamProfilePanel, fokus stabilt vid store-uppdatering mitt under öppe
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(opener).toHaveFocus());
+  });
+});
+
+describe('TeamProfilePanel, Escape-lyssnaren churnar inte vid store-uppdatering (C9)', () => {
+  // ROTORSAK (C9, samma klass som C7): Escape-effekten band till `profile`, ett HÄRLETT
+  // objekt som får ny identitet vid varje store-uppdatering (live/realtid T18 anropar
+  // setMatches -> deriveTeamProfile körs om -> ny identitet). Då remove/add:ades keydown-
+  // lyssnaren i onödan vid varje datauppdatering medan modalen står öppen (churn).
+  // Ofarligt för beteendet (Escape stängde ändå), men onödig avregistrering/registrering
+  // per tick. Fixen binder till det STABILA openProfileId, så lyssnaren läggs EXAKT en
+  // gång per öppning, oberoende av hur ofta datan bakom uppdateras. Detta test räknar
+  // add/remove av just `keydown` på document över en store-uppdatering: med [profile]
+  // skulle uppdateringen ge +1 remove och +1 add (churn); med [openProfileId] noll.
+  afterEach(() => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    vi.restoreAllMocks();
+  });
+
+  const swedenTeam: Team = {
+    id: 'swe',
+    name: 'Sverige',
+    code: 'SWE',
+    group: 'A',
+    fifaRanking: 25,
+    starPlayers: ['Alexander Isak'],
+  };
+  const groups: Group[] = [{ id: 'A', teamIds: ['swe'] }];
+
+  function swedenMatch(id: string): Match {
+    return {
+      id,
+      stage: 'group',
+      groupId: 'A',
+      homeTeamId: 'swe',
+      awayTeamId: null,
+      kickoff: '2026-06-12T18:00:00.000Z',
+      venue: 'Testarena',
+      status: 'scheduled',
+      result: null,
+    };
+  }
+
+  function LiveUpdateHarness() {
+    const [openTeamId, setOpenTeamId] = useState<string | null>(null);
+    const [matches, setMatches] = useState<Match[]>([swedenMatch('m1')]);
+    // onClose stabil (useCallback, [] deps) precis som appens TeamProfileProvider
+    // (closeProfile = useCallback(() => setOpenTeamId(null), [])). Det är avgörande:
+    // Escape-effekten deps:ar på [openProfileId, onClose], så en CHURNANDE onClose
+    // (inline-arrow med ny identitet per render) skulle ge churn via onClose och dölja
+    // att fixen ligger i det stabila openProfileId. Med en stabil onClose isolerar
+    // testet exakt det C9 åtgärdar: profile-identitetens churn, inte onClose:s.
+    const onClose = useCallback(() => setOpenTeamId(null), []);
+    const store: ResultsStore = {
+      status: 'ready',
+      matches,
+      teams: [swedenTeam],
+      groups,
+      mode: 'fixtures',
+      error: null,
+      setMatches,
+      submitResult: () => ({ ok: true }),
+    };
+    return (
+      <ResultsStoreContext.Provider value={store}>
+        <button type="button" onClick={() => setOpenTeamId('swe')}>
+          öppna Sverige
+        </button>
+        <button type="button" onClick={() => setMatches([swedenMatch('m2')])}>
+          live-uppdatera
+        </button>
+        <TeamProfilePanel openTeamId={openTeamId} onClose={onClose} />
+      </ResultsStoreContext.Provider>
+    );
+  }
+
+  it('lägger keydown-lyssnaren EN gång per öppning och remove/add:ar den INTE vid en store-uppdatering', async () => {
+    // Räkna bara `keydown`-registreringar på document (panelens Escape-lyssnare),
+    // andra event-typer (t.ex. RTL/jsdom-interna) ignoreras.
+    const addSpy = vi.spyOn(document, 'addEventListener');
+    const removeSpy = vi.spyOn(document, 'removeEventListener');
+    const keydownAdds = () => addSpy.mock.calls.filter(([type]) => type === 'keydown').length;
+    const keydownRemoves = () => removeSpy.mock.calls.filter(([type]) => type === 'keydown').length;
+
+    render(<LiveUpdateHarness />);
+    fireEvent.click(screen.getByText('öppna Sverige'));
+    const dialog = await screen.findByRole('dialog');
+    const closeBtn = screen.getByRole('button', { name: /Stäng lagprofil/i });
+    await waitFor(() => expect(closeBtn).toHaveFocus()); // öppnings-effekterna flushade
+
+    // Baslinje: lyssnaren ska vara lagd exakt en gång vid öppning, inget remove än.
+    expect(keydownAdds()).toBe(1);
+    expect(keydownRemoves()).toBe(0);
+
+    // Uppdatera storen MEDAN modalen är öppen (ny matchlista-identitet = det setMatches
+    // gör i T18:s realtids-seam). Profile får ny identitet. Med [profile]-deps hade
+    // detta avregistrerat + återregistrerat keydown (churn); med [openProfileId] inte.
+    fireEvent.click(screen.getByText('live-uppdatera'));
+    await waitFor(() =>
+      expect(dialog.querySelector('[data-profile-path-match="m2"]')).not.toBeNull()
+    );
+
+    // KÄRN-ASSERTIONEN (C9): ingen churn, fortfarande exakt en add och noll remove.
+    expect(keydownAdds()).toBe(1);
+    expect(keydownRemoves()).toBe(0);
+
+    // Beteendet är intakt: Escape stänger fortfarande, och DÅ städas lyssnaren (en remove).
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(keydownRemoves()).toBe(1);
   });
 });
 
