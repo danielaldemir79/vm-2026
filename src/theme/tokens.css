@@ -446,7 +446,13 @@ body {
    ritas med box-shadow (ingen layout-påverkan, ingen CLS), tinten med en
    pseudo-yta så den ligger BAKOM innehållet och aldrig mörklägger text. */
 [data-simulation-frame][data-simulation-active='true'] {
+  /* position + z-index:0 skapar en LOKAL stacking-kontext på ramen. Utan den
+     (position: relative men z-index: auto) tolkas ::before-tintens z-index: -1
+     mot närmaste stacking-kontext-förfader (ytterst rot-elementet), så tinten
+     kan ritas BAKOM sidans/förälderns bakgrund och försvinna. z-index: 0 håller
+     pseudo-ytan (z-index: -1) bakom ramens innehåll men INOM sim-zonen. */
   position: relative;
+  z-index: 0;
   border-radius: var(--radius-card);
   /* Inset violett ring (1.5px) + mjuk ytter-glow. color-mix mot transparent ger
      en dämpad ring som följer temat via --vm-sim. Ingen text på ringen. */
@@ -457,8 +463,9 @@ body {
 }
 
 /* Den svaga violetta tinten: en pseudo-yta BAKOM innehållet (z-index -1, inom
-   ramens stacking-kontext) så den färgar mellanrummen men aldrig lägger sig över
-   läsbar text. 6 % alfa = den kontrast-mätta gränsen med stor marginal. */
+   ramens EGNA stacking-kontext, etablerad av z-index: 0 på ramen ovan) så den
+   färgar mellanrummen men aldrig lägger sig över läsbar text OCH aldrig hamnar
+   bakom sidans bakgrund. 6 % alfa = den kontrast-mätta gränsen med stor marginal. */
 [data-simulation-frame][data-simulation-active='true']::before {
   content: '';
   position: absolute;
