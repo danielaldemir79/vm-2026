@@ -220,8 +220,10 @@ osannolika krocken (klienten genererar då en ny kod, gissar aldrig att en kod �
 **Beslut (INGA secrets i repot, PRINCIPLES §7):** Supabase-URL + publik anon/publishable-nyckel läses
 ur env (`import.meta.env`, satta i `.env.local` gitignorad + Cloudflare). Den publika nyckeln är
 publik PER DESIGN (skyddad av just denna RLS) men hålls ändå i env, aldrig hårdkodad i källkoden,
-så koden inte binds till ett specifikt projekt. Integrationstestet faller till projektets KÄNDA
-publika värden bara som sista utväg (de är inga secrets, men behandlas som env-konfig).
+så koden inte binds till ett specifikt projekt. **Uppdaterat efter C7 (runda 1):** RLS-
+integrationstestet har INGEN hårdkodad fallback till projektets kända publika värden längre, det
+KRÄVER `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` ur miljön och `describe.skipIf`:ar hela sviten
+om de saknas (de är inga secrets, men behandlas som env-konfig). Se C7-blocket högre upp.
 
 **Spårbarhet:** #14 + denna rad + `supabase/migrations/` (speglade på kmzhyblzxangpxydufve) +
 `supabase/README.md` + testerna (RLS-integration, auth, rooms-api, room-code, data-source-flip).
