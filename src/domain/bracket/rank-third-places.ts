@@ -41,13 +41,10 @@ import type { GroupId, GroupStanding, GroupTable } from '../types';
 import { GROUP_IDS } from '../types';
 import { QUALIFYING_THIRDS } from './seed-third-places';
 
-/**
- * Antalet grupptreor en KOMPLETT rangordning har, EN per grupp (VM 2026 har 12
- * grupper, SPEC §5). Härleds ur GROUP_IDS (enda sanningen för antal grupper),
- * ingen magisk 12. Garantin för `qualifyingGroups` (se nedan) vilar på att ALLA
- * dessa treor finns rangordnade, inte bara minst 8.
- */
-const GROUPS_TOTAL = GROUP_IDS.length;
+// En KOMPLETT rangordning har EN trea per KANONISK grupp (VM 2026 har 12 grupper
+// A-L, SPEC §5). GROUP_IDS är enda sanningen för giltiga grupper (ingen magisk
+// 12). Garantin för `qualifyingGroups` (se nedan) vilar på att ALLA dessa grupper
+// är representerade bland de rangordnade treorna (unik täckning, inte bara antal).
 
 /**
  * En grupptrea: gruppens id + dess härledda tabellrad (rank === 3). Egen typ så
@@ -137,7 +134,7 @@ export interface ThirdPlaceRanking {
  *                gruppspelet eller med ofullständig data).
  *
  * VARFÖR null tills alla 12: en seedbar grupp-lista får bara fyllas när
- * rangordningen är KOMPLETT (en trea per grupp, alla GROUPS_TOTAL). Med färre
+ * rangordningen är KOMPLETT (en trea per KANONISK grupp, hela GROUP_IDS). Med färre
  * (t.ex. 9-11 färdiga grupper) vore topp-8 av en DELMÄNGD en gissning, en grupp
  * som ännu inte spelat färdigt kan ha en bättre trea och knuffa ut en av de
  * provisoriska 8. Att returnera null tills dess håller "inte avgjort än" till
@@ -149,13 +146,21 @@ export function computeThirdPlaceRanking(tables: readonly GroupTable[]): ThirdPl
   const ranked = rankThirdPlaces(tables);
   const qualified = ranked.slice(0, QUALIFYING_THIRDS);
 
-  // Garantin uttrycks DIREKT: bara en KOMPLETT rangordning (en trea per grupp,
-  // alla GROUPS_TOTAL) ger en seedbar grupp-lista. Villkoret är `ranked.length
-  // === GROUPS_TOTAL`, INTE `qualified.length === QUALIFYING_THIRDS`, det senare
-  // är `slice(0,8).length === 8`, dvs sant för ALLA n >= 8 treor och skulle
-  // seeda topp-8 av en ofullständig mängd (en gissning). Färre treor -> null.
-  const qualifyingGroups =
-    ranked.length === GROUPS_TOTAL ? [...qualified.map((t) => t.group)].sort() : null;
+  // Garantin uttrycks DIREKT: bara en KOMPLETT rangordning (en trea PER kanonisk
+  // grupp, alla GROUP_IDS) ger en seedbar grupp-lista, annars null.
+  //
+  // Varför UNIKA grupper, inte bara `ranked.length === GROUP_IDS.length` (C6, samma
+  // klass som C3 i derive-bracket): en ren ANTALS-koll släpper igenom 12 treor som
+  // råkar ha en DUBBLETT-grupp och saknar en grupp (t.ex. två A-treor, ingen L).
+  // Då vore mängden "komplett" till antalet men inte i täckning, och en av de 8
+  // seedade grupperna kunde vara fel/dubblerad medan en kanonisk grupp saknas.
+  // Vi kräver därför att Set:et av treornas grupp-id TÄCKER hela GROUP_IDS (en av
+  // varje, enda sanningen för giltiga grupper). När hela GROUP_IDS täcks är minst
+  // 12 treor givet på köpet. Fail-safe: hellre null än en seedning på en
+  // ofullständig/dubblerad gruppmängd (gissa aldrig, PRINCIPLES §8).
+  const rankedGroups = new Set(ranked.map((t) => t.group));
+  const allGroupsPresent = GROUP_IDS.every((g) => rankedGroups.has(g));
+  const qualifyingGroups = allGroupsPresent ? [...qualified.map((t) => t.group)].sort() : null;
 
   return { ranked, qualified, qualifyingGroups };
 }
