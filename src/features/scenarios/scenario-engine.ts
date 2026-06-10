@@ -177,7 +177,7 @@ export function assertEnumerable(remainingCount: number, groupId: GroupId): void
 
 /**
  * Syntetiskt resultat för ett tilldelat utfall. Vi använder NEUTRALA marginaler
- * (1-0 / 1-1 / 0-1): exakta målsiffror får inte påverka KLAR/UTE-klassningen
+ * (1-0 / 0-0 / 0-1): exakta målsiffror får inte påverka KLAR/UTE-klassningen
  * (den approximationen hanteras separat via securelyTop2/definitelyOutOfTop2,
  * som BARA tittar på poäng). Marginalen finns bara så computeStandings får ett
  * giltigt resultat att räkna poäng ur; tiebreak-känsligheten fångas inte här
@@ -542,6 +542,15 @@ function buildCondition(
   } else {
     // Laget spelar självt: hitta det enklaste egna kravet (vinst/oavgjort) som
     // garanterar topp-2 oavsett hur övriga matcher går.
+    //
+    // PLURAL-ÄRLIGHET (Copilot C3): ownResultGuarantees låser ALLA lagets egna
+    // återstående matcher till utfallet (se dess loop). Har laget fler än en egen
+    // match kvar betyder "vinst räcker" alltså vinst i ALLA dem, inte en enda.
+    // Singular-text ("Vinst räcker") skulle då ljuga som om en match avgjorde.
+    // Vi väljer därför formulering efter antal egna återstående matcher.
+    const ownRemainingCount = remaining.filter(
+      (rem) => rem.homeTeamId === teamId || rem.awayTeamId === teamId
+    ).length;
     const winGuarantees = ownResultGuarantees(
       teamId,
       'win',
@@ -557,9 +566,17 @@ function buildCondition(
       remaining
     );
     if (drawGuarantees) {
-      parts.push('Oavgjort räcker för topp-2.');
+      parts.push(
+        ownRemainingCount > 1
+          ? 'Oavgjort i lagets matcher räcker för topp-2.'
+          : 'Oavgjort räcker för topp-2.'
+      );
     } else if (winGuarantees) {
-      parts.push('Vinst räcker för topp-2.');
+      parts.push(
+        ownRemainingCount > 1
+          ? 'Vinst i lagets matcher räcker för topp-2.'
+          : 'Vinst räcker för topp-2.'
+      );
     } else {
       parts.push('Måste vinna och hoppas på andra matcher för topp-2.');
     }

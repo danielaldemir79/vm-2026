@@ -5,6 +5,22 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T11 (issue #11): Copilot C2 + C3, doc-/text-ärlighet i "Vad krävs" (inga domänregler rörda)
+
+**Beslut (rätta två formuleringar så de matchar vad koden FAKTISKT gör):**
+- **C2 (doc-inkonsekvens):** kommentaren vid `resultForOutcome` påstod neutrala marginaler "(1-0 / 1-1 /
+  0-1)", men `draw`-grenen returnerar `0-0`, inte `1-1`. Kommentaren rättad till verkligheten
+  "(1-0 / 0-0 / 0-1)". `docs/patterns.md` beskrev redan rätt (`1-0/0-0/0-1`), så den lämnades orörd.
+- **C3 (vilseledande singular):** `ownResultGuarantees` låser ALLA lagets egna återstående matcher till
+  utfallet (vinst/oavgjort), men texterna "Vinst räcker"/"Oavgjort räcker" lät som EN match. Har laget
+  fler än en egen match kvar (n=3-fallet) väljs nu plural-text "Vinst i lagets matcher räcker"/"Oavgjort
+  i lagets matcher räcker"; singular-fallet behåller nuvarande text. KLASSNINGEN är oförändrad, bara den
+  svenska formuleringen. Plural-fallet är testat (lag med två egna matcher kvar -> plural-text, ej singular).
+
+Båda är ren text-/doc-ärlighet (`scenario-engine.ts`), ingen domänregel ändrad. Spårbar via #11 + denna rad + testerna.
+
+---
+
 ## 2026-06-10 , T11 (issue #11): Copilot C1, åskådar-lag i "Vad krävs" får ärlig text, aldrig falskt "måste vinna"
 
 **Beslut (villkorstexten ljuger aldrig om eget agentskap):** i scenario-fasen kan ett lag ha spelat
