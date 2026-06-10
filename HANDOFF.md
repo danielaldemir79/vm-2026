@@ -5,6 +5,71 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T13/#13 (Fas 1-deploy + installation/onboarding + offline) KLAR - FAS 1 KOMPLETT - PR #49 väntar på merge
+
+**Branch:** `feature/T13-install-offline` @ HEAD `1724080`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/49 mot `develop` (Closes #13, state: OPEN)
+**Board:** issue #13 i "In Review" (korrekt). Dirigenten stänger issue #13 MANUELLT och flyttar kort #13 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta ~1 vecka, dirigenten har fullmakt att merga, förbättra brister och mata på nya tasks.
+
+**--- FAS 1 KOMPLETT ---**
+T1-T13 + hotfix #37 + T27/#39 + T28/#42 + T4b är klara och mergade (eller väntar merge på PR #49). Fas 1 definieras som stängd när PR #49 mergats. Fas 2 startar med T14 (Supabase live). Release-gränsen (develop -> main + release-cleanup-skillen) är ett SEPARAT beslut och väntar Daniels hemkomst-go.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `ed9b909` - refactor(lib): safe-storage till delad lib (rule-of-three)
+- `7911ace` - feat(app-settings): installation, onboarding, offline-indikator, haptik/ljud AV default (80 tester)
+- `c6d83f6` - feat(pwa): wiring + workbox offline-skal + decisions.md
+- `1724080` - feat(app-settings): premium-finish, OnboardingArt-scener, dekor-strip-arkitektur, AA lägst 4,57:1 (HEAD)
+
+**Verifiering (dirigent):** 689 tester gröna (71 filer, +80), build/lint/format rent. Lighthouse: Perf 100 / BP 96 / A11y 93 / SEO 91. LH13 har tagit bort PWA-kategorin; installerbarhet manuellt verifierad (manifest + ikoner 192/512/maskable + sw + secure context). Lokal panel: ren (F1 = pre-existerande demo-chip-kontrast -> ny task #48 på boarden Ready; F2 info om gold-chip-namnkollision). Copilot: 1 runda, 0 fynd.
+
+**Alla 7/7 acceptanskriterier bockade i issue #13** (journalisten 2026-06-10). Kriterium 3 uppfyllt via vm-2026.pages.dev från develop, dokumenterat beslut; main-release = Daniels steg vid release-gränsen.
+
+**design-frontend AA-lärdom:** `aa-kontrastbevisning` i design-frontends lärdomsfil ökades till Förekomst 2 av reviewern (commit e2b355d) - inget att agera på nu, befordran sker vid Förekomst 3.
+
+**PINNADE punkter:**
+- **T14-pin UTÖKAD:** flippa `LIVE_READY = true` + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion (inget test refererar "LIVE_READY=false"). Guard-testet BRYTS medvetet vid flip. Projekt kmzhyblzxangpxydufve, RLS per auth.uid()+rum, anon-auth på, Cloudflare-env satt, MCP ansluten. **UTÖKNING T13:** koppla riktig Supabase-synk på online-seamen (nu stub/offline-only), uppdatera live-felvägstester.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn (3 dagar framåt) tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready på boarden.
+
+**"Behöver Daniel"-kö:**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista. Alternativ: (a) visa meddelande "turneringen avslutad", (b) ankra fönstret till sista speldagen.
+- **FIFA-ranking juni-uppdatering:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - om den ska speglas: ändra rank-värden i källfilen + `npm run gen:team-profiles`.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` i `memory/lessons/senior-developer.md` har nått Förekomst 3 (T4 + T8 + T9). Typ: korsar flera agenter (reviewer + senior-developer) -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` i `memory/lessons/journalist.md` har nått Förekomst 3 (T7 + HOTFIX #37 + T8). Typ: agent-beteende (journalist) -> permanent regel i journalistens fil. Väntar Daniels godkännande.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst. Autonomt bygge fortsätter pa develop med T14.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga, förbättra brister och mata på nya tasks autonomt.
+>
+> Om PR #49 (T13/#13, feature/T13-install-offline) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 49 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #13 manuellt (`gh issue close 13`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #13 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar install-prompt (Chrome/Android), onboarding-tour vid första start, och att appen fungerar offline. Skicka demo till Daniel.
+>
+> Om PR #49 REDAN mergad:
+> Fas 1 (T1-T13 + hotfix + T27/#39 + T28/#42 + T4b) är komplett och mergad mot develop. Release-gränsen (develop -> main + release-cleanup-skillen) väntar Daniels hemkomst-go - kör INTE den autonomt.
+> Plocka nästa task från boarden.
+> **Nästa task: T14 (#14, hög-risk: Supabase/auth/RLS -> bredare review-panel)** - "Live-data via Supabase": flippa LIVE_READY, koppla riktig auth/Realtime/RLS, koppla Supabase-synk pa online-seamen fran T13. Projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten. Kolla issue-bodyn för fullständigt scope.
+>
+> Bär framåt (alla tasks):
+> - **T14-pin UTÖKAD:** flippa LIVE_READY + ta bort interims-warn + uppdatera live-felvägstester + F2-assertion + koppla riktig Supabase-synk pa online-seamen. Projekt kmzhyblzxangpxydufve.
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas upp som liten task vid rätt tillfälle.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35), #39-F1-produktbeslut, FIFA-ranking-juni-uppdatering, 2 befordringar (Förekomst 3, väntar Daniels godkännande), release-gränsen (develop -> main).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T12/#12 (What-if-simulator) KLAR - PR #47 väntar på merge
 
 **Branch:** `feature/T12-whatif` @ HEAD `411beb8`
