@@ -87,6 +87,12 @@
   --vm-warning: #f3c14e;
   --vm-danger: #fb7287;
 
+  /* Ink PÅ en fylld success-yta (T11, "Klar"-chip:en). Near-black mot den ljusa
+     mintgröna ytan: UPPMÄTT 9.97:1 (vit text vore osynlig på mint). En EGEN token
+     (inte återbruk av accent-fg) så ett framtida success-hue-byte tvingar en ny
+     mätning här i stället för att tyst sänka kontrasten (lessons aa-kontrast). */
+  --vm-on-success: #04140b;
+
   /* Dekorativa stöd-toner (utanför @theme, fritt designvärde). Guld + grön glow. */
   --vm-gold: #f3c14e;
   --vm-glow-accent: 31 224 130; /* RGB-delar för rgb()/rgba()-glow i mörkt tema */
@@ -122,6 +128,11 @@
   --vm-success: #0f766e;
   --vm-warning: #8a5a05;
   --vm-danger: #c4302c;
+
+  /* Ink PÅ den fyllda success-ytan i ljust tema (T11, "Klar"-chip:en). Vit text
+     mot den djupa teal-gröna: UPPMÄTT 5.47:1 (near-black vore för lågt). Egen
+     token, samma motiv som i mörkt tema (mätning bunden till success-hue:n). */
+  --vm-on-success: #ffffff;
 
   /* Dekorativa stöd-toner i ljust tema. */
   --vm-gold: #b07d10;
