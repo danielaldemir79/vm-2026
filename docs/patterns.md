@@ -574,3 +574,47 @@ tabellmotorn och klassa konservativt på poäng blir slutsatsen sann inom det en
 osäkert syns som "beror på" i stället för att maskeras. Generaliserar de tidigare härledda-state-vyerna
 (T5/T6/T9) till ett scenario-lager, och är basen för T12:s what-if-sandbox. Källa: T11
 (`src/features/scenarios/`: `scenario-engine.ts` + `use-group-scenarios.ts` + `ScenarioView.tsx`).
+
+### hypotetiskt-overlay-ovanpa-den-delade-storen-utan-att-rora-riktig-data (VM 2026)
+
+**Recept (en what-if-sandbox där ALLA vyer ändras live utan att skriva riktig data):**
+
+1. INGEN ny store, INGET dubbellager. What-if-läget är ett HYPOTETISKT OVERLAY
+   (`Map<matchId, Match>`) ovanpå SAMMA matchlista alla vyer redan härleder ur (SPEC §6). Lägg
+   overlayt + `simulating`-flaggan i den BEFINTLIGA storen som äger matchlist-seamen
+   (`ResultsProvider`), inte i en sido-provider. Storen exponerar `matches` som EFFEKTIVA
+   matcher: `simulating ? riktiga + overlay : riktiga`. Konsumenterna (tabell, träd, scenario,
+   inmatning) RÖRS INTE, de läser bara `matches` och reagerar automatiskt. Det är hela vinsten
+   med härledd-state-arkitekturen: en ny sanning-variant (riktig vs effektiv) i EN punkt.
+2. SAMMANVÄVNINGEN i en REN modul (`apply-simulation.ts`, `applySimulationOverlay(realMatches,
+   overlay)`), React-fri och fristående testbar, exakt som `applyMatchResult` är skrivlagret för
+   riktig data. ISOLERINGEN blir en KOD-INVARIANT: funktionen tar `realMatches` `readonly` och
+   muterar den ALDRIG (bygger ny array), så ett hypotetiskt resultat KAN inte ändra riktig data.
+3. SKRIV-SEAMEN ruttas av läget: `submitResult`/`setMatches` skriver OVERLAYT i sim-läge (riktig
+   data orörd), riktig data annars. Gör BÅDA skrivvägarna läges-medvetna (försvar på djupet). En
+   sim-skrivning validerar mot de EFFEKTIVA matcherna (riktig + overlay), så användaren matar mot
+   exakt det hen ser och SAMMA valideringsgrind (T9-straffar inkl. hypotetiska slutspel) gäller.
+4. BLANDA-FALLET faller ut gratis: matcher UTAN overlay-post behåller riktiga värden, matcher MED
+   visar hypotetiskt. Overlay har FÖRETRÄDE för en match som även har ett riktigt resultat (det
+   hypotetiska visas tills overlayn töms). Overlayt ÖVERRIDER bara existerande matcher (uppfinner
+   ingen ny fixtur); en overlay-nyckel utan riktig match FAIL-LOUD:ar (hela schemat finns redan).
+5. TÖM = AVSTÄNGNING/ÅTERSTÄLLNING. `exitSimulation` (av + töm), `resetSimulation` (töm, stanna i
+   sandlådan), och en (om)seedning lämnar sim-läget + tömmer overlayn (datan sandlådan byggdes på
+   byttes ut). Allt idempotent.
+6. MARKERING i en egen app-global komponent (sim-läget rör ALLA vyer): ett uppläst statusmeddelande
+   (`role="status"`) + ett `data-simulation-active`-attribut som design-frontend hänger en premium-
+   banner på. Toggle + "Återställ allt". Funktionellt komplett utan styling.
+7. TÄCKNING: ren overlay (tom -> kopia, isolering, blanda, företräde, ordning, fail-loud-nyckel),
+   store-seamen (toggle/idempotens, isolering riktig data orörd efter avsluta, blanda, reset,
+   validering av hypotetiskt resultat inkl. slutspels-straffar), HÄRLEDDA vyer reagerar (tabell
+   ändras + slutspelsträdet låses av ett hypotetiskt komplett gruppspel, exit släpper), och
+   markerings-UI:t (status syns/försvinner, toggle/reset). Negativ kontroll: stäng av sim-grenarna
+   och bevisa att isolerings-/blanda-testerna RÖDNAR (äkta skyddsräcken, inte gröna av slump).
+
+**Varför:** En what-if-sandbox (SPEC §5) ska låta vänner spela ut tänkta resultat och se tabell +
+träd + "Vad krävs" ändras live, UTAN att röra de riktiga resultaten. Genom att uttrycka läget som
+ett overlay ovanpå den enda sanningen (i stället för en parallell store) ärver sandlådan HELA den
+verifierade härlednings-kedjan (tabeller/seedning/scenarier) gratis, isoleringen blir en invariant
+i koden (ren `readonly`-väv), och avstängning = töm overlay. Generaliserar T5/T6/T9/T11:s härledda-
+state-vyer till ett HYPOTETISKT-DATA-lager på samma store. Källa: T12 (`src/features/simulation/`:
+`apply-simulation.ts` + `SimulationBanner.tsx`, sim-seamen i `results-context.ts`/`ResultsProvider.tsx`).
