@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatDayHeading, formatDayShort, formatKickoffTime } from './format-datetime';
+import {
+  formatDayHeading,
+  formatDayHeadingNoYear,
+  formatDayShort,
+  formatKickoffTime,
+} from './format-datetime';
 
 describe('formatKickoffTime, UTC-instant -> svensk klockslagstid', () => {
   it('formaterar till svensk tid (sommartid +2), inte UTC', () => {
@@ -21,6 +26,13 @@ describe('formatDayHeading / formatDayShort, läsbar svensk dag-rubrik', () => {
     expect(heading.toLowerCase()).toContain('torsdag');
   });
 
+  it('ger en full svensk dag-rubrik UTAN årtal (hero-etiketten, #54)', () => {
+    const heading = formatDayHeadingNoYear('2026-06-11');
+    // "torsdag 11 juni" (versaliseras av CSS i vyn), aldrig årtalet.
+    expect(heading.toLowerCase()).toBe('torsdag 11 juni');
+    expect(heading).not.toContain('2026');
+  });
+
   it('ger en kompakt svensk dag-etikett ur en dag-nyckel', () => {
     const short = formatDayShort('2026-06-11');
     expect(short.toLowerCase()).toContain('11');
@@ -29,6 +41,7 @@ describe('formatDayHeading / formatDayShort, läsbar svensk dag-rubrik', () => {
 
   it('kastar (fail loud) på en felformad dag-nyckel', () => {
     expect(() => formatDayHeading('2026/06/11')).toThrow(/Ogiltig dag-nyckel/);
+    expect(() => formatDayHeadingNoYear('11 juni')).toThrow(/Ogiltig dag-nyckel/);
     expect(() => formatDayShort('11 juni')).toThrow(/Ogiltig dag-nyckel/);
   });
 });

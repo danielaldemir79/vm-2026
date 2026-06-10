@@ -5,6 +5,26 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 3): hero-etiketten "Dagens match" -> matchens datum när matchen inte är idag
+
+**Beslut:** Etiketten ovanför hero:ns framträdande match (`DailyMatchesView`) säger "Dagens match"
+BARA när den matchen spelas IDAG (svensk kalenderdag), annars matchens dag ("torsdag 11 juni",
+versaliserat av CSS:ens `uppercase`). Logiken: jämför `localDateKey(matchOfTheDay.kickoff)` mot
+`useTodayKey().todayKey`; lika -> "Dagens match", annars `formatDayHeadingNoYear(matchDayKey)`.
+**Varför:** Daniel såg "DAGENS MATCH" fast nästa match var dagar bort (turneringen hade inte börjat,
+premiär 11 juni). Etiketten ljög. Nu följer den dagen.
+**Detaljer:** Ny ren helper `formatDayHeadingNoYear` i `format-datetime.ts` (samma lokala-väggklocka-
+tolkning som `formatDayHeading`, men utan årtal, eftersom årtalet är brus i en kort hero-etikett;
+navigerings-rubriken behåller årtalet). `useTodayKey` återanvänds (en sanning för "svensk dag nu",
+dag-medveten över midnatt/PWA-väckning), ingen egen UTC-datumklippning (känd fälla
+`utc-datum-anvant-som-lokalt-datum`). Tester (fejkad Date via `vi.useFakeTimers({ toFake: ['Date'] })`):
+idag === matchens dag (11 juni) -> "Dagens match"; idag 10 juni, match 11 juni -> "torsdag 11 juni";
++ helper-enhetstest (med + utan årtal, fail-loud på felformad nyckel). Verifierat LIVE (idag 2026-06-10):
+hero:n visar "torsdag 11 juni", inte "Dagens match". Spårbart: #54 + denna rad + `DailyMatchesView.tsx`
++ `format-datetime.ts`.
+
+---
+
 ## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 2): sim-KONTROLLEN flyttad till resultatinmatningen
 
 **Beslut:** `SimulationBanner` (what-if-kontrollen: Starta/Återställ/Avsluta + statusmeddelandet)
