@@ -147,9 +147,14 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
   const openProfileId = profile === null ? null : team!.id;
 
   // Escape stänger. Lyssnaren läggs bara när modalen är öppen (städas vid stängning/
-  // unmount), så den inte fångar Escape när inget är öppet.
+  // unmount), så den inte fångar Escape när inget är öppet. Bind till det STABILA
+  // öppet-id:t (openProfileId), inte profile-objektet (samma fix som C7): profile är
+  // härlett och får ny identitet vid varje store-uppdatering (live/realtid T18), så en
+  // profile-deps skulle remove/add lyssnaren i onödan vid varje datauppdatering medan
+  // modalen står öppen. openProfileId ändras bara när modalen faktiskt öppnas för ett
+  // nytt lag eller stängs (null), så lyssnaren bind:as exakt en gång per öppning (C9).
   useEffect(() => {
-    if (profile === null) {
+    if (openProfileId === null) {
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
@@ -159,7 +164,7 @@ export function TeamProfilePanel({ openTeamId, onClose }: TeamProfilePanelProps)
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [profile, onClose]);
+  }, [openProfileId, onClose]);
 
   // Flytta fokus in i dialogen när den öppnas (a11y: tappa inte bort tangentbords-
   // användaren utanför modalen), och återställ fokus till det element som var

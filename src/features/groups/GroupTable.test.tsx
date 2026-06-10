@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { GroupTable } from './GroupTable';
 import type { GroupStanding, Team } from '../../domain/types';
 // Lagnamnen i tabellen är klickbara (TeamNameButton -> useTeamProfile, T10), så
@@ -145,5 +145,27 @@ describe('GroupTable, fel-väg: okänt lag-id maskeras inte', () => {
     );
 
     expect(screen.getByRole('rowheader', { name: /okant-lag/ })).toBeInTheDocument();
+  });
+
+  it('gör ett okänt lag ICKE-klickbart (C8): ingen knapp som öppnar en tom profil', () => {
+    // C8: saknas laget i teamsById hittar profil-modalen inget lag, så en klickbar
+    // knapp skulle göra tyst ingenting. Ett okänt lag ska därför vara ren text, inte
+    // en TeamNameButton (teamId=null -> span), medan ett KÄNT lag förblir klickbart.
+    const openProfile = vi.fn();
+    const mixed = [row('okant-lag', 1), row('mex', 2)];
+    render(
+      <TeamProfileStub openProfile={openProfile}>
+        <GroupTable groupId="B" standings={mixed} teamsById={teamsById} />
+      </TeamProfileStub>
+    );
+
+    // Det okända laget renderas som text, men exponeras INTE som en knapp.
+    const orphanHeader = screen.getByRole('rowheader', { name: /okant-lag/ });
+    expect(within(orphanHeader).queryByRole('button')).not.toBeInTheDocument();
+
+    // Det kända laget (Mexiko) är fortfarande klickbart och öppnar rätt profil.
+    const knownButton = screen.getByRole('button', { name: /Visa lagprofil för Mexiko/i });
+    fireEvent.click(knownButton);
+    expect(openProfile).toHaveBeenCalledWith('mex');
   });
 });
