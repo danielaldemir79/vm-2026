@@ -5,6 +5,49 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T9 (issue #9): Copilot R2 (C4-C8), bl.a. bronsmatch-ordning + form-synk
+
+**Beslut (C4, bronsmatch FÖRE final i visnings-ordningen):** `ROUND_ORDER` (derive-bracket.ts) och
+`ROUND_STEP` (BracketView.tsx) listar nu `third-place` FÖRE `final` (brons-marker = 5, final = 6).
+Bronsmatchen (M103) SPELAS före finalen (M104), så trädets kolumner vänster -> höger visar ... semi ->
+brons -> final. **Källhänvisad (verifierad mot T4, gissas inte):** VM 2026:s svenska TV-tablå
+(`src/data/wc2026/tv-schedule-source.txt`) anger BRONSMATCH lör 18 juli (M103) och FINAL sön 19 juli
+(M104); `matches.ts` har kickoff M103 `2026-07-18T21:00:00Z` < M104 `2026-07-19T19:00:00Z`; och
+`bracket-structure.ts` (FIFA Art. 12.10-12.11) har M103 = brons, M104 = final. Bägge matas av
+semifinalerna (M101/M102), bronsen av förlorarna, finalen av vinnarna.
+
+**Beslut (C5, semantiskt korrekt teststage):** `homeWinsEverywhere()` i derive-bracket.test.ts satte
+`stage: 'round-of-32'` på ALLA bracket-matcher (även M103/M104). Använder nu `bm.stage` ur strukturen.
+Härledningen läser stage ur strukturen (inte ur Match-objektet), så utfallet är oförändrat, men testdatan
+ljuger inte längre om vilken runda en match tillhör.
+
+**Beslut (C6, qualifyingGroups kräver UNIK gruppmängd, inte antal):** `computeThirdPlaceRanking`
+(`rank-third-places.ts`) gatade på `ranked.length === GROUPS_TOTAL` (= antal treor). Det blev sant med en
+DUBBLETT-grupp + en SAKNAD grupp (t.ex. två A-treor, ingen L): 12 treor till antalet men 11 unika grupper,
+så topp-8 seedades på en ofullständig/dubblerad gruppmängd. Samma klass som C3 i derive-bracket. Nu krävs att
+Set:et av treornas grupp-id TÄCKER hela `GROUP_IDS` (en av varje, enda sanningen för giltiga grupper); det
+garanterar minst 12 treor på köpet. Fail-safe: hellre null än seedning på dubblerad data. Live ofarligt redan
+(enda anroparen `deriveBracket` gatar bakom `isGroupStageComplete` som efter C3 kräver unik täckning), men
+funktionen är publik (domain/index.ts) och garantin bor nu i FUNKTIONEN. Bevisat: 12-treor-med-dubblett (11
+unika) -> null, 13-tabeller-utan-L -> null. **Källa för gruppmängden:** `GROUP_IDS` i `src/domain/types.ts`
+(A-L, SPEC §5), samma kanoniska lista som C3.
+
+**Beslut (C7+C8, ResultEntryForm synkar mot extern matchuppdatering, DIRTY-medvetet):** Formuläret seedade
+sin lokala `useState` BARA vid mount, så ett externt ändrat resultat (realtid T18, eller samma match ändrad
+i den delade storen) visades aldrig i ett redan monterat formulär. Förr "löstes" det för MÅL/status via en
+data-beroende re-mount-key i `ResultEntryView` (`${id}-${status}-${homeGoals}-${awayGoals}`), men den (a)
+saknade STRAFFARNA, så penalties blev stale (C8, inkonsekvent med målen), och (b) en re-mount KLOTTRAR ÖVER
+ett pågående osparat edit. Nu synkar `ResultEntryForm` sig själv via en `useEffect` (C7) som re-seedar mål,
+status OCH straffar KONSEKVENT ur matchens nuvarande värden, men BARA när formuläret är "rent" (en
+`dirtyRef` sätts vid första lokala ändringen, nollas vid lyckat sparande), så ett pågående lokalt edit
+bevaras. Re-mount-keyn i `ResultEntryView` är därmed nedgraderad till en stabil `match.id` (instansen lever
+kvar; C2-garantin, osparad inmatning över expandera/ihopfäll, gäller fortfarande). En enda `seedFields(match)`
+är sanningen för både init och synk (DRY). Bevisat: extern mål-uppdatering synkar (rent), extern straff-only-
+uppdatering synkar (C8), osparat edit bevaras vid extern uppdatering, och efter sparat synkar nästa externa
+uppdatering in (dirty nollat).
+
+---
+
 ## 2026-06-10 , T9 (issue #9, design-frontend): premium-bracket ovanpå seamen, AA UPPMÄTT i båda teman
 
 **Beslut (visuellt lager, rör ALDRIG semantiken):** Det premium-visuella trädet byggs ENBART ovanpå
