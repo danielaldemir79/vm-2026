@@ -1,21 +1,27 @@
 // Tillgängligt tips-FORMULÄR för EN match (FUNKTIONELLT + a11y-lager, T15, #15).
 //
 // FOKUS (senior-devs lager): KORREKT, TILLGÄNGLIG tips-inmatning + fel-vägar +
-// LÅST-läge. Samma premium-formspråk som resultatinmatningen (#39, ResultEntryForm):
-// fast-bredds score-grid (lagnamn truncar, knuffar aldrig rutorna), stark fokus-ring,
-// stabila data-attribut. Skillnaden: detta är en GISSNING före avspark, inte ett
-// faktiskt resultat, så det finns inga straffar och ingen status-väljare, och efter
-// avspark är formuläret LÅST (deadline-låset visas tydligt, server-RLS upprätthåller det).
+// LÅST-läge. Samma fast-bredds score-grid som resultatinmatningen (#39): lagnamn
+// truncar och knuffar aldrig rutorna, stark fokus-ring, stabila data-attribut.
+// Skillnaden mot resultat: detta är en GISSNING före avspark, inte ett facit, så
+// inga straffar och ingen status-väljare, och efter avspark är formuläret LÅST.
 //
-// VISUELL DESIGN (design-frontend-agentens lager, ovanpå): premium-styling. Strukturen
-// är gjord lätt att styla: stabila roller + data-attribut (data-prediction-form,
-// data-prediction-locked), inga inbakade statusfärger (T7-pin: accent === success i ljust tema).
+// VISUELL DESIGN (design-frontend-agentens lager, T15): en EGEN identitet , en
+// TIPS-KUPONG. Resultatinmatningen är "arenan/scoreboarden" (grön pitch); tips-
+// kortet är "kupongen i handen" (varm pokal-guld), en spelkupong man fyller i FÖRE
+// avspark och hoppas på. Kupong-metaforen bärs av rena dekor-lager (guld topp-strip,
+// streckad river-linje, guld-hörn-glow) i tokens.css (.vm-coupon-*), så STRUKTUREN
+// här är ren och stabil: stabila roller + data-attribut, inga inbakade statusfärger
+// (T7-pin: accent === success i ljust tema). Spar-knappen behåller den gröna
+// accenten (interaktions-affordans, inte status), kortets signatur är guld.
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { MatchContextRow } from '../results/MatchContextRow';
 
-// Delade fält-klasser, SAMMA premium-formspråk som resultatinmatningen (#39).
+// Delade fält-klasser, SAMMA premium-formspråk som resultatinmatningen (#39):
+// stark tema-trogen fokus-ring (WCAG 2.4.7), mjuk hover. Färgen är accent
+// (interaktions-affordans, inte status), så T7-pinnen hålls ren.
 const FIELD_BASE =
   'rounded-md border border-border bg-bg text-fg transition-colors duration-150 ' +
   'outline-none focus-visible:border-accent ' +
@@ -23,11 +29,18 @@ const FIELD_BASE =
   'hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] ' +
   'disabled:cursor-not-allowed disabled:opacity-60';
 
+// Score-rutan: kompakt men bekvämt touch-mål (48px hög, > 44px WCAG 2.5.5), stark
+// display-siffra. w-16 (64px) är den fasta rut-bredden som håller kolumnerna i linje
+// kort för kort (samma #39-invariant), så ett långt lagnamn aldrig knuffar rutorna.
 const SCORE_INPUT = `${FIELD_BASE} h-12 w-16 px-2 text-center font-display text-[1.375rem] font-bold leading-none tabular-nums`;
 
+// Lag-etiketten: avsiktlig ellipsis (truncate), dämpad ton + tight tracking så ett
+// kapat namn läses som DESIGN, inte tryckfel. Fullt namn via title + labelns text.
 const TEAM_LABEL =
   'min-w-0 truncate text-[0.8125rem] leading-tight tracking-[0.01em] text-fg-muted';
 
+// FIFA-landskodens chip: kompakt monogram-bricka, texten bär full fg-kontrast,
+// tonen lever bara i bakgrunden (AA oavsett tema, samma recept som #39:s code-chip).
 const CODE_CHIP =
   'shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wider';
 
@@ -71,6 +84,53 @@ function parseGoals(raw: string): number | null {
 /** Är ett värde ett icke-negativt heltal? (Avvisar tomt, NaN, decimal, negativt.) */
 function isNonNegativeInteger(value: number | null): value is number {
   return value !== null && Number.isInteger(value) && value >= 0;
+}
+
+/**
+ * Biljett-/kupong-ikonen (kupong-huvudets dekor-glyf): en liten perforerad biljett.
+ * Ren dekoration (aria-hidden), den ger kupong-känslan utan att bära text.
+ */
+function CouponTicketIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* Biljett-kropp med två urtag (perforering) i sidorna. */}
+      <path d="M2 5.5A1 1 0 0 1 3 4.5h10a1 1 0 0 1 1 1v1a1.5 1.5 0 0 0 0 3v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1a1.5 1.5 0 0 0 0-3z" />
+      <path d="M10 4.75v6.5" strokeDasharray="1.4 1.4" />
+    </svg>
+  );
+}
+
+/**
+ * Hänglås-ikonen (låst-läget): ett stängt hänglås. Ren dekoration (aria-hidden);
+ * låst-etikettens text bär betydelsen åt skärmläsaren. Får en lugn engångs-puls
+ * via .vm-coupon-lock-icon (nollad vid reducerad rörelse).
+ */
+function CouponLockIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="vm-coupon-lock-icon h-4 w-4 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3.25" y="7" width="9.5" height="6.5" rx="1.4" />
+      <path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7" />
+      <circle cx="8" cy="10" r="0.85" fill="currentColor" stroke="none" />
+    </svg>
+  );
 }
 
 export function PredictionForm({
@@ -150,35 +210,77 @@ export function PredictionForm({
       data-prediction-form=""
       data-match-id={match.id}
       data-prediction-locked={locked || undefined}
-      className="group/form flex flex-col gap-3 rounded-card border border-border bg-surface p-3.5 shadow-[var(--vm-shadow-card),inset_0_1px_0_0_color-mix(in_srgb,var(--vm-gold)_22%,transparent)] transition-[box-shadow,border-color] duration-300 hover:border-[color-mix(in_srgb,var(--color-accent)_28%,var(--color-border))] sm:p-5"
+      // TIPS-KUPONG (T15, design-frontend): .vm-coupon-card bär kupong-dekoren
+      // (guld topp-strip + hörn-glow, dämpad i låst läge) i tokens.css §10, så
+      // STRUKTUREN här hålls ren. Hover-lyftet bor i CSS (annars vinner inline över
+      // :hover). En aning rundare hörn + guld-tonad vilo-kant skiljer den varma
+      // kupongen från resultat-kortets gröna scoreboard utan att lämna familjen.
+      className="vm-coupon-card group/form flex flex-col gap-3 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] p-3.5 transition-[border-color] duration-300 hover:border-[color-mix(in_srgb,var(--vm-gold)_40%,var(--color-border))] sm:p-5"
     >
       <fieldset className="m-0 flex flex-col gap-3 border-0 p-0" disabled={locked}>
+        {/* KUPONG-HUVUDET: en liten "TIPS"-eyebrow + biljett-ikon ovanför matchnamnet,
+            så kortet omedelbart läses som en kupong (inte ett facit). FÄRG: --color-
+            warning (den AA-SÄKRA guld-TEXT-tonen: ljus #f3c14e i mörkt, djup amber
+            #8a5a05 i ljust), INTE --vm-gold (som faller under AA som text på ljus yta,
+            den kända guld-på-ljus-fällan, lessons). Dekorativ guld-glow lever i CSS-
+            fonden, här bär texten/ikonen läsbarhet -> warning-tonen. */}
+        <p
+          aria-hidden="true"
+          className="flex items-center gap-1.5 font-display text-[0.625rem] font-bold uppercase leading-none tracking-[0.2em] text-warning"
+        >
+          <CouponTicketIcon />
+          Tips
+        </p>
+
+        {/* legend namnger inmatningen för skärmläsare (vilka lag). Visuellt matchens
+            rubrik med en liten guld kupong-prick (i stället för #39:s gröna puls-
+            prick, så identiteten skiljer sig redan i detaljen). */}
         <legend className="flex items-center gap-2 font-display text-sm font-semibold leading-tight tracking-[-0.01em] sm:text-[0.9375rem]">
           <span
             aria-hidden="true"
             className="inline-block h-1.5 w-1.5 shrink-0 rounded-pill"
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            style={{ backgroundColor: 'var(--vm-gold)' }}
           />
           {matchLabel}
         </legend>
 
-        {/* Kontext-rad (återanvänd från resultatinmatningen): avsparkstid + grupp/runda. */}
+        {/* Kontext-rad (återanvänd från resultatinmatningen, DRY): avsparkstid +
+            grupp/runda. Ligger UTANFÖR score-grid:en så den aldrig bryter #39:s
+            kolumn-linjering. */}
         <MatchContextRow match={match} />
 
-        {/* LÅST-etikett: visas tydligt efter avspark. data-prediction-lock är haken
-            för design-frontend. role/aria-describedby kopplar den till fälten så en
-            skärmläsare får veta varför fälten är inaktiva. */}
+        {/* RIVER-LINJEN: kupongens avrivnings-perforering, skiljer huvudet (lag +
+            kontext) från ifyllnads-zonen (mål-rutorna). Ren dekoration (aria-hidden). */}
+        <div aria-hidden="true" className="vm-coupon-tear -mx-0.5 rounded-pill" />
+
+        {/* LÅST-etikett: visas tydligt efter avspark. POSITIV inramning , "låst vid
+            avspark" är spelets rättvisa (alla tippar blint), inte en frustration.
+            data-prediction-lock är haken för design-frontend. aria-describedby
+            kopplar den till fälten så en skärmläsare får veta varför fälten är
+            inaktiva. Hänglås-ikon + dämpad guld-yta gör låsningen elegant. */}
         {locked ? (
-          <p
+          <div
             id={lockId}
             data-prediction-lock=""
-            className="m-0 rounded-md border border-border bg-bg px-3 py-2 text-[0.8125rem] font-semibold text-fg-muted"
+            className="m-0 flex items-start gap-2.5 rounded-md border border-[color-mix(in_srgb,var(--vm-gold)_28%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_7%,var(--color-bg))] px-3 py-2.5"
           >
-            Tipset är låst, matchen har sparkat igång.
-            {current
-              ? ` Ditt tips: ${current.homeGoals}–${current.awayGoals}.`
-              : ' Du hann inte tippa.'}
-          </p>
+            <span className="mt-0.5 shrink-0 text-warning">
+              <CouponLockIcon />
+            </span>
+            <p className="m-0 text-[0.8125rem] font-semibold leading-snug text-fg">
+              Tipset är låst, matchen har sparkat igång.{' '}
+              <span className="font-medium text-fg-muted">
+                Låst vid avspark, så alla tippar blint, det är spelets rättvisa.
+              </span>{' '}
+              {current ? (
+                <span className="whitespace-nowrap">
+                  Ditt tips: {current.homeGoals}–{current.awayGoals}.
+                </span>
+              ) : (
+                <span className="text-fg-muted">Du hann inte tippa.</span>
+              )}
+            </p>
+          </div>
         ) : null}
 
         {/* Score-grid (SAMMA #39-struktur som resultatinmatningen, fast bredd). */}
@@ -186,24 +288,40 @@ export function PredictionForm({
           data-prediction-card-body=""
           className="grid grid-cols-[auto_auto_auto] items-end justify-center gap-x-2.5 gap-y-3 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:justify-between sm:gap-x-4"
         >
-          {/* Kontroll-spåret (Spara). Bär kortets variabla bredd, så rutorna står still. */}
-          <div className="order-2 col-span-3 flex flex-wrap items-end justify-center gap-2.5 sm:order-1 sm:col-span-1 sm:justify-start">
+          {/* Kontroll-spåret (Spara + sparat-kvitto). Bär kortets variabla bredd,
+              så rutorna står still. */}
+          <div className="order-2 col-span-3 flex flex-wrap items-center justify-center gap-2.5 sm:order-1 sm:col-span-1 sm:justify-start">
             {!locked ? (
               <button
                 type="submit"
                 data-prediction-save=""
-                className="ml-auto h-11 self-end rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px"
+                className="ml-auto h-11 self-end rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
               >
                 {current ? 'Ändra tips' : 'Spara tips'}
               </button>
             ) : null}
-            {/* Sparat-kvitto (role=status): diskret bekräftelse, annonseras artigt. */}
+            {/* Sparat-kvitto (role=status): en STOLT, fylld guld-bricka med mörk ink
+                (samma färg-oberoende solid-bricka-form som "Klar"/"Dagens match"-
+                chippen, T9/T11, AA-säker i båda teman). "Mitt tips syns och stolt"
+                (taskens punkt 1): inte bara ett diskret kvitto, utan en tydlig bock. */}
             {saved && !locked ? (
               <span
                 role="status"
                 data-prediction-saved=""
-                className="self-center font-display text-[0.8125rem] font-semibold text-fg-muted"
+                className="vm-coupon-mine inline-flex items-center gap-1.5 self-center rounded-pill px-3 py-1.5 font-display text-[0.8125rem] font-bold leading-none shadow-sm"
               >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  className="h-3.5 w-3.5 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.25}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3.5 8.5l3 3 6-6.5" />
+                </svg>
                 Sparat
               </span>
             ) : null}
@@ -217,7 +335,7 @@ export function PredictionForm({
                   aria-hidden="true"
                   className={CODE_CHIP}
                   style={{
-                    backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    backgroundColor: 'color-mix(in srgb, var(--vm-gold) 16%, transparent)',
                     color: 'var(--color-fg)',
                   }}
                 >
@@ -244,11 +362,15 @@ export function PredictionForm({
             />
           </div>
 
-          {/* "mot"-avdelaren (fast). */}
+          {/* "mot"-avdelaren (fast). Guld-skiftad (kvällsljus-detaljen): blandningen
+              lutar mot fg-muted (AA-säker bastext-ton) och använder --color-warning
+              (den AA-säkra guld-text-tonen per tema), inte rå --vm-gold, så även över
+              kupongens guld-tintade fond håller den AA som normal text (uppmätt, se
+              decisions.md). 50/50-mix ger karaktären utan att sänka läsbarheten. */}
           <span
             aria-hidden="true"
             className="order-1 self-end pb-3 font-display text-[0.6875rem] font-semibold uppercase tracking-[0.18em] sm:order-2 sm:self-center sm:pb-0"
-            style={{ color: 'color-mix(in srgb, var(--vm-gold) 52%, var(--color-fg-muted))' }}
+            style={{ color: 'color-mix(in srgb, var(--color-warning) 50%, var(--color-fg-muted))' }}
           >
             mot
           </span>
@@ -261,7 +383,7 @@ export function PredictionForm({
                   aria-hidden="true"
                   className={CODE_CHIP}
                   style={{
-                    backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)',
+                    backgroundColor: 'color-mix(in srgb, var(--vm-gold) 16%, transparent)',
                     color: 'var(--color-fg)',
                   }}
                 >
@@ -289,16 +411,22 @@ export function PredictionForm({
           </div>
         </div>
 
-        {/* Fel-listan: role="alert" (fail loud), kopplad till fälten via aria. */}
+        {/* Fel-listan: role="alert" (fail loud), kopplad till fälten via aria.
+            Egen yta i danger-ton (semantiskt token, INTE accent/guld) så felet är
+            omöjligt att missa men håller T7-pinnen ren. */}
         {error ? (
           <p
             id={errorId}
             role="alert"
             data-prediction-error=""
             className="m-0 rounded-md border p-3 text-sm"
+            // Felytan blandas mot den OPAKA surface-tokenen (inte transparent): så
+            // sänker kupongens guld-glow i kort-fonden inte fel-textens kontrast
+            // (canvas-komposit-fälla, uppmätt 4.38:1 över glow:en -> 4.81:1 över
+            // opak surface, light). danger-token (semantiskt, INTE accent/guld), T7-pin.
             style={{
               borderColor: 'color-mix(in srgb, var(--color-danger) 45%, transparent)',
-              backgroundColor: 'color-mix(in srgb, var(--color-danger) 9%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--color-danger) 9%, var(--color-surface))',
               color: 'var(--color-danger)',
             }}
           >

@@ -97,6 +97,13 @@
   --vm-gold: #f3c14e;
   --vm-glow-accent: 31 224 130; /* RGB-delar för rgb()/rgba()-glow i mörkt tema */
 
+  /* Ink PÅ en FYLLD guld-yta (T15, tips-kupongens "Mitt tips"-bricka). Den ljusa
+     pokal-gulden (#f3c14e) i mörkt tema kräver near-black ink (vit vore osynlig).
+     EGEN token (inte återbruk av accent-fg) så ett framtida guld-hue-byte tvingar
+     en ny mätning här i stället för att tyst sänka kontrasten (lessons aa-kontrast).
+     UPPMÄTT: near-black (#1c1403) på #f3c14e = 11.0:1 (decisions.md T15-visuellt). */
+  --vm-coupon-ink: #1c1403;
+
   /* SIMULERINGS-TON (T12, what-if-läget). En dämpad indigo/violett som signalerar
      "labbet/hypotetiskt" och som med FLIT ligger utanför appens rollfärger (grön
      accent, guld/warning, mint/teal success, korall danger), så ingen kan förväxla
@@ -151,6 +158,13 @@
   /* Dekorativa stöd-toner i ljust tema. */
   --vm-gold: #b07d10;
   --vm-glow-accent: 14 122 68;
+
+  /* Ink PÅ den fyllda guld-ytan i ljust tema (T15, "Mitt tips"-brickan). Den mörka
+     amber-gulden (#b07d10) i ljust tema kräver NEAR-BLACK ink (vit faller under AA,
+     uppmätt 3.63:1 , den kända guld-på-ljus-fällan). Samma färg-oberoende solid-
+     bricka-form som "Klar"-chippen (T11). Egen token, mätning bunden till guld-hue:n.
+     UPPMÄTT: near-black (#1c1403) på #b07d10 = 5.03:1 (decisions.md T15-visuellt). */
+  --vm-coupon-ink: #1c1403;
 
   /* SIMULERINGS-TON i ljust tema (T12). Djup indigo/violett, samma "labbet"-roll
      och samma utanför-rollfärgerna-motiv som i mörkt tema. UPPMÄTT WCAG AA:
@@ -561,4 +575,136 @@ body {
     rgb(var(--vm-glow-accent) / 0.1) 50%,
     transparent 68%
   );
+}
+
+/* -----------------------------------------------------------------------------
+   10. TIPS-KUPONGEN, dekorativ yta (T15, issue #15). [VÄRDE, ej @theme-kontrakt]
+
+   IDENTITET (taskens punkt 1, tips =/= resultat): resultatinmatningen (#39) är
+   "arenan/scoreboarden", den gröna pitchen där det FAKTISKA spelas. Tips-kortet
+   är "KUPONGEN i handen" , en spelkupong man fyller i FÖRE avspark och hoppas på.
+   Samma "arena i kvällsljus"-familj (SPEC §7), men tonad mot den varma pokal-
+   GULDEN i stället för pitch-grönt: guld = hopp/vad/hejarklack, det som skiljer
+   en gissning från ett facit. Spar-knappen behåller den gröna ACCENTEN (interaktions-
+   affordans, T7-pin: färgen är handling, inte status), men kortets SIGNATUR är guld.
+
+   KUPONG-METAFOREN bärs av tre rena dekor-lager (ingen bär text):
+   - en varm guld topp-strip ("kupong-huvudet") med en hårfin guld-kant-glow,
+   - en streckad "river-linje" (.vm-coupon-tear) som ekar en avrivnings-perforering,
+   - ett diskret guld-hörn-ljus i kortets fond (samma radial-glow-recept som hero:n).
+   Allt via color-mix mot tokens, så det följer temat och dämpas rent i ljust läge.
+
+   KONTRAST-VAKT (taskens punkt 4, canvas-komposit, VÄRSTA fall, BÅDA teman,
+   lessons aa-kontrast-...-varsta-fall + glow-i-dekor-strip-skild-fran-text-yta):
+   ALL läsbar text (lagnamn, kod-chip, kontext-rad, låst-etikett, sparat-kvitto,
+   fel) står på den OPAKA surface-fonden, INTE på guld-glow:en. Den enda tinten i
+   text-vägen är kupong-fondens hörn-glow (guld vid LÅG alfa) , uppmätt som canvas-
+   komposit (alfa-blend över surface), inte ett typfall. Guld-toppstripen + river-
+   linjen + kant-glow:en bär ALDRIG text, så de kan per konstruktion inte sänka
+   någon kontrast. De uppmätta MIN-värdena står i decisions.md (T15-visuellt).
+   -------------------------------------------------------------------------- */
+
+/* Kupong-KORTET: en svag guld-hörn-glow i fonden (kupongens varma ljus) ovanpå
+   surface, plus en hårfin inset guld-topplist (kupong-huvudets kant). Glow-alfan
+   hålls LÅG (text står ändå på opak surface, men en låg alfa håller marginalen
+   bekväm i canvas-komposit-mätningen). box-shadow bär topplisten (ingen layout,
+   ingen CLS); hover lyfter kortet en aning varmare (kupongen "tas upp"). */
+.vm-coupon-card {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(
+    120% 90% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 9%, transparent),
+    transparent 60%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 38%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-coupon-card {
+    transition:
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+}
+
+.vm-coupon-card:hover {
+  box-shadow:
+    var(--vm-shadow-raised),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 52%, transparent);
+}
+
+/* Kupong-huvudets EYEBROW-rad: en liten guld "TIPS"-etikett + biljett-ikon. Den
+   är BARA dekor-yta; texten i den bär full fg/guld-kontrast (mätt). */
+
+/* RIVER-LINJEN: en streckad avrivnings-perforering som skiljer kupong-huvudet
+   (lag + kontext) från ifyllnads-zonen (mål-rutorna), precis som en spelkupongs
+   perforering. En upprepad guld-gradient ger streck-mönstret; en låg höjd håller
+   det diskret. aria-hidden i markup (ren dekoration), bär ingen text. */
+.vm-coupon-tear {
+  height: 2px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vm-gold) 42%, transparent) 0,
+    color-mix(in srgb, var(--vm-gold) 42%, transparent) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+/* LÅST KUPONG: efter avspark dämpas ifyllnads-zonen (den går inte att ändra) och
+   en guld-till-neutral ton signalerar "inlämnad/avgjord". Dämpningen läggs BARA
+   på den dekorativa fonden + topplisten (gulden tonas ner mot border-tonen), så
+   den positiva "låst = rättvist"-känslan finns kvar utan att skrika. Text-lagret
+   rörs inte av dämpningen (låst-etiketten + mitt-tips-talen bär full kontrast). */
+.vm-coupon-card[data-prediction-locked] {
+  background-image: radial-gradient(
+    120% 90% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 5%, transparent),
+    transparent 60%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 20%, var(--color-border));
+}
+
+.vm-coupon-card[data-prediction-locked]:hover {
+  /* Låst kupong lyfter inte på hover (inget att interagera med), så den känns
+     stilla/inlämnad. Samma vilo-skugga som icke-hover. */
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 20%, var(--color-border));
+}
+
+/* HÄNGLÅSETS "klick"-puls när låset just slagit till: en lugn, ENGÅNGS skala-puls
+   (ingen loop, så den inte distraherar), nollad vid reducerad rörelse. Rent
+   dekorativ , låst-etiketten (role-text) bär betydelsen åt skärmläsaren. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-coupon-lock-icon {
+    animation: vm-coupon-lock 0.5s ease-out 1;
+  }
+}
+
+@keyframes vm-coupon-lock {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* MITT TIPS, "stolt"-bricka: när ett tips är sparat visas det som en fylld guld-
+   bricka med mörk ink (samma färg-OBEROENDE solid-bricka-form som "Dagens match"/
+   "Klar"-chippen, T9/T11, lessons: guld-som-text-på-tint faller under AA, en
+   SOLID guld-yta med mörk ink gör det inte). Ink-tokenen är tema-medveten. */
+.vm-coupon-mine {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
 }

@@ -5,6 +5,78 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T15-visuellt (#15): tips-UI premium-finish, TIPS-KUPONG-identitet (design-frontend)
+
+Det visuella lagret ovanpå senior-devs funktionella tips-UI. Mål: en EGEN identitet för tips
+(tips =/= resultat), så det känns KUL att tippa, utan att lämna "arena i kvällsljus"-familjen.
+
+**1. IDENTITET, "TIPS-KUPONG" (taskens punkt 1):** resultatinmatningen (#39) är "arenan/scoreboarden"
+(grön pitch, det FAKTISKA spelet). Tips-kortet är "KUPONGEN i handen" , en spelkupong man fyller i
+FÖRE avspark. Samma score-grid-formspråk och fast-bredds-kolonner (#39-invarianten ärvd, lagnamn
+truncar aldrig in i rutorna), men tonad mot den varma pokal-GULDEN i stället för pitch-grönt: guld
+= hopp/vad/hejarklack. Kupong-metaforen bärs av tre RENA dekor-lager (ingen bär text), isolerade i
+`tokens.css` §10 (`.vm-coupon-*`): (a) en guld topp-strip (kupong-huvudets kant, inset box-shadow),
+(b) en streckad "river-linje" (`.vm-coupon-tear`, repeating-linear-gradient = avrivnings-perforering)
+som skiljer kupong-huvudet från ifyllnads-zonen, (c) ett diskret guld-hörn-glow i kort-fonden. Plus
+en "TIPS"-eyebrow + biljett-ikon i huvudet och en guld kupong-prick i legenden (i stället för #39:s
+gröna puls-prick, så identiteten skiljer sig redan i detaljen). Spar-knappen behåller den GRÖNA
+accenten (interaktions-affordans, T7-pin: färg = handling, inte status); kortets signatur är guld.
+
+**2. MITT TIPS, synligt och stolt (taskens punkt 1):** ett sparat tips bekräftas med en FYLLD guld-
+bricka med mörk ink + bock ("Sparat"), inte bara diskret grå text. Brickan använder den FÄRG-OBEROENDE
+solid-form som "Klar"/"Dagens match"-chippen (T9/T11): solid guld-yta + near-black ink, AA-säker i
+BÅDA teman (guld-som-text-på-tint faller annars under AA, den kända fällan). Ny token `--vm-coupon-ink`
+(near-black i BÅDA teman: ljus gold #f3c14e mörkt -> 10.90:1, mörk amber #b07d10 ljust -> 5.03:1).
+I rubriken: en motiverande räknare ("N matcher öppna att tippa", `role=status`), bara när N > 0 (säger
+aldrig "0 öppna", det vore nedslående).
+
+**3. LÅST-LÄGET, elegant + POSITIVT (taskens punkt 2):** efter avspark dämpas kupongen (guld tonas mot
+border-tonen, ingen hover-lyft, "inlämnad/avgjord"-känsla) och en låst-etikett visas med ett HÄNGLÅS
+(`.vm-coupon-lock-icon`, lugn engångs-puls, nollad vid reducerad rörelse) + texten "Låst vid avspark,
+så alla tippar blint, det är spelets rättvisa." Inramningen är POSITIV (en del av spelets rättvisa),
+inte frustrerande. Mitt tips står kvar synligt i låst-etiketten ("Ditt tips: 2-1"). Text-lagret rörs
+inte av dämpningen (full kontrast). Senior-devs data-attribut + strängar bevarade (testerna gröna).
+
+**4. "GÅ MED I ETT RUM"-läget, INBJUDANDE (taskens punkt 3):** porten till tips är en egen guld-tonad
+ruta med en kupong-ikon + tydlig rubrik + förklaring som pekar mot rum-sektionen ("Skapa eller gå med
+i ett rum ovanför, så öppnar tips-kupongerna här"), inte bara en grå rad. Känns som en inbjudan, inte
+ett felmeddelande. `data-predictions-no-room` bevarat.
+
+**5. GULD-TEXT-DISCIPLIN (lessons aa-kontrast + guld-på-ljus-fällan):** rå `--vm-gold` är DEKOR-färg
+(tints, glows, topp-strip, perforering, prickar). All guld-färgad TEXT/ikon som måste LÄSAS (eyebrow,
+"mot"-avdelare, hänglås, no-room-ikon, "Tips-ligan"-eyebrow) använder `--color-warning` , den AA-SÄKRA
+guld-text-tonen per tema (#f3c14e mörkt, djup amber #8a5a05 ljust). Felytan blandas mot OPAK surface
+(inte transparent), så kupongens guld-glow inte sänker fel-textens kontrast (canvas-komposit-fälla).
+
+**KONTRAST UPPMÄTT (canvas-komposit, VÄRSTA fall, alfa-blend över base-yta, BÅDA teman, ej typfall):**
+varje text-/ikon-yta mätt mot den FAKTISKT komponerade fonden (guld-glow/tint inräknad), inte mot
+token-hex:en. ALLA klarar WCAG AA som NORMAL text (>= 4.5:1), inkl. de element vars formella krav
+bara är 3:1 (ikoner). MIN-värden: **mörkt tema 5.61:1, ljust tema 4.81:1.** Per yta (mörkt / ljust):
+- Eyebrow "TIPS" (warning) på kupong-fond: 8.40 / 5.37
+- Legend matchnamn + lagnamn (fg) på kupong-fond: 12.68 / 16.22
+- Kod-chip text (fg) på guld-16%-tint: 8.78 / 13.73
+- "mot"-avdelare (color-mix warning 50% / fg-muted) på kupong-fond: 7.16 / 5.79
+- Låst-rubrik (fg) / låst-förklaring (fg-muted) på låst-yta (guld 7% / bg): 15.16, 7.46 / 15.12, 5.51
+- Hänglås-ikon (warning) på låst-yta [krav 3:1]: 10.03 / 5.00
+- Sparat-bricka ink (near-black) på SOLID guld: 10.90 / 5.03
+- Räknar-chip (fg-muted) på guld-8%-tint: 6.39 / 5.97
+- "Gå med i rum"-rubrik (fg) / brödtext (fg-muted) på guld-6%-yta: 13.56, 6.67 / 16.77, 6.11
+- "Gå med i rum"-kupong-ikon (warning) på guld-12%-tint [krav 3:1]: 6.86 / 4.89
+- Spar-knapp (accent-fg) på accent: 10.85 / 5.40
+- Fel-text (danger) på danger-9%/OPAK-surface: 5.61 / 4.81
+Metod: WCAG relativ luminans + ratio, color-mix som sRGB-linjär interpolation, alfa-komposit
+source-over. Mätt med en engångsprob (raderad efter, samma mönster som tidigare contrast-mätningar).
+
+**RESPONSIVT + A11Y VERIFIERAT LIVE (Playwright mot dev-render, isolerad harness, raderad efter):**
+ingen horisontell overflow på 280 (vikbar cover) / 375 / 768 / 1440 px i BÅDA teman (scrollW == clientW
+överallt). Score-gridens fasta kolumner håller linjeringen kort-för-kort även med långa lagnamn
+("Bosnien och Hercegovina mot Sydkorea" truncar rent). Fokus-ring bevisad LIVE: score-input +
+spar-knapp ger `:focus-visible == true` + `outline: solid 2px` (accent-ring, index.css). Eyebrow-
+färgen verifierad live = `rgb(243,193,78)` (warning-token, inte rå guld). Reduced-motion: hänglås-
+pulsen gatad under `@media (prefers-reduced-motion: no-preference)` -> ingen animation för reduce.
+
+---
+
 ## 2026-06-11 , T15 (#15): tips-motorn, poängregel + deadline-lås + tips-sekretess (SERVER-SIDE)
 
 Fas 2:s kärna. Vänner gissar resultat före avspark, poäng och (T17) topplista. Fyra beslut, alla
