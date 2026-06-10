@@ -20,6 +20,10 @@ import type { AdvancementStatus, GroupScenario, TeamScenario } from './scenario-
 import type { Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { useGroupScenarios } from './use-group-scenarios';
+// Premium-visuella lagret (status-chips, arena-kort, väntande-tillstånd). Stylas
+// ENBART via seamens data-attribut + klass-hakar nedan, så senior-devs semantik +
+// alla tester står kvar (samma seam-princip som GroupTable/BracketView, T7/T9).
+import './scenario.css';
 
 /** Svensk etikett + a11y-beskrivning per status (en sanning för UI:t). */
 const STATUS_LABELS: Readonly<Record<AdvancementStatus, string>> = {
@@ -42,12 +46,18 @@ function teamLabel(
   return { name: team?.name ?? teamId, code: team?.code ?? '???' };
 }
 
-/** En status-chip: text + data-attribut, färg-oberoende (design färglägger). */
+/**
+ * En status-chip: FÄRG-OBEROENDE (T7/T8-pin). Bär status via TEXT + form + en
+ * glyf + data-attribut, inte bara en färg, så Klar/Ute/Beror på skiljs i båda
+ * teman och för färgblinda. Glyfen + tonen läggs av scenario.css ur data-attributet
+ * (vm-scenario-chip-haken), så denna förblir ren semantik. Bas-formen (pill,
+ * padding, vikt) bor här; status-färgläggningen i CSS-lagret.
+ */
 function StatusChip({ status }: { status: AdvancementStatus }) {
   return (
     <span
       data-scenario-status={status}
-      className="inline-flex shrink-0 items-center rounded-pill border border-border px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
+      className="vm-scenario-chip shrink-0 rounded-pill border px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
     >
       {STATUS_LABELS[status]}
     </span>
@@ -68,12 +78,16 @@ function TeamRow({
       data-scenario-team={team.teamId}
       data-scenario-status={team.status}
       data-scenario-margin-dependent={team.marginDependent ? 'true' : undefined}
-      className="flex flex-col gap-1 border-b border-border/50 py-2 last:border-b-0"
+      // vm-scenario-row: CSS-lagret lyfter raden FÄRG-OBEROENDE ur status-attributet
+      // (Klar = vänster-list + upphöjd yta, Ute = diskret nedtoning, Beror på =
+      // guld-list), så klassningen läses även i gråskala (T7-pin). -mx-2 px-2 låter
+      // radens yt-ton/list nå ut till kortets kant utan att texten flyttar.
+      className="vm-scenario-row -mx-2 flex flex-col gap-1 border-b border-border/50 px-2 py-2 last:border-b-0"
     >
       <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-pill border border-border text-[0.625rem] font-bold tabular-nums text-fg-muted"
+          className="vm-scenario-rank inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-pill border text-[0.625rem] font-bold tabular-nums"
         >
           {team.currentRank}
         </span>
@@ -102,19 +116,25 @@ function GroupScenarioCard({
   index: number;
 }) {
   const delay = Math.min(index * 0.04, 0.4);
+  const isLive = scenario.phase === 'scenarios';
   return (
     <Slide direction="up" transition={{ ...transitions.smooth, delay }} className="h-full">
       <article
         data-scenario-group={scenario.groupId}
         data-scenario-decided={scenario.decided ? 'true' : undefined}
-        className="flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)]"
+        // vm-scenario-card: CSS-lagret lägger en mjuk "arena i kvällsljus"-glow ur
+        // kortets övre hörn (grön i live-läget, guld när gruppen är färdigspelad).
+        className="vm-scenario-card flex h-full flex-col overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)]"
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
           <h3 className="font-display text-base font-bold">Grupp {scenario.groupId}</h3>
           <span
             data-scenario-phase={scenario.phase}
-            className="text-[0.6875rem] uppercase tracking-wide text-fg-muted"
+            className="vm-scenario-phase text-[0.6875rem] font-semibold uppercase tracking-wide text-fg-muted"
           >
+            {/* Live-läget får en lugn andnings-prick (det här lever just nu), de
+                andra faserna en ren etikett. Pricken är dekorativ (aria-hidden). */}
+            {isLive ? <span aria-hidden="true" className="vm-scenario-live-dot" /> : null}
             {scenario.phase === 'decided'
               ? 'Färdigspelad'
               : scenario.phase === 'too-early'
@@ -124,13 +144,43 @@ function GroupScenarioCard({
                   } kvar`}
           </span>
         </div>
-        <ul className="flex flex-col px-4 py-2">
-          {scenario.teams.map((team) => (
-            <TeamRow key={team.teamId} team={team} teamsById={teamsById} />
-          ))}
-        </ul>
+        {scenario.phase === 'too-early' ? (
+          <TooEarlyBody />
+        ) : (
+          <ul className="flex flex-col px-4 py-2">
+            {scenario.teams.map((team) => (
+              <TeamRow key={team.teamId} team={team} teamsById={teamsById} />
+            ))}
+          </ul>
+        )}
       </article>
     </Slide>
+  );
+}
+
+/**
+ * Det ELEGANTA väntande-tillståndet (fas 'too-early'): ett lugnt platshållar-block
+ * i stället för en rad lag utan klassning. En stiliserad arena-ring (ren CSS, ingen
+ * extra asset) + en kort, varm copy som FÖRKLARAR varför scenarierna inte visas än,
+ * så det läser som "snart", inte som ett tomt fel.
+ *
+ * COPY-NOT: fasen "Inför sista omgången" står redan i kortets rubrik-etikett (en
+ * sanning, och senior-devs test pinnar den texten EXAKT 12 gånger = en per grupp).
+ * Body-copyn upprepar därför INTE den frasen, utan utvecklar vad som väntar, så
+ * etikett-räkningen hålls intakt och budskapet inte dubbelt.
+ */
+function TooEarlyBody() {
+  return (
+    <div className="vm-scenario-tooearly flex-1">
+      <span aria-hidden="true" className="vm-scenario-tooearly-icon" />
+      {/* max-w-[16rem] men ALDRIG bredare än kortet (min-w-0 + w-full-cap), så den
+          smalaste skärmen (280px vikbar cover) inte tvingas bredare än viewporten:
+          en fast max-w utan w-full-tak sätter grid-kolumnens MIN-bredd till textens
+          och spränger kortet. Verifierat 280px: noll horisontell overflow. */}
+      <p className="w-full max-w-[16rem] text-xs leading-relaxed text-fg-muted">
+        När färre matcher återstår visar vi exakt vad varje lag behöver för att gå vidare.
+      </p>
+    </div>
   );
 }
 
@@ -199,7 +249,12 @@ export function ScenarioView() {
       ) : null}
 
       {status === 'ready' && scenarios.length > 0 ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        // grid-cols-1 vid bas är AVGÖRANDE: utan en explicit single-kolumn flödar
+        // korten i en implicit `auto`-kolumn (= max-content av bredaste kortet), som
+        // på 280px (vikbar cover) blir bredare än viewporten och klipps av appens
+        // overflow-x-clip. minmax(0,1fr) (= grid-cols-1) låter kolumnen krympa till
+        // viewporten så villkorstext + chips ryms. Verifierat 280px: noll overflow.
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {scenarios.map((scenario, i) => (
             <GroupScenarioCard
               key={scenario.groupId}
