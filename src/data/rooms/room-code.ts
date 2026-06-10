@@ -9,7 +9,8 @@
 // vaktas av DB:ns check-constraint `rooms_code_format` (^[a-z2-9]{4,12}$), så koden
 // och databasen kan aldrig drifta isär.
 //
-// LÄNGD: 6 tecken ur 34 möjliga = 34^6 ~ 1,5 miljarder kombinationer, gott och väl
+// LÄNGD: 6 tecken ur 32 möjliga (ROOM_CODE_ALPHABET.length) = 32^6 ~ 1,07 miljarder
+// kombinationer (24 bokstäver a-z minus l/o + 8 siffror 2-9 = 32, inte 34), gott och väl
 // för en vänkrets-app. UNIQUE i DB fångar den astronomiskt osannolika krocken
 // (create_room kastar då, klienten genererar en ny). Vi GISSAR aldrig att en kod
 // är unik, databasen är sanningen.
