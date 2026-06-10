@@ -20,8 +20,12 @@
 import { hashCode } from '../daily/team-hue';
 
 /**
- * Initialer ur ett visningsnamn: första bokstaven i de (upp till) två första
- * orden, versaliserade. "Daniel Aldemir" -> "DA", "Bob" -> "B", "  " -> "?".
+ * Initialer ur ett visningsnamn: första bokstaven i FÖRSTA och SISTA ordet,
+ * versaliserade (mellannamn hoppas över). "Daniel Aldemir" -> "DA", "Anna Karin
+ * Svensson" -> "AS", "Bob" -> "B", "  " -> "?".
+ *
+ * VARFÖR första + sista (inte de två första): ett efternamn säger oftast mer om
+ * vem personen är än ett mellannamn, så monogrammet blir mer igenkännbart.
  *
  * VARFÖR fail-safe till "?": ett tomt/whitespace-namn ska aldrig ge en tom
  * bricka (som ser trasig ut), utan en neutral platshållare. Namn valideras
