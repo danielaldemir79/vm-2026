@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { TeamProfileProvider } from '../team-profile';
@@ -175,6 +175,81 @@ describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
       expect(card.style.getPropertyValue('--vm-day-hue')).toBe('');
       expect(card.getAttribute('data-day-theme')).toBeNull();
     }
+  });
+});
+
+// HERO-ETIKETTEN "Dagens match" vs matchens datum (T32, #54, fynd 3). Daniel såg
+// "DAGENS MATCH" fast nästa match var dagar bort (turneringen hade inte börjat).
+// Etiketten ska säga "Dagens match" BARA när den framträdande matchen spelas IDAG,
+// annars matchens dag ("torsdag 11 juni"). Vi fejkar BARA Date (toFake: ['Date']),
+// så providerns async-seedning + waitFor kör på riktiga timers (samma mönster som
+// ResultEntryView-fönstertesterna). Hero-etiketten är den FÖRSTA <p> i kolumnen
+// bredvid nedräkningen; vi läser den via den framträdande matchens highlight-kort.
+describe('DailyMatchesView, hero-etikett: "Dagens match" vs matchens datum (#54)', () => {
+  /** Texten i etiketten ovanför hero:ns framträdande (highlight) matchkort. */
+  function featuredLabelText(): string | null {
+    // Det framträdande kortet bär ett (tomt) data-highlight-attribut. Etiketten är
+    // dess föregående syskon (<p> ovanför kortet i samma kolumn-div). Kortets rot ÄR
+    // en <article> (MatchCard, data-match-card), så vi tar dess FÖRÄLDER (kolumnen)
+    // och läser kolumnens första <p>.
+    const highlight = document.querySelector('[data-daily-hero] [data-match-card][data-highlight]');
+    const column = highlight?.parentElement;
+    const label = column?.querySelector('p');
+    return label?.textContent?.trim() ?? null;
+  }
+
+  /**
+   * Texten i highlight-CHIPPET inne i hero:ns framträdande kort (#54, C3). Chippet
+   * är guld-brickan: en <dd> med title-attribut, hängd på <dt>Utvald</dt>. Den ska
+   * ALLTID säga samma sak som etiketten ovanför (featuredLabelText).
+   */
+  function featuredChipText(): string | null {
+    const chip = document.querySelector(
+      '[data-daily-hero] [data-match-card][data-highlight] dd[title]'
+    );
+    return chip?.textContent?.trim() ?? null;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('visar "Dagens match" när den framträdande matchen spelas IDAG (premiärdagen)', async () => {
+    // 2026-06-11 = premiärdagen (Mexiko-Sydafrika). Idag === matchens dag.
+    vi.setSystemTime(new Date('2026-06-11T08:00:00.000Z'));
+    renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    expect(featuredLabelText()).toBe('Dagens match');
+    // Chippet inne i kortet säger SAMMA sak som etiketten (#54, C3).
+    expect(featuredChipText()).toBe('Dagens match');
+  });
+
+  it('visar matchens DATUM (inte "Dagens match") när matchen inte är idag', async () => {
+    // 2026-06-10 = dagen FÖRE premiären. Startdagen blir 11 juni (närmast kommande),
+    // så den framträdande matchen är 11 juni, men IDAG är 10 juni -> etiketten ska
+    // visa matchens dag, inte "Dagens match".
+    vi.setSystemTime(new Date('2026-06-10T08:00:00.000Z'));
+    renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    const label = featuredLabelText();
+    expect(label).not.toBe('Dagens match');
+    // Matchens dag, utan årtal (versaliseras av CSS, så jämför på gemener). Asserta
+    // delsträngar (ICU-versioner kan skilja i interpunktion/mellanslag), inte exakt match.
+    expect(label?.toLowerCase()).toContain('torsdag');
+    expect(label?.toLowerCase()).toContain('11 juni');
+
+    // Chippet inne i kortet följer etiketten: SAMMA datum-text, INTE "Dagens match"
+    // (#54, C3, hela poängen). De ska aldrig divergera.
+    const chip = featuredChipText();
+    expect(chip).not.toBe('Dagens match');
+    expect(chip).toBe(label);
   });
 });
 

@@ -5,6 +5,76 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 3): hero-etiketten "Dagens match" -> matchens datum när matchen inte är idag
+
+**Beslut:** Etiketten ovanför hero:ns framträdande match (`DailyMatchesView`) säger "Dagens match"
+BARA när den matchen spelas IDAG (svensk kalenderdag), annars matchens dag ("torsdag 11 juni",
+versaliserat av CSS:ens `uppercase`). Logiken: jämför `localDateKey(matchOfTheDay.kickoff)` mot
+`useTodayKey().todayKey`; lika -> "Dagens match", annars `formatDayHeadingNoYear(matchDayKey)`.
+**Varför:** Daniel såg "DAGENS MATCH" fast nästa match var dagar bort (turneringen hade inte börjat,
+premiär 11 juni). Etiketten ljög. Nu följer den dagen.
+**Detaljer:** Ny ren helper `formatDayHeadingNoYear` i `format-datetime.ts` (samma lokala-väggklocka-
+tolkning som `formatDayHeading`, men utan årtal, eftersom årtalet är brus i en kort hero-etikett;
+navigerings-rubriken behåller årtalet). `useTodayKey` återanvänds (en sanning för "svensk dag nu",
+dag-medveten över midnatt/PWA-väckning), ingen egen UTC-datumklippning (känd fälla
+`utc-datum-anvant-som-lokalt-datum`). Tester (fejkad Date via `vi.useFakeTimers({ toFake: ['Date'] })`):
+idag === matchens dag (11 juni) -> "Dagens match"; idag 10 juni, match 11 juni -> "torsdag 11 juni";
++ helper-enhetstest (med + utan årtal, fail-loud på felformad nyckel). Verifierat LIVE (idag 2026-06-10):
+hero:n visar "torsdag 11 juni", inte "Dagens match". Spårbart: #54 + denna rad + `DailyMatchesView.tsx`
++ `format-datetime.ts`.
+
+---
+
+## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 2): sim-KONTROLLEN flyttad till resultatinmatningen
+
+**Beslut:** `SimulationBanner` (what-if-kontrollen: Starta/Återställ/Avsluta + statusmeddelandet)
+flyttades från TOPPEN av sim-zonen till DIREKT ovanför resultatinmatnings-sektionen
+(`ResultEntryView`-panelen) i `App.tsx`. Bara banner-elementet flyttade; ordningen är nu
+daily -> gruppspel -> "Vad krävs" -> slutspelsträd -> **sim-banner -> Mata in resultat**.
+**Varför:** Daniels feedback ("har det med resultaten att göra? placera den över sektionen när man
+matar in resultat så den får tydlig koppling"). Sim-läget handlar om RESULTAT (man spelar ut tänkta
+resultat), så kontrollen får en tydligare mental koppling när den står vid inmatningen i stället för
+högst upp på sidan.
+**Bevarat oförändrat:** Sim-RAMEN (`SimulationFrame`) omsluter fortfarande ALLA påverkade vyer
+(daily, gruppspel, "Vad krävs", slutspelsträd, inmatning) och bär den app-globala "labbet"-
+markeringen (violett ram + tint) + den sticky "Simuleringsläge"-badge:n; ingen datalogik eller
+sim-mekanik rördes. Verifierat LIVE: banner-rubriken ("Vad-händer-om") sitter direkt ovanför "Mata
+in resultat", och sim-flödet är intakt (Starta -> frame+badge aktiva och omsluter daily + inmatning,
+Återställ + Avsluta finns, Avsluta -> neutralt läge igen). Spårbart: #54 + denna rad + `App.tsx`.
+
+---
+
+## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 1): inställningspanelen hamnade BAKOM sidan, rotorsak + fix
+
+**Symptom (Daniels mobil):** Klick på kugghjulet öppnade inställningarna, men panelen lades
+bakom/utanför innehållet och syntes inte.
+
+**Rotorsak (verifierad LIVE i browsern, inte gissad):** `SettingsControl`-overlayn
+(`fixed inset-0 z-50`) renderades INLINE inuti appens `<header>`, som är
+`sticky top-0 z-10 backdrop-blur-md`. Två CSS-effekter slog samtidigt:
+1. **Containing block för fixed:** en ancestor med `transform`/`filter`/`backdrop-filter` blir
+   containing block för sina `position: fixed`-descendant (CSS Positioned Layout, MDN
+   "Containing block": https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_display/Containing_block).
+   Headern har `backdrop-filter: blur(12px)`, så overlayns `inset-0` löstes mot headerns
+   64px-box i stället för viewporten (uppmätt: overlayRect 1236×**64**, dialog top **-95**).
+2. **Instängd stacking context:** headerns `sticky` + `z-index: 10` skapar en stacking context
+   (MDN "Stacking context": https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_positioned_layout/Stacking_context),
+   så overlayns `z-50` var instängd i headerns z-10-lager och kunde inte nå över `<main>`.
+
+**Fix:** overlayn portaleras till `document.body` via `createPortal` (React DOM). `document.body`
+saknar transform/filter/backdrop-filter/stacking-context (verifierat live), så `fixed inset-0
+z-50` löses mot viewporten i rot-stacking-contexten och ligger överst, oberoende av VAR triggern
+sitter. Efter fixen (live): overlayParent = `<body>`, overlayRect 1237×1222 (full skärm), dialog
+centrerad/synlig (desktop) och bottom-sheet (mobil 390px, top 590 = bottom 844), `elementFromPoint`
+på dialogens mitt träffar dialogen (ligger överst). **Varför portal och inte att flytta gear-knappen
+ut ur headern:** kugghjulet HÖR hemma i headern; portalen är den robusta lösningen som låter
+triggern bo var som helst. `TeamProfilePanel`/`OnboardingDialog` "fungerade" bara för att de råkar
+renderas utanför en sådan ancestor (inuti `<main>` resp. på rot-nivå), inte tack vare ett topplager.
+Spårbart: #54 + denna rad + `SettingsControl.tsx` (createPortal) + nytt regressionstest
+(overlayn är ett direkt barn av `document.body`).
+
+---
+
 ## 2026-06-10 , T30 (#50): Play Protect-varningen vid Android-install, rotorsak + vad vi kan/inte kan göra
 
 **Symptom (Daniels skärmdump):** Vid installation av PWA:n på Android visar Google Play Protect

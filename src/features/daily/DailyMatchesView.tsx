@@ -17,14 +17,30 @@
 // se group-matches-by-day.ts (off-by-one-skyddet).
 
 import { useMemo } from 'react';
-import type { Team } from '../../domain/types';
+import type { Match, Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { useDailyMatches } from './use-daily-matches';
 import { useDayTheme } from './use-day-theme';
+import { useTodayKey } from './use-today-key';
+import { localDateKey } from './group-matches-by-day';
 import { MatchCard } from './MatchCard';
-import { formatDayHeading, formatDayShort } from './format-datetime';
+import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
 import { stageLabel, teamDisplayName } from './match-display';
+
+/**
+ * Etiketten ovanför hero:ns framträdande match: "Dagens match" BARA när matchen
+ * faktiskt spelas idag (svensk kalenderdag), annars matchens dag ("torsdag 11
+ * juni"), versaliserad av CSS. T32 (#54, fynd 3): turneringen kan ligga dagar bort
+ * (premiär 11 juni), och då var "Dagens match" missvisande, matchen är inte idag.
+ *
+ * @param match    Den framträdande matchen (kickoff i UTC).
+ * @param todayKey Dagens svenska kalenderdag-nyckel (YYYY-MM-DD) från useTodayKey.
+ */
+function featuredMatchLabel(match: Match, todayKey: string): string {
+  const matchDayKey = localDateKey(match.kickoff);
+  return matchDayKey === todayKey ? 'Dagens match' : formatDayHeadingNoYear(matchDayKey);
+}
 
 /** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista). */
 function indexTeams(teams: readonly Team[]): Map<string, Team> {
@@ -137,6 +153,9 @@ export function DailyMatchesView() {
     goNext,
   } = useDailyMatches();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
+  // Dagens svenska kalenderdag (dag-medvetet: flyttar sig över midnatt/PWA-väckning,
+  // se use-today-key). Driver hero-etiketten "Dagens match" vs matchens datum (#54).
+  const { todayKey } = useTodayKey();
 
   // Dynamiskt DAGS-TEMA (T8): härled en subtil, deterministisk accent-hue ur den
   // valda dagens lag och lägg den som en CSS-variabel + stabilt data-attribut på
@@ -255,14 +274,30 @@ export function DailyMatchesView() {
                   <Countdown countdown={countdown} teamsById={teamsById} />
                 </div>
 
-                {matchOfTheDay ? (
-                  <div className="flex flex-col gap-2 lg:max-w-sm lg:flex-1">
-                    <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
-                      Dagens match
-                    </p>
-                    <MatchCard match={matchOfTheDay} teamsById={teamsById} highlight />
-                  </div>
-                ) : null}
+                {matchOfTheDay
+                  ? (() => {
+                      // EN etikett, DELAD av hero-rubriken OCH kortets highlight-chip,
+                      // så de aldrig säger olika saker (datum ovanför men "Dagens match"
+                      // i chippet). "Dagens match" bara när matchen spelas IDAG; annars
+                      // matchens dag ("TORSDAG 11 JUNI", versaliserat av uppercase-
+                      // klassen), så etiketten aldrig ljuger när turneringen ligger
+                      // dagar bort (#54, fynd 3 + C3).
+                      const heroLabel = featuredMatchLabel(matchOfTheDay, todayKey);
+                      return (
+                        <div className="flex flex-col gap-2 lg:max-w-sm lg:flex-1">
+                          <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
+                            {heroLabel}
+                          </p>
+                          <MatchCard
+                            match={matchOfTheDay}
+                            teamsById={teamsById}
+                            highlight
+                            highlightLabel={heroLabel}
+                          />
+                        </div>
+                      );
+                    })()
+                  : null}
               </div>
             </div>
           </Slide>
