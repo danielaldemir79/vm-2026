@@ -40,13 +40,29 @@ describe('InstallBanner', () => {
     expect(screen.getByRole('button', { name: 'Installera' })).toBeInTheDocument();
   });
 
-  it('visar den ärliga Play Protect-noten i Android-prompt-läget (T30)', () => {
+  it('visar den ärliga Play Protect-noten i Android-prompt-läget (T30, C4)', () => {
+    // Play Protect-noten är Android-specifik, så testet måste köra Android-UA
+    // (annars verifierar det inte gaten, default-UA i beforeEach är desktop).
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 Chrome/120 Mobile'
+    );
     render(<InstallBanner />);
     fireBeforeInstallPrompt();
     const note = document.querySelector('[data-install-play-protect-note]');
     expect(note).toBeInTheDocument();
     expect(note).toHaveTextContent(/Play Protect/);
     expect(note).toHaveTextContent(/installera ändå/i);
+  });
+
+  it('visar INTE Play Protect-noten på desktop-Chrome-prompt (Android-specifik, C4)', () => {
+    // beforeEach sätter en desktop-UA (X11; Linux). Desktop-Chrome fyrar samma
+    // beforeinstallprompt-event som Android, men noten ska inte visas där, den
+    // gäller bara Androids WebAPK-mintning.
+    render(<InstallBanner />);
+    fireBeforeInstallPrompt();
+    // Install-knappen finns (prompt-läget aktivt), men noten är gate:ad bort.
+    expect(screen.getByRole('button', { name: 'Installera' })).toBeInTheDocument();
+    expect(document.querySelector('[data-install-play-protect-note]')).not.toBeInTheDocument();
   });
 
   it('klick på Installera triggar webbläsarens prompt', () => {
