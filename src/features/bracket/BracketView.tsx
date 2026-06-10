@@ -17,7 +17,7 @@
 // linjer, vinnar-animation och dags-tema. Strukturen är gjord lätt att styla:
 // stabila roller + data-attribut, inga inbakade statusfärger (T7-pin).
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { Team } from '../../domain/types';
 import { Fade } from '../../motion';
 import { teamDisplayName } from '../daily/match-display';
@@ -198,7 +198,7 @@ function RoundColumn({
   label: string;
   matchCount: number;
   stage: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const step = ROUND_STEP[stage] ?? 0;
   const isFinal = stage === 'final';
