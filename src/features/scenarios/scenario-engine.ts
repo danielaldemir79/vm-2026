@@ -381,8 +381,9 @@ interface Aggregate {
   couldBeTop2Somewhere: boolean;
   /**
    * Kan laget MÖJLIGEN nå minst rank 3 i NÅGOT utfall (POÄNG-konservativt, med
-   * gynnsam marginal)? Skild från reachesThird (neutral marginal): denna driver
-   * 'eliminated'-grinden så ett lag aldrig falskt klassas ute pga vald marginal.
+   * gynnsam marginal)? Skild från den neutral-marginal-rank tabellen visar:
+   * denna driver 'eliminated'-grinden så ett lag aldrig falskt klassas ute pga
+   * vald marginal.
    */
   couldBeThirdSomewhere: boolean;
   /** Minst ett utfall där MÅLSKILLNAD avgör topp-2 för laget. */
@@ -698,9 +699,9 @@ function statusFromAggregate(agg: Aggregate): AdvancementStatus {
   }
   // Ute BARA om laget aldrig kan nå topp-2 OCH inte ens kan sluta trea med
   // någon målskillnad (couldBeThirdSomewhere, POÄNG-konservativt). Vi använder
-  // INTE reachesThird (neutral marginal) här: det vore för optimistiskt åt fel
-  // håll och kunde falskt klassa ett lag ute. Konservativ riktning = hellre
-  // "beror på" än ett falskt "ute".
+  // INTE den neutral-marginal-rank tabellen visar här: den vore för optimistisk
+  // åt fel håll och kunde falskt klassa ett lag ute. Konservativ riktning =
+  // hellre "beror på" än ett falskt "ute".
   if (agg.secureOutEverywhere && !agg.couldBeThirdSomewhere) {
     return 'eliminated';
   }
