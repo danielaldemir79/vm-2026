@@ -5,6 +5,20 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T11 (issue #11): Copilot C1, åskådar-lag i "Vad krävs" får ärlig text, aldrig falskt "måste vinna"
+
+**Beslut (villkorstexten ljuger aldrig om eget agentskap):** i scenario-fasen kan ett lag ha spelat
+ALLA sina egna matcher medan bara andra lags match återstår (åskådare, t.ex. en grupp där bara A3-A4
+är kvar, eller en ofullständig matchlista). Då kan laget varken vinna eller spela oavgjort sig vidare.
+Tidigare föll ett sådant lag i `buildCondition`-grenens else och fick "Måste vinna och hoppas på andra
+matcher" = objektivt fel. Fix: `hasOwnRemaining(teamId, remaining)` gatar FÖRST i grenen och ger
+åskådar-texten "Kan inte påverka själv, avgörs av övriga matcher i gruppen.". KLASSNINGEN (qualified/
+eliminated/depends) var redan konservativt korrekt via enumerationen, det var bara TEXTEN som ljög;
+fixen rör därför ingen domänregel, bara den svenska formuleringen (`scenario-engine.ts`). Riktad:
+ett lag som FAKTISKT spelar i sista matchen behåller sitt egna krav-villkor (testat, båda riktningarna).
+
+---
+
 ## 2026-06-10 , T11 (issue #11, design-frontend): premium-finish på "Vad krävs", FÄRG-OBEROENDE status-chips + AA UPPMÄTT i båda teman
 
 **Beslut (visuellt lager, rör ALDRIG semantiken):** Premium-finishen byggs ENBART ovanpå senior-devs

@@ -498,6 +498,17 @@ function ownOutcomeToMatchOutcome(
 }
 
 /**
+ * Har laget någon EGEN återstående match (är det självt med och spelar i sista
+ * omgången)? Falskt = laget är ÅSKÅDARE: alla dess matcher är spelade och bara
+ * andra lags matcher återstår (t.ex. en grupp där en match mellan två ANDRA lag
+ * är kvar, eller en ofullständig matchlista). Då kan laget inte "vinna" eller
+ * "spela oavgjort" något, och villkorstexten får aldrig påstå det (Copilot C1).
+ */
+function hasOwnRemaining(teamId: string, remaining: readonly RemainingMatch[]): boolean {
+  return remaining.some((rem) => rem.homeTeamId === teamId || rem.awayTeamId === teamId);
+}
+
+/**
  * Bygg den svenska villkorstexten utifrån det aggregerade läget + vad lagets
  * egna resultat garanterar. Hålls kort och ärlig: vi lovar bara det vi bevisat
  * (konservativt), och pekar ut målskillnads-/andra-gruppers-beroendet explicit.
@@ -519,23 +530,39 @@ function buildCondition(
     return 'Kan inte längre nå topp-2, men kan sluta trea, om det räcker beror på de andra grupperna.';
   }
 
-  // Laget KAN nå topp-2 men inte garanterat: hitta det enklaste egna kravet.
-  const winGuarantees = ownResultGuarantees(teamId, 'win', teamIds, playedGroupMatches, remaining);
-  const drawGuarantees = ownResultGuarantees(
-    teamId,
-    'draw',
-    teamIds,
-    playedGroupMatches,
-    remaining
-  );
-
+  // Laget KAN nå topp-2 men inte garanterat. ÅSKÅDAR-FALLET FÖRST (Copilot C1):
+  // har laget INGEN egen återstående match är det färdigspelat och bara andra
+  // lags matcher återstår. Då kan det varken "vinna" eller "spela oavgjort" sig
+  // vidare, så ett vinst-/oavgjort-/"måste vinna"-villkor vore objektivt fel.
+  // Statusen (qualified/eliminated/depends) är redan konservativt korrekt via
+  // enumerationen, det är bara TEXTEN som annars skulle ljuga: vi gör den ärlig.
   const parts: string[] = [];
-  if (drawGuarantees) {
-    parts.push('Oavgjort räcker för topp-2.');
-  } else if (winGuarantees) {
-    parts.push('Vinst räcker för topp-2.');
+  if (!hasOwnRemaining(teamId, remaining)) {
+    parts.push('Kan inte påverka själv, avgörs av övriga matcher i gruppen.');
   } else {
-    parts.push('Måste vinna och hoppas på andra matcher för topp-2.');
+    // Laget spelar självt: hitta det enklaste egna kravet (vinst/oavgjort) som
+    // garanterar topp-2 oavsett hur övriga matcher går.
+    const winGuarantees = ownResultGuarantees(
+      teamId,
+      'win',
+      teamIds,
+      playedGroupMatches,
+      remaining
+    );
+    const drawGuarantees = ownResultGuarantees(
+      teamId,
+      'draw',
+      teamIds,
+      playedGroupMatches,
+      remaining
+    );
+    if (drawGuarantees) {
+      parts.push('Oavgjort räcker för topp-2.');
+    } else if (winGuarantees) {
+      parts.push('Vinst räcker för topp-2.');
+    } else {
+      parts.push('Måste vinna och hoppas på andra matcher för topp-2.');
+    }
   }
 
   if (agg.marginDependent) {

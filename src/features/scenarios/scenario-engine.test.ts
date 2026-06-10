@@ -295,6 +295,53 @@ describe('villkorstext: vinst/oavgjort räcker, ärligt formulerat', () => {
   });
 });
 
+describe('åskådar-lag (Copilot C1): inget eget kvar -> ärlig text, aldrig "måste vinna"', () => {
+  it('ett lag utan EGEN återstående match (bara andra lags match kvar) får åskådar-text', () => {
+    // A1 har spelat ALLA sina tre matcher (mot A2/A3/A4) och är därmed åskådare:
+    // bara A3-A4 återstår, en match A1 inte är med i. A1 ligger på 4 p och är
+    // varken säkert klart (kan knuffas ur topp-2 beroende på A3-A4) eller säkert
+    // ute, alltså 'depends'. Före fixen föll A1 i else-grenen och fick "Måste
+    // vinna..." = objektivt fel (A1 kan inte vinna något, det är ju utspelat).
+    const matches: Match[] = [
+      fin('m1', 'A1', 'A2', 1, 0), // A1 +3
+      fin('m2', 'A1', 'A3', 0, 1), // A1 +0, A3 +3
+      fin('m3', 'A1', 'A4', 1, 1), // A1 +1 -> A1: 4 p (FÄRDIGSPELAD, åskådare)
+      fin('m4', 'A2', 'A3', 0, 0), // A2 +1, A3 +1 -> A3: 4
+      fin('m5', 'A2', 'A4', 1, 0), // A2 +3 -> A2: 4
+      sched('m6', 'A3', 'A4'), // enda återstående: A1 är INTE med
+    ];
+    const s = computeGroupScenario(TEAMS, matches, GROUP);
+    expect(s.phase).toBe('scenarios');
+    const a1 = teamOf(s.teams, 'A1');
+    // A1 är i scenario-fasen och 'depends' (det är just den gren där buggen låg).
+    expect(a1.status).toBe('depends');
+    // Texten är ärlig: A1 kan inte påverka själv, det avgörs av övriga matcher.
+    expect(a1.condition).toMatch(/kan inte påverka själv/i);
+    // Och ljuger ALDRIG om att A1 ska vinna/spela oavgjort något (det är utspelat).
+    expect(a1.condition).not.toMatch(/måste vinna/i);
+    expect(a1.condition).not.toMatch(/vinst räcker/i);
+    expect(a1.condition).not.toMatch(/oavgjort räcker/i);
+  });
+
+  it('ett lag som FAKTISKT spelar i sista matchen behåller sitt egna krav-villkor', () => {
+    // Kontroll att fixen är riktad: A4 spelar i den återstående A3-A4-matchen och
+    // ska därför fortfarande få ett eget krav ("måste vinna ..."), inte åskådar-
+    // texten, så vi inte tystar lag som faktiskt kan påverka sitt öde.
+    const matches: Match[] = [
+      fin('m1', 'A1', 'A2', 1, 0),
+      fin('m2', 'A1', 'A3', 0, 1),
+      fin('m3', 'A1', 'A4', 1, 1),
+      fin('m4', 'A2', 'A3', 0, 0),
+      fin('m5', 'A2', 'A4', 1, 0),
+      sched('m6', 'A3', 'A4'),
+    ];
+    const s = computeGroupScenario(TEAMS, matches, GROUP);
+    const a4 = teamOf(s.teams, 'A4'); // sist, men spelar i sista matchen
+    expect(a4.condition).not.toMatch(/kan inte påverka själv/i);
+    expect(a4.condition).toMatch(/måste vinna/i);
+  });
+});
+
 describe('enumerations-gränsen: tröskel-garantin randtestad n-1 / n / n+1 (fail loud)', () => {
   // Garantin (MAX_REMAINING_MATCHES) bor i motorn (assertEnumerable) och randtestas
   // DIREKT, per lessons "uttommande-test-vaktar-svagare-invariant" (Förekomst 3:
