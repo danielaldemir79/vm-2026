@@ -5,6 +5,28 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T10 (issue #10, Copilot C3/C4): profil-oberoende lag-bas bryter bootstrap-cykeln
+
+**Beslut:** Den RÅ lag-/grupp-datan (id/namn/kod/grupp + WC2026_GROUPS + WC2026_TEAM_REFS) flyttades
+till en egen modul `src/data/wc2026/team-refs.ts` som ALDRIG importerar `team-profiles.ts`. `teams.ts`
+importerar bas-listan därifrån och gör BARA profil-berikningen (enrichWithProfile). Profil-generatorn
+(`scripts/generate-team-profiles.ts`) och källankrings-testet (`team-profiles-source.test.ts`)
+konsumerar `WC2026_TEAM_REFS` DIREKT ur `team-refs.ts`, inte ur `teams.ts`. `teams.ts` återexporterar
+`WC2026_GROUPS`/`WC2026_TEAM_REFS` så den publika data-ytan är oförändrad för alla andra konsumenter.
+
+**Varför (det cirkulära bootstrap-beroendet, Copilot C3/C4):** Generatorn/testet läste tidigare
+`WC2026_TEAMS`, men den listan berikas på modul-toppnivå med den GENERERADE `team-profiles.ts`. Att
+importera `teams.ts` exekverar alltså berikningen, så om den genererade filen saknas eller är trasig
+(exakt det läge man vill kunna REGENERERA ur) kraschar import:en med `TypeError: Cannot read
+properties of undefined` FÖRE generatorn kört. Låset gav då ett import-fel i stället för det avsedda
+diff-felet och filen kunde inte återskapas (moment 22). En profil-oberoende bas-modul bryter cykeln.
+
+**Verifierat (negativ kontroll):** Tömde `team-profiles.ts` -> `npm run gen:team-profiles` lyckas
+ändå och återskapar filen VÄRDE-IDENTISK med originalet (48 profiler, 9387 byte). Med den gamla koden
+kraschade samma kontroll på `reading 'mex'` vid import. Build/test/lint/format gröna.
+
+---
+
 ## 2026-06-10 , T10 (issue #10): lag-profil-modalen, premium-finish (design-frontend)
 
 **Beslut (visuellt lager ovanpå senior-devs funktionella dialog):** Lag-profil-modalen fick en
