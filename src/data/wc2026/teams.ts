@@ -20,6 +20,11 @@
 // sändningsrätts-källa och är medvetet flaggad som en egen data-punkt (se T4
 // handoff Findings) i stället för att gissas.
 //
+// RÅ-DATAN (lag + grupper, FÖRE profil-berikning) bor i team-refs.ts, en
+// PROFIL-OBEROENDE modul. Den här filen BERIKAR de lagen med profil-fälten.
+// Varför den uppdelningen: se preambeln i team-refs.ts (bryter ett cirkulärt
+// bootstrap-beroende så profil-generatorn kan köra även utan team-profiles.ts).
+//
 // LAG-PROFIL-FÄLTEN (T10): fifaRanking, starPlayers och trivia fylls nu ur den
 // KÄLLÅNKRADE profil-tabellen (team-profiles.ts, genererad ur team-profiles-source.txt
 // och värde-låst i CI). De vävs in nedan (enrichWithProfile), så Team-objekten bär
@@ -28,97 +33,13 @@
 // profil-tabellen och lag-listan fail-loud:ar redan vid byggtid (buildProfileTable),
 // en sanning.
 
-import type { Group, GroupId, Team } from '../../domain/types';
-import { GROUP_IDS } from '../../domain/types';
+import type { Team } from '../../domain/types';
+import { WC2026_TEAM_BASES, type TeamBase } from './team-refs';
 import { WC2026_TEAM_PROFILES } from './team-profiles';
 
-/**
- * De 48 lagen, grupperade A-L i lottnings-positionsordning (position 1-4).
- * Definieras grupp för grupp för läsbarhet; den platta listan byggs nedan.
- */
-const TEAMS_BY_GROUP: Record<GroupId, ReadonlyArray<{ name: string; code: string }>> = {
-  // Grupp A: värdnation Mexiko på A1 (förbestämd).
-  A: [
-    { name: 'Mexiko', code: 'MEX' },
-    { name: 'Sydafrika', code: 'RSA' },
-    { name: 'Sydkorea', code: 'KOR' },
-    { name: 'Tjeckien', code: 'CZE' },
-  ],
-  // Grupp B: värdnation Kanada på B1 (förbestämd).
-  B: [
-    { name: 'Kanada', code: 'CAN' },
-    { name: 'Bosnien och Hercegovina', code: 'BIH' },
-    { name: 'Qatar', code: 'QAT' },
-    { name: 'Schweiz', code: 'SUI' },
-  ],
-  C: [
-    { name: 'Brasilien', code: 'BRA' },
-    { name: 'Marocko', code: 'MAR' },
-    { name: 'Haiti', code: 'HAI' },
-    { name: 'Skottland', code: 'SCO' },
-  ],
-  // Grupp D: värdnation USA på D1 (förbestämd).
-  D: [
-    { name: 'USA', code: 'USA' },
-    { name: 'Paraguay', code: 'PAR' },
-    { name: 'Australien', code: 'AUS' },
-    { name: 'Turkiet', code: 'TUR' },
-  ],
-  E: [
-    { name: 'Tyskland', code: 'GER' },
-    { name: 'Curaçao', code: 'CUW' },
-    { name: 'Elfenbenskusten', code: 'CIV' },
-    { name: 'Ecuador', code: 'ECU' },
-  ],
-  // Grupp F: Sverige (vann playoff mars 2026, SPEC §10:s öppna fråga avgjord).
-  F: [
-    { name: 'Nederländerna', code: 'NED' },
-    { name: 'Japan', code: 'JPN' },
-    { name: 'Sverige', code: 'SWE' },
-    { name: 'Tunisien', code: 'TUN' },
-  ],
-  G: [
-    { name: 'Belgien', code: 'BEL' },
-    { name: 'Egypten', code: 'EGY' },
-    { name: 'Iran', code: 'IRN' },
-    { name: 'Nya Zeeland', code: 'NZL' },
-  ],
-  H: [
-    { name: 'Spanien', code: 'ESP' },
-    { name: 'Kap Verde', code: 'CPV' },
-    { name: 'Saudiarabien', code: 'KSA' },
-    { name: 'Uruguay', code: 'URU' },
-  ],
-  I: [
-    { name: 'Frankrike', code: 'FRA' },
-    { name: 'Senegal', code: 'SEN' },
-    { name: 'Irak', code: 'IRQ' },
-    { name: 'Norge', code: 'NOR' },
-  ],
-  J: [
-    { name: 'Argentina', code: 'ARG' },
-    { name: 'Algeriet', code: 'ALG' },
-    { name: 'Österrike', code: 'AUT' },
-    { name: 'Jordanien', code: 'JOR' },
-  ],
-  K: [
-    { name: 'Portugal', code: 'POR' },
-    { name: 'DR Kongo', code: 'COD' },
-    { name: 'Uzbekistan', code: 'UZB' },
-    { name: 'Colombia', code: 'COL' },
-  ],
-  L: [
-    { name: 'England', code: 'ENG' },
-    { name: 'Kroatien', code: 'CRO' },
-    { name: 'Ghana', code: 'GHA' },
-    { name: 'Panama', code: 'PAN' },
-  ],
-};
-
-/** Stabilt internt lag-id: gemen landskod (t.ex. "swe"), oberoende av visningsnamn. */
-function teamId(code: string): string {
-  return code.toLowerCase();
-}
+// Grupper + de profil-oberoende referenserna är samma sanning som lagen och
+// återexporteras härifrån, så konsumenter har EN data-yta (teams.ts) oförändrad.
+export { WC2026_GROUPS, WC2026_TEAM_REFS } from './team-refs';
 
 /**
  * Väv in den källånkrade profil-datan (FIFA-ranking, stjärnspelare, kuriosa) på
@@ -129,7 +50,7 @@ function teamId(code: string): string {
  * också: ett känt lag utan profil är ett internt fel (fail loud, PRINCIPLES §8),
  * inte ett tyst tomt fält. bestPlay sätts ALDRIG (utelämnat med flit, decisions.md T10).
  */
-function enrichWithProfile(base: Team): Team {
+function enrichWithProfile(base: TeamBase): Team {
   const profile = WC2026_TEAM_PROFILES[base.id];
   if (profile === undefined) {
     throw new Error(
@@ -145,36 +66,9 @@ function enrichWithProfile(base: Team): Team {
 }
 
 /**
- * Alla 48 lag som en platt, typad lista. Lag-id härleds ur landskoden (stabil
- * nyckel som matcher/tabeller refererar, SPEC §6). group sätts ur indelningen
- * ovan så Team.group och Group.teamIds garanterat stämmer överens (en sanning).
- * Profil-fälten (T10) vävs in ur den källånkrade profil-tabellen (enrichWithProfile).
- *
- * Gruppordningen härleds EXPLICIT ur den kanoniska `GROUP_IDS` (A-L, enda
- * sanningen för iteration, se domain/types.ts), inte ur `Object.keys`. Object-
- * nyckelordning RÅKAR vara insättningsordning men är ett implicit beroende, här
- * krävs uttrycklig grupp-ordning A-L oavsett hur objektet råkar ligga.
+ * Alla 48 lag som en platt, typad lista i A-L-ordning. Bas-lagen (id/namn/kod/grupp)
+ * kommer ur den profil-oberoende WC2026_TEAM_BASES (team-refs.ts); här berikas de
+ * med profil-fälten (T10) ur den källånkrade profil-tabellen (enrichWithProfile).
+ * Lag-id härleds ur landskoden (stabil nyckel som matcher/tabeller refererar, SPEC §6).
  */
-export const WC2026_TEAMS: Team[] = GROUP_IDS.flatMap((group) =>
-  TEAMS_BY_GROUP[group].map(
-    (t): Team =>
-      enrichWithProfile({
-        id: teamId(t.code),
-        name: t.name,
-        code: t.code,
-        group,
-      })
-  )
-);
-
-/**
- * De 12 grupperna med sina lag-id i lottnings-positionsordning (position 1-4).
- * Refererar Team.id, inte inbäddade objekt (en sanning per lag, SPEC §6).
- * Grupp-ordningen härleds explicit ur `GROUP_IDS` (A-L), inte objekt-nyckelordning.
- */
-export const WC2026_GROUPS: Group[] = GROUP_IDS.map(
-  (group): Group => ({
-    id: group,
-    teamIds: TEAMS_BY_GROUP[group].map((t) => teamId(t.code)),
-  })
-);
+export const WC2026_TEAMS: Team[] = WC2026_TEAM_BASES.map(enrichWithProfile);

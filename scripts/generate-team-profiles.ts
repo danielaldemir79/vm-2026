@@ -25,17 +25,24 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { buildProfilesFile, type TeamRef } from '../src/data/wc2026/team-profiles-parser.ts';
-import { WC2026_TEAMS } from '../src/data/wc2026/teams.ts';
+import { buildProfilesFile } from '../src/data/wc2026/team-profiles-parser.ts';
+// PROFIL-OBEROENDE bas-lista: importeras direkt ur team-refs.ts, INTE teams.ts.
+// teams.ts berikar lagen med team-profiles.ts vid modul-toppnivå; importeras den
+// hit kraschar import:en om team-profiles.ts saknas/är trasig , exakt det läge
+// generatorn ska kunna laga. team-refs.ts rör aldrig profilerna, så cykeln bryts.
+import { WC2026_TEAM_REFS } from '../src/data/wc2026/team-refs.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const wc2026Dir = join(here, '..', 'src', 'data', 'wc2026');
 const srcPath = process.argv[2] ?? join(wc2026Dir, 'team-profiles-source.txt');
 const outPath = join(wc2026Dir, 'team-profiles.ts');
 
-// Lag-listan kommer ur teams.ts (en sanning för lagen + A-L-ordningen); parsern
-// dubblerar den inte. Vi skickar bara den minimala TeamRef-formen vidare.
-const teams: TeamRef[] = WC2026_TEAMS.map((t) => ({ id: t.id, code: t.code, group: t.group }));
+// Lag-listan kommer ur team-refs.ts bas-export (WC2026_TEAM_REFS): id/kod/grupp
+// FÖRE profil-berikning. Avsiktligt INTE WC2026_TEAMS (teams.ts), som berikas med
+// den GENERERADE team-profiles.ts , det vore ett cirkulärt bootstrap-beroende
+// (generatorn kunde inte köra om utdatafilen saknades/var trasig). Bas-listan låter
+// generatorn alltid återskapa team-profiles.ts från noll. Parsern dubblerar inte lagen.
+const teams = WC2026_TEAM_REFS;
 
 let fileContent: string;
 try {

@@ -16,6 +16,9 @@ import {
 } from './team-profiles-parser';
 import { WC2026_TEAM_PROFILES } from './team-profiles';
 import { WC2026_TEAMS } from './teams';
+// Bas-listan importeras ur den PROFIL-OBEROENDE team-refs.ts (samma källa
+// generatorn använder), inte ur teams.ts, så testet speglar generatorns bootstrap.
+import { WC2026_TEAM_REFS } from './team-refs';
 
 // ============================================================================
 // KÄLLÅNKRING av VM 2026:s lag-profiler (T10, #10, SPEC §6).
@@ -32,8 +35,12 @@ import { WC2026_TEAMS } from './teams';
 //      trivia) ur tabellen, och bestPlay förblir UTELÄMNAD (decisions.md T10).
 // ============================================================================
 
-/** Lag-listan i teams.ts-ordning (A-L), den minimala formen parsern behöver. */
-const teamRefs: TeamRef[] = WC2026_TEAMS.map((t) => ({ id: t.id, code: t.code, group: t.group }));
+// Lag-listan parsern/generatorn behöver: teams.ts PROFIL-OBEROENDE bas-export
+// (id/kod/grupp, A-L-ordning). Avsiktligt INTE härledd ur WC2026_TEAMS, som
+// berikas med den GENERERADE team-profiles.ts , det vore samma cirkulära
+// bootstrap-beroende generatorn nu undviker (källankrings-testet ska kunna
+// regenerera profilerna även om team-profiles.ts saknas/är trasig).
+const teamRefs: readonly TeamRef[] = WC2026_TEAM_REFS;
 
 /**
  * Radslut-normalisering före jämförelse. Den committade .ts:en kan vara CRLF på
