@@ -5,7 +5,16 @@
 // ELLER hoppats över (en localStorage-flagga). Korta steg som introducerar de fyra
 // hörnen av appen, så en vän som öppnar den delade länken förstår vad den gör.
 
-/** Ett steg i touren: en rubrik + en kort förklaring. */
+/**
+ * Vilken dekorativa CSS-illustration ett steg visar i hero-strippen. En sluten
+ * union så OnboardingArt kan uttömmande matcha varje variant (ingen default-gren
+ * som tyst sväljer en ny art-typ). Sammanfaller med `id` idag men hålls som ett
+ * EGET fält: art är ett presentations-val (vilken bild), id är stegets identitet
+ * (React-key/test), och de ska kunna divergera utan att bryta det ena.
+ */
+export type OnboardingArt = 'live' | 'results' | 'whatif' | 'install';
+
+/** Ett steg i touren: en rubrik + en kort förklaring + dess dekor-illustration. */
 export interface OnboardingStep {
   /** Stabil nyckel (för React-key + ev. test). */
   id: string;
@@ -13,6 +22,8 @@ export interface OnboardingStep {
   title: string;
   /** Förklaring (en till två meningar). */
   body: string;
+  /** Vilken dekorativa CSS-illustration hero-strippen visar för steget. */
+  art: OnboardingArt;
 }
 
 /**
@@ -24,21 +35,25 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
     id: 'live',
     title: 'Allt lever',
     body: 'Tabeller och slutspelsträd uppdateras direkt när resultat matas in. Följ VM:t i realtid, tillsammans.',
+    art: 'live',
   },
   {
     id: 'results',
     title: 'Mata in resultat',
     body: 'Skriv in mål för spelade matcher. Grupptabellerna och trädet räknas om på en gång.',
+    art: 'results',
   },
   {
     id: 'whatif',
     title: 'Lek med vad-händer-om',
     body: 'Slå på simuleringsläget och spela ut tänkta resultat utan att röra de riktiga. Se hur tabellen och trädet skulle ändras.',
+    art: 'whatif',
   },
   {
     id: 'install',
     title: 'Installera på hemskärmen',
     body: 'Lägg till appen på hemskärmen för helskärm och snabb åtkomst. Den fungerar även utan nät.',
+    art: 'install',
   },
 ] as const;
 

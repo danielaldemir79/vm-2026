@@ -11,9 +11,10 @@
 // komponent renderar bara och anropar tillbaka.
 
 import { useCallback, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { springs, transitions } from '../../motion';
 import { ONBOARDING_STEPS, ONBOARDING_STEP_COUNT } from './onboarding';
+import { OnboardingArt } from './OnboardingArt';
 import { useOnboarding } from './use-onboarding';
 
 export function OnboardingDialog() {
@@ -110,19 +111,47 @@ export function OnboardingDialog() {
         initial={panelInitial}
         animate={panelAnimate}
         transition={motionEnabled ? springs.gentle : transitions.quick}
-        className="relative flex w-full max-w-md flex-col gap-5 rounded-t-card border border-border bg-surface p-6 shadow-[var(--vm-shadow-raised)] sm:rounded-card sm:p-7"
+        className="relative flex w-full max-w-md flex-col gap-5 overflow-hidden rounded-t-card border border-border bg-surface p-6 shadow-[var(--vm-shadow-raised)] sm:rounded-card sm:p-7"
       >
-        <header className="flex flex-col gap-2">
-          <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-            Välkommen till VM 2026
-          </p>
-          <h2 id={headingId} className="font-display text-2xl font-bold sm:text-3xl">
-            {step.title}
-          </h2>
-          <p id={bodyId} className="text-sm leading-relaxed text-fg-muted">
-            {step.body}
-          </p>
-        </header>
+        {/* HERO-STRIP + TEXTBLOCK byter innehåll PER STEG med en mjuk cross-fade
+            (AnimatePresence). Bara opacitet + en liten y-glid rör sig, så ingen
+            layout hoppar (ingen CLS) och inget kräver tunga assets. Vid reducerad
+            rörelse hoppar bytet rakt (transitions.quick, ingen förskjutning), så
+            WCAG 2.3.3 respekteras. mode="wait" => det gamla steget tonar UT innan
+            det nya tonar IN, så de aldrig överlappar visuellt.
+
+            VARFÖR key på step.id: presence-bytet ska ske när STEGET byts, inte vid
+            varje render. Eyebrow:n ("Välkommen till VM 2026") ligger MED i blocket
+            (den är samma text varje steg, men får tona med så hela textpelaren
+            byts som en enhet, i stället för att eyebrow:n står still medan resten
+            glider, vilket skulle se hackigt ut). */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={step.id}
+            data-onboarding-step-content={step.id}
+            initial={motionEnabled ? { opacity: 0, y: 8 } : { opacity: 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={motionEnabled ? { opacity: 0, y: -8 } : { opacity: 0 }}
+            transition={transitions.quick}
+            className="flex flex-col gap-5"
+          >
+            {/* Dekorativ hero-strip: "arena i kvällsljus" + stegets CSS-illustration.
+                aria-hidden i sin helhet (bär ingen läsbar text). */}
+            <OnboardingArt art={step.art} />
+
+            <header className="flex flex-col gap-2">
+              <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                Välkommen till VM 2026
+              </p>
+              <h2 id={headingId} className="font-display text-2xl font-bold sm:text-3xl">
+                {step.title}
+              </h2>
+              <p id={bodyId} className="text-sm leading-relaxed text-fg-muted">
+                {step.body}
+              </p>
+            </header>
+          </motion.div>
+        </AnimatePresence>
 
         {/* Steg-indikator: prickar som visar var i touren man är. aria-hidden,
             steg-status bärs av "Steg X av Y"-texten nedan för skärmläsare. */}
