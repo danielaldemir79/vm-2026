@@ -54,10 +54,23 @@ describe('MatchContextRow, kontext per kort (tid + grupp/runda)', () => {
     expect(stage).not.toHaveTextContent(/Grupp/);
   });
 
-  it('avdelar-pricken är aria-hidden (läses inte som en uppläst punkt)', () => {
+  it('läses rent som "21:00 Grupp A" (ingen uppläst skiljetecken-prick)', () => {
+    // Designen skiljer tid och steg visuellt via ett eget chip (rounded-pill) +
+    // en klock-ikon, INTE via en mellanliggande punkt. Så raden ska aldrig
+    // innehålla en avdelar-prick som en skärmläsare kan läsa som "punkt".
     render(<MatchContextRow match={groupMatch()} />);
-    // Raden läses som "21:00 Grupp A", inte "21:00 punkt Grupp A".
-    const dot = screen.getByText('·', { selector: '[aria-hidden="true"]' });
-    expect(dot).toBeInTheDocument();
+    expect(screen.queryByText('·')).not.toBeInTheDocument();
+  });
+
+  it('klock-ikonen och steg-chipet är dekorativa/AA-säkra (a11y)', () => {
+    const { container } = render(<MatchContextRow match={groupMatch()} />);
+    // Klock-ikonen är ren affordans: aria-hidden, så tiden inte dubbel-läses.
+    const icon = container.querySelector('[data-result-time] svg');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    // Steg-chipet bär sin text på fg-muted (AA som normal text i båda teman),
+    // tinten lever bara i bakgrund + kant. Vi verifierar bara strukturen här;
+    // de uppmätta kontrast-värdena ligger i decisions.md (canvas-komposit).
+    const stage = container.querySelector('[data-result-stage]');
+    expect(stage).toHaveClass('text-fg-muted');
   });
 });
