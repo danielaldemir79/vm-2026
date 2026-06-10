@@ -67,8 +67,19 @@ ordningens inbördes head-to-head (compute-standings steg 1), eftersom de tolv t
 olika grupper och ALDRIG mött varandra, det finns inget inbördes möte att räkna. Kriterium d (kort/
 disciplin) + e/f (FIFA-ranking) är inte deterministiskt beräkningsbara ur matchresultaten (samma
 avgränsning som compute-standings compareOverall), så vid exakt lika a-c används en stabil groupId-
-fallback, UTTRYCKLIGEN dokumenterad som EJ en FIFA-tiebreak. `qualifyingGroups` är null tills exakt 8
-treor finns, så ingen seedning sker på en gissning (fail-safe).
+fallback, UTTRYCKLIGEN dokumenterad som EJ en FIFA-tiebreak. `qualifyingGroups` är null tills HELA
+rangordningen är komplett (en trea per grupp, alla 12), inte bara tills 8 treor finns, så ingen
+seedning sker på en gissning (fail-safe). **Källhänvisad rättelse (2026-06-10, lokal panel F1 +
+lessons `uttommande-test-vaktar-svagare-invariant`, Förekomst 3):** texten sa tidigare "null tills
+exakt 8 treor", men koden gatade på `qualified.length === QUALIFYING_THIRDS` (= `slice(0,8).length
+=== 8`), sant för ALLA n >= 8 treor, inte bara n === 8 (probe-bevisat: 9/10/11 treor gav `['A'..'H']`,
+topp-8 av en DELMÄNGD, inte null). Den AVSEDDA semantiken är "vänta tills ALLA grupptreor är
+rangordnade": topp-8 av en ofullständig mängd är en gissning, en grupp som inte spelat färdigt kan ha
+en bättre trea och knuffa ut en av de provisoriska 8 (testat: n=12 där grupp L sist får bästa trean
+ändrar de kvalificerade). Villkoret uttrycker nu garantin direkt (`ranked.length === GROUPS_TOTAL`,
+`GROUPS_TOTAL = GROUP_IDS.length`) och randen 7/8/9/11/12 är testad. Live ofarligt redan förr (enda
+anroparen `deriveBracket` gatar bakom `isGroupStageComplete` = alla 12 färdiga = alltid 12 treor), men
+funktionen är publik och garantin bor nu i FUNKTIONEN, inte i callerns grind.
 **Källa:** Regulations for the FIFA World Cup 26 (May 2026), Article 13, sid. 27-28. Committat verbatim
 i `src/domain/bracket/fifa-knockout-rules-source.txt` (pdftotext-utdrag), så reviewern kan BEKRÄFTA
 regeln mot källan i stället för att jaga den.

@@ -119,17 +119,68 @@ describe('computeThirdPlaceRanking, de 8 bästa', () => {
     expect(qualified.map((t) => t.group)).not.toContain('I');
   });
 
-  it('qualifyingGroups är null tills exakt 8 treor finns (inte avgjort -> ingen gissning)', () => {
-    // Bara 5 grupper med en trea: under 8 -> null (seedThirdPlaces körs inte).
-    const partial = GROUP_IDS.slice(0, 5).map((g, i) => tableWithThird(g, 9 - i, 0, 3));
-    const { qualifyingGroups, qualified } = computeThirdPlaceRanking(partial);
-    expect(qualifyingGroups).toBeNull();
-    expect(qualified).toHaveLength(5);
-  });
-
   it('qualifyingGroups är de 8 unika grupperna som seedThirdPlaces kan ta emot', () => {
     const { qualifyingGroups } = computeThirdPlaceRanking(twelveTables());
     expect(qualifyingGroups).not.toBeNull();
     expect(new Set(qualifyingGroups!).size).toBe(8);
+  });
+});
+
+describe('computeThirdPlaceRanking, qualifyingGroups-RANDEN (null tills KOMPLETT rangordning)', () => {
+  // F1 (lokal panel + lessons "uttommande-test-vaktar-svagare-invariant"): garantin
+  // är "null tills ALLA 12 grupptreor finns rangordnade", INTE "minst 8". Det gamla
+  // villkoret `qualified.length === 8` (= `slice(0,8).length === 8`) är sant för ALLA
+  // n >= 8 och skulle seeda topp-8 av en ofullständig mängd. Vi testar därför HELA
+  // randen kring tröskeln (7, 8, 9, 11, 12), inte bara ett värde långt under (gamla
+  // n=5-testet rörde aldrig grenen 8-11 där den påstådda garantin faktiskt bröts).
+
+  /** n grupptabeller, var och en med en trea, distinkta poäng så ordningen är entydig. */
+  function nTables(n: number): GroupTable[] {
+    return GROUP_IDS.slice(0, n).map((g, i) => tableWithThird(g, 20 - i, 0, 3));
+  }
+
+  it('n=7 (under tröskeln): null, ingen seedning', () => {
+    const { qualifyingGroups, qualified } = computeThirdPlaceRanking(nTables(7));
+    expect(qualifyingGroups).toBeNull();
+    expect(qualified).toHaveLength(7); // alla 7 är (provisoriskt) inom topp-8
+  });
+
+  it('n=8 (exakt 8 treor men rangordningen ÄNNU INTE komplett): null', () => {
+    // Detta är raden gamla villkoret slog fel på: 8 treor -> det returnerade
+    // ['A'..'H'] fast 4 grupper ännu inte har en rangordnad trea. En av dem kan
+    // få en bättre trea och knuffa ut en av dessa 8. Sant svar: inte avgjort än.
+    const { qualifyingGroups, qualified } = computeThirdPlaceRanking(nTables(8));
+    expect(qualifyingGroups).toBeNull();
+    expect(qualified).toHaveLength(8);
+  });
+
+  it('n=9 (över 8, fortfarande ofullständig): null (gamla villkoret gav ["A".."H"])', () => {
+    const { qualifyingGroups } = computeThirdPlaceRanking(nTables(9));
+    expect(qualifyingGroups).toBeNull();
+  });
+
+  it('n=11 (en grupp kvar): fortfarande null, ingen gissning på den sista', () => {
+    const { qualifyingGroups } = computeThirdPlaceRanking(nTables(11));
+    expect(qualifyingGroups).toBeNull();
+  });
+
+  it('n=12 (KOMPLETT rangordning): non-null, exakt de 8 bästa grupperna sorterat', () => {
+    const { qualifyingGroups, qualified } = computeThirdPlaceRanking(nTables(12));
+    expect(qualifyingGroups).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+    expect(qualified).toHaveLength(8);
+  });
+
+  it('n=12 där en SEN grupp har den bästa trean ändrar vilka 8 som kvalificerar', () => {
+    // Bevisar VARFÖR vi väntar på alla 12: grupp L (sist) får den allra bästa trean
+    // och tränger ut den svagaste av de annars-kvalificerade. Hade vi seedat vid
+    // 11 grupper (utan L) vore L felaktigt utelämnad.
+    const tables = GROUP_IDS.map((g, i) =>
+      g === 'L' ? tableWithThird(g, 99, 9, 9) : tableWithThird(g, 20 - i, 0, 3)
+    );
+    const { qualifyingGroups } = computeThirdPlaceRanking(tables);
+    // L är nu bäst och inne; H (poäng 13, svagast av de tidigare 8) faller ut.
+    expect(qualifyingGroups).toContain('L');
+    expect(qualifyingGroups).not.toContain('H');
+    expect(qualifyingGroups).toHaveLength(8);
   });
 });
