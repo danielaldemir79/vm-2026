@@ -46,7 +46,8 @@ export function PredictionsView({ env, now }: PredictionsViewProps) {
   const predictable = useMemo(() => selectPredictableMatches(matches, evalNow), [matches, evalNow]);
 
   // Hur många KOMMANDE (icke-låsta) matcher finns att tippa? Driver en liten,
-  // motiverande räknare i rubriken ("3 matcher öppna att tippa"), så det känns
+  // motiverande räknare i rubriken ("3 matcher öppna att tippa", "1 match öppen
+  // att tippa" i singular, både substantiv och adjektiv böjs), så det känns
   // levande och kul. Låsta matcher räknas inte (de går inte att tippa längre).
   const openCount = useMemo(() => predictable.filter((p) => !p.locked).length, [predictable]);
 
@@ -79,7 +80,7 @@ export function PredictionsView({ env, now }: PredictionsViewProps) {
                 className="inline-block h-1.5 w-1.5 rounded-pill"
                 style={{ backgroundColor: 'var(--vm-gold)' }}
               />
-              {openCount} {openCount === 1 ? 'match' : 'matcher'} öppna att tippa
+              {openCount} {openCount === 1 ? 'match öppen' : 'matcher öppna'} att tippa
             </span>
           ) : null}
         </div>

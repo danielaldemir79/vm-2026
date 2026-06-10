@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { PredictionsProvider } from './PredictionsProvider';
 import { usePredictionsStore } from './predictions-context';
@@ -33,13 +34,21 @@ const env = {} as ImportMetaEnv;
 /** Liten sond som exponerar storen för assertions. */
 function Probe() {
   const store = usePredictionsStore();
+  // Fånga ett ev. kast från savePrediction och exponera det (som UI:t gör), så
+  // ett avvisat löfte inte blir ett obehandlat fel i testet utan en assertbar text.
+  const [saveError, setSaveError] = useState<string | null>(null);
   return (
     <div>
       <span data-testid="status">{store.status}</span>
       <span data-testid="enabled">{String(store.enabled)}</span>
       <span data-testid="count">{store.myPredictions.size}</span>
+      <span data-testid="save-error">{saveError ?? ''}</span>
       <button
-        onClick={() => store.savePrediction({ matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 })}
+        onClick={() =>
+          store
+            .savePrediction({ matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 })
+            .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'fel'))
+        }
       >
         save
       </button>
@@ -114,5 +123,25 @@ describe('PredictionsProvider', () => {
       </PredictionsProvider>
     );
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('error'));
+  });
+
+  it('FAIL LOUD (C5): savePrediction utan aktivt rum KASTAR (ingen tyst no-op)', async () => {
+    // Inget rum -> savePrediction har inget att spara till. Kontraktet säger
+    // "Kastar vid fel"; en tyst return hade gett ett falskt "Sparat". Verifiera att
+    // löftet avvisas och att upsert ALDRIG anropas (ingen halv-väg-skrivning).
+    render(
+      <PredictionsProvider env={env} liveReady client={fakeClient} activeRoomId={null}>
+        <Probe />
+      </PredictionsProvider>
+    );
+    expect(screen.getByTestId('enabled').textContent).toBe('false');
+
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('save-error').textContent).toMatch(/inget aktivt rum/)
+    );
+    expect(api.upsertMyPrediction).not.toHaveBeenCalled();
   });
 });

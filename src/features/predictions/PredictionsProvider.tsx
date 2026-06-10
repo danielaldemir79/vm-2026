@@ -112,7 +112,14 @@ export function PredictionsProvider({
   const savePrediction = useCallback(
     async (input: PredictionInput) => {
       if (!supabase || activeRoomId === null) {
-        return;
+        // Kontraktet (PredictionsStore.savePrediction) säger "Kastar vid fel".
+        // Utan klient/rum finns inget att spara till: KASTA (fail loud, PRINCIPLES
+        // §8) i stället för en tyst no-op som annars hade gett ett falskt "Sparat".
+        // UI:t gatar redan detta (formuläret renderas bara när store.enabled, dvs
+        // activeRoomId !== null), så detta nås bara via felaktig wiring, exakt det
+        // ett fail-loud-fel ska avslöja. Den legitima "inget rum"-vyn anropar aldrig
+        // savePrediction (PredictionsView visar då "gå med i rum"), så den kraschar inte.
+        throw new Error('[VM2026] Spara tips misslyckades: inget aktivt rum att spara tipset i.');
       }
       // Kastar vid fel (UI fångar), inkl. RLS-avslag om matchen är låst (fail loud).
       const saved = await upsertMyPrediction(supabase, activeRoomId, input);

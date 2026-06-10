@@ -113,9 +113,9 @@ describe('PredictionsView', () => {
       const formBefore = document.querySelector('[data-prediction-form]') as HTMLElement;
       // Före avspark: öppen, dvs låst-attributet är FRÅNVARANDE (formuläret
       // sätter bara data-prediction-locked="true" när det är låst). Räknaren
-      // säger 1 match öppen.
+      // säger "1 match öppen" (singular böjer både substantiv och adjektiv).
       expect(formBefore.getAttribute('data-prediction-locked')).toBeNull();
-      expect(screen.getByText(/1 match öppna att tippa/)).toBeInTheDocument();
+      expect(screen.getByText(/1 match öppen att tippa/)).toBeInTheDocument();
 
       // Tiden passerar avspark; minut-ticken bumpar nu:et och låset ska räknas om.
       act(() => {
