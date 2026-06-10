@@ -76,8 +76,11 @@ export function PredictionsProvider({
     return getSupabaseClient(env);
   }, [client, liveConfigured, env]);
 
-  // EPOCH-vakt (samma mönster som RoomsProvider.loadRoomData): ett snabbt rumsbyte
-  // får aldrig låta ett föråldrat svar skriva över ett nyare rums tips.
+  // EPOCH-vakt (samma mönster som RoomsProvider.loadRoomData, KA-F2): ett snabbt
+  // rumsbyte får aldrig låta ett föråldrat svar skriva över ett nyare rums tips.
+  // Bumpas vid varje rumsbyte av load-effekten och konsulteras av BÅDE laddningen
+  // och savePrediction (C14: en optimistisk save som löser efter ett rumsbyte
+  // tillhör fel rum och måste droppas, inte skrivas i nya rummets map).
   const loadTokenRef = useRef(0);
 
   // Ladda MINA tips för det aktiva rummet (en gång per rumsbyte). Tom utan rum.
@@ -134,8 +137,22 @@ export function PredictionsProvider({
       if (activeRoomId === null) {
         throw new Error('[VM2026] Spara tips misslyckades: inget aktivt rum att spara tipset i.');
       }
+      // STALE-REQUEST-VAKT (C14): boka in vilken laddnings-epok (= vilket aktivt
+      // rum) detta save tillhör. Samma loadTokenRef som load-effekten bumpar vid
+      // varje rumsbyte, så vi återanvänder seamen i stället för att uppfinna en ny.
+      // myPredictions är bara keyad på matchId, så utan vakten kan ett save startat i
+      // rum A (vän byter till rum B under await) skriva A:s svar i B:s tips-map.
+      const saveToken = loadTokenRef.current;
       // Kastar vid fel (UI fångar), inkl. RLS-avslag om matchen är låst (fail loud).
       const saved = await upsertMyPrediction(supabase, activeRoomId, input);
+      // Bytte det aktiva rummet under await? Då har load-effekten redan bumpat token
+      // och laddat det NYA rummets tips. A:s optimistiska uppdatering DROPPAS tyst
+      // (den tillhör ett inaktuellt rum), exakt som load-effektens epoch-vakt gör.
+      // RLS har ändå persisterat tipset i rätt rum (room_id i upserten), så inget
+      // tappas på servern, bara den lokala spegeln av ett rum vi inte längre tittar på.
+      if (saveToken !== loadTokenRef.current) {
+        return;
+      }
       // Optimistiskt: spegla in det sparade tipset i den lokala mappen direkt.
       setMyPredictions((prev) => {
         const next = new Map(prev);
