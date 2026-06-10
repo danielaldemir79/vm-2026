@@ -18,6 +18,12 @@ import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './feat
 import { ScenarioView } from './features/scenarios';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
+import {
+  InstallBanner,
+  OnboardingDialog,
+  OnlineStatusIndicator,
+  SettingsControl,
+} from './features/app-settings';
 
 /** Sektions-rubrik med liten överrad (eyebrow) för redaktionell känsla. */
 function SectionHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
@@ -64,7 +70,16 @@ export default function App() {
           style={{ backgroundColor: 'color-mix(in srgb, var(--color-surface) 70%, transparent)' }}
         >
           <Wordmark className="text-xl sm:text-2xl" />
-          <ThemeToggle />
+          {/* Nät-status + inställningar (kugghjul) + tema-toggle. Status-chippet
+              döljs på de minsta skärmarna (sm:inline-flex) så headern aldrig
+              trängs; offline-läget syns ändå tydligt via offline-bannern nedan. */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden sm:inline-flex">
+              <OnlineStatusIndicator />
+            </span>
+            <SettingsControl />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
@@ -90,6 +105,15 @@ export default function App() {
             </div>
           </section>
         </Fade>
+
+        {/* Installations-bannern (T13): diskret erbjudande att lägga till på
+            hemskärmen. Visar en install-knapp i Chrome/Android (beforeinstallprompt),
+            en "Dela -> Lägg till på hemskärm"-instruktion i iOS Safari, och inget
+            alls när appen redan är installerad eller tipset avfärdats. Bär sin egen
+            synlighets-logik (useInstallPrompt), så den tar ingen plats när dold. */}
+        <Slide direction="up">
+          <InstallBanner />
+        </Slide>
 
         {/* Foundation-grid: palett + rörelse sida vid sida på stora skärmar,
             staplade på mobil. Inga krockande element, kolumnerna bryts rent. */}
@@ -213,6 +237,12 @@ export default function App() {
           slutspelsträdet. Tips-ligan byggs härnäst.
         </footer>
       </main>
+
+      {/* Onboarding-touren (T13): visas EN gång vid första start (localStorage-
+          flagga), aldrig igen efter klar/hoppad. Ligger på rot-nivå (utanför main)
+          så modalen täcker hela skärmen. Bär sin egen öppen-logik (useOnboarding),
+          renderar inget när touren redan setts. */}
+      <OnboardingDialog />
     </div>
   );
 }

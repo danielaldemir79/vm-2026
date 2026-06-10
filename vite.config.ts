@@ -43,8 +43,29 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      // Tar med statiska tillgångar som inte importeras av appen i precachen.
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      // Tar med statiska tillgångar som inte importeras av appen i precachen
+      // (favicon, apple-touch-icon, det självhostade typsnittet). Allt under
+      // public/ kopieras till dist-roten och fångas av workbox glob nedan, men
+      // includeAssets gör de icke-importerade assetsen explicit precachade.
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'fonts/space-grotesk.woff2'],
+      // OFFLINE-STRATEGI (T13): appen är fixtures-driven, ALL data ligger i
+      // bundlen, så ren PRECACHE räcker, det finns ingen server-data att hämta
+      // förrän T14 (Supabase). workbox genererar en service worker som precachar
+      // hela byggets statiska skal (JS/CSS/HTML/ikoner/typsnitt).
+      workbox: {
+        // Vilka filtyper som precachas. woff2 läggs till explicit så det
+        // självhostade typsnittet är tillgängligt offline (annars faller texten
+        // tillbaka till systemfonten utan nät, fungerande men inte premium).
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,webmanifest}'],
+        // NAVIGATION FALLBACK: en single-page app utan router, alla rutter ska
+        // serveras av index.html (det precachade skalet). Så en hård
+        // omladdning/djuplänk offline visar appen i stället för webbläsarens
+        // dino-sida. Source: vite-plugin-pwa / workbox generateSW-docs.
+        navigateFallback: 'index.html',
+        // Städa bort gamla precache-poster när en ny version tas i bruk
+        // (registerType: autoUpdate), så cachen inte växer obegränsat.
+        cleanupOutdatedCaches: true,
+      },
       manifest: {
         name: 'VM 2026',
         short_name: 'VM 2026',
@@ -82,5 +103,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    // Sviten har vuxit (689+ tester) och flera är render-tunga integrationstester
+    // (full ResultsProvider + 12 grupptabeller + inmatning). Under full parallell
+    // fork-last kan en sådan rendering + async-seedning legitimt ta > 5 s, så
+    // default-timeouten (5000) ger sporadiska timeouts som INTE är äkta hängningar.
+    // Höjd till 15 s för marginal; isolerat kör samma tester på 1-3 s.
+    testTimeout: 15000,
   },
 });
