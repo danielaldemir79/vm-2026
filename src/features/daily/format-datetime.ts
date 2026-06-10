@@ -49,6 +49,29 @@ export function formatDayHeading(dateKey: string): string {
 }
 
 /**
+ * En svensk dag-etikett UTAN årtal ur en dag-nyckel ("YYYY-MM-DD"), t.ex.
+ * "torsdag 11 juni". Samma lokala-väggklocka-tolkning som formatDayHeading (12:00
+ * lokal -> okänslig för zon-offset), men utan år. Används där årtalet är brus i en
+ * kort etikett (t.ex. hero:ns "dagens match"-rad som visar matchens dag när den
+ * inte spelas idag), versaliseras av anroparen via CSS (uppercase) vid behov.
+ *
+ * @throws Om nyckeln inte är på formen YYYY-MM-DD (datafel, fail loud).
+ */
+export function formatDayHeadingNoYear(dateKey: string): string {
+  const m = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) {
+    throw new Error(`Ogiltig dag-nyckel (väntade YYYY-MM-DD): "${dateKey}".`);
+  }
+  const [, year, month, day] = m;
+  const date = new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0);
+  return new Intl.DateTimeFormat('sv-SE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(date);
+}
+
+/**
  * En kompakt svensk dag-etikett för datumnavigerings-knappar, t.ex. "ons 10 jun".
  * Samma lokala-väggklocka-tolkning som formatDayHeading.
  *

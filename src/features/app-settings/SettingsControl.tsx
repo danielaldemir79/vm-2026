@@ -17,6 +17,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, useReducedMotion } from 'motion/react';
 import { springs, transitions } from '../../motion';
 import { useAppSettings } from './settings-context';
@@ -196,7 +197,25 @@ export function SettingsControl() {
   );
 }
 
-/** Själva dialog-skalet (overlay + modal-panel). Hålls intern, en sak. */
+/** Själva dialog-skalet (overlay + modal-panel). Hålls intern, en sak.
+ *
+ * PORTAL till document.body (BUGGFIX T32, #54): kugghjulet bor i appens <header>,
+ * som är `sticky z-10 backdrop-blur-md`. BÅDE sticky+z-index OCH backdrop-filter
+ * gör headern till en STACKING CONTEXT och dessutom till CONTAINING BLOCK för
+ * position:fixed-barn (CSS-spec: en ancestor med transform/filter/backdrop-filter
+ * blir den fixerade descendantens containing block, inte viewporten). Renderas
+ * overlayn inline i headern blir den därför (a) inklämd i headerns 64px-box i
+ * stället för att täcka skärmen, och (b) instängd i headerns z-10-lager, så `z-50`
+ * inte kan nå över <main>. Resultatet: panelen hamnar bakom/utanför sidan (Daniels
+ * fynd). Genom att portalera overlayn till document.body (som saknar transform/
+ * filter/stacking-context, verifierat live) hamnar den i ROT-stacking-contexten
+ * där `fixed inset-0 z-50` löses mot viewporten och ligger överst, oberoende av
+ * VAR triggern råkar sitta. TeamProfilePanel/OnboardingDialog "fungerar" bara för
+ * att de råkar renderas utanför en sådan ancestor; portalen gör det robust här.
+ *
+ * SSR-not: createPortal kräver document; appen är klient-renderad (Vite SPA, ingen
+ * SSR), så document finns alltid när detta körs (dialogen renderas dessutom bara
+ * efter ett klick, dvs i webbläsaren). */
 function SettingsDialog({
   dialogRef,
   closeButtonRef,
@@ -216,7 +235,7 @@ function SettingsDialog({
   const panelInitial = motionEnabled ? { opacity: 0, y: 24, scale: 0.98 } : { opacity: 0 };
   const panelAnimate = motionEnabled ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1 };
 
-  return (
+  return createPortal(
     <motion.div
       data-settings-overlay=""
       onClick={onClose}
@@ -263,6 +282,7 @@ function SettingsDialog({
           Haptik och ljud är avstängda som standard. Slå på det du vill ha.
         </p>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }

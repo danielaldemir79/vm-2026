@@ -75,9 +75,34 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
   });
 
   it('markerar "Dagens match" via textetikett + data-highlight (färg-oberoende, T7-pin)', () => {
+    // Default highlightLabel = "Dagens match" (bakåtkompatibelt, #54 C3).
     renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} highlight />);
     expect(screen.getByText('Dagens match')).toBeInTheDocument();
     expect(screen.getByRole('article')).toHaveAttribute('data-highlight', '');
+  });
+
+  it('chippet visar den DYNAMISKA highlightLabel (matchens datum) när matchen inte är idag (#54 C3)', () => {
+    // När hero-etiketten är matchens dag (inte idag) ska chippet säga SAMMA sak,
+    // annars var UI:t inkonsekvent (datum ovanför men "Dagens match" i chippet).
+    renderCard(
+      <MatchCard
+        match={groupMatch()}
+        teamsById={teamsById}
+        highlight
+        highlightLabel="Torsdag 11 juni"
+      />
+    );
+    expect(screen.getByText('Torsdag 11 juni')).toBeInTheDocument();
+    // Och INTE den gamla hårdkodade texten, så chip + etikett aldrig krockar.
+    expect(screen.queryByText('Dagens match')).not.toBeInTheDocument();
+  });
+
+  it('utan highlight visas inget highlight-chip (varken default- eller datum-text)', () => {
+    renderCard(
+      <MatchCard match={groupMatch()} teamsById={teamsById} highlightLabel="Torsdag 11 juni" />
+    );
+    expect(screen.queryByText('Dagens match')).not.toBeInTheDocument();
+    expect(screen.queryByText('Torsdag 11 juni')).not.toBeInTheDocument();
   });
 
   it('slutspelsmatch utan kända lag visar platshållare, inte ett gissat lag', () => {
