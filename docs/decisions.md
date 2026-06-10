@@ -5,6 +5,72 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T13 (issue #13): installation, onboarding, offline-indikator, haptik/ljud
+
+**Beslut (egen app-settings-feature, KÄLLHÄNVISADE plattformsregler):** Fas 1-poleringen
+(installerbar PWA + onboarding + offline-indikator + valbar haptik/ljud) samlas i en ny modul
+`src/features/app-settings/`, byggd på SAMMA mönster som resten av appen: ren logik + tunn hook
++ a11y-komponent, persistens via en delad safe-storage-hjälpare. Inga domänregler rörs.
+
+**Beslut (PWA install-prompt, KÄLLHÄNVISAD, gissas inte):** Installations-vägen skiljer sig per
+plattform och är en regel som lätt gissas fel, så den är källhänvisad inline (`install-prompt.ts`)
+och här. Chrome/Edge/Android fyrar `beforeinstallprompt`: vi `preventDefault`:ar webbläsarens
+default-mini-infobar och visar en EGEN diskret install-knapp som anropar `event.prompt()` (web.dev:
+"Patterns for promoting PWA installation"). iOS Safari stödjer INTE `beforeinstallprompt` (MDN:
+"BeforeInstallPromptEvent" listar Safari som ej stödd), så där visas en INSTRUKTIONS-fallback
+("Dela -> Lägg till på hemskärmen"), den enda vägen på iOS. Redan installerad (`display-mode:
+standalone` eller iOS `navigator.standalone`) -> ingen prompt. iPadOS 13+ maskerar sig som macOS i
+UA men har `maxTouchPoints > 1` (känd UA-fälla, MDN "Navigator.userAgent"), så iOS-detektionen
+täcker det. Avfärdande persistas (localStorage) och respekteras permanent. Beslutet är spårbart
+via #13 + denna rad + `install-prompt.test.ts` (varje mode-kombination + UA-sniff).
+
+**Beslut (offline = ren PRECACHE, "synk" är ÄRLIGT trivialt idag):** Appen är fixtures-driven, ALL
+data ligger i bundlen, så workbox-precachen av det statiska skalet (JS/CSS/HTML/ikoner + det
+självhostade typsnittet, 19 entries) räcker för full offline-funktion. `navigateFallback:
+'index.html'` (workbox `NavigationRoute`, verifierat i genererad `sw.js`) serverar SPA-skalet vid
+en hård omladdning/djuplänk offline. "Synkar vid återuppkoppling" är därför TRIVIALT idag, det
+finns ingen server-data att synka förrän T14 (Supabase). Vi lovar ingen synk-mekanik som inte
+finns: en online/offline-indikator (`navigator.onLine` + online/offline-event) visar bara nät-
+LÄGET. När T14 inför live-data hängs den faktiska om-hämtningen på samma online-seam (pinnat).
+
+**Beslut (haptik + ljud AV SOM STANDARD, SPEC §12):** Oombedd vibration/ljud är påträngande, så
+båda kanalerna är AV tills användaren slår på dem i inställningarna (frånvaro av flaggan = av, vi
+gissar aldrig att det är önskat). Feedbacken (`feedback.ts`) är CAPABILITY-GATAD: haptik via
+`navigator.vibrate` bara om API:t finns (saknas på desktop + iOS Safari), ljud via en kort
+PROGRAMMATISKT genererad Web Audio-ton (oscillator + gain-envelope, ingen ljud-asset i bundlen,
+PRINCIPLES §11). Feedbacken hängs på den BEFINTLIGA spar-seamen (`handleSaved` i ResultEntryView,
+samma seam som målfirandet), invasivt minimum. ResultEntryView läser inställningarna via en
+TOLERANT accessor (`useFeedbackSettings`, faller till tyst standard utan provider) så vyn fungerar
+fristående precis som det valfria firande-lagret; setter:na (som kräver providern) nås via
+`useAppSettings` (fail-loud).
+
+**Beslut (onboarding visas EN gång, a11y-dialog återanvänd):** En kort tour (4 steg: live-vyer,
+resultatinmatning, what-if, installera) visas vid första start och aldrig igen efter klar/hoppad
+(localStorage-flagga). Dialogen återanvänder EXAKT T10-modalens a11y-kontrakt (role="dialog" +
+aria-modal + aria-labelledby, Escape, fokus in/ut, fokus-fälla, explicit reduced-motion-grind
+`=== false`). Bakgrundsklick stänger MEDVETET inte (en första-gångs-tour ska inte avfärdas av ett
+oavsiktligt klick), användaren väljer "Hoppa över" eller går igenom stegen.
+
+**Beslut (DRY: safe-storage extraherad till delad lib, rule-of-three uppnådd):** Den robusta
+localStorage-åtkomsten från T2 (`getLocalStorage`, skyddar mot SecurityError i privat läge/sandbox)
+flyttades till `src/lib/safe-storage.ts` som EN sanning, eftersom tema + installation + onboarding +
+haptik/ljud nu alla behöver den (PRINCIPLES §4). `theme-core.ts` återexporterar den så inga gamla
+call-sites eller tester ändrades. Lib:en lade till generiska flagg-hjälpare (`readStoredFlag`/
+`writeStoredFlag`: exakt "1" = sant, false tar bort nyckeln så ingen "0"-rad lämnas).
+
+**Beslut (Lighthouse ÄRLIGT rapporterad, PWA-audit borttagen i LH13):** Lighthouse 13 kör inte
+längre den dedikerade PWA-kategorin (borttagen i LH12), så PWA-installerbarheten verifierades
+MANUELLT i stället: giltig serverad manifest (name/short_name/start_url/standalone/theme+
+background-color/lang/scope), ikoner 192+512 + maskable 512, registrerad service worker (sw.js
+200 text/javascript), secure context. Uppmätta kategori-poäng (desktop-preset, lokalt):
+Performance 100, Best Practices 96, A11y 93, SEO 91. A11y-fynd som var T13:s (install-knappens
+WCAG 2.5.3 label-in-name) rättades; ÖVRIGA a11y-fynd (gold-chip-kontrast + `<abbr>`-kontrast i
+tabeller, Wordmark-spanens aria-label, charset-meta efter no-flash-scriptet, robots.txt saknas) är
+PRE-EXISTERANDE från T2/T5/T7, utanför T13:s scope, lämnade orörda (skulle riskera regression av
+tidigare uppmätt AA-arbete). Spårbart via #13 + denna rad.
+
+---
+
 ## 2026-06-10 , T12-visuellt (issue #12): sim-läget får en app-global, färg-oberoende "labbet"-markering
 
 **Beslut (HELA sim-zonen kläs i en markering, inte bara banner-kortet):** När what-if-läget är
