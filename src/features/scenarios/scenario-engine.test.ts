@@ -245,10 +245,10 @@ describe('KONSERVATIVITET (HARD): målskillnads-gränsfall klassas ALDRIG KLART/
 
   it('ett rent målskillnads-utfall flaggas marginDependent och blir aldrig "qualified" falskt', () => {
     // Bygg ett utfall där två lag MÅSTE stå lika på poäng och målskillnad avgör.
-    // A1: 3p, A2: 3p efter 2 matcher; A3: 3p; A4: 0p. Sista: A1-A4, A2-A3.
-    // Utfall "A1 vinner, A2 vinner": A1=6, A2=6, A3=3, A4=0. A1 & A2 säkert topp-2.
-    // Utfall "A1 oavgjort, A2 oavgjort": A1=4, A2=4, A3=4, A4=1. Tre lag på 4 ->
-    // MÅLSKILLNAD avgör vem som blir tvåa/trea. W/D/L kan inte avgöra det.
+    // Nuvarande tabell (spelade x1-x4): A1:3, A2:4, A3:4, A4:0. Kvar: A1-A4, A3-A4.
+    // Utfall "A1-A4 oavgjort, A3-A4 oavgjort": A1=4, A2=4, A3=5, A4=2. A3 etta;
+    // A1 och A2 står lika på 4 p om tvåan -> MÅLSKILLNAD avgör tvåa/trea. W/D/L
+    // ensamt kan inte avgöra det, så minst ett lag måste vara marginDependent.
     const m: Match[] = [
       fin('x1', 'A1', 'A2', 1, 0), // A1 +3
       fin('x2', 'A1', 'A3', 0, 1), // A1 +0 (3p kvar), A3 +3
@@ -366,6 +366,36 @@ describe('åskådar-lag (Copilot C1): inget eget kvar -> ärlig text, aldrig "m�
     const a4 = teamOf(s.teams, 'A4'); // sist, men spelar i sista matchen
     expect(a4.condition).not.toMatch(/kan inte påverka själv/i);
     expect(a4.condition).toMatch(/måste vinna/i);
+  });
+
+  it('lagets egen match är ENDA kvar (Copilot C4): "måste vinna" utan falskt "hoppas på andra"', () => {
+    // C4: else-grenen sa "Måste vinna och hoppas på andra matcher" även när lagets
+    // egen match är den ENDA återstående -> det FINNS inga andra matcher att hoppas
+    // på, texten ljög. Här är A3-A4 den enda kvar (A3:s egen) och A3 hamnar i else-
+    // grenen: en vinst NÅR A2:s 3 p men avgör inte ensam (lika poäng -> målskillnad),
+    // oavgjort räcker inte alls. Probe-verifierat upplägg:
+    //   Spelade: A1-A2 1-0, A1-A3 1-0, A1-A4 1-0, A2-A3 1-0, A2-A4 0-1
+    //   -> A1:9 (klar etta), A2:3, A3:0, A4:3. Enda kvar: A3-A4 (A3:s egen).
+    // Vinst för A3 -> 3 p, lika med A2 -> målskillnad avgör tvåan; vinst garanterar
+    // alltså inte topp-2 -> else-grenen. Texten får INTE påstå "andra matcher".
+    const matches: Match[] = [
+      fin('m1', 'A1', 'A2', 1, 0), // A1 +3, A2 0
+      fin('m2', 'A1', 'A3', 1, 0), // A1 +3, A3 0
+      fin('m3', 'A1', 'A4', 1, 0), // A1 +3 -> A1: 9
+      fin('m4', 'A2', 'A3', 1, 0), // A2 +3 -> A2: 3, A3 0
+      fin('m5', 'A2', 'A4', 0, 1), // A4 +3 -> A4: 3
+      sched('m6', 'A3', 'A4'), // enda kvar; A3 spelar själv i den
+    ];
+    const s = computeGroupScenario(TEAMS, matches, GROUP);
+    expect(s.phase).toBe('scenarios');
+    expect(s.remainingMatches).toBe(1); // bekräftar: EN enda match kvar
+    const a3 = teamOf(s.teams, 'A3');
+    // A3 är i else-grenen: "måste vinna" men varken vinst eller oavgjort garanterar.
+    expect(a3.condition).toMatch(/måste vinna/i);
+    // Och, kärnan i C4: ALDRIG påstå att man "hoppas på andra matcher" när det inte
+    // finns några andra. I stället ärligt om att målskillnad/tiebreak avgör.
+    expect(a3.condition).not.toMatch(/hoppas på andra matcher/i);
+    expect(a3.condition).toMatch(/målskillnad\/tiebreak/i);
   });
 });
 
