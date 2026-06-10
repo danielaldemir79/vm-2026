@@ -17,9 +17,15 @@ function liveEnv(): ImportMetaEnv {
   } as ImportMetaEnv;
 }
 
-function wrapperFor(env: ImportMetaEnv) {
+// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testet.
+// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
+function wrapperFor(env: ImportMetaEnv, liveReady = false) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <ResultsProvider env={env}>{children}</ResultsProvider>;
+    return (
+      <ResultsProvider env={env} liveReady={liveReady}>
+        {children}
+      </ResultsProvider>
+    );
   };
 }
 
@@ -36,7 +42,9 @@ describe('ResultsProvider/useResultsStore, seedning', () => {
   });
 
   it('fail-loud:ar (status error + meddelande) när källan kastar (live-stub före T14)', async () => {
-    const { result } = renderHook(() => useResultsStore(), { wrapper: wrapperFor(liveEnv()) });
+    const { result } = renderHook(() => useResultsStore(), {
+      wrapper: wrapperFor(liveEnv(), true),
+    });
     await waitFor(() => expect(result.current.status).toBe('error'));
     expect(result.current.error).toMatch(/inte byggd än \(T14\)/);
     expect(result.current.matches).toHaveLength(0);

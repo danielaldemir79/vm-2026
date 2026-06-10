@@ -19,9 +19,11 @@ function liveEnv(): ImportMetaEnv {
 
 // GroupStageView är nu en ren konsument av den delade storen (T6). Rendera den
 // inuti en ResultsProvider med rätt env så seedningen sker som förr.
-function renderView(env: ImportMetaEnv) {
+// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testet.
+// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
+function renderView(env: ImportMetaEnv, liveReady = false) {
   return render(
-    <ResultsProvider env={env}>
+    <ResultsProvider env={env} liveReady={liveReady}>
       <GroupStageView />
     </ResultsProvider>
   );
@@ -96,7 +98,7 @@ describe('GroupStageView, fel-väg (fail loud, inte tyst tom vy)', () => {
   it('visar ett fel-meddelande när datakällan kastar (live-stub före T14)', async () => {
     // Live-env utan riktig klient => datakällans stub KASTAR vid getMatches.
     // Vyn ska visa felet via role="alert", inte tyst rendera en tom vy.
-    renderView(liveEnv());
+    renderView(liveEnv(), true);
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');

@@ -1,11 +1,19 @@
 // Datalagrets miljö-gating (fixtures-först, SPEC §12 + Agent Kit-playbookens
 // "fixtures-forst-mot-externt-cms-eller-api").
 //
-// EN gata väljer datakälla utifrån miljön:
-//   - Saknas Supabase-env (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
-//     -> fixtures-läge (typad platshållar-data), med en FAIL-LOUD-logg så
-//        övergången till live aldrig glöms bort.
-//   - Finns env-variablerna -> live-läge (Supabase-klienten, byggs i T14).
+// EN gata väljer datakälla utifrån TVÅ villkor:
+//   1. Är Supabase-env satt? (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)
+//   2. Är live-klienten faktiskt byggd? (LIVE_READY, se nedan)
+// Live väljs bara när BÅDA är sanna. Annars fixtures, alltid med en synlig logg
+// (fail loud) så övergången till live aldrig glöms bort.
+//
+// Varför två villkor och inte bara env (#37, hotfix): supabase-client.ts är en
+// MEDVETEN fail-loud-stub tills T14 bygger den. Env-variablerna sattes redan i
+// Cloudflare (2026-06-09) inför T14, så enbart en env-gate tände live-grenen i
+// produktion -> stubben kastade i varje vy och Daniels vänner såg fel-alerts i
+// stället för matchdata. LIVE_READY behåller fail-loud-principen (env utan
+// fungerande klient SKA inte tyst se ut som live) men flyttar smällen från
+// användarens ansikte till en console.warn tills T14 tänder live på riktigt.
 //
 // Samma kod tänds live UTAN ändring: konsumenter (T6-T11) anropar bara
 // getDataSource() och får samma kontrakt (DataSource) oavsett källa. Det är
@@ -17,6 +25,20 @@
 
 import type { Group, Match, Team } from '../domain/types';
 import { fixtureGroups, fixtureMatches, fixtureTeams } from './fixtures';
+
+/**
+ * Är live-Supabase-klienten byggd och redo att användas?
+ *
+ * `false` tills T14 fyller supabase-client.ts (stubben kastar fortfarande, se
+ * den filen). Detta är T14:s ENDA extra kod-steg för att tända live:
+ *   T14: sätt LIVE_READY = true OCH ta bort interims-varningen i getDataSource.
+ * (Pinnat i docs/decisions.md, #37, så T14 inte missar det.)
+ *
+ * Konstanten är en in-kod-flagga med FLIT (inte en env-variabel): att flippa
+ * den till true kräver en kod-ändring som går genom review + bygge ihop med
+ * T14:s faktiska klient, så live aldrig tänds av enbart en miljö-konfiguration.
+ */
+export const LIVE_READY = false;
 
 /**
  * Kontraktet varje datakälla (fixtures eller live) uppfyller. Async med flit:
@@ -37,11 +59,27 @@ export type DataSourceMode = 'fixtures' | 'live';
  * icke-tomma, en halv-konfiguration (bara URL, ingen nyckel) räknas som EJ
  * konfigurerad och faller till fixtures, hellre det än ett tyst trasigt live-
  * läge. Trimmar för att inte luras av enbart whitespace.
+ *
+ * Detta är VILLKOR 1 av gaten (env satt). Live kräver dessutom VILLKOR 2,
+ * att klienten är byggd (LIVE_READY), se isLiveActive.
  */
 export function isSupabaseConfigured(env: ImportMetaEnv): boolean {
   const url = env.VITE_SUPABASE_URL?.trim();
   const key = env.VITE_SUPABASE_ANON_KEY?.trim();
   return Boolean(url) && Boolean(key);
+}
+
+/**
+ * Den SAMMANSATTA gaten: live är aktivt bara när Supabase-env är satt OCH
+ * live-klienten är byggd (LIVE_READY). En enda sanning som både getDataSource
+ * och getDataSourceMode läser, så källan och UI-märkningen aldrig kan säga
+ * olika saker (annars hade UI:t kunnat märka demo-data som "live").
+ *
+ * @param liveReady  injicerbar (default LIVE_READY) så testet kan verifiera
+ *                   live-grenen utan att flippa den globala konstanten (KISS).
+ */
+function isLiveActive(env: ImportMetaEnv, liveReady: boolean): boolean {
+  return isSupabaseConfigured(env) && liveReady;
 }
 
 /** Datakälla byggd på de typade fixtures-objekten. */
@@ -83,28 +121,55 @@ function createLiveDataSource(env: ImportMetaEnv): DataSource {
 }
 
 /**
- * Välj och returnera den aktiva datakällan utifrån miljön.
+ * Välj och returnera den aktiva datakällan utifrån gaten.
  *
- * Fail-loud i fixtures-läge: en synlig console.warn säkerställer att vi inte
- * tyst kör på platshållar-data i tron att det är live. Detta är medvetet en
- * WARNING (inte en error), fixtures-läge är ett giltigt utvecklings-/preview-
- * tillstånd, men det ska SYNAS, inte gömma sig (PRINCIPLES §8, fail loud).
+ * Tre fall, alla fail-loud (PRINCIPLES §8, en synlig logg så ingen tyst kör fel
+ * data, men en WARNING, inte error, eftersom fixtures är ett giltigt läge):
+ *   - Live aktivt (env satt + LIVE_READY): live-källan, ingen logg behövs.
+ *   - Env satt men LIVE_READY false (interims-läget, #37): fixtures + en EGEN
+ *     varning som förklarar att env finns men klienten väntar på T14. T14 tar
+ *     bort just denna varning när LIVE_READY flippas.
+ *   - Env saknas: fixtures + den vanliga "env saknas"-varningen.
  *
- * @param env  import.meta.env (injiceras för testbarhet, default = den riktiga).
+ * @param env        import.meta.env (injiceras för testbarhet, default = riktiga).
+ * @param liveReady  injicerbar live-flagga (default LIVE_READY), så live-grenen
+ *                   kan testas utan att flippa den globala konstanten.
  */
-export function getDataSource(env: ImportMetaEnv = import.meta.env): DataSource {
-  if (isSupabaseConfigured(env)) {
+export function getDataSource(
+  env: ImportMetaEnv = import.meta.env,
+  liveReady: boolean = LIVE_READY
+): DataSource {
+  if (isLiveActive(env, liveReady)) {
     return createLiveDataSource(env);
   }
-  console.warn(
-    '[VM2026] Datalager kör i FIXTURES-läge (platshållar-data). ' +
-      'Supabase-env saknas (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). ' +
-      'Sätt dem för att växla till live (Supabase byggs i T14).'
-  );
+  if (isSupabaseConfigured(env)) {
+    // Interims-läget (#37): env satt, men klienten inte byggd än. Kör fixtures
+    // och förklara varför, så detta inte förväxlas med "env saknas".
+    // T14: ta bort denna gren när LIVE_READY blir true.
+    console.warn(
+      '[VM2026] Datalager kör i FIXTURES-läge trots att Supabase-env är satt. ' +
+        'Live-klienten är inte byggd än (LIVE_READY=false, byggs i T14). ' +
+        'Detta är avsiktligt tills T14 tänder live.'
+    );
+  } else {
+    console.warn(
+      '[VM2026] Datalager kör i FIXTURES-läge (platshållar-data). ' +
+        'Supabase-env saknas (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). ' +
+        'Sätt dem för att växla till live (Supabase byggs i T14).'
+    );
+  }
   return createFixtureDataSource();
 }
 
-/** Vilket läge som är aktivt utifrån miljön (för UI-märkning / diagnostik). */
-export function getDataSourceMode(env: ImportMetaEnv = import.meta.env): DataSourceMode {
-  return isSupabaseConfigured(env) ? 'live' : 'fixtures';
+/**
+ * Vilket läge som FAKTISKT är aktivt (för UI-märkning / diagnostik). Speglar
+ * gaten exakt: 'live' bara när live-källan verkligen körs, annars 'fixtures'.
+ * Avgörande att detta följer isLiveActive (inte bara env): annars hade UI:t
+ * märkt interims-lägets demo-data som "live".
+ */
+export function getDataSourceMode(
+  env: ImportMetaEnv = import.meta.env,
+  liveReady: boolean = LIVE_READY
+): DataSourceMode {
+  return isLiveActive(env, liveReady) ? 'live' : 'fixtures';
 }

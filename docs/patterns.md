@@ -59,20 +59,43 @@ att `initial`-propen saknar transform vid reducerad rörelse.
    göra (samma fältnamn, samma form). Annoteras mot typerna så `tsc -b` failar om formen avviker.
 3. Definiera ett `DataSource`-kontrakt (async-metoder) i `src/data/data-source.ts` som både
    fixtures och live uppfyller.
-4. En `getDataSource(env = import.meta.env)`-gate väljer källa: `isSupabaseConfigured(env)` (båda
-   `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` finns och är icke-tomma) -> live, annars fixtures
-   med en **fail-loud `console.warn`** så fixtures-läget syns och övergången till live inte glöms.
-5. Live-klienten laddas via **dynamisk import** (`import('./supabase-client')`) så Rollup inte måste
-   lösa ett Supabase-paket som ännu inte är installerat, fixtures-bygget förblir rent.
-6. Live-stubben **fail loud:ar** (kastar) vid anrop innan den är byggd, i stället för att returnera
-   tyst tom data som ser giltig ut.
-7. Injicera `env` som parameter (default `import.meta.env`) så gaten kan enhetstestas utan att mocka
-   `import.meta` globalt.
+4. **Gata live på TVÅ villkor, inte bara env (tvåstegs-gate).** Live väljs bara när BÅDA är sanna:
+   - **Villkor 1 (env satt):** `isSupabaseConfigured(env)`, dvs båda `VITE_SUPABASE_URL` +
+     `VITE_SUPABASE_ANON_KEY` finns och är icke-tomma.
+   - **Villkor 2 (klienten byggd):** en in-kod-konstant `LIVE_READY === true` (default `false` tills
+     live-klienten faktiskt är byggd, här T14).
 
-**Varför:** Hela appen kan byggas och testas innan Supabase-kontot finns (T14), utan kod-ändring vid
-aktivering. Fixtures som uppfyller live-typerna fångar mappnings-drift i bygget i stället för att
-gömma den i en otestad live-gren. Detta är Agent Kit-playbookens generella "fixtures-först"-mönster
-konkretiserat för VM 2026:s React + Vite + Supabase-stack. Källa: T3.
+   Lägg den SAMMANSATTA gaten i EN funktion (`isLiveActive(env, liveReady) = isSupabaseConfigured(env)
+   && liveReady`) som BÅDE `getDataSource` OCH `getDataSourceMode` (UI-märkningen demo/live) läser, så
+   källan och märkningen aldrig kan säga emot varandra. Tre fall, alla **fail-loud** (PRINCIPLES §8):
+   live aktivt -> live-källan; env satt men `LIVE_READY` false (interims-läget) -> fixtures + en EGEN
+   `console.warn` som förklarar att klienten väntar på sitt bygg-steg; env saknas -> fixtures + den
+   vanliga "env saknas"-varningen. De två varningarna är SKILDA så lägena inte förväxlas.
+5. **Pinna det enda extra steget som tänder live.** När live-klienten byggs ska BÅDA göras i SAMMA
+   ändring: (a) sätt `LIVE_READY = true`, (b) ta bort interims-grenens `console.warn`. Pinna det i
+   `docs/decisions.md` och låt ett guard-test (`LIVE_READY ... är false`) BRYTAS medvetet när
+   konstanten flippas, så de två stegen inte glöms.
+6. Live-klienten laddas via **dynamisk import** (`import('./supabase-client')`) så Rollup inte måste
+   lösa ett Supabase-paket som ännu inte är installerat, fixtures-bygget förblir rent.
+7. Live-stubben **fail loud:ar** (kastar) vid anrop innan den är byggd, i stället för att returnera
+   tyst tom data som ser giltig ut.
+8. Injicera BÅDE `env` (default `import.meta.env`) OCH `liveReady` (default `LIVE_READY`) som parametrar
+   så gaten + live-grenen kan enhetstestas utan att mocka `import.meta` globalt eller flippa den globala
+   konstanten.
+
+**Varför tvåstegs-gate och inte bara env (#37, hotfix):** env kan vara satt INNAN live-klienten är
+byggd. Här sattes `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` i Cloudflare (2026-06-09) inför T14,
+medan `supabase-client.ts` fortfarande var en medveten fail-loud-stub. En REN env-gate tände därför
+live-grenen i produktion (vm-2026.pages.dev) -> stubben kastade i varje `getGroups/getMatches/getTeams`
+-> alla vyer visade fel-alerts i stället för matchdata. `LIVE_READY` (en in-kod-konstant, inte en
+env-flagga, så den flippas bara genom review + bygge ihop med den riktiga klienten) bevarar fail-loud-
+principen (env utan byggd klient SKA inte tyst se ut som live) men flyttar smällen från användarens
+ansikte till en `console.warn` tills klienten finns. **Varför fixtures-först över huvud taget:** hela
+appen kan byggas och testas innan Supabase-kontot finns (T14), utan kod-ändring vid aktivering.
+Fixtures som uppfyller live-typerna fångar mappnings-drift i bygget i stället för att gömma den i en
+otestad live-gren. Detta är Agent Kit-playbookens generella "fixtures-först"-mönster konkretiserat för
+VM 2026:s React + Vite + Supabase-stack. Källa: T3 (env-gaten), tvåstegs-gaten hotfix #37
+(`docs/decisions.md` 2026-06-10).
 
 ### harledd-state-vy: ren-derive + hook-med-state + reaktiv-memo (React, VM 2026)
 
