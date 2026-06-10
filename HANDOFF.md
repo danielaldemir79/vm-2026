@@ -5,6 +5,65 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T7 KLAR - PR #36 väntar på autonom merge
+
+**Branch:** `feature/T7-daglig-matchvy` @ HEAD `d88b8eb`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/36 mot `develop` (Closes #7, state: OPEN)
+**Board:** issue #7 i "In Review" (korrekt). Dirigenten stänger issue #7 MANUELLT (`gh issue close 7`) och flyttar kort #7 till Done EFTER merge (auto-close funkar inte mot develop, default-branch är main).
+
+**Autonomt läge: Daniel är borta ~1 vecka.** Full fullmakt: dirigenten mergar till develop och betar av hela listan utan att vänta på Daniel.
+
+**KLART med bevis (SHA + verifiering):**
+- `7271d04` - senior-dev funktionellt: daglig matchvy, hero, nedräkning, datumnavigering
+- `9d44325` - design-frontend premium: arena i kvällsljus-estetik, matchkort, TeamFlag, TvBadge
+- `80dba59` - Copilot R1: C1-C4 (a11y, doc-drift, kontrast, typogr.)
+- `da760eb` + `55ed575` + `2b10e69` + `8e34386` - Copilot R2: C5-C8 (inkl. vilodagar hanterade i datumnavigeringen)
+- `d88b8eb` - Copilot R3: C9-C10 (HEAD)
+- Verifiering (dirigenten, oberoende): **352 tester gröna (37 filer)**, build/lint/format rent, inga secrets
+- Alla 6/6 acceptanskriterier bockade i issue #7 (journalisten 2026-06-10)
+- Lokal panel: 1 runda (F1 doc-drift rättad nedan, F2 pinnad till T8, F3 kuriosa scopad T10 via 8e34386 + issue-DoD uppdaterad, F4 avvisad - tom-dag-grenen nåbar via C7-fixen så premissen föll)
+- Copilot-loop: 4 rundor (4->4->2->0), alla 10 trådar lösta
+
+**Journalist-åtgärd (F1 doc-drift):** `docs/patterns.md` rad ~313 påstod falskt AA-löfte ("Cappa ljusheten ... 42% L -> >= ~5:1"). Empiriskt fel (min ~2.7:1 vid gul hue). Rättat: discen är aria-hidden + redundant, AA krävs inte; uppmätt min-kontrast ~2.7:1 noterat. Ingen falskt AA-kravtext kvar.
+
+**PINNADE punkter (bär framåt):**
+- **F2/T8-pin (ägare design-frontend):** success-token == accent #0e7a44 i ljust tema. T8 ger success en distinkt AA-klarande ton.
+- **F1/penalties-pin (T9, ägare senior-developer):** reducern hanterar inte `MatchResult.penalties`. Inert i T7 (gruppspel saknar straff). T9 fixar. Acceptanstest: redigera finished slutspelsmatch med straff, penalties bevaras.
+- **T14-pin:** Supabase/auth/RLS, inga secrets i repo. Live-klienten fail-loud-stub, T14 tänder den. RLS: restriktera per auth.uid()+rum. Projekt: kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten.
+- **#35 (arena/stad, Backlog):** `Match.venue` = platshållare tills #35 fyller den med verifierad per-match-källa.
+
+**"Behöver Daniel"-kö (han är borta):**
+- Push-notiser-setup (T22): kräver Apple/Google Developer-konton, Daniel måste godkänna.
+- Captcha (T14 valfri): av som default, ingen akut åtgärd.
+- Arena-källa (#35): kräver verifierad per-match-källa (FIFA official).
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta ~1 vecka och har gett dirigenten full fullmakt att merga och beta av hela task-listan autonomt.
+>
+> Om PR #36 (T7, feature/T7-daglig-matchvy) ÄNNU INTE mergad:
+> Merga den mot develop: `gh pr merge 36 --merge --repo danielaldemir79/vm-2026`.
+> Stäng sedan issue #7 manuellt (`gh issue close 7`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #7 till Done på boarden.
+>
+> Om PR #36 REDAN mergad:
+> T1-T7 + T4b är alla klara och mergade. Plocka nästa task från boarden.
+> **Nästa task: #8 (T8, Dynamiskt dags-tema)** - F2/T8-pin gäller: success-token == accent #0e7a44 i ljust tema, T8 ger success en distinkt AA-klarande ton, ägare design-frontend.
+> Skapa feature-branch med `--base develop`, PR med `--base develop`.
+>
+> Därefter (i ordning, autonomt): T9 (F1/penalties-pin!), T10, T11, T12, T13 - alla Fas 1.
+> Sedan T14 (Supabase live - projekt kmzhyblzxangpxydufve, anon-auth på, dokumentera beslut i docs/decisions.md, RLS: restriktera per auth.uid()+rum).
+> Därefter Fas 2 (T15-T20), Fas 3 (T21-T26).
+>
+> Bär framåt (alla tasks):
+> - **F2/T8-pin:** success-token == accent-grön (#0e7a44) i ljust tema. T8 ger success en distinkt AA-ton, ägare design-frontend.
+> - **F1/penalties-pin (T9):** reducern hanterar inte penalties. T9 fixar.
+> - **T14-pin:** Supabase/auth/RLS, inga secrets i repo. RLS måste restriktera per auth.uid()+rum.
+> - **Supabase:** projekt kmzhyblzxangpxydufve, anon-auth på, Cloudflare-env satt, MCP ansluten.
+> - **#35 (arena/stad, Backlog):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), captcha (T14 valfri, av), arena-källa (#35). Notifiera Daniel vid hemkomst.
+
+---
+
 ## RESUME-HERE , 2026-06-09 , T4b KLAR - PR #34 väntar på autonom merge
 
 **Branch:** `feature/T4b-matchtabla` @ HEAD `69df0f4`

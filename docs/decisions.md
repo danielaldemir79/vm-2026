@@ -5,6 +5,123 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T7 (issue #7): Copilot-review R2 (C5-C8)
+
+**Beslut (C5, reduced-motion stänger AV hero-animationerna helt):** Vid `prefers-reduced-motion: reduce`
+nollas de dekorativa hero-animationerna EXPLICIT med `animation: none` på `.vm-hero-sheen` och
+`.vm-live-dot` (`src/index.css`), utöver den svepande `animation-duration: 0.01ms`-regeln.
+**Varför:** Den svepande regeln (`duration: 0.01ms` + `iteration-count: 1`) kör animationen en gång
+till SLUT nästan momentant, så keyframsen landar på sitt 100 %-läge, inte sitt startläge. För
+`vm-sheen` är 100 % `background-position: 140% 0%`, dvs sveptet fryser mitt i/utanför fonden i stället
+för i ro, och den gamla kommentaren ("stannar på sitt första steg") var falsk. Designintentet (T7
+design-lager) är en HELT statisk hero vid reducerad rörelse; `animation: none` ger det och håller
+kommentaren sann (WCAG 2.3.3).
+
+**Beslut (C6, MatchCard-kommentar rättad till verkligheten):** Kommentaren i botten-raden sa att
+"dt:erna är visuellt dolda (sr-only)", men Arena-dt:n är SYNLIG (`font-semibold`). Rättad (minsta
+sanna ändring): de flesta dt:er är `sr-only` (värdet bär sin egen identitet, t.ex. TV-badgen och
+guld-chippet), men Arena-dt:n hålls synlig eftersom ett bart arena-/stadsnamn behöver en synlig
+"Arena"-etikett för att inte bli tvetydigt. Ingen funktionell ändring, bara doc-drift bort.
+
+**Beslut (C7, vilodagar inkluderas i dagslistan):** `groupMatchesByDay` returnerar nu en post för
+VARJE kalenderdag mellan turneringens första och sista speldag, även dagar utan matcher (`matches: []`).
+**Varför:** VM 2026 spelas 11 juni-19 juli och har vilodagar mellan ronderna (mellan gruppspelets slut
+och sextondelarna m.m.); med bara speldagar i listan hoppade datumnavigeringen rakt över dem och
+vilodags-panelen i vyn (lokala reviewens F4) var oåtkomlig. Issue #7:s DoD kräver "Datumnavigering
+bläddrar dag för dag, hanterar dagar utan matcher". Tomma dagar fylls med en ren datum-uppräkning i
+UTC-midnatt (`enumerateDateKeys`) så ingen DST-övergång i Europe/Stockholm kan hoppa över/upprepa ett
+datum (nycklarna är redan rena svenska kalenderdatum, det är bara kalender-aritmetik på dem).
+**Startdags-val (dokumenterat):** `initialDayIndex` landar på "idag" när idag ligger i spannet OAVSETT
+om det är en speldag eller vilodag (en vilodag som "idag" visar vilodags-panelen), annars premiären
+(idag före spannet) eller sista dagen (allt passerat). Mer intuitivt än att tvinga fram nästa speldag
+mitt under ett pågående mästerskap. Första/sista dag förblir kant-disabled i navigeringen.
+
+**Beslut (C8, kuriosa SCOPAS BORT från T7 -> T10):** "Kuriosa"-fältet på matchkortet renderas aldrig
+eftersom `matches.ts` inte bär verifierad trivia-data. Kuriosa flyttas till T10 (lag-profil-tasken)
+där en verifierad datakälla finns. **Varför:** Samma princip som arena-platshållaren (#35) och
+gissa-aldrig: en uppgift utan verifierad källa presenteras inte som data. Dirigenten uppdaterar
+issue #7:s DoD.
+
+---
+
+## 2026-06-10 , T7 (issue #7): Copilot-review R1 (C1-C4)
+
+**Beslut (C1, startdag synkront):** Den valda startdagen i `useDailyMatches` härleds SYNKRONT i
+render (memo över `selectedKey` + fallback till `initialDayIndex`), inte längre via en `useEffect`.
+En `useEffect` speglar bara den härledda nyckeln tillbaka till state för navigeringen (goPrev/goNext),
+den är inte källan till vad vyn visar.
+**Varför:** En effekt körs först EFTER första commit, så med effekt-initiering fanns en render där
+`status==='ready'` och `days.length>0` men `selectedDay===null` -> vyn kunde flicker-visa tom-dag-
+panelen ("Ingen match den här dagen") fast matcher fanns. Synkron härledning stänger den glipan
+(regressionstest bevisat: failar mot effekt-versionen, passerar mot render-härledningen).
+
+**Beslut (C2, fail loud på ogiltig kickoff):** `isUpcoming` (countdown.ts) KASTAR på en NaN-tidsstämpel
+i stället för att tyst returnera `false`. Samma fail-loud-kontrakt som `localDateKey` /
+`formatDayHeading` / `formatDayShort` i samma feature.
+**Varför:** En tyst `false` dolde en datakorrupt match som "inte kommande" (PRINCIPLES §8, känd fälla
+`tyst-maskerande-fallback` i senior-developer lessons): nästa-avspark-valet hoppade tyst över den och
+hero:n kunde felaktigt landa i sluttillståndet. Ett datafel ska synas vid källan, inte maskeras.
+
+**Beslut (C3/C4, TvBadge-doc rättad till verkligheten):** `channelTone` returnerar en HEX-LITERAL som
+hue för SVT/TV4 (kanalens signaturfärg). Kommentaren/JSDoc:en sa tidigare "inga råa hex" / "aldrig
+blir en rå hex", vilket var doc-drift mot koden. Vald lösning (KISS/YAGNI): rätta texten så den
+beskriver verkligheten, hue:n ÄR en hex-literal men bakas alltid ihop med en semantisk yt-token via
+`color-mix` (14 % bakgrund, 38 % kant) så den RENDERADE färgen följer temat, hex:en lyser aldrig rå
+rakt ut. Att flytta tonerna till CSS-tokens vore en större ändring utan funktionell vinst (avvisad).
+
+---
+
+## 2026-06-09 , T7 (issue #7): daglig matchvy, dag-gruppering i svensk tid + dagens-match-regel
+
+**Beslut (tidszon):** Den dagliga matchvyn grupperar och visar matcher per SVENSK kalenderdag
+(Europe/Stockholm), trots att `Match.kickoff` lagras i UTC. Dag-nyckeln härleds via `Intl`
+(`localDateKey`, `groupMatchesByDay`), inte genom att klippa datumdelen ur UTC-ISO-strängen.
+**Varför:** Direkt UTC-datum vore en off-by-one kring midnatt (känd fälla i senior-developers
+lessons): en match 2026-06-13T22:00Z är 00:00 svensk tid 2026-06-14 och hör till den svenska
+dagen 06-14, inte UTC-dagen 06-13. Samma svenska tidszon som tablå-källan uttrycktes i (parserns
+`SOURCE_TIMEZONE`). Allt som VISAS (tid, dag-rubrik) formateras tillbaka till svensk tid via Intl.
+
+**Beslut ("Match of the day"):** Dagens framträdande match väljs deterministiskt som dagens
+TIDIGASTE avspark (lägst kickoff, tie-break på match-id). Live-nedräkningen i hero:n räknar mot
+turneringens NÄSTA kommande avspark över ALLA matcher (inte bara vald dag).
+**Varför:** Rankning (FIFA-ranking) kräver lag-profil-data som är T10 (out of scope här), och för
+slutspel är lagen ännu okända (homeTeamId/awayTeamId null). "Dagens första avspark" är data vi har
+för varje match och en naturlig hero. Regeln kan skärpas i T10 när rankning finns, på ett
+dokumenterat sätt. Nedräknings-beräkningen är en REN funktion (`computeCountdown(matches, now)`),
+UI-tickandet (sekund-timer) är skilt från logiken så slut-tillståndet (efter finalen, ingen
+kommande match) och exakt-vid-avspark hanteras explicit och testbart.
+
+**Beslut (arena-platshållare, #35):** Matchkortet DÖLJER `venue` när den är "ej verifierad"-
+platshållaren (`isVenuePlaceholder`, mönster-baserad detektion), i stället för att visa den som
+verifierad arena-data. **Varför:** Källan bär ännu inte arena/stad (känd lucka, gissas aldrig);
+att visa platshållaren vore att presentera en icke-verifierad uppgift som data. Döljs tills riktig
+arena-data finns. Design-frontend finputsar (dölj/dämpa) ovanpå.
+
+**Beslut (design-frontend, premium-lager):** Hero:n byggs som "arena i kvällsljus": en mörk yta med
+två radiella ljus (pitch-grön ur övre hörnet, varm guld ur det nedre) plus ett långsamt rörligt
+ljus-svep (`vm-sheen`) och en pulsande live-prick (`vm-pulse`). Båda CSS-animationerna är RENT
+dekorativa och stängs AV explicit vid `prefers-reduced-motion` (`animation: none` på `.vm-hero-sheen`
+/ `.vm-live-dot` i `index.css`, se C5-beslutet 2026-06-10), så hero:n är helt statisk, WCAG 2.3.3
+håller utan en egen JS-grind. Nedräkningen renderas som
+upphöjda "tiles" med `tabular-nums` + fast min-bredd, så siffrorna aldrig ger layout-hopp när
+sekunderna tickar (ingen CLS).
+**Varför (featured-signal, T7-pin):** "Dagens match" framhävs FÄRG-OBEROENDE med GULD (chip + kant +
+gradient), aldrig med accent/success, eftersom de två rollerna delar exakt samma skogsgröna hue i
+ljust tema (verifierat live: `--vm-accent` === `--vm-success` === #0e7a44). Guld-chippet är en SOLID
+guld-bricka med mörk ink-text (`#1c1403`), inte guld-text-på-tint: solid + mörk text ger garanterad
+WCAG AA i båda teman (uppmätt 5.03:1 ljust / 10.90:1 mörkt), medan guld-text-på-18%-tint föll under
+AA på den ljusa ytan (2.97:1). Samma färg-oberoende princip som T5:s kvalificeringszon
+(`fargoberoende-framhavning`, patterns.md).
+**Beslut (lag-emblem + TV-badge):** Lag får en deterministisk tvåtons-"flagg-disc" genererad ur
+FIFA-landskoden (`TeamFlag`), inte riktiga flaggbilder. **Varför:** 48 flaggbilder vore ett
+nät-/asset-beroende som hotar LCP/CLS (Core Web Vitals, PRINCIPLES §12), och emoji-flaggor renderas
+inte på Windows. Discen är ren dekoration (aria-hidden); lagnamnet bär a11y. Kan bytas mot riktig
+flagg-data i lag-profil-tasken utan att röra matchkortet. TV-kanalen blir ett kännbart märke
+(`TvBadge`) med kanal-egen ton i kant/bakgrund/prick men TEXTEN på full fg-kontrast (15.10:1 ljust /
+13.23:1 mörkt), så kanalen skummas snabbt och håller AA oavsett kanalfärg.
+
+---
+
 ## 2026-06-09 , T4b (issue #31): matchtablån genererad ur svensk TV-tablå, värde-låst, arena flaggad
 
 **Beslut (data + arkitektur):** Hela VM 2026:s matchplan (72 gruppmatcher + 32 slutspelsmatcher
