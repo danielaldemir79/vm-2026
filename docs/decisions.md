@@ -5,6 +5,37 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , #39 (T27) senior-developer: Copilot R1, dag-medvetet fönster (C1) + dolt-ej-filtrerat (C2)
+
+**Beslut (C1, dag-medvetet 3-dagars fönster):** `ResultEntryView` läser inte längre "idag" via ett
+fruset `Date.now()`. En ny hook `useTodayKey` (`src/features/daily/use-today-key.ts`) äger ett "nu" som
+bara uppdateras när den svenska kalenderdagen FAKTISKT växlar (minut-tick som gatar på dag-byte +
+en `visibilitychange`-lyssnare), och vyn memoizerar fönstret på det (`windowMatches(editable, nowMs)`).
+**Varför:** appen är en PWA som lämnas öppen hela VM:t (fliken kan stå öppen över midnatt). Det gamla
+`useMemo(() => windowMatches(editable), [editable])` läste `Date.now()` internt men berodde bara på
+matchlistan, så 3-dagars fönstret frös på första beräkningens dag och flyttade sig inte över midnatt.
+`useTodayKey` återanvänder `localDateKey` (EN sanning för svensk-dag, off-by-one-säker) och returnerar ett
+referens-stabilt `nowMs` inom en dag, så fönstret räknas om vid dygnsväxling men inte i onödan varje tick.
+`visibilitychange` täcker att en bakgrunds-flik får sina timers strypta: appen synkar dagen direkt när den
+blir synlig igen. Bevisat: `use-today-key.test.tsx` (fejkad Date, flytt över midnatt, synlighets-synk) +
+`ResultEntryView.test.tsx` (vyn visar olika kort premiärdagen vs en vecka senare).
+
+**Beslut (C2, alla kort renderas, de utanför fönstret DÖLJS med `hidden` i stället för att filtreras bort):**
+Listan renderar nu ALLA `editable`-matcher som `<li>`, och markerar de utanför fönstret med `hidden`-
+attributet (display:none + borttaget ur a11y-trädet) när listan inte är utfälld, i stället för att klippa
+bort dem ur den renderade arrayen.
+**Varför:** varje `ResultEntryForm` seedar sin lokala `useState` (osparade mål/status) en gång vid mount.
+Filtrerades ett out-of-window-kort bort vid ihopfällning unmountades formuläret och OSPARAD inmatning
+tappades. Med `hidden` bevaras React-instansen, så ett pågående edit överlever expandera/ihopfäll.
+Prestanda-OK: före #39 renderades alla kort jämt, så att hålla dem mounted är inte dyrare än den baseline.
+A11y bevarad: dolda kort nås inte av tab/skärmläsare (hidden-attributet sköter det), och `hiddenCount`/
+knapptexten stämmer fortfarande (en `fieldset` i ett hidden-träd är inte i a11y-trädet, så
+`getAllByRole('group')` räknar bara synliga). Bevisat: `ResultEntryView.test.tsx` (skriv i ett
+out-of-window-kort, fäll ihop, fäll ut, värdet kvar). Den ursprungliga fönster-/expandera-regeln
+står kvar under "#39 (T27) senior-developer: resultatinmatning, stabilt kolumn-grid + 3-dagars fönster".
+
+---
+
 ## 2026-06-10 , #39 (T27) design-frontend: premium-finish på resultatinmatningen (kompakta kort + tydlig expandera)
 
 **Beslut (kompakta kort, "arena i kvällsljus"):** ResultEntryForm-kortet komprimerades ovanpå senior-devs
