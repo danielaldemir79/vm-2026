@@ -1,0 +1,514 @@
+// Härled slutspelsträdets LEVANDE tillstånd ur matchresultaten (REN funktion).
+//
+// Detta är slutspelsträdets motsvarighet till deriveGroupTables (SPEC §6,
+// "härledd state"): trädet LAGRAS aldrig, det är en ren funktion av den enda
+// sanningen (matchlistan) + den hårt testade FIFA-motorn (T4). Tre lägen, helt
+// datadrivna, ingen gissning:
+//
+//   1. GRUPPSPEL PÅGÅR  -> varje slot visar VILKA lag som KAN hamna där
+//      ("möjliga lag") + en grupp-positions-etikett ("1:a grupp A", "3:a
+//      A/B/C/D/F" enligt FIFA Article 12.6). Bästa-trea-platserna visar de
+//      eligibleGroups som STRUKTUREN (bracket-structure.ts) anger, EXAKT vad
+//      motorn säger, aldrig spekulation om vilka som kvalificerar.
+//   2. GRUPPERNA KLARA  -> slotarna LÅSES till riktiga lag: gruppvinnare/tvåa
+//      ur de härledda tabellerna, och de 8 bästa treorna seedade via FIFA:s
+//      Annexe C (seedThirdPlaces, T4). Treplats-rankningen (Article 13) avgör
+//      VILKA 8 grupper som bidrar (rankThirdPlaces).
+//   3. SLUTSPELSRESULTAT FINNS -> vinnaren propagerar till nästa slot
+//      (match-winner), och bronsmatchen matas av semifinal-FÖRLORARNA
+//      (match-loser). En straff-avgjord match (FIFA Art. 14) ger en entydig
+//      vinnare via penalties.
+//
+// Funktionen är React-fri och muterar inte sina argument, så den är enhetstestbar
+// fristående och kan köras om vid varje resultatinmatning (live).
+//
+// KÄLLA (gissas ALDRIG): hela strukturen + seedningen kommer från den redan
+// källhänvisade, verifierade T4-motorn (bracket-structure.ts, build-bracket.ts,
+// seed-third-places.ts/Annexe C, rank-third-places.ts/Article 13). Denna modul
+// HÄRLEDER bara lag-tillståndet ovanpå den, den definierar ingen ny slutspelsregel.
+
+import type { GroupId, GroupTable, Match } from '../../domain/types';
+import { buildBracket, type BracketNode } from '../../domain/bracket/build-bracket';
+import { seedThirdPlaces } from '../../domain/bracket/seed-third-places';
+import { computeThirdPlaceRanking } from '../../domain/bracket/rank-third-places';
+
+/** Hur en slots lag är bestämt just nu. */
+export type SlotResolution =
+  // Ett konkret, framräknat lag (gruppspel klart / slutspelsmatch avgjord).
+  | 'resolved'
+  // Gruppspelet pågår: laget är inte fastställt, men en mängd MÖJLIGA lag finns
+  // (de lag som ännu kan landa i denna position) + en grupp-positions-etikett.
+  | 'possible'
+  // Inget kan ännu sägas om laget (t.ex. en senare slutspelsmatch vars båda
+  // föregångare ännu inte är avgjorda, och inga möjliga lag är meningsfulla).
+  | 'tbd';
+
+/**
+ * En slot i det HÄRLEDDA trädet: T4:s strukturella BracketNode + lag-tillståndet.
+ * `label` är en människo-läsbar position ("1:a grupp A", "Vinnare M89") som UI:t
+ * kan visa oavsett läge. `teamId` är satt när `resolution === 'resolved'`.
+ * `candidateTeamIds` bär de möjliga lagen när `resolution === 'possible'`.
+ */
+export interface BracketSlotState {
+  /** Slot-id, t.ex. "M79-home" (från build-bracket). */
+  id: string;
+  /** Matchnummer-id, t.ex. "M79". */
+  matchId: string;
+  /** Hemma/borta. */
+  side: BracketNode['side'];
+  /** Rundan (round-of-32 ... final). */
+  stage: BracketNode['stage'];
+  /** Slot dit vinnaren går vidare, null för final/bronsmatch. */
+  nextSlotId: string | null;
+  resolution: SlotResolution;
+  /** Människo-läsbar positions-etikett (alltid satt). */
+  label: string;
+  /** Framräknat lag (Team.id), satt vid 'resolved', annars null. */
+  teamId: string | null;
+  /** Möjliga lag (Team.id) vid 'possible', annars tom. */
+  candidateTeamIds: string[];
+}
+
+/** En slutspelsmatch i det härledda trädet: dess två slots + ev. utfall. */
+export interface BracketMatchState {
+  matchId: string;
+  stage: BracketNode['stage'];
+  home: BracketSlotState;
+  away: BracketSlotState;
+  /**
+   * Vinnarens slot-id ('home'-slotens eller 'away'-slotens id) när matchen är
+   * avgjord (inkl. på straffar), annars null. Driver vinnar-propageringen och
+   * låter UI:t markera/animera fram vinnaren.
+   */
+  winnerSlotId: string | null;
+}
+
+/** Hela det härledda slutspelsträdet, i officiell match-ordning (M73 -> M104). */
+export interface BracketState {
+  matches: BracketMatchState[];
+  /**
+   * Är gruppspelet klart och trädets sextondelsfinaler LÅSTA till riktiga lag?
+   * (true när alla 12 gruppers tabeller är slutgiltiga, se isGroupStageComplete.)
+   */
+  locked: boolean;
+}
+
+/* ------------------------------------------------------------------ *
+ * Etiketter (människo-läsbara positioner). Rena, ingen logik.
+ * ------------------------------------------------------------------ */
+
+function winnerLabel(group: GroupId): string {
+  return `1:a grupp ${group}`;
+}
+function runnerUpLabel(group: GroupId): string {
+  return `2:a grupp ${group}`;
+}
+function bestThirdLabel(groups: readonly GroupId[]): string {
+  return `3:a ${groups.join('/')}`;
+}
+function matchWinnerLabel(matchId: string): string {
+  return `Vinnare ${matchId}`;
+}
+function matchLoserLabel(matchId: string): string {
+  return `Förlorare ${matchId}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Gruppspel: är det klart, och uppslag av tabell-positioner.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Är gruppspelet klart? Sant när VARJE inskickad grupptabell har alla sina
+ * matcher spelade (varje lag har spelat 3 matcher i VM 2026-formatet). Vi
+ * härleder det ur tabellerna (played), inte ur ett separat flagg-fält, så det
+ * är en ren funktion av sanningen. Kräver alla 12 grupperna OCH att var och en
+ * är färdigspelad, annars är seedningen inte giltig att låsa.
+ *
+ * MATCHES_PER_TEAM = 3: i en grupp om 4 lag spelar varje lag 3 matcher (envars-
+ * möte). Härleds inte ur datan (en ofullständig grupp har färre), utan är
+ * formatets konstant (SPEC §5).
+ */
+const GROUPS_TOTAL = 12;
+const MATCHES_PER_TEAM = 3;
+
+export function isGroupStageComplete(tables: readonly GroupTable[]): boolean {
+  if (tables.length < GROUPS_TOTAL) {
+    return false;
+  }
+  return tables.every(
+    (t) => t.standings.length > 0 && t.standings.every((row) => row.played >= MATCHES_PER_TEAM)
+  );
+}
+
+/** Slå upp gruppens tabell ur den härledda listan (eller undefined). */
+function tableOf(
+  tablesByGroup: ReadonlyMap<GroupId, GroupTable>,
+  group: GroupId
+): GroupTable | undefined {
+  return tablesByGroup.get(group);
+}
+
+/** Lag-id på en given 1-baserad rank i en grupp, eller null om den saknas. */
+function teamAtRank(table: GroupTable | undefined, rank: number): string | null {
+  return table?.standings.find((r) => r.rank === rank)?.teamId ?? null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Resolver per slot-källa.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Bygg lag-tillståndet för en GRUPP-källa (winner/runner-up) i ETT läge.
+ * Klart gruppspel -> resolved (rank 1/2). Pågående -> possible: kandidaterna är
+ * gruppens nuvarande topp i rätt position-spann (de lag som rimligen kan ta
+ * platsen). Vi håller "möjliga lag" enkelt och datadrivet: hela gruppens lag är
+ * kandidater tills gruppen är klar (vilket lag som helst kan teoretiskt sluta
+ * 1:a/2:a innan alla matcher spelats). UI:t visar etiketten + nuvarande topp.
+ */
+function resolveGroupSlot(
+  table: GroupTable | undefined,
+  rank: number,
+  label: string,
+  groupComplete: boolean
+): Pick<BracketSlotState, 'resolution' | 'label' | 'teamId' | 'candidateTeamIds'> {
+  if (groupComplete) {
+    const teamId = teamAtRank(table, rank);
+    return { resolution: 'resolved', label, teamId, candidateTeamIds: [] };
+  }
+  // Gruppspel pågår: alla lag i gruppen är möjliga (positionen är inte avgjord).
+  const candidateTeamIds = table ? table.standings.map((r) => r.teamId) : [];
+  return { resolution: 'possible', label, teamId: null, candidateTeamIds };
+}
+
+/**
+ * Bygg lag-tillståndet för en BÄSTA-TREA-källa.
+ * Klart gruppspel + seedning löst -> resolved (det specifika lagets trea).
+ * Pågående -> possible: kandidaterna är de NUVARANDE treorna i de eligibleGroups
+ * som strukturen anger (Article 12.6), EXAKT vad motorn säger.
+ */
+function resolveBestThirdSlot(
+  eligibleGroups: readonly GroupId[],
+  seededTeamId: string | null,
+  tablesByGroup: ReadonlyMap<GroupId, GroupTable>,
+  groupComplete: boolean
+): Pick<BracketSlotState, 'resolution' | 'label' | 'teamId' | 'candidateTeamIds'> {
+  const label = bestThirdLabel(eligibleGroups);
+  if (groupComplete && seededTeamId !== null) {
+    return { resolution: 'resolved', label, teamId: seededTeamId, candidateTeamIds: [] };
+  }
+  // Pågående (eller seedning ännu inte löst): de nuvarande treorna i de behöriga
+  // grupperna är kandidater. Inga gissningar om vilka som kvalificerar.
+  const candidateTeamIds: string[] = [];
+  for (const group of eligibleGroups) {
+    const third = teamAtRank(tableOf(tablesByGroup, group), 3);
+    if (third !== null) {
+      candidateTeamIds.push(third);
+    }
+  }
+  return { resolution: 'possible', label, teamId: null, candidateTeamIds };
+}
+
+/**
+ * Bygg lag-tillståndet för en MATCH-PROGRESSIONS-källa (winner/loser av Mxx).
+ * Matchen avgjord -> resolved (vinnaren/förloraren propagerad). Annars -> tbd,
+ * men om BÅDA lagen i föregångar-matchen är kända (resolved) visar vi dem som
+ * möjliga lag (de två som kan gå vidare), så trädet känns levande även framåt.
+ */
+function resolveMatchProgressionSlot(
+  feederMatchId: string,
+  wantWinner: boolean,
+  outcomeByMatchId: ReadonlyMap<string, MatchOutcome>,
+  slotStateById: ReadonlyMap<string, BracketSlotState>,
+  label: string
+): Pick<BracketSlotState, 'resolution' | 'label' | 'teamId' | 'candidateTeamIds'> {
+  const outcome = outcomeByMatchId.get(feederMatchId);
+  if (outcome) {
+    const teamId = wantWinner ? outcome.winnerTeamId : outcome.loserTeamId;
+    return { resolution: 'resolved', label, teamId, candidateTeamIds: [] };
+  }
+  // Inte avgjord: visa de två möjliga lagen om föregångar-matchens slots är lösta.
+  const home = slotStateById.get(`${feederMatchId}-home`);
+  const away = slotStateById.get(`${feederMatchId}-away`);
+  const candidateTeamIds = [home?.teamId, away?.teamId].filter((id): id is string => id != null);
+  return {
+    resolution: candidateTeamIds.length > 0 ? 'possible' : 'tbd',
+    label,
+    teamId: null,
+    candidateTeamIds,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Slutspelsmatchernas utfall (vinnare/förlorare), inkl. straffar.
+ * ------------------------------------------------------------------ */
+
+interface MatchOutcome {
+  winnerTeamId: string;
+  loserTeamId: string;
+}
+
+/**
+ * Härled vinnare/förlorare för en FÄRDIG slutspelsmatch med KÄNDA lag. Lika
+ * ordinarie ställning avgörs på straffar (FIFA Article 14); saknas en avgörande
+ * straff-vinnare kan utfallet inte bestämmas (returnerar null, ingen gissning).
+ * Returnerar null också om lagen ännu inte är kända (slot ej resolved).
+ */
+function outcomeOf(
+  match: Match,
+  homeTeamId: string | null,
+  awayTeamId: string | null
+): MatchOutcome | null {
+  if (match.status !== 'finished' || homeTeamId === null || awayTeamId === null) {
+    return null;
+  }
+  const { homeGoals, awayGoals, penalties } = match.result;
+  if (homeGoals > awayGoals) {
+    return { winnerTeamId: homeTeamId, loserTeamId: awayTeamId };
+  }
+  if (awayGoals > homeGoals) {
+    return { winnerTeamId: awayTeamId, loserTeamId: homeTeamId };
+  }
+  // Lika ordinarie tid: straffar avgör (Art. 14). Utan avgörande straffar kan
+  // vinnaren inte bestämmas (fail-safe: lämna oavgjort, propagera inte en gissning).
+  if (penalties && penalties.homeGoals !== penalties.awayGoals) {
+    return penalties.homeGoals > penalties.awayGoals
+      ? { winnerTeamId: homeTeamId, loserTeamId: awayTeamId }
+      : { winnerTeamId: awayTeamId, loserTeamId: homeTeamId };
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Huvud-härledningen.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Härled slutspelsträdets levande tillstånd.
+ *
+ * @param tables   De härledda grupptabellerna (deriveGroupTables). Avgör låsning
+ *                 + seedning när gruppspelet är klart, och driver "möjliga lag"
+ *                 under gruppspelet.
+ * @param matches  Alla matcher (den enda sanningen). Slutspelsmatchernas resultat
+ *                 driver vinnar-propageringen.
+ * @returns        Hela trädet i officiell match-ordning, med varje slots
+ *                 lag-tillstånd (resolved/possible/tbd) + matchutfall.
+ *
+ * Slotarna byggs i match-ordning (M73 -> M104), och eftersom en match ALLTID
+ * kommer efter sina föregångare i den ordningen (FIFA-numreringen), är en slots
+ * föregångar-utfall redan beräknat när vi når den. Så en enda passering räcker
+ * för att propagera vinnare genom hela trädet.
+ */
+export function deriveBracket(
+  tables: readonly GroupTable[],
+  matches: readonly Match[]
+): BracketState {
+  const nodes = buildBracket();
+  const tablesByGroup = new Map<GroupId, GroupTable>(tables.map((t) => [t.groupId, t]));
+  const matchById = new Map<string, Match>(matches.map((m) => [m.id, m]));
+  const groupComplete = isGroupStageComplete(tables);
+
+  // Seeda de 8 bästa treorna (bara när gruppspelet är klart): matchId -> trean.
+  // qualifyingGroups är null tills exakt 8 treor finns, då seedar vi inte (möjliga
+  // lag-läget gäller). En giltig kombination ger en kollisionsfri Annexe C-seedning.
+  const thirdByMatchId = new Map<string, string>();
+  if (groupComplete) {
+    const { qualifyingGroups } = computeThirdPlaceRanking(tables);
+    if (qualifyingGroups) {
+      for (const assignment of seedThirdPlaces(qualifyingGroups)) {
+        const teamId = teamAtRank(tableOf(tablesByGroup, assignment.thirdPlaceGroup), 3);
+        if (teamId !== null) {
+          thirdByMatchId.set(assignment.matchId, teamId);
+        }
+      }
+    }
+  }
+
+  // Bygg slot-tillstånden i match-ordning, så en match-progressions-slot kan slå
+  // upp sin föregångares redan beräknade utfall + slot-tillstånd.
+  const slotStateById = new Map<string, BracketSlotState>();
+  const outcomeByMatchId = new Map<string, MatchOutcome>();
+  const matchStates: BracketMatchState[] = [];
+
+  // Gruppera noderna per match (home/away) i strukturens ordning.
+  const nodesByMatch = new Map<string, { home?: BracketNode; away?: BracketNode }>();
+  const matchOrder: string[] = [];
+  for (const node of nodes) {
+    let pair = nodesByMatch.get(node.matchId);
+    if (!pair) {
+      pair = {};
+      nodesByMatch.set(node.matchId, pair);
+      matchOrder.push(node.matchId);
+    }
+    pair[node.side] = node;
+  }
+
+  for (const matchId of matchOrder) {
+    const pair = nodesByMatch.get(matchId)!;
+    const homeNode = pair.home!;
+    const awayNode = pair.away!;
+
+    const homeState = buildSlotState(
+      homeNode,
+      thirdByMatchId,
+      tablesByGroup,
+      outcomeByMatchId,
+      slotStateById,
+      groupComplete
+    );
+    const awayState = buildSlotState(
+      awayNode,
+      thirdByMatchId,
+      tablesByGroup,
+      outcomeByMatchId,
+      slotStateById,
+      groupComplete
+    );
+    slotStateById.set(homeState.id, homeState);
+    slotStateById.set(awayState.id, awayState);
+
+    // Beräkna matchutfallet NU (efter att lagen lösts) så efterföljande matchers
+    // progressions-slots kan slå upp det i samma passering.
+    const match = matchById.get(matchId);
+    let winnerSlotId: string | null = null;
+    if (match) {
+      const outcome = outcomeOf(match, homeState.teamId, awayState.teamId);
+      if (outcome) {
+        outcomeByMatchId.set(matchId, outcome);
+        winnerSlotId = outcome.winnerTeamId === homeState.teamId ? homeState.id : awayState.id;
+      }
+    }
+
+    matchStates.push({
+      matchId,
+      stage: homeNode.stage,
+      home: homeState,
+      away: awayState,
+      winnerSlotId,
+    });
+  }
+
+  return { matches: matchStates, locked: groupComplete };
+}
+
+/** Bygg en slots fulla tillstånd ur dess källa + det aktuella läget. */
+function buildSlotState(
+  node: BracketNode,
+  thirdByMatchId: ReadonlyMap<string, string>,
+  tablesByGroup: ReadonlyMap<GroupId, GroupTable>,
+  outcomeByMatchId: ReadonlyMap<string, MatchOutcome>,
+  slotStateById: ReadonlyMap<string, BracketSlotState>,
+  groupComplete: boolean
+): BracketSlotState {
+  const base = {
+    id: node.id,
+    matchId: node.matchId,
+    side: node.side,
+    stage: node.stage,
+    nextSlotId: node.nextSlotId,
+  };
+
+  const source = node.source;
+  let resolved: Pick<BracketSlotState, 'resolution' | 'label' | 'teamId' | 'candidateTeamIds'>;
+
+  switch (source.kind) {
+    case 'group-winner':
+      resolved = resolveGroupSlot(
+        tableOf(tablesByGroup, source.group),
+        1,
+        winnerLabel(source.group),
+        groupComplete
+      );
+      break;
+    case 'group-runner-up':
+      resolved = resolveGroupSlot(
+        tableOf(tablesByGroup, source.group),
+        2,
+        runnerUpLabel(source.group),
+        groupComplete
+      );
+      break;
+    case 'best-third':
+      resolved = resolveBestThirdSlot(
+        source.eligibleGroups,
+        thirdByMatchId.get(node.matchId) ?? null,
+        tablesByGroup,
+        groupComplete
+      );
+      break;
+    case 'match-winner':
+      resolved = resolveMatchProgressionSlot(
+        source.matchId,
+        true,
+        outcomeByMatchId,
+        slotStateById,
+        matchWinnerLabel(source.matchId)
+      );
+      break;
+    case 'match-loser':
+      resolved = resolveMatchProgressionSlot(
+        source.matchId,
+        false,
+        outcomeByMatchId,
+        slotStateById,
+        matchLoserLabel(source.matchId)
+      );
+      break;
+  }
+
+  return { ...base, ...resolved };
+}
+
+/* ------------------------------------------------------------------ *
+ * UI-hjälp: gruppera trädet i rundor (för en kolumn-per-runda-layout).
+ * ------------------------------------------------------------------ */
+
+/** Rundornas ordning vänster -> höger i trädet (officiell progression). */
+export const ROUND_ORDER: ReadonlyArray<BracketNode['stage']> = [
+  'round-of-32',
+  'round-of-16',
+  'quarter-final',
+  'semi-final',
+  'final',
+  'third-place',
+];
+
+/** Svenska rubriker per runda (en sanning för UI:t). */
+export const ROUND_LABELS: Readonly<Record<BracketNode['stage'], string>> = {
+  'round-of-32': 'Sextondelsfinaler',
+  'round-of-16': 'Åttondelsfinaler',
+  'quarter-final': 'Kvartsfinaler',
+  'semi-final': 'Semifinaler',
+  'third-place': 'Bronsmatch',
+  final: 'Final',
+};
+
+/** En runda med sina matcher (för kolumn-per-runda-rendering). */
+export interface BracketRound {
+  stage: BracketNode['stage'];
+  label: string;
+  matches: BracketMatchState[];
+}
+
+/**
+ * Dela upp det härledda trädet i rundor i officiell progressions-ordning. Tom
+ * runda hoppas över (ska inte hända för det fulla trädet, men robust).
+ */
+export function groupByRound(state: BracketState): BracketRound[] {
+  const byStage = new Map<BracketNode['stage'], BracketMatchState[]>();
+  for (const match of state.matches) {
+    const bucket = byStage.get(match.stage);
+    if (bucket) {
+      bucket.push(match);
+    } else {
+      byStage.set(match.stage, [match]);
+    }
+  }
+  const rounds: BracketRound[] = [];
+  for (const stage of ROUND_ORDER) {
+    const matches = byStage.get(stage);
+    if (matches && matches.length > 0) {
+      rounds.push({ stage, label: ROUND_LABELS[stage], matches });
+    }
+  }
+  return rounds;
+}
