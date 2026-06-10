@@ -10,13 +10,15 @@
 // NEKAS och en medlem TILLÅTS. Testet använder samma rooms-API som appen, så det
 // dubbel-bevisar både RLS OCH att klient-koden anropar rätt.
 //
-// NÄT-GIND: testet kräver nät + de publika Supabase-uppgifterna. Saknas de (t.ex.
-// en offline-CI utan env) SKIPPAS hela sviten rent (describe.skipIf), så den gröna
-// enhetstest-sviten inte blir röd av en nät-avsaknad. Uppgifterna är PUBLIKA per
-// design (anon/publishable-nyckel, skyddad av just den RLS vi testar), men läses
-// ur env (VITE_SUPABASE_URL/ANON_KEY) eller faller till projektets kända publika
-// värden, så de inte hårdkodas som "secrets" (de är inga, men vi behandlar dem
-// som env-konfig ändå, PRINCIPLES §7).
+// ENV-GRIND: testet kräver nät + Supabase-projektets publika uppgifter, och de
+// måste komma UR MILJÖN (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Saknas de
+// (t.ex. en offline-CI, eller en contributor utan projektkoppling) SKIPPAS hela
+// sviten rent (describe.skipIf), så den gröna enhetstest-sviten inte blir röd och
+// inget kör mot ett okänt projekt. INGEN hårdkodad fallback (Copilot-runda 1, C7): en
+// inbäddad projekt-URL + nyckel i repot band testet till ETT live-projekt för alla
+// contributors/CI och lade live-uppgifter i koden. Nyckeln är publik per design
+// (RLS är skyddet, inte hemlighållande), men den hör i miljö-konfig, inte i repot
+// (PRINCIPLES §7). CI/lokalt sätter env (Cloudflare-env finns redan, T14).
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
@@ -31,17 +33,22 @@ import {
   upsertRoomResult,
 } from './rooms-api';
 
-// Publik projektkonfig: env först (Vites import.meta.env, bundler-native), annars
-// projektets kända publika värden. Den publishable-nyckeln är publik per design
-// (RLS är skyddet), inte en secret, men läses ändå via env-konfig (PRINCIPLES §7).
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ?? 'https://kmzhyblzxangpxydufve.supabase.co';
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_dqH6DdvuZDJ4vVTRd-bC5Q__fOMygZ0';
+// Publik projektkonfig UR MILJÖN (Vites import.meta.env, bundler-native). Ingen
+// hårdkodad fallback (C7): saknas någon av dem skippas hela sviten (se hasEnv +
+// describe.skipIf nedan), så testet aldrig binds till ett inbäddat live-projekt.
+// Nyckeln är publik per design (RLS är skyddet), men hör i env-konfig (PRINCIPLES §7).
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-/** Skapa en fristående klient (egen storage-nyckel) = en isolerad session. */
+// Båda måste finnas, annars är projektet inte konfigurerat för detta test.
+const hasEnv = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+/**
+ * Skapa en fristående klient (egen storage-nyckel) = en isolerad session. Anropas
+ * bara när hasEnv är sant (sviten är annars skippad), så icke-null hävdas tryggt.
+ */
 function freshClient(tag: string): VmSupabaseClient {
-  return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  return createClient<Database>(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
     auth: {
       // Ingen delad storage mellan testanvändarna: var och en sin egen session.
       persistSession: false,
@@ -59,9 +66,13 @@ function freshClient(tag: string): VmSupabaseClient {
 // håller skipIf sviten grön i stället för röd, men RLS-modellen är bevisad när
 // testet KÖR (den körs i CI/lokalt när projektet är nåbart + under rate-limiten).
 async function reachable(): Promise<boolean> {
+  // Utan env-konfig är projektet per definition inte nåbart för detta test.
+  if (!hasEnv) {
+    return false;
+  }
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
-      headers: { apikey: SUPABASE_ANON_KEY },
+    const res = await fetch(`${SUPABASE_URL!}/auth/v1/health`, {
+      headers: { apikey: SUPABASE_ANON_KEY! },
     });
     return res.ok;
   } catch {
@@ -93,11 +104,12 @@ async function signInOrRateLimit(c: VmSupabaseClient): Promise<{ id: string }> {
   throw new Error('RATE_LIMIT');
 }
 
-// Avgör EN gång vid inläsning om projektet är nåbart. skipIf gör sviten grön
-// (skippad) offline i stället för röd.
-const online = await reachable();
+// Avgör EN gång vid inläsning om projektet är konfigurerat (env) OCH nåbart.
+// skipIf gör sviten grön (skippad) utan env eller offline i stället för röd.
+// (reachable() returnerar redan false utan env, men namnet håller villkoret tydligt.)
+const runnable = hasEnv && (await reachable());
 
-describe.skipIf(!online)('RLS: rum, medlemmar och delade resultat (riktiga sessioner)', () => {
+describe.skipIf(!runnable)('RLS: rum, medlemmar och delade resultat (riktiga sessioner)', () => {
   let alice: VmSupabaseClient; // skapar rummet
   let bob: VmSupabaseClient; // går med via kod
   let carol: VmSupabaseClient; // utomstående, går aldrig med
