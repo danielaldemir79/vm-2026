@@ -5,6 +5,65 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T31 (#51, C1): tomt Spara på en LIVE-match bevarar live (ingen statusregression)
+
+**Beslut:** `intendedStatus` tar nu emot matchens nuvarande status. Vid TOMMA mål bevaras
+`live` om matchen redan är live (annars `scheduled`). Ifyllda mål ger som förr `finished`.
+**Varför:** `ResultEntryForm` renderas även för en pågående match (`match.status === 'live'`).
+Med den gamla regeln (tomt -> alltid `scheduled`) backade ett tomt Spara en live-match till
+scheduled, en oavsiktlig statusregression. `live -> live` (utan resultat) är en validerad no-op
+enligt `validate-result.ts` `ALLOWED_TRANSITIONS` (live tillåter scheduled/live/finished, och
+`status !== 'finished' && hasAnyGoal` är falskt vid tomma mål -> inget result-fel). Nollställnings-
+vägen är ORÖRD: en `finished`-match med tömda fält + Spara ger fortsatt `scheduled` (avsiktlig
+reset), och "Rensa resultat"-knappen sätter `scheduled` direkt. Källa för övergångsreglerna:
+`src/features/results/validate-result.ts` (`ALLOWED_TRANSITIONS`, livscykel scheduled -> live -> finished).
+
+---
+
+## 2026-06-10 , T31 (#51, F1): två likvärdiga vägar att nollställa en spelad match
+
+**Beslut:** En spelad match kan nollställas tillbaka till `scheduled` på två likvärdiga vägar,
+båda går genom `intendedStatus` och ger samma validerade back-övergång: (1) tömma båda målfälten
+och trycka Spara, (2) "Rensa resultat"-knappen (sparar en entry med tomma mål). Rensa-knappen är
+inte den enda vägen, bara en tydligare genväg som syns först när matchen är spelad.
+**Varför:** Tidigare docstring i `ResultEntryForm` påstod att nollställning ENBART skedde via
+Rensa-knappen. Det var falskt, töm-fält+Spara ger samma resultat. Raden gör beteendet ärligt och
+spårbart så nästa läsare inte tror Rensa är en spärr.
+
+---
+
+## 2026-06-10 , T31 (#51, Daniels feedback): auto-spelad vid spar, status-väljaren borttagen
+
+**Beslut:** Statusväljaren ("Ej spelad"/"Pågår"/"Spelad"-dropdownen) togs bort ur
+`ResultEntryForm`. Statusen sätts AUTOMATISKT vid spar och HÄRLEDS ur målfälten
+(`intendedStatus`): något måltal ifyllt -> `finished` (spelad), inga mål -> `scheduled`.
+Ett halv-ifyllt fall (bara ett mål) härleds till `finished` och fångas då av valideringens
+`finished-without-result` ("kräver både ... mål"), så användaren leds att fylla i båda utan
+ett manuellt status-steg. En "Rensa resultat"-knapp lades till, synlig BARA när matchen är
+spelad (`match.status === 'finished'`), som sparar en tom inmatning (-> scheduled, inget
+resultat) och därmed är den minsta sanna vägen att ÅNGRA/nollställa en spelad match.
+**Varför:** Det manuella status-steget var ett onödigt moment (Daniels feedback): när man
+skriver in mål ÄR matchen spelad. Härledd status håller UI:t i fas med resultatet utan en
+extra väljare. **Bevarat oförändrat:** (a) T9:s slutspels-/straffvalidering (FIFA Art. 14):
+straff-fältens synlighet drivs nu av den härledda statusen i stället för väljaren, men
+`validate-result.ts` + `apply-match-result.ts` är ORÖRDA, så lika slutspelsmatch + straffar
+= spelad, och lika utan straff-vinnare = valideringsfel, precis som förr. (b) Rum-läget (T14)
+och sim-läget (T12): `submitResult`-seamen tar fortfarande en entry med status, och formuläret
+skickar den härledda statusen, så bägge vägarna fungerar oförändrat (verifierat: hela sviten
+grön, inkl. rooms-wiring- och simulerings-integrationstesterna). `validate-result`-koden
+`result-without-finished` är nu onåbar FRÅN formuläret men kvar för det lägre API-kontraktet
+(direkta `submitResult`-anropare), ärligt behållen.
+
+**Beslut:** T2:s showcase-block i `App.tsx` (Paletten/Rörelsen-griden under rubrikerna
+"Designfundament"/"Levande känsla" + Typografi-provet) togs bort ur den renderade vyn, och de
+nu föräldralösa komponenterna `src/components/foundation/SwatchGrid.tsx` + `MotionDemo.tsx`
+raderades (inga tester använde dem). Footer-prosan "Fundamentet är på plats: ..." (byggnadsställnings-
+text) ersattes med en färdig rad. Tema-TOGGLEN i headern är INTE showcasen och är kvar (riktig funktion).
+**Varför:** Showcasen var en byggnadsställning från T2 för att premium-känslan skulle synas på tidiga
+PR-förhandsvisningar. På den färdiga appen (riktiga matchvyer + tips-liga) blev den brus som drog
+fokus från innehållet. Daniels feedback (#51). Inga tester refererade showcase-texten, så App-smoke-
+testerna (h1 = "VM 2026", main-landmark, tema-toggle, 12 grupptabeller) förblir gröna oförändrade.
+
 ## 2026-06-10 , T14 COPILOT-RUNDA 1 (issue #14): 7 fynd åtgärdade (C1-C7)
 
 **Beslut (C1, DB-INTEGRITET, halv-straff-läcka i `rmr_penalties_paired`, KÄLLHÄNVISAT):** Den

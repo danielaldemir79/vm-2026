@@ -5,6 +5,69 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T31/#51 (Showcasen bort + auto-spelad) KLAR - PR #53 väntar på merge
+
+**Branch:** `feature/T31-feedback3` @ HEAD `7cd8bd7`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/53 mot `develop` (Closes #51, state: OPEN)
+**Board:** issue #51 i "In Review" (korrekt). Dirigenten stänger issue #51 MANUELLT och flyttar kort #51 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester/flyg), dirigenten har fullmakt hela vägen till slutet.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `3a9bf13` - feat(app): ta bort designfundament-showcase (Paletten/Rörelsen/Typografi + föräldralösa komponenter borttagna, tema-toggle kvar, footer-prosa ersatt)
+- `13942cb` - feat(results): auto-spelad vid spara + Rensa-knapp (statusväljaren borttagen, `intendedStatus` härleder status ur målfälten)
+- `022de57` - docs(panel): F1-kommentar-sanning (panel-fynd: felaktig kommentar i resultats-formulär rättad)
+- `7cd8bd7` - fix(copilot-C1): bevarar live-status vid Rensa (Copilot runda 1, C2 avvisad husstils-kommat)
+
+**Verifiering:** 782 tester gröna + 12 env-skippade (+4 nya), build/lint/format rent. Panel: 1 fynd (F1 kommentar-lögn) åtgärdat. Copilot: 2 rundor (2 fynd -> 0, C2 avvisad). T9:s straffvalidering, T12:s sim-läge och T14:s rum-väg orörda.
+
+**Alla 5/5 acceptanskriterier bockade i issue #51** (journalisten 2026-06-10).
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e (YAGNI).
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #53 (T31/#51, feature/T31-feedback3) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 53 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #51 manuellt (`gh issue close 51`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #51 till Done på boarden.
+> Verifiera att vm-2026.pages.dev INTE visar "Designfundament"-sektionen, och att spara ett resultat med ifyllda mål direkt sätter status "spelad" utan manuell statusväljare.
+>
+> Om PR #53 REDAN mergad:
+> T31 är klar och mergad. Plocka nästa task.
+> **Nästa task: #50 (T30, Play Protect-varningen vid Android-install)** - research-task: undersök varför Android visar "Play Protect-varning" vid installation av APK/PWA, dokumentera orsak och rekommenderad åtgärd med web-källor. Därefter T15 (tips-motorn), sedan T25 (T26 DR-webb-inbäddning skippad, stängd not planned).
+>
+> PR #52 (T14/#14, feature/T14-supabase-live) kan också vara öppen och oamerged - om den fortfarande är OPEN: merga den FÖRE T30 (`gh pr merge 52 --merge`), stäng issue #14 manuellt.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T14/#14 (Supabase live + auth + RLS + rumskod) KLAR - FAS 2 IGÅNG - PR #52 väntar på merge
 
 **Branch:** `feature/T14-supabase-live` @ HEAD `bfc05a9`
