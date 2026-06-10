@@ -5,6 +5,48 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T12-visuellt (issue #12): sim-läget får en app-global, färg-oberoende "labbet"-markering
+
+**Beslut (HELA sim-zonen kläs i en markering, inte bara banner-kortet):** När what-if-läget är
+PÅ omsluts banner:n + alla simulerade vyer av en tunn wrapper, `SimulationFrame`
+(`src/features/simulation/SimulationFrame.tsx`), som läser `simulating` ur den delade storen och
+speglar den till `data-simulation-active` på sin rot. CSS-lagret (tokens.css §8) hänger en
+violett INRAMNING (inset-ring + mjuk ytterglow via box-shadow, ingen layout-påverkan / CLS) +
+en SVAG violett tint (pseudo-yta bakom innehållet) på den haken. Så markeringen täcker hela det
+hypotetiska området, inte bara kontrollen, och ingen kan bläddra in i tabell/träd och glömma att
+de spelar ut tänkta resultat. Vilo-läge = helt neutral wrapper (ingen ram, ingen tint).
+
+**Beslut (markeringen är FÄRG-OBEROENDE, tonen är bara förstärkning):** En sticky badge
+("SIMULERINGSLÄGE" + kolv-ikon + status-prick) följer med vid bläddring och bär signalen i TEXT
++ IKON (role="status", uppläst när läget slås på). Den violetta tonen/ringen ENSAM räcker
+aldrig (färgblind/färg-okänslig användare ser badge-texten). Banner-rubriken får dessutom en
+kolv-ikon. WCAG 2.3.3: en lugn andnings-puls på status-pricken nollas vid
+`prefers-reduced-motion: reduce` (verifierat: `animation-name` blir `none`), ramen blir statisk.
+
+**Beslut (VARFÖR violett, utanför appens rollfärger):** `--vm-sim` (mörkt `#b3a0ff`, ljust
+`#5b3bb8`) ligger med flit utanför grön accent / guld-warning / mint-teal success / korall
+danger, så sim-ramen aldrig kan läsas som "ett riktigt resultat-tillstånd". Indigo/violett läser
+kulturellt som "labb/utkast/hypotetiskt".
+
+**Beslut (KONTRAST mätt som canvas-komposit, värsta fall, BÅDA teman):** den violetta tinten är
+en alfa-blend (`--vm-sim` @ 6 %) över sidans fond, mätt genom att komponera färgen över base-ytan
+(inte ett typfall). Uppmätta värden (live-renderade pixlar bekräftade Node-alfa-blend):
+- Badge-ink PÅ den fyllda violett-pillen: **8.74:1 (mörkt) / 7.60:1 (ljust)**.
+- Banner-status (muted) på sitt kort i sim-läge: **7.50:1 (mörkt) / 6.52:1 (ljust)**.
+- Muted-text rakt på den 6 %-tintade FONDEN (värsta fall, ingen opak yta under):
+  **7.49:1 (mörkt) / 5.50:1 (ljust)**; brödtext (fg) **14.1:1 / 13.5:1**.
+- Alla >= 4.5:1 (normal text). Ringen + glow:en bär ALDRIG text, kan inte sänka kontrast.
+Mätmetod + lärdom (fast HSL/alfa garanterar inte fast kontrast, mät värsta fallet): lessons
+`design-frontend.md` (aa-kontrast-canvas-komposit). Verifierat 280-1440 px (ingen horisontell
+scroll vid 280) och i båda teman.
+
+**Spårbarhet:** UX/produkt + intern design-regel, ingen extern auktoritativ källa. Spårbar via
+#12 + denna rad + testerna (`SimulationFrame.test.tsx` markering finns bara i sim-läge + är
+text-buren/färg-oberoende, `SimulationBanner.test.tsx` oförändrad). Tokens i `tokens.css` (§
+SIM-TON + §8), wiring i `App.tsx`.
+
+---
+
 ## 2026-06-10 , T12 (issue #12): What-if-simulatorn = hypotetiskt overlay ovanpå den delade storen
 
 **Beslut (arkitektur, minsta sanna):** What-if-läget är INTE en egen datakälla eller en

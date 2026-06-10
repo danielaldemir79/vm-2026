@@ -618,3 +618,42 @@ verifierade härlednings-kedjan (tabeller/seedning/scenarier) gratis, isoleringe
 i koden (ren `readonly`-väv), och avstängning = töm overlay. Generaliserar T5/T6/T9/T11:s härledda-
 state-vyer till ett HYPOTETISKT-DATA-lager på samma store. Källa: T12 (`src/features/simulation/`:
 `apply-simulation.ts` + `SimulationBanner.tsx`, sim-seamen i `results-context.ts`/`ResultsProvider.tsx`).
+
+### app-global-fargoberoende-lages-markering- for-ett-icke-permanent-tillstand (VM 2026)
+
+**Recept (göra ett "läge" omisskännligt utan att förstöra läsbarhet eller a11y):** när appen kan
+gå in i ett icke-permanent tillstånd som ändrar vad siffrorna BETYDER (här: what-if-simulering,
+där allt blir hypotetiskt), måste tillståndet kännas över HELA den påverkade ytan, annars
+förväxlas det med de riktiga resultaten.
+
+1. EN tunn wrapper (`SimulationFrame`) omsluter hela den påverkade zonen, läser läget ur den
+   delade storen och speglar det till ETT data-attribut (`data-simulation-active`) på sin rot.
+   CSS hänger all visuell markering på den haken, så JSX:en bara bär läget vidare (en sanning,
+   ingen styling-logik i komponenten). Wrappern är NEUTRAL i vilo-läge (ingen ram, ingen tint).
+2. MARKERINGEN ÄR FÄRG-OBEROENDE. En ton/ring ENSAM räcker aldrig (färgblind/färg-okänslig
+   användare). Bär signalen i TEXT + IKON: en sticky badge ("SIMULERINGSLÄGE" + kolv-ikon) som
+   FÖLJER MED vid bläddring (`position: sticky`, `top` under den sticky headern) så markeringen
+   aldrig hamnar utom synhåll, med `role="status"` så en skärmläsare hör att läget slogs på.
+   Tonen/ringen är bara FÖRSTÄRKNING ovanpå text-signalen.
+3. RAMEN bär INGEN text: en inset-ring + mjuk ytter-glow med `box-shadow` (inte border-width), så
+   den inte ändrar layout (ingen CLS), plus en SVAG tint på en pseudo-yta BAKOM innehållet
+   (`z-index: -1`), så tinten färgar mellanrummen men aldrig mörklägger läsbar text.
+4. VÄLJ EN TON UTANFÖR APPENS ROLLFÄRGER. Här violett (`--vm-sim`), medvetet skild från grön
+   accent / guld-warning / mint-teal success / korall danger, så läges-markeringen aldrig kan
+   läsas som "ett riktigt status-tillstånd". Egna tokens per tema (mörkt/ljust), mätta separat.
+5. KONTRAST mäts som CANVAS-KOMPOSIT, VÄRSTA FALL, BÅDA teman: tinten är en alfa-blend över
+   fonden, så muted-text rakt på den tintade fonden (ingen opak yta under = värsta fallet) mäts
+   genom att komponera tint-färgen över base-ytan, inte ett typfall. Håll tint-alfan vid den
+   uppmätta gränsen med marginal (här 6 % -> muted-text >= 5.5:1 i båda teman). Skriv bara det
+   UPPMÄTTA min-värdet i docs (lessons: fast alfa/HSL garanterar inte fast kontrast).
+6. RÖRELSE gatas (WCAG 2.3.3): en lugn puls på en status-prick nollas vid
+   `prefers-reduced-motion: reduce` (`animation: none`), ramen blir statisk. Markeringen
+   (text + ikon + ring + tint) står kvar, bara rörelsen tas bort.
+
+**Varför:** ett läge som ändrar betydelsen av det användaren ser MÅSTE vara omisskännligt över
+hela ytan och för ALLA användare (inkl. färgblinda och skärmläsar-användare), utan att sänka
+läsbarheten. Genom att binda all styling till EN data-hake på en neutral wrapper, bära signalen i
+text + ikon (inte bara ton), välja en ton utanför rollfärgerna och mäta tint-kontrasten som
+canvas-komposit i värsta fallet, blir markeringen både premium och tillgänglig per konstruktion.
+Generaliserar till vilket "utkast/förhandsgransknings/sandlåde"-läge som helst. Källa: T12-visuellt
+(`SimulationFrame.tsx` + `SimulationBanner.tsx`, tokens i `tokens.css` § SIM-TON + §8, `App.tsx`).
