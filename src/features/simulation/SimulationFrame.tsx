@@ -15,8 +15,13 @@
 //
 // FÄRG-OBEROENDE (taskens punkt 1): den violetta tonen ENSAM räcker aldrig som
 // markering (färgblind/färg-okänslig användare). Badge:ns text + ikon bär
-// signalen; tonen och ringen förstärker den bara. role="status" gör att en
-// skärmläsare hör när läget slås på (artigt aria-live, flyttar inte fokus).
+// signalen visuellt; tonen och ringen förstärker den bara.
+//
+// EN live region (C4): badge:n är en VISUELL förstärkning, det informativa
+// announcement-meddelandet ("Simulering pågår...") äger SimulationBanner med
+// role="status". Hade badge:n OCKSÅ haft role="status" skulle två live regions
+// dyka upp samtidigt när läget slås på = skärmläsaren läser dubbelt. Därför är
+// badge:n aria-hidden: ögat ser den, skärmläsaren hör bannerns enda announcement.
 
 import type { ReactNode } from 'react';
 import { useResultsStore } from '../results/results-context';
@@ -68,14 +73,15 @@ export function SimulationFrame({ children }: { children: ReactNode }) {
     >
       {simulating && (
         // STICKY badge: pinnad nära toppen så den följer med vid bläddring i de
-        // simulerade vyerna. role="status" => uppläst när läget slås på.
+        // simulerade vyerna. VISUELL förstärkning, aria-hidden => INTE en live
+        // region (bannern äger den enda announcement-statusen, se C4-noten ovan).
         // top-16 lämnar plats för app-headern (sticky, z-10); badge:n ligger
         // ovanför innehållet men under headern (z-[5]).
-        <div className="pointer-events-none sticky top-16 z-[5] flex justify-center sm:top-20">
-          <p
-            role="status"
-            className="vm-sim-badge pointer-events-auto inline-flex items-center gap-2 rounded-pill px-3.5 py-1.5 font-display text-xs font-bold uppercase tracking-[0.12em] sm:text-sm"
-          >
+        <div
+          className="pointer-events-none sticky top-16 z-[5] flex justify-center sm:top-20"
+          aria-hidden="true"
+        >
+          <p className="vm-sim-badge pointer-events-auto inline-flex items-center gap-2 rounded-pill px-3.5 py-1.5 font-display text-xs font-bold uppercase tracking-[0.12em] sm:text-sm">
             <span
               className="vm-sim-dot inline-block h-2 w-2 shrink-0 rounded-pill"
               aria-hidden="true"
