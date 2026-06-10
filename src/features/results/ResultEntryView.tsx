@@ -18,6 +18,7 @@
 import { useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { formatDayHeading, useTodayKey } from '../daily';
+import { triggerResultFeedback, useFeedbackSettings } from '../app-settings';
 import { useGoalCelebration, type GoalCelebration } from './goal-celebration';
 import { groupMatchesForEntry } from './group-matches-for-entry';
 import { useResultsStore } from './results-context';
@@ -122,6 +123,12 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
   const { status, matches, teams, submitResult, error } = useResultsStore();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
   const { celebration, celebrateGoal } = useGoalCelebration();
+  // Valbar haptik + ljud (AV som standard, T13). Läses via den TOLERANTA
+  // accessorn (faller till tyst standard utan provider) så den BEFINTLIGA
+  // spar-seamen (handleSaved) kan spela en kort feedback utan att tvinga vyn att
+  // känna till settings-providern, exakt som det valfria firande-lagret.
+  // triggerResultFeedback gatar varje kanal internt, så detta är invasivt minimum.
+  const { haptics, sound } = useFeedbackSettings();
 
   // Bara matcher med BÅDA lag kända kan matas in (ett slutspels-slot utan
   // framräknat lag har inget att mata in mot än, T4/T9 fyller dem). Filtrera
@@ -205,13 +212,17 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
     });
   }
 
-  // Trigga målfirande EFTER ett lyckat sparande av en spelad match med mål.
-  // Kroken hoppar själv reducerad rörelse + mållösa resultat (a11y), så vi
-  // anropar den ovillkorligt här.
+  // Trigga målfirande + valbar feedback EFTER ett lyckat sparande av en spelad
+  // match. Firande-kroken hoppar själv reducerad rörelse + mållösa resultat
+  // (a11y), så vi anropar den ovillkorligt här. Haptik/ljud spelas vid SPARANDET
+  // (oavsett mål, det är spar-handlingen som bekräftas) men bara om kanalen är
+  // PÅ, triggerResultFeedback gatar internt. Båda är ren glädje-/bekräftelse-yta;
+  // själva inmatningen är klar oavsett.
   function handleSaved(match: Match, entry: ResultEntry) {
     if (entry.status === 'finished') {
       const total = (entry.homeGoals ?? 0) + (entry.awayGoals ?? 0);
       celebrateGoal(match.id, total);
+      triggerResultFeedback({ haptics, sound });
     }
   }
 

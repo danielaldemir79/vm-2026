@@ -10,6 +10,12 @@ import {
   type Theme,
 } from './theme-constants';
 
+// Den säkra localStorage-åtkomsten bor numera i den delade lib-modulen (EN
+// sanning, används av tema + installation + onboarding + inställningar). Vi
+// återexporterar den här så tema-systemets call-sites och tester är oförändrade
+// (ThemeProvider importerar getLocalStorage härifrån).
+export { getLocalStorage } from '../lib/safe-storage';
+
 /**
  * Härled vilket tema som ska gälla vid första render.
  *
@@ -61,30 +67,6 @@ export function applyThemeToDocument(doc: Document, theme: Theme): void {
 export function readThemeFromDocument(doc: Document): Theme {
   const current = doc.documentElement.getAttribute(THEME_ATTRIBUTE);
   return isTheme(current) ? current : DEFAULT_THEME;
-}
-
-/**
- * Hämta webbläsarens localStorage på ett SÄKERT sätt.
- *
- * Varför: i vissa lägen (Safari med blockerade cookies, sandboxade iframes,
- * en del privacy-lägen) kastar redan ÅTKOMSTEN till `window.localStorage` ett
- * SecurityError, alltså innan något läses/skrivs. Den åtkomsten måste därför
- * ske inuti en try/catch, annars kraschar anroparen (t.ex. ett tema-byte)
- * redan på argument-uttrycket innan persist-/läs-funktionen ens körs.
- *
- * Samma fail-loud-men-inte-fatalt-mönster som persistTheme/readStoredTheme:
- * vi maskerar inte felet, vi loggar en varning och returnerar null så att
- * anroparen kan fortsätta utan persistens.
- *
- * @returns Storage om den kan nås, annars null (blockerad/sandbox).
- */
-export function getLocalStorage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch (error) {
-    console.warn('Kunde inte komma åt localStorage (blockerad/sandbox):', error);
-    return null;
-  }
 }
 
 /**
