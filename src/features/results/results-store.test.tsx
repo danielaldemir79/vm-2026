@@ -1,28 +1,23 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
+import type { DataSource } from '../../data';
 import type { Match } from '../../domain/types';
 import { ResultsProvider } from './ResultsProvider';
 import { useResultsStore } from './results-context';
 import { useGroupData } from '../groups/use-group-data';
+import { createFailingDataSource } from '../../test/failing-data-source';
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
 }
 
-function liveEnv(): ImportMetaEnv {
-  return {
-    VITE_SUPABASE_URL: 'https://x.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'anon-key',
-  } as ImportMetaEnv;
-}
-
-// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testet.
-// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
-function wrapperFor(env: ImportMetaEnv, liveReady = false) {
+// Fel-vägs-testet injicerar en REJECTANDE datakälla (sedan T14 kastar live-källan
+// inte längre, så ett genuint datakälle-fel testas via dataSource-injektionen).
+function wrapperFor(env: ImportMetaEnv, dataSource?: DataSource) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ResultsProvider env={env} liveReady={liveReady}>
+      <ResultsProvider env={env} dataSource={dataSource}>
         {children}
       </ResultsProvider>
     );
@@ -41,12 +36,12 @@ describe('ResultsProvider/useResultsStore, seedning', () => {
     expect(result.current.mode).toBe('fixtures');
   });
 
-  it('fail-loud:ar (status error + meddelande) när källan kastar (live-stub före T14)', async () => {
+  it('fail-loud:ar (status error + meddelande) när datakällan rejectar (genuint fel)', async () => {
     const { result } = renderHook(() => useResultsStore(), {
-      wrapper: wrapperFor(liveEnv(), true),
+      wrapper: wrapperFor(fixturesEnv(), createFailingDataSource()),
     });
     await waitFor(() => expect(result.current.status).toBe('error'));
-    expect(result.current.error).toMatch(/inte byggd än \(T14\)/);
+    expect(result.current.error).toMatch(/Simulerat datakälle-fel/);
     expect(result.current.matches).toHaveLength(0);
   });
 });

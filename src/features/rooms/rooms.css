@@ -1,0 +1,162 @@
+/* =============================================================================
+   RUMS-UI:ts PREMIUM-VISUELLA LAGER (design-frontend, T14 / issue #14).
+   =============================================================================
+
+   DELNINGS-ÖGONBLICKET: "skapa ett rum, skicka koden till kompisarna" ska kännas
+   inbjudande och självklart. Därför är hero-headern + biljett-huvudet "arena i
+   kvällsljus" (SPEC §7, samma språk som dagliga hero:n / lag-profilen / onboarding),
+   rumskoden en stor kopierbar biljett, och medlemmarna monogram-avatarer med en
+   STABIL, per-person färg.
+
+   ÄGARSKAP (seam): senior-dev äger semantik + data-attribut i RoomPanel.tsx
+   (data-rooms-*, role/aria, fält-etiketter). Detta lager STYLAR ovanpå de hakarna
+   och rör inte logiken eller a11y-semantiken (PRINCIPLES §4, samma seam-princip
+   som GroupTable/BracketView/ScenarioView).
+
+   ALLT stylat via tema-token (color-mix / var(--vm-*) / hsl(var(--hue) ...)),
+   aldrig ett rått färg-beslut, så panelen är trogen BÅDA teman. Hero-/biljett-
+   glow:en är HELT STATISK (ingen rörlig sheen, se kontrast-vakten nedan), så det
+   finns ingen rums-egen animation att nolla vid prefers-reduced-motion; den enda
+   rörelsen i panelen är de delade knapp-hover-övergångarna (index.css-grinden).
+
+   KONTRAST (WCAG AA, UPPMÄTT i båda teman, canvas-komposit, decisions.md T14):
+   ALL läsbar text står på OPAKA ytor (surface/raised), aldrig på glow:en, så glow
+   per konstruktion inte kan sänka någon textkontrast. Avatar-INK:en är det enda
+   som ligger på en GENERERAD (hue-driven) yta; den är därför klampad PER HUE över
+   hela 0-359-spannet (lessons aa-kontrast-pastad-pa-genererad-farg: mät värsta
+   fallet, inte ett typfall).
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   1. HERO-HEADER + BILJETT-HUVUD: "arena i kvällsljus".
+   Två radiella ljus (pitch-grön ur övre vänstra hörnet, varm guld ur nedre högra)
+   på den upphöjda ytan. Glow-alforna hålls låga (stämning, inte färgklick) och
+   bär ALDRIG text, så de kan inte sänka kontrast. Samma recept som onboarding-
+   hero:n (tokens.css §9), här inlinat för rums-feature:ns egen yta.
+   -------------------------------------------------------------------------- */
+/* KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall, T13-precedensen): ALL
+   läsbar text (eyebrow/accent, rubrik/fg, brödtext/fg-muted, koden/fg, etiketter/
+   fg-muted) ligger på DENNA yta. Glow:en ligger BAKOM texten (samma lager), så
+   en naiv komposit KAN sänka kontrasten (grön glow LYFTER luminansen på den mörka
+   raised-ytan -> fg-muted-text faller, exakt fällan lessons varnar för). DÄRFÖR
+   är glow-alforna satta så att ÄVEN den teoretiskt fulla stacken (grön 0.08 +
+   guld 0.05 i samma punkt) håller AA: dark fg-muted 4.73:1, light accent-eyebrow
+   4.59:1, allt >= 4.5:1 (.vmshots/green-only.mjs, svept). INGEN rörlig sheen läggs
+   här (den la +0.09 grön ovanpå och knäckte muted-marginalen), tvärtom T13:s strip
+   där texten satt på en SEPARAT opak yta UNDER sheenen. Här bär hero:n både dekor
+   och text, så vi väljer en HELT statisk, AA-säker glow i stället för en sheen
+   som kräver att texten flyttas av. */
+.vm-rooms-hero,
+.vm-rooms-ticket-head {
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(120% 140% at 0% 0%, rgb(var(--vm-glow-accent) / 0.08), transparent 60%),
+    radial-gradient(
+      100% 140% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 5%, transparent),
+      transparent 58%
+    );
+}
+
+/* -----------------------------------------------------------------------------
+   2. BILJETTEN: kort som inramar den delbara koden. En diskret varm topp-list
+   (inset box-shadow i guld-ton) fångar "kvällsljuset" utan att bli en grell kant,
+   samma kvällsljus-detalj som resultatinmatnings-kortet (#39).
+   -------------------------------------------------------------------------- */
+.vm-rooms-ticket {
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 28%, transparent);
+}
+
+/* Koden själv vilar luftigt; tracking + tabular-nums (i TSX) ger den biljett-
+   känsla. Den bor på den opaka raised-ytan, så full fg-kontrast (mätt i docs). */
+
+/* -----------------------------------------------------------------------------
+   3. KOPIERA / DELA-KNAPPARNA: en lugn, accent-tonad "action"-pille som lyfter på
+   hover och bär en tydlig fokus-ring (WCAG 2.4.7). Texten/ikonen är fg (full
+   kontrast); accent-tonen lever bara i ytan + kanten. Kopierad-läget blir success-
+   tonat (form + bock + text bär signalen, inte bara färgen).
+   -------------------------------------------------------------------------- */
+.vm-rooms-action {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  color: var(--color-fg);
+}
+
+.vm-rooms-action:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+  box-shadow: var(--vm-shadow-card);
+}
+
+/* Kopierad-läget: en lugn success-bekräftelse. Tonen är förstärkning, bocken +
+   "Kopierad!" bär betydelsen (färg-oberoende). success-token är AA mot fg. */
+.vm-rooms-action[data-state='copied'] {
+  border-color: color-mix(in srgb, var(--color-success) 50%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-success) 16%, var(--color-surface));
+}
+
+/* -----------------------------------------------------------------------------
+   4. MEDLEMS-AVATAR: monogram-bricka med STABIL per-person färg.
+   Hue:n kommer som --vm-avatar-hue (ur user-id, member-avatar.ts). Ytan är en
+   mjuk hue-tint OCH ink:en (initialerna) är en KLAMPAD ton av samma hue, så ink-
+   på-tint håller AA i båda teman OAVSETT hue.
+
+   KONTRAST-VAKT (lessons aa-kontrast-pastad-pa-genererad-farg, VÄRSTA FALL över
+   alla 360 hue:er): vi använder INTE vit/mörk FAST ink på en variabel-mättad yta
+   (det FALLER för gula/ljusa hue:er, bevisat: vit ink på en hue-driven pastell gav
+   3.78:1 vid gult i ljust tema, under AA). I stället är BÅDE ytan OCH ink:en hue-
+   roterade men med LÅST lightness per tema, så hue bara roterar tonen och aldrig
+   in i en kontrast-fälla:
+     - MÖRKT tema: ytan = hue @ 22% S / 28% L (mörk, dämpad), ink = hue @ 80% S /
+       84% L (ljus, mättad). Ljus ink på mörk yta -> AA för ALLA hue:er.
+     - LJUST tema: ytan = hue @ 70% S / 93% L (ljus pastell), ink = hue @ 75% S /
+       25% L (mörk, mättad). Mörk ink på ljus pastell -> AA för ALLA hue:er.
+   UPPMÄTT min-kontrast, svept över alla 360 hue:er (.vmshots/avatar-contrast.mjs,
+   exakt CSS-recept, sRGB-luminans):
+     - Mörkt: MIN 5.89:1 (vid hue 240, blå). - Ljust: MIN 4.94:1 (vid hue 60, gul).
+   Båda >= 4.5:1 (initialerna är 12px bold = normal-text-tröskeln gäller). Hue 60
+   (gult) är värsta fallet i båda teman, exakt den fälla lessons varnar för, och
+   den klarar nu marginalen. Den egna medlemmens ("du") chip får dessutom en
+   accent-kant så man hittar sig själv (form, inte enbart färg). */
+.vm-rooms-avatar {
+  background-color: hsl(var(--vm-avatar-hue) 22% 28%);
+  color: hsl(var(--vm-avatar-hue) 80% 84%);
+}
+
+:root[data-theme='light'] .vm-rooms-avatar {
+  background-color: hsl(var(--vm-avatar-hue) 70% 93%);
+  color: hsl(var(--vm-avatar-hue) 75% 25%);
+}
+
+/* Den egna medlemmen: en accent-tonad kant runt hela chip:en + en aning starkare
+   yta, så "du" hittas direkt (form-/text-buret, inte bara färg). */
+.vm-rooms-member[data-self='true'] {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+
+/* -----------------------------------------------------------------------------
+   5. MINA RUM-VÄLJAREN: aktiv-pricken tänds (accent) för det valda rummet, släckt
+   (dämpad kant-ton) annars. Markeringen är form-/text-buren (aria-pressed + en
+   "Aktivt"-pille i TSX), pricken är bara förstärkning.
+   -------------------------------------------------------------------------- */
+.vm-rooms-pick-dot {
+  background-color: color-mix(in srgb, var(--color-fg-muted) 45%, transparent);
+}
+
+.vm-rooms-pick-dot[data-active='true'] {
+  background-color: var(--color-accent);
+}
+
+/* -----------------------------------------------------------------------------
+   6. FORMULÄREN: en diskret varm topp-list (samma kvällsljus-detalj som #39) så
+   skapa-/gå-med-korten känns som en familj med resultatinmatningen, utan att
+   skrika. Fält-fokus-ringen bor i TSX (FIELD_BASE), delad med inmatningen.
+   -------------------------------------------------------------------------- */
+.vm-rooms-form {
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 16%, transparent);
+}

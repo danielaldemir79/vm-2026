@@ -2,7 +2,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { BracketView, SlotRow } from './BracketView';
 import { ResultsProvider } from '../results/ResultsProvider';
+import type { DataSource } from '../../data';
 import type { BracketSlotState } from './derive-bracket';
+import { createFailingDataSource } from '../../test/failing-data-source';
 
 // Fixtures-miljö (ingen Supabase-env) => datakällan ger den verifierade VM 2026-
 // datan (alla 12 grupper + 104 matcher, alla scheduled). BracketView är en ren
@@ -11,16 +13,9 @@ function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
 }
 
-function liveEnv(): ImportMetaEnv {
-  return {
-    VITE_SUPABASE_URL: 'https://x.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'anon-key',
-  } as ImportMetaEnv;
-}
-
-function renderView(env: ImportMetaEnv, liveReady = false) {
+function renderView(env: ImportMetaEnv, dataSource?: DataSource) {
   return render(
-    <ResultsProvider env={env} liveReady={liveReady}>
+    <ResultsProvider env={env} dataSource={dataSource}>
       <BracketView />
     </ResultsProvider>
   );
@@ -165,10 +160,10 @@ describe('SlotRow, möjliga-lag-chippets böjning (C10)', () => {
 });
 
 describe('BracketView, fel-väg (fail loud)', () => {
-  it('visar ett fel-meddelande när källan kastar (live-stub före T14)', async () => {
-    // liveReady=true driver LIVE-grenen (stubben som kastar). Produktion (#37)
-    // använder defaulten false, så env satt utan byggd klient ger fixtures.
-    renderView(liveEnv(), true);
+  it('visar ett fel-meddelande när datakällan rejectar (genuint datakälle-fel)', async () => {
+    // Sedan T14 kastar live-källan inte längre (ger giltig data), så ett genuint
+    // datakälle-fel injiceras via en rejectande datakälla.
+    renderView(fixturesEnv(), createFailingDataSource());
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(/Kunde inte ladda slutspelsträdet/i);
     });

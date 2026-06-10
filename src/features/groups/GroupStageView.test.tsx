@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { GroupStageView } from './GroupStageView';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { TeamProfileProvider } from '../team-profile';
+import type { DataSource } from '../../data';
+import { createFailingDataSource } from '../../test/failing-data-source';
 
 // Fixtures-miljö (ingen Supabase-env) => datakällan ger fixtures-datan, dvs den
 // verifierade VM 2026-datan med alla 12 grupper. Env injiceras nu i den delade
@@ -11,20 +13,13 @@ function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
 }
 
-function liveEnv(): ImportMetaEnv {
-  return {
-    VITE_SUPABASE_URL: 'https://x.supabase.co',
-    VITE_SUPABASE_ANON_KEY: 'anon-key',
-  } as ImportMetaEnv;
-}
-
 // GroupStageView är nu en ren konsument av den delade storen (T6). Rendera den
-// inuti en ResultsProvider med rätt env så seedningen sker som förr.
-// liveReady=true driver LIVE-grenen (stubben som kastar) i fel-vägs-testet.
-// Default false speglar produktion (#37): env satt utan byggd klient -> fixtures.
-function renderView(env: ImportMetaEnv, liveReady = false) {
+// inuti en ResultsProvider med rätt env så seedningen sker som förr. Fel-vägs-
+// testet injicerar en REJECTANDE datakälla (sedan T14 kastar live-källan inte
+// längre, så ett genuint datakälle-fel testas via dataSource-injektionen).
+function renderView(env: ImportMetaEnv, dataSource?: DataSource) {
   return render(
-    <ResultsProvider env={env} liveReady={liveReady}>
+    <ResultsProvider env={env} dataSource={dataSource}>
       <TeamProfileProvider>
         <GroupStageView />
       </TeamProfileProvider>
@@ -98,10 +93,10 @@ describe('GroupStageView, datakälla-läge', () => {
 });
 
 describe('GroupStageView, fel-väg (fail loud, inte tyst tom vy)', () => {
-  it('visar ett fel-meddelande när datakällan kastar (live-stub före T14)', async () => {
-    // Live-env utan riktig klient => datakällans stub KASTAR vid getMatches.
-    // Vyn ska visa felet via role="alert", inte tyst rendera en tom vy.
-    renderView(liveEnv(), true);
+  it('visar ett fel-meddelande när datakällan rejectar (genuint datakälle-fel)', async () => {
+    // En rejectande datakälla => seedningen failar. Vyn ska visa felet via
+    // role="alert", inte tyst rendera en tom vy.
+    renderView(fixturesEnv(), createFailingDataSource());
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');
