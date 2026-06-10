@@ -5,6 +5,20 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T15 (#15, C14): stale-request-vakt på savePrediction (samma epoch-mönster som T14 KA-F2)
+
+**Beslut (C14, dataintegritets-fynd):** `PredictionsProvider.savePrediction` gjorde en optimistisk
+`setMyPredictions` efter `await upsertMyPrediction` UTAN att kolla att det aktiva rummet fortfarande var
+detsamma. `myPredictions` är bara keyad på `matchId`, så bytte vännen rum (A -> B) medan upserten var i
+flykt skrev A:s svar in i B:s tips-map (förorening + visar fel rums tips). Fix: samma cancellation-/
+epoch-mönster som `RoomsProvider.loadRoomData` (T14, KA-F2) , `savePrediction` bokar `loadTokenRef.current`
+(samma token som load-effekten bumpar vid varje rumsbyte) FÖRE await, och droppar den optimistiska
+uppdateringen tyst om token ändrats efter await. A:s tips persisteras ändå korrekt på servern (room_id i
+upserten), bara den lokala spegeln av ett inaktuellt rum droppas. Load-vägen (`listMyPredictions`-effekten)
+hade redan epoch-vakten, så bara save-vägen saknade den; ingen ny seam uppfanns. Regressionstest: starta
+save i rum A, byt till B under await, asserta att B:s state = exakt {g-B-9} (A:s g-A-1 droppas, ingen
+förorening). Bevisat true regression: utan vakten ger testet `g-A-1,g-B-9`.
+
 ## 2026-06-11 , T15 (#15, Copilot C10-C13): fyra review-fynd, disposition
 
 **C10 (åtgärdad) , två tips-index var REDUNDANTA med PK:n, borttagna.** `predictions_room_idx
