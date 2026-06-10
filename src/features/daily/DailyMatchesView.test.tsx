@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
@@ -98,6 +98,36 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
     }
 
     expect(emptyPanelSeen).toBe(false);
+  });
+
+  it('en VILODAG är nåbar via "nästa speldag"-knappen och visar vilodags-panelen (C7)', async () => {
+    // F4 + C7: VM 2026 har vilodagar mellan ronderna. Tidigare hoppade navigeringen
+    // rakt över dem (days saknade tomma dagar) och vilodags-panelen var oåtkomlig.
+    // Nu går navigeringen dag för dag; bläddrar vi framåt ska vi förr eller senare
+    // landa på en vilodag och se panelen "Ingen match den här dagen".
+    renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    const nextButton = () =>
+      within(screen.getByRole('navigation', { name: /datumnavigering/i })).getAllByRole(
+        'button'
+      )[1];
+
+    // Spannet är 11 juni-19 juli (< 45 dagar). En gräns skyddar mot oändlig loop
+    // om navigeringen skulle gå sönder; vilodagen ska nås långt innan dess.
+    let restPanelSeen = false;
+    for (let step = 0; step < 45; step += 1) {
+      if (screen.queryByText('Ingen match den här dagen')) {
+        restPanelSeen = true;
+        break;
+      }
+      const btn = nextButton();
+      if ((btn as HTMLButtonElement).disabled) break; // nått sista dagen
+      fireEvent.click(btn);
+    }
+
+    expect(restPanelSeen).toBe(true);
   });
 });
 

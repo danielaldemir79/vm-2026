@@ -308,9 +308,10 @@ export function DailyMatchesView() {
             </button>
           </nav>
 
-          {/* Dagens matchlista. En tom dag ska inte hända här (days innehåller bara
-              dagar MED matcher), men vi gardera ändå för en framtida källa och
-              pekar mot nästa speldag i stället för en blank yta.
+          {/* Dagens matchlista. En tom dag ÄR ett förväntat tillstånd: `days`
+              rymmer nu varje kalenderdag i turneringsspannet inklusive vilodagar
+              (group-matches-by-day, C7), så datumnavigeringen kan landa på en
+              vilodag och då visas vilodags-panelen nedan i stället för en blank yta.
 
               Match-of-the-day FRAMHÄVS inte igen i listan: hero:n kröner den redan
               ovanför, så ett andra identiskt featured-kort vore en visuell dubblett.
