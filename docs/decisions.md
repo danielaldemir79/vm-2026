@@ -97,13 +97,18 @@ bygger den slutgiltiga dekoren ur hue:n i `tokens.css` sektion 6 (hsl()/color-mi
 befintliga reduced-motion-grinden (`index.css`) stänger av den för den som bett om minskad rörelse.
 Ingen egen JS-grind behövs (samma princip som body-färgövergången).
 
-**T8-PIN (success-token, ÄGARE design-frontend, EJ åtgärdad här):** I ljust tema är `--vm-success`
-fortfarande == `--vm-accent` (#0e7a44, `tokens.css` rad 103/107). Det funktionella dags-tema-lagret
-RÖR INTE den krocken (dags-temat ligger helt i dekor, inte i success-tokenet), så ingen del av T8:s
-funktion beror på separationen. Att VÄLJA det nya success-färgvärdet är ett design-authored token-värde
-(mönstret `tema-tokens-som-kontrakt`: senior-dev gissar inte färgvärden), så det lämnas distinkt till
-design-frontend i `tokens.css`. Acceptanstest design-frontend: i ljust tema ska `--vm-success` skilja
-sig från `--vm-accent` och klara AA mot ytorna.
+**T8-PIN (success-token, ÄGARE design-frontend) , [ERSATT 2026-06-10, se nyaste T8-raden överst:
+"T8-PIN löst (success-ton)"]:** Pinnet ÄR numera löst, success fick en egen AA-ton (#0f766e) i ljust
+tema. Texten nedan är HISTORIK (läget när senior-dev skrev den, innan design-frontend åtgärdade), den
+beskriver INTE nuläget , behåll den bara som spår, ändra aldrig nuläget efter den. Aktuell sanning +
+mätvärden står i den översta T8-raden.
+> _(historik, ej längre sant)_ I ljust tema var `--vm-success` fortfarande == `--vm-accent` (#0e7a44).
+> Det funktionella dags-tema-lagret RÖR INTE den krocken (dags-temat ligger helt i dekor, inte i
+> success-tokenet), så ingen del av T8:s funktion berodde på separationen. Att VÄLJA det nya
+> success-färgvärdet var ett design-authored token-värde (mönstret `tema-tokens-som-kontrakt`:
+> senior-dev gissar inte färgvärden), så det lämnades distinkt till design-frontend i `tokens.css`.
+> Acceptanstest design-frontend: i ljust tema ska `--vm-success` skilja sig från `--vm-accent` och
+> klara AA mot ytorna. (Uppfyllt: #0f766e, se översta T8-raden.)
 
 ---
 
