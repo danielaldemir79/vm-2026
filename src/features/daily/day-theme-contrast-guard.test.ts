@@ -29,8 +29,17 @@
 
 import { describe, it, expect } from 'vitest';
 
-/** Den enda CSS-selektor-prefix som får KONSUMERA dagstonen (hero-dekoren). */
-const ALLOWED_SELECTOR_PREFIX = '.vm-daily-hero';
+/**
+ * De enda CSS-klasser som får KONSUMERA dagstonen (hero-dekoren). Matchas som
+ * HELA klass-token, inte som prefix: `.includes('.vm-daily-hero')` skulle annars
+ * släppa igenom `.vm-daily-heroX` (falskt grönt, en helt annan klass som råkar
+ * börja likadant). En klass-token tar slut vid det FÖRSTA tecknet som inte är
+ * `[\w-]` (whitespace, `[`, `:`, `.`, `,`, `>` osv.), så en negativ lookahead på
+ * `[\w-]` fångar gränsen. `.vm-daily-hero-sheen` listas separat eftersom den ska
+ * accepteras som egen klass , den matchar INTE `.vm-daily-hero(?![\w-])` (efter
+ * `hero` kommer `-`, som ÄR `[\w-]`). En `.vm-daily-heroX`-regel matchar ingen av
+ * dem och avvisas korrekt. */
+const ALLOWED_SELECTOR_PART = /\.vm-daily-hero(?![\w-])|\.vm-daily-hero-sheen(?![\w-])/;
 
 /** Den variabel-konsumtion vi vaktar (en `var()`-läsning, inte en sättning). */
 const CONSUMPTION = 'var(--vm-day-hue)';
@@ -54,6 +63,22 @@ function stripCssComments(css: string): string {
 /** True om filnyckeln är en testfil (de citerar variabeln legitimt). */
 function isTestFile(key: string): boolean {
   return /\.test\.(ts|tsx)$/.test(key);
+}
+
+/**
+ * True om en (ev. komma-separerad) selektor i HELA sin längd är scopad till
+ * hero-dekoren: VARJE komma-del måste innehålla en tillåten hero-klass som hel
+ * klass-token (ALLOWED_SELECTOR_PART). Tom selektor avvisas. Detta är den ENDA
+ * platsen vakt-regeln bor, så huvudtestet och negativ-kontrollen inte kan glida
+ * isär (en bekräftar samma predikat som den andra bryter mot).
+ */
+function selectorIsHeroScoped(selector: string): boolean {
+  const parts = selector
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (parts.length === 0) return false;
+  return parts.every((part) => ALLOWED_SELECTOR_PART.test(part));
 }
 
 /**
@@ -101,15 +126,38 @@ describe('dags-tema kontrast-vakt: var(--vm-day-hue) lever bara i hero-dekoren (
 
     for (const { selector } of consumers) {
       // Selektorn (ev. komma-separerad lista) måste i HELA sin längd vara scopad
-      // till hero-dekoren. Varje del ska innehålla .vm-daily-hero.
-      for (const part of selector.split(',').map((s) => s.trim())) {
-        expect(
-          part.includes(ALLOWED_SELECTOR_PREFIX),
-          `var(--vm-day-hue) konsumeras under en selektor utanför hero-dekoren: "${selector}". ` +
-            `Dagstonen får bara väva in i .vm-daily-hero*-ytor (kontrast-vakt, decisions.md T8).`
-        ).toBe(true);
-      }
+      // till hero-dekoren (varje del en .vm-daily-hero*-klass-token, inte bara ett
+      // prefix , se selectorIsHeroScoped/ALLOWED_SELECTOR_PART).
+      expect(
+        selectorIsHeroScoped(selector),
+        `var(--vm-day-hue) konsumeras under en selektor utanför hero-dekoren: "${selector}". ` +
+          `Dagstonen får bara väva in i .vm-daily-hero*-ytor (kontrast-vakt, decisions.md T8).`
+      ).toBe(true);
     }
+  });
+
+  it('NEGATIV KONTROLL: en .vm-daily-heroX-regel som läser var(--vm-day-hue) FAILAR vakten', () => {
+    // En klass som BARA börjar som hero-klassen (`.vm-daily-heroX`) är en HELT
+    // annan klass och får inte konsumera dagstonen. Den gamla prefix-matchen
+    // (`.includes('.vm-daily-hero')`) släppte den igenom (falskt grönt); klass-
+    // token-matchen ska avvisa den. Vi syntetiserar en sådan regel och kör den
+    // genom EXAKT samma scan-väg (cssRules + selectorIsHeroScoped) som vakten,
+    // så testet bevisar att gränsdragningen faktiskt smäller.
+    const maliciousCss = `.vm-daily-heroX { color: hsl(${CONSUMPTION} 70% 50%); }`;
+    const consumers = cssRules(stripCssComments(maliciousCss)).filter((r) =>
+      r.body.includes(CONSUMPTION)
+    );
+    expect(consumers.length).toBe(1); // regeln plockades upp som konsument
+    expect(selectorIsHeroScoped(consumers[0].selector)).toBe(false);
+
+    // Och de legitima hero-selektorerna passerar (positiv motpol, så vi inte bara
+    // bevisar att allt avvisas). Inkluderar descendant- och attribut-formerna som
+    // faktiskt finns i tokens.css.
+    expect(selectorIsHeroScoped(".vm-daily-hero[data-day-theme='active']")).toBe(true);
+    expect(
+      selectorIsHeroScoped(".vm-daily-hero[data-day-theme='active'] .vm-daily-hero-sheen")
+    ).toBe(true);
+    expect(selectorIsHeroScoped('.vm-daily-hero-sheen')).toBe(true);
   });
 
   it('ingen ANNAN källfil konsumerar var(--vm-day-hue) (bara tokens.css får det)', () => {
