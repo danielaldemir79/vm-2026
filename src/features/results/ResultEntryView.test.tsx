@@ -129,7 +129,12 @@ describe('ResultEntryView + GroupStageView, inmatning uppdaterar tabellen (en sa
 // default och att expandera-kontrollen är tillgänglig och fungerar end-to-end.
 // Vi fryser systemklockan till premiärdagen (11 juni 2026) så urvalet är
 // deterministiskt oavsett när testet körs (annars styr verklig tid vad som syns).
-describe('ResultEntryView, 3-dagars fönster + expandera (#39)', () => {
+// Describe-nivå timeout (20 s): varje test här fäller ut/ihop hela listan (72 formulär)
+// en eller flera gånger, och varje toggle re-renderar alla kort. Det är legitimt
+// långsammare än Vitests 5 s-default (mätt ~5-9 s, inte en hängning) och blir flaky mot
+// defaulten under full svit-last. En timeout på describe-nivå (KISS) täcker alla tunga
+// tester i blocket likadant, i stället för en per-test-override på varje.
+describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 20000 }, () => {
   beforeEach(() => {
     // Faka BARA Date (inte setTimeout/microtasks), så providerns async-seedning och
     // testing-librarys `waitFor` fortfarande kör på riktiga timers. Annars fryser
@@ -256,10 +261,8 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', () => {
       document.querySelector(formSelector) as HTMLFormElement
     ).getByLabelText(/\(hemma\)/) as HTMLInputElement;
     expect(homeInputAfter.value).toBe('7');
-    // Längre timeout: testet fäller ut/ihop hela listan (72 formulär) flera gånger,
-    // varje toggle re-renderar alla kort, så det är legitimt långsammare än 5 s-
-    // defaulten (inte en hängning, mätt ~7 s).
-  }, 20000);
+    // Timeout ärvs från describe-nivån (20 s); detta test fäller ut/ihop flera gånger.
+  });
 });
 
 // DAG-MEDVETET fönster (Copilot R1, C1, PWA-fälla). Den rena fönster-funktionen och
