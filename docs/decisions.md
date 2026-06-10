@@ -5,6 +5,58 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , T14 PANEL-FIXAR (issue #14): KA-F2/KA-F3 wiring + KA-SA1/SA2 härdning
+
+**Beslut (KA-F3, delade rums-resultat vävs in end-to-end, "ni fyller i tillsammans"):** Rum-panelen
+LOVAR att medlemmar fyller i matchresultaten ihop, men `saveResult`/`room_match_results` hade ingen
+UI-anropare, inget delades. Wiringen sker på den BEFINTLIGA infrastrukturen utan ny apparat:
+ResultsProvider ligger NÄSTLAT inuti RoomsProvider (App.tsx), så den läser rums-synken via en NY
+tolerant hook `useRoomsSync` (inert utan provider, samma tolerans-mönster som `useFeedbackSettings`,
+så alla results-tester utan RoomsProvider är oförändrade). (a) En inmatning i `submitResult` sparas
+även till rummet (`upsertRoomResult`) när ett rum är aktivt, optimistiskt + fail-loud-men-icke-
+blockerande (ett spar-fel river inte den lokala inmatningen, nästa fokus/online-refetch återhämtar).
+(b) Rummets delade resultat vävs in i matchlistan via en REN funktion `applyRoomResults` (återanvänder
+`applyMatchResult`, så samma validering + immutabilitet, DRY) ovanpå den SEEDADE BASEN (bevarad
+separat så vävningen är idempotent och ett ändrat/borttaget delat resultat backar korrekt). (c) Utan
+aktivt rum är allt lokalt precis som förr. **Konflikt: SISTA-SKRIVET-VINNER** (`updated_at`, server-
+upsert på PK `(room_id, match_id)`), så den senaste skrivningen från valfri medlem är den delade
+sanningen; en refetch hämtar det vinnande tillståndet. **Bieffekt (medveten):** att gå med i ett rum
+gör rummets delade resultat till sanningen, en lokal-bara-inmatning gjord INNAN man gick med skrivs
+inte automatiskt upp till rummet (rummet är den delade källan; man matar in på nytt om man vill dela).
+
+**Beslut (KA-F2, cancellation-guard mot ur-synk rumsbyten):** `RoomsProvider.loadRoomData` saknade
+skydd mot att ett LÅNGSAMT svar för rum A landar EFTER att man bytt till rum B (A:s medlemmar/resultat
+skrev då över B:s). Fix: en monotont ökande request-token (epoch) per laddning, bara den SENAST
+startade laddningens svar tillämpas, äldre kastas tyst. Acceptanstest mockar `listMembers` med olika
+fördröjning, byter rum snabbt och assertar slutstate = senast valda rummet.
+
+**Beslut (KA-F1, rumskods-kombinatorik rättad till 32 tecken):** Alfabetet är 32 tecken (24 bokstäver
+a-z minus l/o + 8 siffror 2-9), inte 34. 6 tecken = 32^6 ~ 1,07 mrd kombinationer (inte 34^6 ~ 1,5
+mrd, ett räknefel som glömde l/o-uteslutningen). Rättat i `room-code.ts` + denna fil; verifierat
+`node -e "A.length=32, A.length**6=1073741824"`.
+
+**Beslut (KA-SA2, match_id-format härdat, KÄLLHÄNVISAT, avviker från direktivet):** `room_match_results.
+match_id` var obegränsad `text`. Ny migration lägger `check (match_id ~ '^(g-[A-L]-[1-6]|M(7[3-9]|
+8[0-9]|9[0-9]|10[0-4]))$')`. **Regeln är härledd ur de FAKTISKA match-id:na i klient-bundlen, inte
+gissad:** planen (`src/data/wc2026`, verifierat mot `getDataSource().getMatches()`, 104 matcher) har
+TVÅ id-format, 72 gruppmatcher `g-<A-L>-<1-6>` och 32 slutspel `M73..M104` (FIFA-matchnummer; gruppspelet
+bär g-...-id, så M-prefixet börjar vid 73). **Direktivets föreslagna `^M[0-9]{1,3}$` var FELAKTIGT för
+denna kodbas** (antog "M1..M104"), det hade NEKAT alla 72 gruppresultat och brutit delnings-funktionen.
+Constrainten matchar exakt de 104 giltiga id:na (0 av 104 omatchade) och nekar godtycklig/lång text
+(verifierat live: en 10000-teckens match_id nekas, M105/M1/M1-format nekas). Källa: match-schedule-
+parser.ts (`id: M${matchNumber}` rad ~475) + wc2026-id-konventionen + live-probe mot getMatches().
+Applicerad via MCP `apply_migration` (live-version 20260610184225) + committad fil
+`supabase/migrations/20260610160500_t14_room_match_id_format.sql` (konsoliderad slutform, se SA1-noten).
+
+**Beslut (KA-SA1, README-historik-not gjord ärlig):** `supabase/README.md` påstod att `list_migrations`
+"visar samma uppsättning" som filerna. Live har 9 migrationer (iterativ historik), committade filer är 4
+(konsoliderad slutform). Omformulerat ärligt: konsoliderad slutform, live byggdes via flera iterativa
+steg, sluttillstånd funktionellt identiskt verifierat mot `pg_proc`/`pg_policies`/`pg_constraint`,
+`list_migrations` är sanningen för exakt historik, inte filträdet (lärdomen committad-migration-pastar-
+spegla-live-men-ar-konsoliderad-historik).
+
+---
+
 ## 2026-06-10 , T14 VISUELLT LAGER (issue #14): premium-finish på rum-UI:t, delnings-ögonblicket
 
 **Beslut (visuellt lager ovanpå senior-devs seam, rör ALDRIG datalogiken):** Premium-finishen
@@ -132,7 +184,8 @@ fokus + online-event (INGEN polling; T18 byter detta mot Supabase Realtime på s
 **Beslut (rumskods-alfabet, källhänvisat val):** Koden är gemener `a-z` (minus `l`/`o`) + siffror
 `2-9` (minus `0`/`1`), ett OTVETYDIGT teckenförråd (Crockford-andan: undvik tecken som förväxlas
 muntligt/i chatt). Samma teckenförråd vaktas av DB:ns check-constraint `^[a-z2-9]{4,12}$`, så klient
-och databas aldrig driver isär. 6 tecken = 34^6 ~ 1,5 mrd kombinationer; UNIQUE i DB fångar den
+och databas aldrig driver isär. Teckenförrådet är 32 tecken (24 bokstäver a-z minus l/o + 8 siffror
+2-9), så 6 tecken = 32^6 ~ 1,07 mrd kombinationer; UNIQUE i DB fångar den
 osannolika krocken (klienten genererar då en ny kod, gissar aldrig att en kod är unik).
 
 **Beslut (INGA secrets i repot, PRINCIPLES §7):** Supabase-URL + publik anon/publishable-nyckel läses

@@ -2,4 +2,10 @@
 
 export { RoomsProvider, type RoomsProviderProps } from './RoomsProvider';
 export { RoomPanel, RoomSection } from './RoomPanel';
-export { useRoomsStore, type RoomsStore, type RoomsStatus } from './rooms-context';
+export {
+  useRoomsStore,
+  useRoomsSync,
+  type RoomsStore,
+  type RoomsStatus,
+  type RoomsSync,
+} from './rooms-context';
