@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { GroupId, GroupStanding, GroupTable, Match } from '../../domain/types';
 import { GROUP_IDS } from '../../domain/types';
-import { ROUND_OF_32 } from '../../domain/bracket/bracket-structure';
-import { deriveBracket, groupByRound, isGroupStageComplete } from './derive-bracket';
+import { BRACKET_MATCHES, ROUND_OF_32 } from '../../domain/bracket/bracket-structure';
+import {
+  deriveBracket,
+  groupByRound,
+  isGroupStageComplete,
+  type BracketMatchState,
+} from './derive-bracket';
 
 // ============================================================================
 // Härledning av det LEVANDE slutspelsträdet (T9, SPEC §5 + §6). Tre lägen:
@@ -291,6 +296,155 @@ describe('deriveBracket, struktur + bronsmatch/final', () => {
     expect(m104.home.label).toBe('Vinnare M101');
     expect(m104.away.label).toBe('Vinnare M102');
     expect(m104.home.nextSlotId).toBeNull();
+  });
+});
+
+describe('deriveBracket, BRONS-/FINAL-propagering spelar HELA trädet (F2)', () => {
+  // F2 (lokal panel): brons-/final-matningen var bara ETIKETT-testad ("Förlorare
+  // M101"). Ett etikett-test rör aldrig den gren som propagerar de RIKTIGA lagen,
+  // så ett fel där förlorare/vinnare förväxlades (eller fel feeder-match lästes)
+  // hade passerat tyst. Här spelas hela trädet (alla 104-slutspelsmatcher med
+  // hemmavinst) så att M101/M102 har riktiga lag, och vi assertar att bronsmatchen
+  // (M103) får FÖRLORARNA och finalen (M104) VINNARNA, fyra distinkta lag.
+
+  const tables = allComplete({
+    A: 6,
+    B: 6,
+    C: 6,
+    D: 6,
+    E: 6,
+    F: 6,
+    G: 6,
+    H: 6,
+    I: 1,
+    J: 1,
+    K: 1,
+    L: 1,
+  });
+
+  /** Sätt hemmavinst (1-0) på VARJE slutspelsmatch, så hemmalaget propagerar hela vägen. */
+  function homeWinsEverywhere(): Match[] {
+    return BRACKET_MATCHES.map((bm) => ({
+      id: bm.id,
+      stage: 'round-of-32',
+      groupId: null,
+      homeTeamId: null,
+      awayTeamId: null,
+      kickoff: '2026-07-01T19:00:00Z',
+      venue: 'Arena',
+      status: 'finished',
+      result: { homeGoals: 1, awayGoals: 0 },
+    }));
+  }
+
+  const state = deriveBracket(tables, homeWinsEverywhere());
+  const match = (id: string): BracketMatchState => state.matches.find((m) => m.matchId === id)!;
+
+  /** Vinnar-/förlorar-lag ur en avgjord match (slot-id -> teamId). */
+  function winnerTeam(m: BracketMatchState): string | null {
+    return m.winnerSlotId === m.home.id ? m.home.teamId : m.away.teamId;
+  }
+  function loserTeam(m: BracketMatchState): string | null {
+    return m.winnerSlotId === m.home.id ? m.away.teamId : m.home.teamId;
+  }
+
+  it('semifinalerna M101/M102 är avgjorda med riktiga lag (förutsättning för bronsen)', () => {
+    const m101 = match('M101');
+    const m102 = match('M102');
+    expect(m101.winnerSlotId).not.toBeNull();
+    expect(m102.winnerSlotId).not.toBeNull();
+    expect(m101.home.teamId).not.toBeNull();
+    expect(m102.home.teamId).not.toBeNull();
+  });
+
+  it('bronsmatchen (M103) får FÖRLORARNA av M101 och M102 (inte vinnarna, inte fel feeder)', () => {
+    const m101 = match('M101');
+    const m102 = match('M102');
+    const m103 = match('M103');
+    expect(m103.home.resolution).toBe('resolved');
+    expect(m103.away.resolution).toBe('resolved');
+    // KÄRNAN: home = förloraren av M101, away = förloraren av M102.
+    expect(m103.home.teamId).toBe(loserTeam(m101));
+    expect(m103.away.teamId).toBe(loserTeam(m102));
+    // ...och uttryckligen INTE vinnarna (negativ kontroll mot vinnare/förlorare-förväxling).
+    expect(m103.home.teamId).not.toBe(winnerTeam(m101));
+    expect(m103.away.teamId).not.toBe(winnerTeam(m102));
+  });
+
+  it('finalen (M104) får VINNARNA av M101 och M102', () => {
+    const m101 = match('M101');
+    const m102 = match('M102');
+    const m104 = match('M104');
+    expect(m104.home.teamId).toBe(winnerTeam(m101));
+    expect(m104.away.teamId).toBe(winnerTeam(m102));
+  });
+
+  it('de fyra medalj-lagen (final 2 + brons 2) är DISTINKTA lag', () => {
+    const m103 = match('M103');
+    const m104 = match('M104');
+    const four = [m104.home.teamId, m104.away.teamId, m103.home.teamId, m103.away.teamId];
+    expect(four.every((t) => t !== null)).toBe(true);
+    expect(new Set(four).size).toBe(4);
+  });
+});
+
+describe('deriveBracket, RE-propagering: byt M73-utfall -> nedströms-laget byter (F3)', () => {
+  // F3 (lokal panel): att vinnaren propagerar var testat, men inte att en NY
+  // härledning med ett ANNAT utfall ger ett ANNAT nedströms-lag. Eftersom trädet
+  // är en REN funktion av matchlistan ska samma struktur härledd om med bortavinst
+  // i stället för hemmavinst flytta laget i nedströms-sloten. Detta vaktar att
+  // härledningen verkligen LÄSER resultatet varje gång, inte cachar/fryser ett
+  // tidigare utfall.
+
+  const tables = allComplete({
+    A: 6,
+    B: 6,
+    C: 6,
+    D: 6,
+    E: 6,
+    F: 6,
+    G: 6,
+    H: 6,
+    I: 1,
+    J: 1,
+    K: 1,
+    L: 1,
+  });
+
+  /** Bygg trädets matcher och sätt ETT resultat på M73 (övriga schemalagda). */
+  function matchesWithM73(homeGoals: number, awayGoals: number): Match[] {
+    return ROUND_OF_32.map((m) =>
+      m.id === 'M73'
+        ? ({
+            id: 'M73',
+            stage: 'round-of-32',
+            groupId: null,
+            homeTeamId: null,
+            awayTeamId: null,
+            kickoff: '2026-07-01T19:00:00Z',
+            venue: 'Arena',
+            status: 'finished',
+            result: { homeGoals, awayGoals },
+          } as Match)
+        : knockoutMatch(m.id)
+    );
+  }
+
+  it('M73 hemmavinst -> M90-home = A2; härled om med bortavinst -> M90-home byter till B2', () => {
+    // M73 = Runner-up A (A2) mot Runner-up B (B2); M73:s vinnare matar M90-home.
+    const homeWin = deriveBracket(tables, matchesWithM73(2, 0));
+    const m90HomeWin = homeWin.matches.find((m) => m.matchId === 'M90')!;
+    expect(m90HomeWin.home.resolution).toBe('resolved');
+    expect(m90HomeWin.home.teamId).toBe('A2');
+
+    // RE-derivering med motsatt utfall: nedströms-laget MÅSTE byta.
+    const awayWin = deriveBracket(tables, matchesWithM73(0, 2));
+    const m90AwayWin = awayWin.matches.find((m) => m.matchId === 'M90')!;
+    expect(m90AwayWin.home.resolution).toBe('resolved');
+    expect(m90AwayWin.home.teamId).toBe('B2');
+
+    // Kärnan i F3: teamId bytte mellan de två härledningarna (inte fruset).
+    expect(m90AwayWin.home.teamId).not.toBe(m90HomeWin.home.teamId);
   });
 });
 
