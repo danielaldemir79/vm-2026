@@ -5,6 +5,71 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-10 , T32/#54 (Daniels feedback 4) KLAR - PR #57 väntar på merge
+
+**Branch:** `feature/T32-feedback4` @ HEAD `e6c8a4e`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/57 mot `develop` (Closes #54, state: OPEN)
+**Board:** issue #54 i "In Review" (korrekt). Dirigenten stänger issue #54 MANUELLT och flyttar kort #54 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `e5d9714` - fix(settings): portalerar inställningspanelen till body, fixar bakom-sidan-bugg (#54, backdrop-filter+sticky rotorsak källhänvisad)
+- `223ab69` - refactor(app): flytta sim-kontrollen till resultatinmatningen (#54)
+- `8934713` - fix(daily): hero-etikett visar matchens datum när matchen inte är idag (#54)
+- `a9c3c45` - test(daily): robusta delsträngs-assertioner mot ICU-flakighet (#54)
+- `3e08ecb` - fix(daily): highlight-chip följer hero-etiketten, ingen UI-krock (#54)
+- `e6c8a4e` - Rätta felaktig kommentar om MatchCard-rotens element
+
+**Verifiering:** 798 tester gröna + 12 env-skippade. Panel: F1-F3 godkända, F4 (delad modal-primitiv, rule-of-three) -> ny task #56 på boarden Ready. Copilot: 4 rundor (2->1->1->0). Build/lint/format rent.
+
+**Alla 4/4 acceptanskriterier bockade i issue #54** (journalisten 2026-06-10).
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort #56 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #57 (T32/#54, feature/T32-feedback4) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 57 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #54 manuellt (`gh issue close 54`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #54 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar inställningspanelen OVANPÅ allt innehåll (båda teman, mobil + desktop), att sim-kontrollen sitter vid resultatinmatningen, och att hero-etiketten visar datum (inte "DAGENS MATCH") för matcher som inte är idag.
+>
+> Om PR #57 REDAN mergad:
+> T32 är klar och mergad. Plocka nästa task.
+> **Nästa task: T15 (#15, tips-motorn - kärnan i Fas 2!)** - tips-lagret med topplista. Därefter T16-T25 (T26 skippad, stängd not planned). #48 och #56 vävs in där de passar.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **#56 (delad modal-primitiv):** kort i Ready, plockas när rule-of-three nås (3:e dialog-use-case).
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T30/#50 (Play Protect-varning) KLAR - PR #55 väntar på merge
 
 **Branch:** `feature/T30-play-protect` @ HEAD `5f16405`
