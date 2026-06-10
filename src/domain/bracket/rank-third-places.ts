@@ -38,7 +38,16 @@
 // ============================================================================
 
 import type { GroupId, GroupStanding, GroupTable } from '../types';
+import { GROUP_IDS } from '../types';
 import { QUALIFYING_THIRDS } from './seed-third-places';
+
+/**
+ * Antalet grupptreor en KOMPLETT rangordning har, EN per grupp (VM 2026 har 12
+ * grupper, SPEC §5). Härleds ur GROUP_IDS (enda sanningen för antal grupper),
+ * ingen magisk 12. Garantin för `qualifyingGroups` (se nedan) vilar på att ALLA
+ * dessa treor finns rangordnade, inte bara minst 8.
+ */
+const GROUPS_TOTAL = GROUP_IDS.length;
 
 /**
  * En grupptrea: gruppens id + dess härledda tabellrad (rank === 3). Egen typ så
@@ -107,9 +116,14 @@ export interface ThirdPlaceRanking {
   qualified: ThirdPlaceTeam[];
   /**
    * Grupp-id för de 8 kvalificerade treorna (i grupp-bokstavsordning), formen
-   * seedThirdPlaces (Annexe C) tar emot. `null` tills exakt 8 treor finns
-   * rangordnade (gruppspelet inte klart / ofullständig data), så ingen seedning
-   * sker på en gissning. Fail-safe: hellre "ännu inte avgjort" än fel seedning.
+   * seedThirdPlaces (Annexe C) tar emot. `null` tills ALLA 12 grupptreor finns
+   * rangordnade (en KOMPLETT rangordning), så ingen seedning sker på en gissning.
+   *
+   * VARFÖR hela 12, inte bara 8: topp-8 av en OFULLSTÄNDIG mängd treor (t.ex. 9,
+   * 10 eller 11 av 12 grupper färdiga) är en gissning, en grupp som ännu inte
+   * spelat färdigt kan visa sig ha en BÄTTRE trea än någon av de provisoriska 8
+   * och knuffa ut en av dem. Fail-safe: hellre "ännu inte avgjort" (null) än en
+   * seedning som senare måste rivas. Non-null exakt när rangordningen är komplett.
    */
   qualifyingGroups: GroupId[] | null;
 }
@@ -119,22 +133,29 @@ export interface ThirdPlaceRanking {
  *
  * @param tables  De härledda grupptabellerna (alla 12 när gruppspelet är klart).
  * @returns       Rangordnade treor + de 8 kvalificerade + deras grupper (eller
- *                null om inte exakt 8 treor kunde rangordnas, t.ex. mitt i
+ *                null om INTE alla 12 grupptreor kunde rangordnas, t.ex. mitt i
  *                gruppspelet eller med ofullständig data).
  *
- * VARFÖR null tills 8: seedThirdPlaces KRÄVER exakt 8 unika grupper och fail-
- * loud:ar annars. Att returnera null här (i stället för en kortare lista) håller
- * "inte avgjort än" till ETT ställe och låter härledningen (derive-bracket)
- * lämna bästa-trea-slotarna i sitt "möjliga lag"-läge tills gruppspelet är klart.
+ * VARFÖR null tills alla 12: en seedbar grupp-lista får bara fyllas när
+ * rangordningen är KOMPLETT (en trea per grupp, alla GROUPS_TOTAL). Med färre
+ * (t.ex. 9-11 färdiga grupper) vore topp-8 av en DELMÄNGD en gissning, en grupp
+ * som ännu inte spelat färdigt kan ha en bättre trea och knuffa ut en av de
+ * provisoriska 8. Att returnera null tills dess håller "inte avgjort än" till
+ * ETT ställe och låter härledningen (derive-bracket) lämna bästa-trea-slotarna i
+ * sitt "möjliga lag"-läge tills gruppspelet är klart. seedThirdPlaces KRÄVER
+ * dessutom exakt 8 unika grupper och fail-loud:ar annars.
  */
 export function computeThirdPlaceRanking(tables: readonly GroupTable[]): ThirdPlaceRanking {
   const ranked = rankThirdPlaces(tables);
   const qualified = ranked.slice(0, QUALIFYING_THIRDS);
 
-  // Bara en KOMPLETT rangordning (exakt 8 treor) ger en seedbar grupp-lista.
-  // Färre treor (ofullständigt gruppspel) -> null, ingen seedning på en gissning.
+  // Garantin uttrycks DIREKT: bara en KOMPLETT rangordning (en trea per grupp,
+  // alla GROUPS_TOTAL) ger en seedbar grupp-lista. Villkoret är `ranked.length
+  // === GROUPS_TOTAL`, INTE `qualified.length === QUALIFYING_THIRDS`, det senare
+  // är `slice(0,8).length === 8`, dvs sant för ALLA n >= 8 treor och skulle
+  // seeda topp-8 av en ofullständig mängd (en gissning). Färre treor -> null.
   const qualifyingGroups =
-    qualified.length === QUALIFYING_THIRDS ? [...qualified.map((t) => t.group)].sort() : null;
+    ranked.length === GROUPS_TOTAL ? [...qualified.map((t) => t.group)].sort() : null;
 
   return { ranked, qualified, qualifyingGroups };
 }
