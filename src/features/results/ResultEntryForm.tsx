@@ -193,7 +193,17 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
     }
     const h = parseGoals(homeGoals);
     const a = parseGoals(awayGoals);
-    return h !== null && a !== null && Number.isInteger(h) && Number.isInteger(a) && h === a;
+    // Mål måste vara icke-negativa heltal (>= 0). Number.isInteger ensamt godtar
+    // negativa heltal, så straff-fälten kunde annars visas vid t.ex. -1 mot -1.
+    return (
+      h !== null &&
+      a !== null &&
+      Number.isInteger(h) &&
+      Number.isInteger(a) &&
+      h >= 0 &&
+      a >= 0 &&
+      h === a
+    );
   }, [match, status, homeGoals, awayGoals]);
 
   // Snabb uppslagning fält -> har-fel, för aria-invalid + describedby per fält.

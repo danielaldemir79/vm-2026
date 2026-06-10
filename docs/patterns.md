@@ -407,7 +407,8 @@ dekor-token i `tokens.css` sektion 6).
    beräknat när du når en match-progressions-slot, så EN passering propagerar vinnare genom hela trädet.
 3. LÅSNINGEN härleds, inte ur ett flagg-fält: `isGroupStageComplete` = alla 12 grupper har varje lag på 3
    spelade matcher (`played >= 3`), en ren funktion av sanningen. Först då seedas treorna (annars stannar
-   bästa-trea-slotarna i `possible`-läget). `qualifyingGroups` är null tills exakt 8 treor finns, så
+   bästa-trea-slotarna i `possible`-läget). `qualifyingGroups` är null tills rangordningen är komplett
+   (en trea per grupp, alla A-L representerade), så
    seedThirdPlaces (som fail-loud:ar på fel antal) aldrig anropas på en ofullständig gissning.
 4. VINNAR-PROPAGERING via en ren `outcomeOf(match, home, away)`: ordinarie mål avgör, vid lika avgör
    straffar (FIFA Article 14); en lika match UTAN avgörande straffar ger INGEN vinnare (fail-safe, propagera

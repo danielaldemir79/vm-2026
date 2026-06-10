@@ -322,8 +322,9 @@ export function deriveBracket(
   const groupComplete = isGroupStageComplete(tables);
 
   // Seeda de 8 bästa treorna (bara när gruppspelet är klart): matchId -> trean.
-  // qualifyingGroups är null tills exakt 8 treor finns, då seedar vi inte (möjliga
-  // lag-läget gäller). En giltig kombination ger en kollisionsfri Annexe C-seedning.
+  // qualifyingGroups är null tills rangordningen är komplett (en trea per grupp,
+  // alla A-L representerade), då seedar vi inte (möjliga lag-läget gäller). En
+  // giltig kombination ger en kollisionsfri Annexe C-seedning.
   const thirdByMatchId = new Map<string, string>();
   if (groupComplete) {
     const { qualifyingGroups } = computeThirdPlaceRanking(tables);
