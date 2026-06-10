@@ -103,6 +103,33 @@ describe('isGroupStageComplete', () => {
   it('är true när alla 12 grupper är färdigspelade', () => {
     expect(isGroupStageComplete(allComplete())).toBe(true);
   });
+
+  // C3 (Copilot runda 1): låsningen får INTE ske bara för att ANTALET tabeller är
+  // 12, om de inte täcker alla 12 UNIKA grupperna. En dubblett (två A) + en saknad
+  // grupp (ingen L) ger 12 tabeller men 11 unika groupId:n. En ren längd-koll
+  // (`tables.length >= 12`) skulle låsa felaktigt och seedningen skulle slå upp den
+  // saknade gruppen -> undefined -> en resolved slot med teamId null.
+  it('är false med 12 FÄRDIGSPELADE tabeller om en grupp är dubblerad och en saknas (11 unika)', () => {
+    // Alla 12 färdigspelade, men byt ut L mot ett andra A: 12 tabeller, 11 unika.
+    const tables = allComplete();
+    const indexOfL = GROUP_IDS.indexOf('L');
+    tables[indexOfL] = completeTable('A');
+    expect(tables).toHaveLength(GROUP_IDS.length);
+    expect(new Set(tables.map((t) => t.groupId)).size).toBe(GROUP_IDS.length - 1);
+    // Måste fortfarande vara "pågår" (false), annars låses ett ofullständigt
+    // gruppspel och L:s slotar resolvas till null.
+    expect(isGroupStageComplete(tables)).toBe(false);
+  });
+
+  it('är false med FLER än 12 tabeller om en kanonisk grupp saknas (antalet räcker ändå inte)', () => {
+    // 13 tabeller: alla utom L (11) + två extra A. Antalet (13) >= 12, men L saknas
+    // -> får inte låsa. Bevisar att en ren antals-koll (length >= 12) inte räcker.
+    const withoutL = allComplete().filter((t) => t.groupId !== 'L');
+    const tables = [...withoutL, completeTable('A'), completeTable('A')];
+    expect(tables.length).toBeGreaterThan(GROUP_IDS.length);
+    expect(new Set(tables.map((t) => t.groupId)).has('L')).toBe(false);
+    expect(isGroupStageComplete(tables)).toBe(false);
+  });
 });
 
 describe('deriveBracket, GRUPPSPEL PÅGÅR (möjliga lag + etiketter)', () => {

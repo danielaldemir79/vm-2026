@@ -42,14 +42,16 @@ describe('BracketView, rendering + a11y', () => {
       expect(screen.getByRole('region', { name: /Sextondelsfinaler/i })).toBeInTheDocument();
     });
     // Varje runda är en etiketterad region (a11y-navigerbar). Exakta namn med
-    // antalet matcher, så "Final (1 matcher)" inte krockar med "Semifinaler ...".
+    // antalet matcher, så "Final (1 match)" inte krockar med "Semifinaler ...".
+    // Antalet böjs grammatiskt: 1 -> "match", >1 -> "matcher" (C1/C2), så
+    // skärmläsaren inte säger "Final (1 matcher)".
     for (const name of [
       'Sextondelsfinaler (16 matcher)',
       'Åttondelsfinaler (8 matcher)',
       'Kvartsfinaler (4 matcher)',
       'Semifinaler (2 matcher)',
-      'Final (1 matcher)',
-      'Bronsmatch (1 matcher)',
+      'Final (1 match)',
+      'Bronsmatch (1 match)',
     ]) {
       expect(screen.getByRole('region', { name })).toBeInTheDocument();
     }

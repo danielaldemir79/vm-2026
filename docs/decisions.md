@@ -99,6 +99,15 @@ lag; en lika match UTAN avgörande straffar propagerar INGEN vinnare (fail-safe,
 **Låsnings-regeln (härledd, inte ett flagg-fält):** `isGroupStageComplete` är sann när alla 12 grupper
 har varje lag på 3 spelade matcher (`played >= 3`, formatets konstant SPEC §5), härlett ur tabellerna
 så det är en ren funktion av sanningen. Först då seedas treorna och slotarna låses.
+**Källhänvisad rättelse (2026-06-10, Copilot R1 C3):** villkoret kollade tidigare bara `tables.length >=
+12`, ett ANTAL, inte 12 UNIKA grupper. 12 tabeller med en dubblett (två A) och en saknad grupp (ingen L)
+hade då låst gruppspelet felaktigt, varpå slot-resolvern slår upp den saknade gruppen, får undefined och
+ger en `resolved` slot med `teamId` null (en låst plats utan lag). Nu krävs att Set:et av `groupId` täcker
+hela `GROUP_IDS` (en av varje, A-L, enda sanningen för giltiga grupper), vilket på köpet garanterar minst
+12 tabeller, i stället för en lös 12:a som antal. Fail-safe: hellre fortsatt "pågår" än en felaktig låsning
+på dubblerad/ofullständig data. Bevisat av test (dubblett-scenario: 12 tabeller / 11 unika + 13 tabeller /
+L saknas, båda ger false). **Källa för grupp-mängden:** `GROUP_IDS` i `src/domain/types.ts` (A-L, SPEC §5),
+samma kanoniska lista som teams/fixtures härleds ur.
 
 ---
 
