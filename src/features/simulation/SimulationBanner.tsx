@@ -17,6 +17,31 @@
 
 import { useResultsStore } from '../results/results-context';
 
+/** Kolv-/laboratorie-ikon i banner-rubriken (dekorativ, aria-hidden): förstärker
+ *  "labbet"-känslan vid sidan av rubriktexten, men texten bär betydelsen. */
+function FlaskIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      // I sim-läge tonas ikonen mot sim-violetten, annars dämpad accent-grön: en
+      // diskret färg-signal som FÖLJER textens betydelse (aldrig dess ersättning).
+      className={active ? 'shrink-0 text-[var(--vm-sim)]' : 'shrink-0 text-accent'}
+    >
+      <path d="M9 3h6" />
+      <path d="M10 3v6.5L5.2 17.3A2 2 0 0 0 6.9 20.4h10.2a2 2 0 0 0 1.7-3.1L14 9.5V3" />
+      <path d="M7.5 14h9" />
+    </svg>
+  );
+}
+
 export function SimulationBanner() {
   const { simulating, enterSimulation, exitSimulation, resetSimulation } = useResultsStore();
 
@@ -24,14 +49,26 @@ export function SimulationBanner() {
     // data-simulation-active speglar läget för design-frontends styling OCH för
     // tester (stabil hake). aria-live via role="status" på meddelandet nedan, så
     // en skärmläsare hör när läget slås på/av utan att flytta fokus.
+    //
+    // SIM-LÄGE PÅ = "labbet": kortet får en violett kant + mjuk glow (via
+    // box-shadow/border-färg på sim-tonen) så själva kontrollen tydligt hör ihop
+    // med den globala sim-ramen (SimulationFrame). AV = neutral surface-kort.
     <section
       aria-labelledby="simulering-rubrik"
       data-simulation-banner=""
       data-simulation-active={simulating ? 'true' : 'false'}
-      className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      className={
+        simulating
+          ? 'flex flex-col gap-3 rounded-card border bg-surface p-4 shadow-[0_10px_40px_-16px_color-mix(in_srgb,var(--vm-sim)_55%,transparent)] [border-color:color-mix(in_srgb,var(--vm-sim)_55%,var(--color-border))] sm:flex-row sm:items-center sm:justify-between sm:gap-4'
+          : 'flex flex-col gap-3 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4'
+      }
     >
       <div className="flex flex-col gap-1">
-        <h2 id="simulering-rubrik" className="font-display text-base font-bold sm:text-lg">
+        <h2
+          id="simulering-rubrik"
+          className="flex items-center gap-2 font-display text-base font-bold sm:text-lg"
+        >
+          <FlaskIcon active={simulating} />
           Vad-händer-om
         </h2>
         {simulating ? (

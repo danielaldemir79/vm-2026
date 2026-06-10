@@ -13,3 +13,7 @@ export type { SimulationOverlay } from './apply-simulation';
 
 // Kontroll + markering (starta/återställ/avsluta + "Simulering pågår"-banner).
 export { SimulationBanner } from './SimulationBanner';
+
+// App-global visuell ram (ring + tint + sticky markeringsbadge) runt de
+// simulerade vyerna när what-if-läget är PÅ.
+export { SimulationFrame } from './SimulationFrame';
