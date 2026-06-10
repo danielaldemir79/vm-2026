@@ -5,6 +5,113 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-10 , #39 (T27) senior-developer: Copilot R1, dag-medvetet fönster (C1) + dolt-ej-filtrerat (C2)
+
+**Beslut (C1, dag-medvetet 3-dagars fönster):** `ResultEntryView` läser inte längre "idag" via ett
+fruset `Date.now()`. En ny hook `useTodayKey` (`src/features/daily/use-today-key.ts`) äger ett "nu" som
+bara uppdateras när den svenska kalenderdagen FAKTISKT växlar (minut-tick som gatar på dag-byte +
+en `visibilitychange`-lyssnare), och vyn memoizerar fönstret på det (`windowMatches(editable, nowMs)`).
+**Varför:** appen är en PWA som lämnas öppen hela VM:t (fliken kan stå öppen över midnatt). Det gamla
+`useMemo(() => windowMatches(editable), [editable])` läste `Date.now()` internt men berodde bara på
+matchlistan, så 3-dagars fönstret frös på första beräkningens dag och flyttade sig inte över midnatt.
+`useTodayKey` återanvänder `localDateKey` (EN sanning för svensk-dag, off-by-one-säker) och returnerar ett
+referens-stabilt `nowMs` inom en dag, så fönstret räknas om vid dygnsväxling men inte i onödan varje tick.
+`visibilitychange` täcker att en bakgrunds-flik får sina timers strypta: appen synkar dagen direkt när den
+blir synlig igen. Bevisat: `use-today-key.test.tsx` (fejkad Date, flytt över midnatt, synlighets-synk) +
+`ResultEntryView.test.tsx` (vyn visar olika kort premiärdagen vs en vecka senare).
+
+**Beslut (C2, alla kort renderas, de utanför fönstret DÖLJS med `hidden` i stället för att filtreras bort):**
+Listan renderar nu ALLA `editable`-matcher som `<li>`, och markerar de utanför fönstret med `hidden`-
+attributet (display:none + borttaget ur a11y-trädet) när listan inte är utfälld, i stället för att klippa
+bort dem ur den renderade arrayen.
+**Varför:** varje `ResultEntryForm` seedar sin lokala `useState` (osparade mål/status) en gång vid mount.
+Filtrerades ett out-of-window-kort bort vid ihopfällning unmountades formuläret och OSPARAD inmatning
+tappades. Med `hidden` bevaras React-instansen, så ett pågående edit överlever expandera/ihopfäll.
+Prestanda-OK: före #39 renderades alla kort jämt, så att hålla dem mounted är inte dyrare än den baseline.
+A11y bevarad: dolda kort nås inte av tab/skärmläsare (hidden-attributet sköter det), och `hiddenCount`/
+knapptexten stämmer fortfarande (en `fieldset` i ett hidden-träd är inte i a11y-trädet, så
+`getAllByRole('group')` räknar bara synliga). Bevisat: `ResultEntryView.test.tsx` (skriv i ett
+out-of-window-kort, fäll ihop, fäll ut, värdet kvar). Den ursprungliga fönster-/expandera-regeln
+står kvar under "#39 (T27) senior-developer: resultatinmatning, stabilt kolumn-grid + 3-dagars fönster".
+
+---
+
+## 2026-06-10 , #39 (T27) design-frontend: premium-finish på resultatinmatningen (kompakta kort + tydlig expandera)
+
+**Beslut (kompakta kort, "arena i kvällsljus"):** ResultEntryForm-kortet komprimerades ovanpå senior-devs
+stabila grid (seamen `data-result-card-body` orörd): padding 16 -> 14px (mobil), kort-gap + fieldset-gap
+16 -> 12px, body-grid-gap (10px kolumn / 12px rad), score-input 56 -> 48px hög (font 24 -> 22px, fortfarande
+ett bekvämt touch-mål >= 44px, WCAG 2.5.5), och en diskret varm topp-list (`inset 0 1px 0` i `--vm-gold`-mix)
+som premium-detalj. Lagnamn fick avsiktlig ellipsis-typografi (dämpad ton + tight tracking) och "mot"-
+avdelaren en guld-skiftad ton. Resultat: kort-höjden gick från 213 -> 192px (mobil) och 128px (desktop/
+vikbar inner), den "luftiga spill-ytan" i Daniels skärmdump är borta.
+**Varför:** Daniels mobil-feedback (#39): korten var luftiga med mycket död yta. Kompaktionen rör BARA
+spårbredder/typografi/spacing/dekor (design-frontends lager), aldrig grid-strukturen eller a11y-haken
+(`w-16`, `truncate`, `data-result-card-body` är låsta av strukturtesten och bevarade). Inga råa hex, allt
+via `color-mix` mot semantiska tokens (samma husstil som GroupTable), så det följer temat.
+
+**Beslut (expandera TYDLIGT SYNLIG):** "Visa alla matcher (N dolda)"-knappen gick från en blek border-pill
+till en INBJUDANDE accent-kontroll: en accent-tonad yta (`color-mix(accent 12%, surface)`, hover 20%),
+accent-kant (42% -> hover 60%) och en accent-färgad chevron som pekar ner (= mer finns) och vänds 180° i
+utfällt läge. Knapptexten + aria-attributen (`aria-expanded`/`aria-controls`/`data-results-toggle`) är
+OFÖRÄNDRADE (test-låsta). Chevron-vridningen animeras via `transition-[rotate]` (Tailwind v4:s `rotate-180`
+sätter CSS-`rotate`, inte transform, så övergången måste rikta `rotate` för att inte snappa) och nollas av
+den globala reduced-motion-regeln (index.css).
+**Varför:** Daniel bad uttryckligen att göra den "tydligt synlig, omöjlig att missa, men inte skrikig".
+En låg-alfa accent-tint + kant + chevron drar ögat utan att bli en fylld accent-knapp (den tonen är
+reserverad för primär-action Spara), så hierarkin hålls.
+
+**UPPMÄTTA kontraster (WCAG AA, canvas-komposit i webbläsaren, BÅDA teman, värsta uppmätta = min):**
+Endast uppmätta värden, inga antagna (lessons `aa-kontrast-pastad...`). Mätmetod: rendera elementets
+faktiska color över sin faktiska yt-färg på en 1x1-canvas, läs sRGB-byte, räkna WCAG-ratio.
+- Expandera-knappens text (`--color-fg`) på sin accent-tint-yta: **ljust 15.14:1**, **mörkt 11.85:1**.
+- Expandera-chevron (accent, dekorativ affordans): ljust 4.57:1, mörkt 7.53:1 (>= 4.5:1 i båda ändå).
+- Lagnamn (`--color-fg`) på kort-ytan: ljust 17.91:1, mörkt 15.24:1.
+- Status-etikett (`--color-fg-muted`) på kort-ytan: ljust 6.52:1, mörkt 7.50:1.
+- "mot"-avdelaren (guld-mix `gold 52% / fg-muted 48%`) på kort-ytan: **ljust 4.88:1**, **mörkt 8.67:1**
+  (mixet justerades från 72% guld till 52% just för att klara AA som normal text i ljust tema; aria-hidden
+  men hålls ändå >= 4.5:1).
+- Spara-text (`--accent-fg`) på accent: ljust 5.40:1, mörkt 10.85:1.
+Alla text-par >= 4.5:1 (AA normal text) i båda teman. Min uppmätt = 4.57 (chevron, dekorativ) / 4.88 ("mot").
+
+**Live-verifierat (dev-server, per bredd):** 280 (vikbar cover), 360, 768 (vikbar inner ~Daniels skärmdump),
+1024, 1440, i båda teman. Per bredd uppmätt: noll horisontell overflow (`scrollWidth === clientWidth`),
+score-kolumnerna linjerar IDENTISKT kort-till-kort (home/away-input + "mot"-center samma offset på alla
+kort, en enda unik offset-uppsättning), trunkering aktiv (`overflow:hidden` + ellipsis, namn inom kort-
+kanten), och layout-växeln (mobil-staplad < 640px -> desktop-inline >= 640px) korrekt. Expandera-knappen
+fäller ut 5 -> 72 kort och tillbaka, `aria-expanded` växlar, chevron vänds. Reduced-motion emulerad:
+chevron + kort-transition = 0.01ms (nollade), inga animationer.
+
+## 2026-06-10 , #39 (T27) senior-developer: resultatinmatning, stabilt kolumn-grid + 3-dagars fönster
+
+**Beslut (stabil kolumn-layout):** ResultEntryForm-kortets kropp gick från en flex-layout med
+`flex-1`-lag-kolumner till ett CSS-GRID med fasta/proportionella spår: bara KONTROLL-spåret är
+flexibelt (`minmax(0,1fr)`), score-blocket (hemma-ruta / "mot" / borta-ruta) sitter i auto-spår med
+IDENTISK bredd på varje kort. Lagnamnen trunkeras (`truncate`, ellipsis) inom rut-bredden, fullt namn
+via `title` (+ labelns text för skärmläsare, "(hemma)"/"(borta)"-suffixet flyttat till `sr-only` så det
+inte konkurrerar om den trunkerade bredden).
+**Varför:** Daniels mobil-feedback (#39): olika långa lagnamn knuffade poängrutorna i sidled kort för
+kort, och namn höggs av fult. Med `flex-1` ärver kolumnbredden innehållet, så rutorna kunde aldrig
+linjera mellan kort. Ett grid där bara kontroll-spåret är flexibelt låser score-kolumnerna på samma
+plats oavsett namnlängd. Grundlayouten (grid-spåren) ägs av senior-dev; design-frontend finjusterar
+spår/typografi via seamen `data-result-card-body`. Ingen horisontell overflow 280px (vikbar) -> desktop.
+
+**Beslut (3-dagars fönster + expandera):** Inmatningslistan visar default bara matcher inom de närmaste
+3 SVENSKA kalenderdagarna; en tillgänglig "Visa alla matcher (N dolda)"-knapp (`aria-expanded`,
+`aria-controls`) fäller ut hela listan, "Visa färre" fäller ihop. ANKARDAGEN = idag om turneringen
+pågår, annars PREMIÄRDAGEN (idag före första matchen). Ren funktion `windowMatches(matches, now)` i
+`result-window.ts`, återanvänder `localDateKey` från features/daily (DRY, EN sanning för svensk-dag-
+härledningen, off-by-one-säker). WINDOW_DAYS = 3.
+**Varför:** Hela VM:t är 104 matcher = en orimligt lång lista (Daniels feedback). Default-fönstret håller
+listan kort utan att gömma data (allt nås via expandera). Premiär-ankringen följer samma intuition som
+den dagliga vyns `initialDayIndex` (visa premiären innan turneringen börjat, inte ett tomt fönster runt
+"idag"). Edge-fall källtestade i `result-window.test.ts`: ej börjad, slutet (< 3 dagar kvar), allt inom
+fönstret (ingen knapp), vilodag i fönstret (kalenderdagar räknas, inte matcher), tom indata, ogiltig
+kickoff (fail loud via localDateKey). Detta är en UX-/produkt-regel (ingen extern auktoritativ källa att
+källhänvisa), spårbar via #39 + denna rad.
+
+---
+
 ## 2026-06-10 , T8 (issue #8) design-frontend: dags-tonen vävd in i heron + T8-PIN löst (success-ton)
 
 **Beslut (T8-PIN LÖST, success får en egen AA-ton i ljust tema):** I ljust tema var
