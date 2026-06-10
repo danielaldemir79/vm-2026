@@ -17,6 +17,7 @@
 
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import type { Match, Team } from '../../domain/types';
+import { useTodayKey } from '../daily';
 import { useGoalCelebration, type GoalCelebration } from './goal-celebration';
 import { useResultsStore } from './results-context';
 import { ResultEntryForm } from './ResultEntryForm';
@@ -69,9 +70,21 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
   // ej börjad, slutet, allt inom fönstret, vilodag); här äger vyn bara expandera-
   // tillståndet och den tillgängliga kontrollen.
   const [expanded, setExpanded] = useState(false);
-  const windowed = useMemo(() => windowMatches(editable), [editable]);
-  // Vad som faktiskt renderas: hela listan när användaren fällt ut, annars fönstret.
-  const shownMatches = expanded ? editable : windowed.visible;
+
+  // DAG-MEDVETET "nu" (Copilot R1, C1, PWA-fälla): fönstret läser "idag", och appen
+  // lämnas öppen hela VM:t, så fliken kan stå öppen över midnatt. useTodayKey ger ett
+  // `nowMs` som är referens-STABILT inom en dag och bara ändras vid en faktisk
+  // dygnsväxling (eller när fliken blir synlig igen efter att ha varit dold). Genom
+  // att memoizera fönstret på `nowMs` (inte bara `editable`) flyttar sig fönstret över
+  // midnatt utan en omladdning, men räknas inte om i onödan varje tick.
+  const { nowMs } = useTodayKey();
+  const windowed = useMemo(() => windowMatches(editable, nowMs), [editable, nowMs]);
+
+  // Vilka matcher som ligger i fönstret (snabb id-koll). ALLA editable-matcher renderas
+  // alltid (se nedan, C2); detta avgör bara vilka som DÖLJS när listan inte är utfälld.
+  const visibleIds = useMemo(() => new Set(windowed.visible.map((m) => m.id)), [windowed]);
+  const isInWindow = (matchId: string): boolean => expanded || visibleIds.has(matchId);
+
   // Knappen behövs bara när det FINNS något dolt (alla inom fönstret -> ingen knapp).
   const hasHidden = windowed.hiddenCount > 0;
   // Stabil id-koppling för aria-controls/aria-expanded mellan knappen och listan.
@@ -129,8 +142,19 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
 
       {status === 'ready' && editable.length > 0 ? (
         <ul id={listId} className="m-0 flex list-none flex-col gap-3 p-0">
-          {shownMatches.map((match) => (
-            <li key={match.id}>
+          {/* RENDERA ALLA matcher alltid, dölj de utanför fönstret med `hidden`
+              (Copilot R1, C2). Före #39 renderades alla 104 kort jämt, så att hålla
+              dem mounted är inte dyrare än den baseline. VARFÖR `hidden` i stället
+              för att FILTRERA bort dem ur listan: ett out-of-window-formulär kan ha
+              OSPARAD inmatning i sin lokala useState; filtrerar vi bort det vid
+              ihopfällning unmountas formuläret och inmatningen tappas. `hidden`
+              (= display:none + borttaget ur a11y-trädet) bevarar React-instansen,
+              så ett pågående edit överlever expandera/ihopfäll. Dolda kort nås inte
+              av tab eller skärmläsare (det sköter hidden-attributet), och
+              getAllByRole('group') räknar bara de synliga (fieldset i ett hidden-
+              träd är inte i a11y-trädet), så knapptextens hiddenCount stämmer. */}
+          {editable.map((match) => (
+            <li key={match.id} hidden={!isInWindow(match.id)}>
               {/* key inkluderar matchens status + mål, inte bara match.id (C10):
                   ResultEntryForm seedar sin lokala useState EN gång vid mount.
                   Ändras matchen externt i storen (samma match.id => samma React-

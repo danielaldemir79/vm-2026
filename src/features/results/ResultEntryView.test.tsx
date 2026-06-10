@@ -201,4 +201,111 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', () => {
       expect(screen.getAllByRole('group').length).toBeGreaterThan(windowedCount);
     });
   });
+
+  // Copilot R1, C2: ett kort UTANFÖR fönstret renderas (dolt med `hidden`), inte
+  // bort-filtrerat, så dess lokala useState överlever en ihopfällning. Bevisar att
+  // osparad inmatning INTE tappas när man fäller ihop och fäller ut igen.
+  it('bevarar osparad inmatning i ett kort utanför fönstret över expandera/ihopfäll (C2)', async () => {
+    await renderView();
+
+    // Fäll ut så ALLA kort är synliga/interaktiva.
+    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    await waitFor(() => {
+      expect(document.querySelectorAll('li[hidden] form[data-match-id]').length).toBe(0);
+    });
+
+    // Hitta ett kort som ligger UTANFÖR fönstret: i ihopfällt läge är dess <li>
+    // `hidden`. Vi fäller ihop, läser av ett dolt match-id, och fäller ut igen så
+    // kortet är interaktivt men vi vet att det är ett out-of-window-kort.
+    fireEvent.click(screen.getByRole('button', { name: /Visa färre/i }));
+    const hiddenForm = await waitFor(() => {
+      const form = document.querySelector('li[hidden] form[data-match-id]');
+      expect(form).not.toBeNull();
+      return form as HTMLFormElement;
+    });
+    const outOfWindowId = hiddenForm.getAttribute('data-match-id') as string;
+
+    // Fäll ut igen och skriv en OSPARAD siffra i out-of-window-kortets hemma-fält.
+    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    const formSelector = `form[data-match-id="${outOfWindowId}"]`;
+    await waitFor(() => {
+      // Kortet får inte vara dolt nu (utfällt), annars är inmatningen inte möjlig.
+      const form = document.querySelector(formSelector) as HTMLFormElement | null;
+      expect(form?.closest('li')?.hasAttribute('hidden')).toBe(false);
+    });
+    const homeInputBefore = within(
+      document.querySelector(formSelector) as HTMLFormElement
+    ).getByLabelText(/\(hemma\)/) as HTMLInputElement;
+    fireEvent.change(homeInputBefore, { target: { value: '7' } });
+    expect(homeInputBefore.value).toBe('7');
+
+    // Fäll ihop (kortet blir hidden, men UNMOUNTAS inte) och fäll ut igen.
+    fireEvent.click(screen.getByRole('button', { name: /Visa färre/i }));
+    await waitFor(() => {
+      const form = document.querySelector(formSelector) as HTMLFormElement;
+      expect(form.closest('li')?.hasAttribute('hidden')).toBe(true);
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Visa alla matcher/i }));
+    await waitFor(() => {
+      const form = document.querySelector(formSelector) as HTMLFormElement;
+      expect(form.closest('li')?.hasAttribute('hidden')).toBe(false);
+    });
+
+    // Den osparade siffran ska finnas kvar (samma React-instans, ingen unmount).
+    const homeInputAfter = within(
+      document.querySelector(formSelector) as HTMLFormElement
+    ).getByLabelText(/\(hemma\)/) as HTMLInputElement;
+    expect(homeInputAfter.value).toBe('7');
+    // Längre timeout: testet fäller ut/ihop hela listan (72 formulär) flera gånger,
+    // varje toggle re-renderar alla kort, så det är legitimt långsammare än 5 s-
+    // defaulten (inte en hängning, mätt ~7 s).
+  }, 20000);
+});
+
+// DAG-MEDVETET fönster (Copilot R1, C1, PWA-fälla). Den rena fönster-funktionen och
+// useTodayKey är enhetstestade fristående (result-window.test.ts, use-today-key.test.tsx,
+// inkl. midnatts-flytten). Här bevisar vi att VYN ankrar fönstret på den FAKTISKA dagen,
+// inte på ett fruset Date.now(): renderas vyn två olika dagar visas olika kort. Det
+// stänger regressionen där fönstret räknades i ett useMemo som bara berodde på matchlistan.
+describe('ResultEntryView, fönstret följer dagens datum (C1)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Vilka match-id som är SYNLIGA (i fönstret) just nu = formulär i ett icke-dolt <li>. */
+  async function visibleMatchIds(systemTime: string): Promise<Set<string>> {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(systemTime));
+    const { unmount } = render(
+      <ResultsProvider env={fixturesEnv()}>
+        <ResultEntryView />
+      </ResultsProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+    });
+    const ids = new Set<string>();
+    document.querySelectorAll('li:not([hidden]) form[data-match-id]').forEach((f) => {
+      ids.add((f as HTMLElement).getAttribute('data-match-id') as string);
+    });
+    unmount();
+    vi.useRealTimers();
+    return ids;
+  }
+
+  it('visar OLIKA kort på premiärdagen (11 juni) än mitt i turneringen (20 juni)', async () => {
+    // Premiärdagen: fönstret 11-13 juni -> premiärmatcherna syns.
+    const premiere = await visibleMatchIds('2026-06-11T08:00:00.000Z');
+    // En vecka senare: fönstret 20-22 juni -> ANDRA matcher syns, premiärmatcherna
+    // har glidit ut ur fönstret. Hade vyn frusit Date.now() (C1-buggen) hade samma
+    // kort visats båda gångerna.
+    const later = await visibleMatchIds('2026-06-20T08:00:00.000Z');
+
+    // Båda fönstren har matcher (turneringen pågår båda dagarna).
+    expect(premiere.size).toBeGreaterThan(0);
+    expect(later.size).toBeGreaterThan(0);
+    // Och de skiljer sig: minst ett kort som syns på premiärdagen är borta senare.
+    const premiereOnly = [...premiere].filter((id) => !later.has(id));
+    expect(premiereOnly.length).toBeGreaterThan(0);
+  });
 });
