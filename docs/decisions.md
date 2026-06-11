@@ -114,6 +114,39 @@ dekor). Båda teman verifierade (computed colors matchar token-värdena ovan).
 *Städning:* DESIGN-TEST-rummet RADERAT ur produktion efter testet (medlemslöst, exakt id-villkorat
 DELETE), verifierat: 0 DESIGN-TEST-rum kvar, Daniels rum ewrmdt orört. Inget för dirigenten att städa.
 
+## 2026-06-11 , T39 (#68): signatur-namnet länkar till Daniels sajt (www.danielaldemir.com)
+
+**Vad:** namnet "Daniel Aldemir" i footer-signaturen (T38) är nu en länk till
+`https://www.danielaldemir.com`. Diskret men klickbar, i samma arena-estetik.
+
+**Val (varför namnet blir länken, inte en separat rad):** signaturen är EN tät, balanserad enhet
+(sigill + tick + "Made by NAMN"). En extra "danielaldemir.com"-rad under hade brutit den lugna
+kompositionen och dragit blicken. Att göra NAMNET klickbart är det mest naturliga målet (det ÄR
+upphovspersonen) och håller raden oförändrad i vila. Namnet behåller sin stolthets-styling (full
+`--vm-fg` + display-vikt), så footern ser ut precis som efter T38 tills man pekar/fokuserar.
+
+**Affordans (tydligt en länk):** en SOLID accent-underline (`decoration-accent`, `decoration-2`,
+`underline-offset-[3px]`) tänds på `hover` OCH `focus-visible`, samma "tänds-vid-interaktion"-mönster
+som lagnamns-knappen (T10) men med ett SOLIT accent-streck i stället för T10:s prickade fg-muted, så
+formspråket skiljer "länk till annan sajt" från "öppna en panel i appen". Vid tangentbord tar
+dessutom den globala `:focus-visible`-ringen (accent, index.css, WCAG 2.4.7) över som primär signal.
+
+**Säkerhet:** `target="_blank"` + `rel="noopener noreferrer"` (hindrar tabnabbing + läcker ingen
+referrer).
+
+**a11y:** explicit `aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"` ger ett
+tydligt länknamn som även förvarnar om ny flik; `title` på raden uppdaterad med domänen. Monogrammet
++ tick:en förblir `aria-hidden`.
+
+**Kontrast (UPPMÄTT, scripts/contrast-t38.mjs, ny rad 6, canvas-komposit mot sidans FOND, BÅDA teman):**
+- Namnets TEXT är OFÖRÄNDRAD full `--vm-fg`: 17.04:1 mörkt / 16.25:1 ljust (ingen ny brödtext-kontrast).
+- Länk-underline:n (accent, full opacitet) mot fonden = icke-text indikator, WCAG 1.4.11 (>=3:1):
+  **10.83:1 mörkt / 4.90:1 ljust**, klarar med marginal i båda teman.
+
+**Responsivitet (verifierat 280-1440px, båda teman):** länken är inline i samma flex-rad, lägger ingen
+bredd (samma text som förr), så raden får plats på 280px utan horisontell scroll precis som T38, och
+renderar rent upp till 1440px.
+
 ## 2026-06-11 , T17 (#17, Copilot C1+C2): slutspels-matchtips poängsätts + sr-only-interpunktion
 
 **C1 (korrekthetsbug, källmedveten fix):** `deriveMatchFacit` (derive-facit.ts) filtrerade på

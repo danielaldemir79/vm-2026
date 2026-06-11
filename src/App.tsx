@@ -285,26 +285,47 @@ function AppShell() {
           <p>
             VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med en länk.
           </p>
-          {/* Upphovs-signatur (T38, #67): Daniels stolta lilla avsändarrad i "arena i
-              kvällsljus"-estetiken. Ett "DA"-monogram-sigill (solid accent-bricka, mörk/
+          {/* Upphovs-signatur (T38, #67; länk T39, #68): Daniels stolta lilla avsändarrad i
+              "arena i kvällsljus"-estetiken. Ett "DA"-monogram-sigill (solid accent-bricka, mörk/
               vit ink = den färg-oberoende solid-bricka-formen, AA i båda teman) + en hårfin
               accent-tick som diskret separator, sen "Made by" dämpat (fg-muted, FULL
               opacitet = AA-säkert mot fonden) och NAMNET i full fg/display-vikt så det
               läses stolt, inte som en eftertanke. data-app-signature = stabil krok + testad
               semantik. Monogrammet är aria-hidden (ren dekor), så skärmläsaren läser den rena
-              meningen "Made by Daniel Aldemir". Kontrast mätt i scripts/contrast-t38.mjs
-              (canvas-komposit mot FONDEN, värsta basytan), värden i docs/decisions.md. */}
+              meningen. Kontrast mätt i scripts/contrast-t38.mjs (canvas-komposit mot FONDEN,
+              värsta basytan), värden i docs/decisions.md.
+
+              LÄNK (T39, #68): namnet är nu en länk till Daniels sajt (www.danielaldemir.com).
+              Den behåller stolthets-stilen (full fg + display-vikt) i vila, så raden ser ut
+              precis som förr; klickbarheten signaleras med en AFFORDANS som tänds vid
+              interaktion: en accent-färgad underline på hover OCH focus-visible (samma
+              "tänds-vid-interaktion"-mönster som lagnamns-knappen T10, men SOLID accent-streck
+              = "länk till annan sida", inte den prickade fg-muted "öppna-panel"-signalen). Vid
+              tangentbords-fokus tar dessutom :focus-visible-ringen (index.css, accent, WCAG
+              2.4.7) över som primär affordans. aria-label ger ett tydligt länknamn som även
+              säger att den öppnar en ny flik; target=_blank + rel=noopener noreferrer (säkerhet,
+              hindrar tabnabbing). Underline-färgen (accent) är ren dekor PÅ texten (texten själv
+              är full fg = 17:1+), så ingen ny text-kontrast tillkommer. */}
           <p
             data-app-signature=""
             className="mt-1 flex items-center gap-2.5 text-xs"
-            title="Made by Daniel Aldemir"
+            title="Made by Daniel Aldemir, www.danielaldemir.com"
           >
             <span aria-hidden="true" className="vm-signature-seal">
               DA
             </span>
             <span aria-hidden="true" className="vm-signature-tick" />
             <span className="text-fg-muted">
-              Made by <span className="font-display font-semibold text-fg">Daniel Aldemir</span>
+              Made by{' '}
+              <a
+                href="https://www.danielaldemir.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
+                className="rounded-sm font-display font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+              >
+                Daniel Aldemir
+              </a>
             </span>
           </p>
         </footer>
