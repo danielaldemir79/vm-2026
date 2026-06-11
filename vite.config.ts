@@ -59,21 +59,24 @@ function themeNoFlashPlugin(): Plugin {
 // Vite-konfiguration för VM 2026.
 // PWA-skalet ger en installerbar app (manifest + service worker + ikon).
 //
-// UPPDATERINGS-MODELL (T43/#74): registerType 'prompt' i stället för 'autoUpdate'.
-// Appen ändras ofta och delas brett, och en TYST auto-omladdning kan rycka undan
-// vyn mitt i något. Med 'prompt' installeras en ny SW men VÄNTAR; appen visar en
-// diskret "ny version finns, ladda om"-prompt (UpdatePrompt) och användaren tar
-// den i bruk med ETT klick (updateSW(true) -> skipWaiting + reload). Så ingen
-// fastnar på en gammal cache OCH ingen får en oväntad omladdning. injectRegister:
-// null = vi registrerar SJÄLVA via virtual:pwa-register (register-sw.ts), annars
-// skulle pluginet auto-injicera en andra registrering vid sidan av prompt-hooken.
+// UPPDATERINGS-MODELL (HOTFIX, ersätter T43:s 'prompt'): TYST AUTO-UPPDATERING.
+// registerType 'autoUpdate' + workbox skipWaiting:true + clientsClaim:true. En ny
+// SW INSTALLERAS, AKTIVERAS direkt (skipWaiting) och TAR ÖVER alla öppna flikar
+// (clientsClaim). register-sw.ts laddar sedan om sidan EN gång när den nya SW:n tar
+// kontroll (controllerchange), så användaren ser senaste versionen UTAN något
+// manuellt handgrepp (ingen "rensa cache", ingen klick-prompt).
 //
-// VIKTIGT (källa: vite-plugin-pwa-docs, prompt-for-update): med registerType
-// 'prompt' sätts INTE workbox skipWaiting/clientsClaim. skipWaiting skulle
-// aktivera den nya SW:n direkt och kringgå prompten (då blir det de facto
-// auto-update). I prompt-läget är det användarens klick (updateSW(true)) som
-// posterar SKIP_WAITING och laddar om, dvs takeovern sker direkt VID klicket, inte
-// först när alla flikar stängts. cleanupOutdatedCaches städar gamla precaches.
+// VARFÖR bytet från 'prompt' (Daniels krav): 'prompt' visar en "ny version finns"-
+// ruta som användaren klickar. Men den rutan finns BARA i den nya kodens UI, och
+// den koden kör inte förrän man redan tagit i bruk den nya versionen, en moment-22:
+// själva FÖRSTA hoppet in i en ny version kan inte visa någon prompt och fastnar
+// (gammal SW serverar gammalt skal). Det drabbade Daniels enhet. Appen ska delas
+// med OTEKNISKA vänner, så uppdateringen MÅSTE ske autonomt. skipWaiting+clientsClaim
+// gör att den nya SW:n tar över av sig själv, oberoende av vilken kod som råkar köra.
+//
+// injectRegister: null = vi registrerar SJÄLVA via virtual:pwa-register
+// (register-sw.ts), där controllerchange -> reload bor. cleanupOutdatedCaches städar
+// gamla precaches när den nya SW:n tar över.
 export default defineConfig({
   define: {
     // Bygg-stämpel injiceras som string-literaler (define), lästa via app-version.ts.
@@ -86,7 +89,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       injectRegister: null,
       // Tar med statiska tillgångar som inte importeras av appen i precachen
       // (favicon, apple-touch-icon, det självhostade typsnittet). Allt under
@@ -107,9 +110,17 @@ export default defineConfig({
         // omladdning/djuplänk offline visar appen i stället för webbläsarens
         // dino-sida. Source: vite-plugin-pwa / workbox generateSW-docs.
         navigateFallback: 'index.html',
-        // Städa bort gamla precache-poster när en ny version tas i bruk (efter
-        // att användaren laddat om via prompten), så cachen inte växer obegränsat.
+        // Städa bort gamla precache-poster när en ny version tas i bruk, så cachen
+        // inte växer obegränsat.
         cleanupOutdatedCaches: true,
+        // TYST AUTO-UPPDATERING (hotfix, källa: workbox/vite-plugin-pwa autoUpdate):
+        // den nya SW:n hoppar över "waiting"-läget och AKTIVERAS direkt (skipWaiting),
+        // och TAR ÖVER de redan öppna sidorna (clientsClaim). Tillsammans med
+        // controllerchange -> reload i register-sw.ts ser en användare den nya
+        // versionen utan något manuellt handgrepp. Detta är det avgörande som gör
+        // uppdateringen autonom även för otekniska vänner (Daniels krav).
+        skipWaiting: true,
+        clientsClaim: true,
       },
       // Manifestet bor i en egen ren modul (src/pwa/app-manifest.ts) så dess
       // WebAPK-mintningskrav (id, separat maskable-ikon, 192+512) kan källankras
