@@ -2,6 +2,10 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InstallBanner } from './InstallBanner';
 import { INSTALL_DISMISSED_KEY } from './storage-keys';
+import {
+  registerInstallPromptCapture,
+  resetInstallPromptCaptureForTest,
+} from './install-prompt-capture';
 
 /** Fyra ett fejk-beforeinstallprompt-event (Chrome/Android-vägen). */
 function fireBeforeInstallPrompt() {
@@ -22,11 +26,14 @@ function fireBeforeInstallPrompt() {
 describe('InstallBanner', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    resetInstallPromptCaptureForTest();
+    registerInstallPromptCapture();
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (X11; Linux) Chrome/120');
   });
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+    resetInstallPromptCaptureForTest();
   });
 
   it('renderar inget när det inte finns någon install-väg (dold)', () => {
@@ -78,6 +85,30 @@ describe('InstallBanner', () => {
     fireEvent.click(screen.getByRole('button', { name: /Inte nu/ }));
     expect(screen.queryByRole('button', { name: 'Installera' })).not.toBeInTheDocument();
     expect(window.localStorage.getItem(INSTALL_DISMISSED_KEY)).toBe('1');
+  });
+
+  it('döljer HELA install-ytan i app-läge (standalone), inget event, ingen Play Protect-not (T39)', () => {
+    // I installerat läge (display-mode: standalone) ska INGEN install-affordans
+    // visas, varken Chrome-knappen, iOS-instruktionen eller Play Protect-noten.
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('standalone'),
+          media: query,
+          onchange: null,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        }) as unknown as MediaQueryList
+    );
+    const { container } = render(<InstallBanner />);
+    // Även om ett event skulle fyra ska standalone vinna och allt förbli dolt.
+    fireBeforeInstallPrompt();
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button', { name: 'Installera' })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-install-play-protect-note]')).not.toBeInTheDocument();
   });
 
   it('visar iOS-INSTRUKTIONEN (Dela -> Lägg till på hemskärmen) på iOS Safari, ingen install-knapp', () => {

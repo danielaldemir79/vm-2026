@@ -5,6 +5,46 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T39 (#68): install-knappen, rotorsak + standalone-detektering
+
+**Symptom (Daniel):** "Installera som app"-knappen gör inget vid klick. Bekräftat blockerande inför
+delningen.
+
+**ROTORSAK (källhänvisad, gissas inte):** `beforeinstallprompt`-event:et fångades först i React-
+hookens `useEffect` (`use-install-prompt.ts`), som kör EFTER att appen monterat. Men event:et fyrar
+"usually on page load" UTAN garanterad tidpunkt (MDN: "There's no guaranteed time this event is fired,
+but it usually happens on page load",
+https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeinstallprompt_event). I en riktig
+webbläsare hinner det därför ofta fyra INNAN hooken registrerat sin lyssnare, och event:et är borta
+för alltid (det re-fyrar inte). Då förblir `deferredPrompt` null, knappen dyker aldrig upp / klick gör
+inget. Enhetstesterna missade det för att de dispatchar event:et EFTER mount, ett klassiskt mock-/
+timing-blint-fläck (samma familj som "happy-path bevisar aldrig den gren där de verkliga källorna
+kopplas").
+
+**Fix (MDN + web.dev-mönstret):** Registrera lyssnaren SÅ TIDIGT som möjligt, FÖRE framework-mount.
+Ny modul `install-prompt-capture.ts` registreras från `main.tsx` (före `createRoot`),
+`preventDefault`:ar mini-infobaren och stashar event:et i en modul-variabel + en liten subscribe-API.
+Hooken läser det redan-fångade event:et via `useSyncExternalStore` (synkron läsning vid mount), så ett
+event fångat före mount syns direkt och tappas inte. `prompt()` anropas på det SPARADE event:et och
+nollas direkt (engångs, MDN/web.dev "customize-install":
+https://web.dev/articles/customize-install). Live-verifierat i Chrome mot byggd `dist`: klick på
+"Installera" anropar `prompt()` exakt en gång, sen försvinner knappen (event förbrukat).
+
+**Standalone-detektering (dölj install-ytan HELT i app-läge):** `detectStandalone` kombinerar nu de
+TRE standard-signalerna (web.dev "Detecting PWA standalone mode",
+https://web.dev/learn/pwa/detection): (1) `matchMedia('(display-mode: standalone)')`, (2) iOS
+`navigator.standalone === true` (icke-standard, MDN), (3) `document.referrer.startsWith('android-app://')`
+(TWA / Android-app-wrapper). I standalone returnerar `resolveInstallMode` 'hidden', så VARKEN Chrome-
+knappen, iOS-instruktionen ELLER Play Protect-noten visas. Källhänvisat inline i `install-prompt.ts`
+och `install-prompt-capture.ts`.
+
+**Findings:** Onboarding-touren (T13) renderar en full-skärms overlay (z-50) vid första besök som
+ligger ÖVER install-bannern, så en FÖRSTA-gångs-användare kan inte klicka install-knappen förrän
+touren stängts. Funktionellt korrekt (touren är dismissbar och knappen funkar efteråt), men det är en
+andra, separat orsak till "knappen gör inget" för exakt den vanligaste användaren (en vän som öppnar
+delnings-länken första gången). Lämnas som ett pinnat fynd (F1) för orchestrator, ändring av onboarding-
+beteendet ligger utanför T39:s scope.
+
 ## 2026-06-11 , T38 (#67): rum-persistens, senast valda rummet återställs över sidladdning
 
 **Beslut (persistens-modell):** Det AKTIVA rummets id persistas i localStorage under nyckeln

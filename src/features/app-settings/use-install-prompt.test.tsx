@@ -2,6 +2,10 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useInstallPrompt } from './use-install-prompt';
 import { INSTALL_DISMISSED_KEY } from './storage-keys';
+import {
+  registerInstallPromptCapture,
+  resetInstallPromptCaptureForTest,
+} from './install-prompt-capture';
 
 /**
  * Bygg och fyra ett fejk-beforeinstallprompt-event. Returnerar event:et så
@@ -25,12 +29,17 @@ function fireBeforeInstallPrompt() {
 describe('useInstallPrompt, beforeinstallprompt-flöde', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    // Den TIDIGA capture-lyssnaren registreras i produktionen från main.tsx före
+    // mount; i test gör vi det i beforeEach så event:et fångas av samma väg.
+    resetInstallPromptCaptureForTest();
+    registerInstallPromptCapture();
     // jsdom: en vanlig (icke-iOS, icke-standalone) webbläsare som standard.
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (X11; Linux) Chrome/120');
   });
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
+    resetInstallPromptCaptureForTest();
   });
 
   it('är dold tills ett beforeinstallprompt-event fångats', () => {
@@ -43,6 +52,20 @@ describe('useInstallPrompt, beforeinstallprompt-flöde', () => {
     const event = fireBeforeInstallPrompt();
     expect(event.preventDefault).toHaveBeenCalled();
     expect(result.current.mode).toBe('prompt');
+  });
+
+  it('surfar ett event som fångades FÖRE mount (rotorsaken till T39, regressionsvakt)', () => {
+    // Detta är exakt buggen: webbläsaren fyrar beforeinstallprompt "usually on
+    // page load" (MDN), ofta INNAN React-hooken monterats. Den tidiga capture-
+    // lyssnaren (registrerad i beforeEach, som main.tsx gör före mount) ska ha
+    // fångat det, och hooken ska läsa det redan vid mount, inte tappa det.
+    const event = fireBeforeInstallPrompt(); // fyras INNAN renderHook
+    const { result } = renderHook(() => useInstallPrompt());
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(result.current.mode).toBe('prompt');
+    // Och klick på den ska kunna trigga prompt() på det tidigt-fångade event:et.
+    act(() => result.current.promptInstall());
+    expect(event.prompt).toHaveBeenCalledTimes(1);
   });
 
   it('promptInstall() anropar event.prompt() och nollar läget (engångs-event)', () => {

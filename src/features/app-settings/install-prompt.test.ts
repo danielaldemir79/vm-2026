@@ -87,6 +87,24 @@ describe('detectStandalone, redan installerad?', () => {
     expect(detectStandalone(win)).toBe(true);
   });
 
+  it('är true via android-app://-referrer (TWA / Android-app-wrapper, T39)', () => {
+    const win = {
+      matchMedia: () => ({ matches: false }),
+      navigator: {} as Navigator,
+      document: { referrer: 'android-app://com.vm2026.twa' } as Document,
+    } as unknown as Window;
+    expect(detectStandalone(win)).toBe(true);
+  });
+
+  it('är false för en vanlig http-referrer (inte en app-wrapper, T39)', () => {
+    const win = {
+      matchMedia: () => ({ matches: false }),
+      navigator: {} as Navigator,
+      document: { referrer: 'https://vm-2026.pages.dev/' } as Document,
+    } as unknown as Window;
+    expect(detectStandalone(win)).toBe(false);
+  });
+
   it('är false i vanligt webbläsar-läge', () => {
     const win = {
       matchMedia: () => ({ matches: false }),
