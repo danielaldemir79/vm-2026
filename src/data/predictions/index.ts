@@ -12,10 +12,12 @@ export {
 
 export {
   scorePrediction,
+  pointTypeOf,
   outcomeOf,
   PREDICTION_POINTS,
   type Scoreline,
   type Outcome,
+  type MatchPointType,
 } from './score';
 
 // T16 (#16): pool-bonus-poängsättning (grupp- + bracket-tips).

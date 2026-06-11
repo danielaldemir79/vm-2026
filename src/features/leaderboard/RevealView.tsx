@@ -18,59 +18,70 @@
 // renderar bara det som FÅR visas. Vyn LÄSER store.reveal + slår upp lagnamn ur den
 // delade lag-listan (results-storen).
 //
-// UTFALLS-KATEGORI härleds ur pick.points mot den TESTADE poängregeln (PREDICTION_POINTS
-// = { exact:3, outcome:1, miss:0 }, score.ts), inte en ny tröskel , en sanning för
-// "vad är en exakt träff".
+// UTFALLS-KATEGORI härleds ur pick.pointType (T46), den TESTADE poäng-TYPEN ur score.ts
+// (pointTypeOf, samma sanning som poäng-siffran). Inte en egen tröskel mot points-talet,
+// en sanning för "vad är en exakt träff" OCH "varför fick tipset sin poäng".
 
 import { useMemo } from 'react';
 import { useLeaderboardStore } from './leaderboard-context';
-import { PREDICTION_POINTS, type Scoreline } from '../../data/predictions';
+import { type MatchPointType, type Scoreline } from '../../data/predictions';
 
 /** Formatera en målställning som "2-1". */
 function formatScore(score: Scoreline): string {
   return `${score.homeGoals}-${score.awayGoals}`;
 }
 
-/** En utfalls-kategori + dess färg-oberoende markör (ikon, form, etikett). */
+/**
+ * Formatera ett poängtillägg synligt för en pick-rad: "+3", "+1" eller "0" (0 får inget
+ * plustecken, det är ingen vinst). Visas i VARFÖR-etiketten ("Exakt resultat +3").
+ */
+function formatPointDelta(points: number): string {
+  return points > 0 ? `+${points}` : `${points}`;
+}
+
+/** En utfalls-kategori + dess färg-oberoende markör (ikon, form, etiketter). */
 interface Outcome {
-  /** data-outcome-värde (CSS-hak för vänsterkant + markör-variant). */
-  key: 'exact' | 'outcome' | 'miss';
+  /** data-outcome-värde (CSS-hak för vänsterkant + markör-variant). Lika med pointType. */
+  key: MatchPointType;
   /** Markör-glyf (ikon/form). Skiljer kategorierna även utan färg. */
   glyph: string;
   /** CSS-modifierare för markör-brickan. */
   markClass: string;
-  /** Dold etikett för skärmläsare (samma besked i ord). */
+  /** SYNLIG VARFÖR-etikett (T46): orsaken bredvid poängen, "Exakt resultat" osv. */
+  reason: string;
+  /** Dold etikett för skärmläsare (kort besked i ord, samma anda som reason). */
   label: string;
 }
 
 /**
- * Härled utfalls-kategorin ur poängen ETT tips gav. Speglar poängregeln exakt
- * (PREDICTION_POINTS): 3 = exakt, 1 = rätt utfall, 0 = miss. En okänd poäng (skulle
- * inte hända för match-tips) faller till "miss" (fail-safe, ingen krasch).
+ * Slå upp utfalls-kategorin ur poäng-TYPEN (pointTypeOf, score.ts). Uttömmande över
+ * MatchPointType ('exact' | 'outcome' | 'miss'), inget default-fall: en ny typ blir ett
+ * KOMPILERINGSFEL här i stället för en tyst fallback (fail-loud i typen). VARFÖR-texten
+ * (reason) följer poängregeln: exakt resultat / rätt vinnare-utfall / miss.
  */
-function outcomeFor(points: number): Outcome {
-  if (points === PREDICTION_POINTS.exact) {
-    return {
-      key: 'exact',
-      glyph: '✓',
-      markClass: 'vm-reveal-mark--exact',
-      label: 'Exakt rätt',
-    };
-  }
-  if (points === PREDICTION_POINTS.outcome) {
-    return {
-      key: 'outcome',
-      glyph: '◐',
-      markClass: 'vm-reveal-mark--outcome',
-      label: 'Rätt utfall',
-    };
-  }
-  return {
-    key: 'miss',
+const OUTCOME_BY_TYPE: Record<MatchPointType, Omit<Outcome, 'key'>> = {
+  exact: {
+    glyph: '✓',
+    markClass: 'vm-reveal-mark--exact',
+    reason: 'Exakt resultat',
+    label: 'Exakt resultat',
+  },
+  outcome: {
+    glyph: '◐',
+    markClass: 'vm-reveal-mark--outcome',
+    reason: 'Rätt vinnare',
+    label: 'Rätt vinnare',
+  },
+  miss: {
     glyph: '✗',
     markClass: 'vm-reveal-mark--miss',
-    label: 'Bom',
-  };
+    reason: 'Miss',
+    label: 'Miss',
+  },
+};
+
+function outcomeFor(pointType: MatchPointType): Outcome {
+  return { key: pointType, ...OUTCOME_BY_TYPE[pointType] };
 }
 
 export function RevealView() {
@@ -133,11 +144,12 @@ export function RevealView() {
             </div>
 
             {/* Allas tips + poäng (sorterade på poäng fallande av reveal-modulen). Varje
-                rad bär en FÄRG-OBEROENDE utfalls-markör + en grön/guld vänsterkant. */}
+                rad bär en FÄRG-OBEROENDE utfalls-markör + en SYNLIG VARFÖR-etikett (T46)
+                + en grön/guld vänsterkant. */}
             {match.picks.length > 0 ? (
               <ul data-reveal-picks="" className="mt-3 flex list-none flex-col gap-1.5 p-0">
                 {match.picks.map((pick) => {
-                  const outcome = outcomeFor(pick.points);
+                  const outcome = outcomeFor(pick.pointType);
                   return (
                     <li
                       key={pick.userId}
@@ -145,28 +157,27 @@ export function RevealView() {
                       data-user-id={pick.userId}
                       data-points={pick.points}
                       data-outcome={outcome.key}
-                      className="vm-reveal-pick flex items-center gap-3 py-1 pl-2 text-sm"
+                      className="vm-reveal-pick flex flex-wrap items-center gap-x-3 gap-y-1 py-1 pl-2 text-sm"
                     >
-                      {/* FÄRG-OBEROENDE utfalls-markör: ikon + form + dold ord-etikett. */}
+                      {/* FÄRG-OBEROENDE utfalls-markör: ikon + form. Etiketten står synlig
+                          bredvid poängen, så ingen sr-only-dublett behövs här längre. */}
                       <span
                         className={`vm-reveal-mark ${outcome.markClass} h-6 w-6 text-xs`}
                         aria-hidden="true"
                       >
                         {outcome.glyph}
                       </span>
-                      <span className="min-w-0 flex-1 truncate">
+                      <span data-reveal-name="" className="min-w-0 flex-1 truncate">
                         {pick.displayName}
-                        {/* sr-only-mening: kommatecknet sitter ihop med namnet (ingen
-                            ledande blanksteg), annars läser skärmläsaren "Anna kommatecken".
-                            Detta är interpunktion i en uppläst mening, inte husstilens
-                            " , "-titel-separator. */}
-                        <span className="sr-only">, {outcome.label}</span>
                       </span>
                       <span className="shrink-0 tabular-nums text-fg-muted">
                         {formatScore(pick.predicted)}
                       </span>
+                      {/* VARFÖR + poäng (T46): orsaken bredvid poängen, "Exakt resultat +3".
+                          data-reveal-reason = stabil krok för design-frontend + test. */}
                       <span
-                        className={`w-16 shrink-0 text-right font-medium tabular-nums ${
+                        data-reveal-reason=""
+                        className={`shrink-0 text-right font-medium tabular-nums ${
                           outcome.key === 'exact'
                             ? 'text-warning'
                             : outcome.key === 'miss'
@@ -174,7 +185,7 @@ export function RevealView() {
                               : ''
                         }`}
                       >
-                        {pick.points} poäng
+                        {outcome.reason} {formatPointDelta(pick.points)}
                       </span>
                     </li>
                   );

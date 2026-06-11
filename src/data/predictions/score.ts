@@ -44,6 +44,16 @@ export const PREDICTION_POINTS = {
 export type Outcome = 'home' | 'draw' | 'away';
 
 /**
+ * Poäng-TYPEN ett match-tips gav, som etikett (inte siffran). EN sanning för "varför"
+ * ett tips gav sin poäng, så UI:t kan visa orsaken ("Exakt resultat", "Rätt vinnare",
+ * "Miss") utan att gissa en egen tröskel mot poängsiffran.
+ *   * 'exact'   = exakt resultat (3p)
+ *   * 'outcome' = rätt utfall men ej exakt (1p)
+ *   * 'miss'    = fel utfall (0p)
+ */
+export type MatchPointType = 'exact' | 'outcome' | 'miss';
+
+/**
  * Härled 1X2-utfallet ur en målställning (ordinarie tid). En sanning för hur ett
  * utfall avgörs, delad av både tippet och det faktiska resultatet, så de jämförs
  * på samma plan.
@@ -67,18 +77,34 @@ function isExact(a: Scoreline, b: Scoreline): boolean {
 }
 
 /**
- * Poängsätt ett tips mot det faktiska resultatet.
+ * Härled poäng-TYPEN (etiketten) ett tips ger mot facit. EN sanning för klassningen,
+ * delad med scorePrediction (siffran), så typ och poäng ALDRIG kan drifta isär: båda
+ * läser samma exakt-/utfall-/miss-beslut. UI:t (avslöjande-vyn) visar "varför"-texten
+ * ur denna typ, poäng-värdet ur PREDICTION_POINTS[typ], en regel.
+ *
+ * @param predicted  Den tippade ordinarie målställningen.
+ * @param actual     Den faktiska ordinarie målställningen (matchens result).
+ * @returns          'exact' (samma resultat), 'outcome' (samma 1X2, ej exakt) el. 'miss'.
+ */
+export function pointTypeOf(predicted: Scoreline, actual: Scoreline): MatchPointType {
+  if (isExact(predicted, actual)) {
+    return 'exact';
+  }
+  if (outcomeOf(predicted) === outcomeOf(actual)) {
+    return 'outcome';
+  }
+  return 'miss';
+}
+
+/**
+ * Poängsätt ett tips mot det faktiska resultatet. Slår upp poängen ur poäng-TYPEN
+ * (pointTypeOf) i PREDICTION_POINTS, så siffran och etiketten är samma sanning: en
+ * ändring av regeln slår igenom på BÅDA. (PREDICTION_POINTS-nycklarna ÄR MatchPointType.)
  *
  * @param predicted  Den tippade ordinarie målställningen.
  * @param actual     Den faktiska ordinarie målställningen (matchens result).
  * @returns          3 (exakt), 1 (rätt utfall) eller 0 (miss). Se modul-doc för regeln.
  */
 export function scorePrediction(predicted: Scoreline, actual: Scoreline): number {
-  if (isExact(predicted, actual)) {
-    return PREDICTION_POINTS.exact;
-  }
-  if (outcomeOf(predicted) === outcomeOf(actual)) {
-    return PREDICTION_POINTS.outcome;
-  }
-  return PREDICTION_POINTS.miss;
+  return PREDICTION_POINTS[pointTypeOf(predicted, actual)];
 }

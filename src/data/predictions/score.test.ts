@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 import {
   outcomeOf,
   scorePrediction,
+  pointTypeOf,
   PREDICTION_POINTS,
+  type MatchPointType,
   type Outcome,
   type Scoreline,
 } from './score';
@@ -100,6 +102,71 @@ describe('scorePrediction (poängregeln: exakt=3, rätt utfall=1, miss=0)', () =
         } else {
           expect(score, `tip=${tip} real=${real}`).toBe(0);
         }
+      }
+    }
+  });
+});
+
+describe('pointTypeOf (poäng-TYPEN/etiketten: exact/outcome/miss)', () => {
+  it('EXAKT resultat ger "exact" (rätt antal mål för båda lagen)', () => {
+    expect(
+      pointTypeOf({ homeGoals: 2, awayGoals: 1 }, { homeGoals: 2, awayGoals: 1 })
+    ).toBe<MatchPointType>('exact');
+    // EDGE: 0-0 exakt ska vara 'exact', inte 'outcome' (oavgjort + exakt = exakt).
+    expect(
+      pointTypeOf({ homeGoals: 0, awayGoals: 0 }, { homeGoals: 0, awayGoals: 0 })
+    ).toBe<MatchPointType>('exact');
+  });
+
+  it('RÄTT UTFALL men fel siffror ger "outcome" (hemma/borta/oavgjort)', () => {
+    // Hemmavinst, ej exakt.
+    expect(
+      pointTypeOf({ homeGoals: 2, awayGoals: 1 }, { homeGoals: 3, awayGoals: 0 })
+    ).toBe<MatchPointType>('outcome');
+    // Bortavinst, ej exakt.
+    expect(
+      pointTypeOf({ homeGoals: 0, awayGoals: 1 }, { homeGoals: 1, awayGoals: 4 })
+    ).toBe<MatchPointType>('outcome');
+    // EDGE (lärdomen): oavgjort-tips mot oavgjort-facit men OLIKA siffror = 'outcome',
+    // INTE 'exact'. Den grenen skiljer "rätt utfall" från "exakt" just för oavgjort.
+    expect(
+      pointTypeOf({ homeGoals: 1, awayGoals: 1 }, { homeGoals: 2, awayGoals: 2 })
+    ).toBe<MatchPointType>('outcome');
+  });
+
+  it('FEL utfall ger "miss"', () => {
+    expect(
+      pointTypeOf({ homeGoals: 2, awayGoals: 0 }, { homeGoals: 0, awayGoals: 2 })
+    ).toBe<MatchPointType>('miss');
+    expect(
+      pointTypeOf({ homeGoals: 1, awayGoals: 1 }, { homeGoals: 2, awayGoals: 1 })
+    ).toBe<MatchPointType>('miss');
+  });
+
+  // DET STARKA INVARIANTET (HARD, lärdom uttommande-test-vaktar-svagare-invariant):
+  // poäng-TYPEN och poäng-SIFFRAN är samma sanning. Bevisa att de ALDRIG kan drifta:
+  // för ALLA tip/real-utfallspar (exakt OCH icke-exakt), måste PREDICTION_POINTS[typ]
+  // === scorePrediction(...). Detta vaktar den faktiska garantin (en regel, två vyer),
+  // inte bara att etiketten "ser rimlig ut".
+  it('typ och siffra är samma sanning: PREDICTION_POINTS[pointTypeOf] === scorePrediction (uttömmande)', () => {
+    // Representanter per utfall, plus en EXAKT-träff per utfall, så matrisen når både
+    // exact-grenen och outcome/miss-grenarna (annars vore exact-grenen otestad i loopen).
+    const samples: Scoreline[] = [
+      { homeGoals: 0, awayGoals: 0 },
+      { homeGoals: 1, awayGoals: 0 },
+      { homeGoals: 0, awayGoals: 1 },
+      { homeGoals: 2, awayGoals: 2 },
+      { homeGoals: 3, awayGoals: 1 },
+      { homeGoals: 1, awayGoals: 3 },
+      { homeGoals: 7, awayGoals: 0 },
+    ];
+    for (const predicted of samples) {
+      for (const actual of samples) {
+        const type = pointTypeOf(predicted, actual);
+        expect(
+          PREDICTION_POINTS[type],
+          `predicted=${predicted.homeGoals}-${predicted.awayGoals} actual=${actual.homeGoals}-${actual.awayGoals} type=${type}`
+        ).toBe(scorePrediction(predicted, actual));
       }
     }
   });

@@ -5,6 +5,43 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T46 (#79): resultat-presentation (VARFÖR per tips + sammanfattning överst)
+
+Daniels pre-share-blockerare: man måste skrolla hela vägen ner för att se sina poäng, och
+avslöjande-vyn visar bara en siffra utan att förklara VARFÖR. Tre tillägg ovanpå T17, ingen
+ny poäng-regel (match-värdena 3/1/0 är OFÖRÄNDRADE, PREDICTION_POINTS, score.ts).
+
+**1. POÄNG-TYPEN ('exact' | 'outcome' | 'miss') ÄR SAMMA SANNING SOM SIFFRAN (en regel, två
+vyer):** `score.ts` fick `pointTypeOf(predicted, actual)` som härleder etiketten, och
+`scorePrediction` slår nu upp poängen ur `PREDICTION_POINTS[pointTypeOf(...)]`. Så siffran och
+"varför"-texten kan ALDRIG drifta isär, en ändring av regeln slår igenom på båda. Avslöjande-vyn
+(RevealView) visar nu en SYNLIG orsak bredvid poängen ("Exakt resultat +3" / "Rätt vinnare +1" /
+"Miss 0"), driven av `pick.pointType` (reveal.ts härleder den ur SAMMA facit som `points`), inte
+av en egen tröskel mot poäng-talet. **Detta ERSÄTTER T17-visuellts derivering ur `pick.points`**
+(den raden i denna logg, T17-visuellt, beskriver det gamla `outcomeFor(points)`-uppslaget; T46 är
+nu sanningen). Uttömmande test bevisar att `PREDICTION_POINTS[pointTypeOf] === scorePrediction`
+för alla utfallspar (det STARKA invariantet, inte bara att etiketten ser rimlig ut).
+**Källa:** poängregeln SPEC §4/§12 + decisions.md T15-beslutet (3/1/0); etiketterna är ren
+omformulering av samma regel, inte en ny domän-regel.
+
+**2. SAMMANFATTNING ÖVERST (egen poäng + placering):** en HÄRLEDD vy av topplistan
+(`deriveSelfSummary(leaderboard, currentUserId)`), inte en ny poäng-källa, så den kan aldrig
+drifta från listan. Aktuell användares id kommer ur `store.currentUserId` (= `rooms.userId`,
+den anonyma auth-sessionen, T14), samma seam som "du"-framhävningen i listan. Fail-safe: null
+identitet ELLER id ej i listan -> ingen panel (hellre tyst än en gissad rad), samma anda som
+"du"-markeringen. Placeringen speglar DELAD rank troget (rank, inte radindex). Topplistan (full
+lista) är KVAR längst ned (oförändrad).
+
+**3. "SÅ FUNKAR POÄNGEN":** kort `<details>` med 3p exakt / 1p rätt vinnare / 0p miss, och NÄMNER
+att special-tips (gruppvinnare, VM-vinnare) kommer ge poäng. Special-tips-wiring (champion-poäng,
+pool-tips-inmatnings-UI) är SEPARAT kommande task (T47), därför nämns de bara, inga poängvärden
+utlovas som inte är wirade.
+
+**ARBETSDELNING (samma som T15/T16/T42):** funktionell + tillgänglig bas här (stabil semantik +
+data-attribut `data-leaderboard-self-summary/-score-legend/-reveal-reason`, `vm-board-self-summary`/
+`vm-board-legend`-klasser som seam), premium-finish + estetik -> design-frontend. Inga stabila
+statusfärger inbakade (T7-pin); poäng-text behåller T17:s warning/fg-muted-hakar.
+
 ## 2026-06-11 , T42 (#72): admin-UI (funktionell bas) + T42b-split + Behöver-Daniel
 
 **UI-DISPOSITION (funktionell bas här, premium-design -> T42b, samma som T16/T16b):** admin-sektionen
