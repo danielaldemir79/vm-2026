@@ -9,11 +9,11 @@
 // REGELN (en sanning, testad fristående i shouldShowResultEntry):
 //   - FIXTURES/lokalt läge: visa ALLTID (lokal utveckling, simulering, befintliga
 //     tester driver tabellerna via lokal inmatning precis som förr).
-//   - LIVE-läge + ADMIN: visa (arrangören får använda inmatningen).
-//   - LIVE-läge + ICKE-ADMIN: visa BARA när simulering är PÅ. Då är inmatningen den
-//     LOKALA "tänk om"-leken (skriver till sim-overlayn, ALDRIG till DB/delat facit,
-//     se ResultsProvider), tydligt märkt av SimulationFrame/-Banner. Utanför sim-läge
-//     döljs den helt, så en vanlig vän aldrig ser en delad/officiell resultat-inmatning.
+//   - LIVE-läge: visa BARA när simulering är PÅ ("tänk om"-leken, skriver till sim-
+//     overlayn, ALDRIG till DB/delat facit, se ResultsProvider). Utanför sim-läge döljs
+//     den helt, för ALLA inkl. arrangören (T48 F2): arrangören matar in de OFFICIELLA
+//     resultaten via AdminResultEntry (AdminSection), så en lokal inmatning vid sidan om
+//     skulle ge två förvirrande inmatnings-ytor. En sanning för officiellt: admin-formen.
 //
 // VARFÖR en egen grind-komponent (inte logik i ResultEntryView): ResultEntryView är
 // en REN, återanvändbar vy (renderas i fixtures-paritetstester utan admin-/facit-
@@ -22,7 +22,6 @@
 // shouldShowResultEntry + denna tunna wrapper), ResultEntryView förblir oförändrad.
 
 import type { ReactNode } from 'react';
-import { useOfficialResultsStore } from '../official-results';
 import { useResultsStore } from './results-context';
 import { shouldShowResultEntry } from './result-entry-gate-rule';
 import { ResultEntryView, type ResultEntryViewProps } from './ResultEntryView';
@@ -43,8 +42,7 @@ export interface ResultEntryGateProps extends ResultEntryViewProps {
  */
 export function ResultEntryGate({ surface, ...viewProps }: ResultEntryGateProps) {
   const { mode, simulating } = useResultsStore();
-  const { isAdmin } = useOfficialResultsStore();
-  if (!shouldShowResultEntry(mode === 'live', isAdmin, simulating)) {
+  if (!shouldShowResultEntry(mode === 'live', simulating)) {
     return null;
   }
   const view = <ResultEntryView {...viewProps} />;
