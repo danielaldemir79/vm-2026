@@ -30,7 +30,11 @@
 
 import type { Team } from '../../domain/types';
 import { teamCode, type TeamCode } from '../../domain/team-code';
-import { bracketDeadlineMatchId, CHAMPION_SLOT_ID } from '../../data/predictions';
+import {
+  bracketDeadlineMatchId,
+  CHAMPION_SLOT_ID,
+  applyExtendedDeadline,
+} from '../../data/predictions';
 import {
   groupByRound,
   ROUND_LABELS,
@@ -140,8 +144,13 @@ export function selectPredictableBracket(
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const matchById = new Map(matches.map((m) => [m.id, m]));
 
-  // Champion-slotten: alla 48 lag (KISS), låst vid turneringsstart (g-A-1).
-  const championDeadlineIso = deadlineIsoFor(CHAMPION_SLOT_ID, matchById);
+  // Champion-slotten: alla 48 lag (KISS). DEADLINE = GREATEST(g-A-1, fasta söndagstiden
+  // 14/6 21:59Z): T53 (#95) förlängde CHAMPION-tipset (g-A-1 = 11 juni ligger FÖRE fasta
+  // tiden, så champion förlängs till söndagen). applyExtendedDeadline speglar RLS-helpern
+  // bracket_deadline_kickoff('champion') EXAKT (greatest(g-A-1, pool_extended_deadline())).
+  // OBS: bara CHAMPION berörs , match-SLOTSEN (M73..M104) nedan behåller sina EGNA
+  // avsparks-lås orörda (deadlineIsoFor utan förlängning), exakt som RLS slot-grenen.
+  const championDeadlineIso = applyExtendedDeadline(deadlineIsoFor(CHAMPION_SLOT_ID, matchById));
   const champion: ChampionSlot = {
     slotId: CHAMPION_SLOT_ID,
     teams: teams.map((t) => ({ code: teamCode(t.code), name: t.name })),

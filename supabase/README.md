@@ -94,6 +94,18 @@ Bevisat SERVER-SIDE med riktiga roller (DO-block, 9 prov: medlemskap, deadline-l
 champion, förfalskning, sekretess, utomstående) av senior-developern, med tre kickoff-tider
 tillfälligt i det förflutna och återställda. Klient-delarna: `pool-predictions-rls.integration.test.ts`.
 
+**T53 (#95) , FÖRLÄNGD deadline för gruppvinnare + champion:** migrationen
+`t53_extended_deadline_group_and_champion` ändrar `group_deadline_kickoff` och champion-grenen av
+`bracket_deadline_kickoff` till `GREATEST(ursprungligt ankare, fasta söndagstiden)`, där den fasta
+tiden bor i `pool_extended_deadline()` (= `2026-06-14T21:59:00Z` = sön 14/6 23:59 svensk). FÖRLÄNG,
+FÖRKORTA ALDRIG: sena grupper (G..L, första match efter 14/6) behåller sitt senare ankare. SLOT-grenen
+(M73..M104) + match-tipsen är OFÖRÄNDRADE (egna avsparks-lås). FAIL-SAFE bevarad (explicit null-gren).
+Applicerad 1:1 från den committade filen via `apply_migration` (namn `t53_extended_deadline_group_and_
+champion` i `list_migrations`, samma SQL). Bevisat live: read-only-frågor (alla 12 gruppers deadline =
+GREATEST, ingen förkortad; champion = fasta tiden; M73 oförändrad) + ett hårt skriv-prov genom riktig
+anonym session i ett isolerat test-rum (grupp A + champion skriver nu igenom RLS, städat efteråt).
+Klient-spegel: `src/data/predictions/prediction-deadline.ts`. Se `docs/decisions.md` T53.
+
 **Migration-historik (T16, samma nyans som T15):** de fyra T16-migrationerna applicerades 1:1 från
 de committade filerna via `apply_migration` i samma ordning: `t16_group_predictions_schema`,
 `t16_group_predictions_rls`, `t16_bracket_predictions_schema`, `t16_bracket_predictions_rls` (samma

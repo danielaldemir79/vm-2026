@@ -3,17 +3,21 @@
 // är tunn ovanpå denna. Systerfil till predictable-matches.ts (T15).
 //
 // REGLER:
-//   * DEADLINE = gruppens FÖRSTA match (g-X-1). LÅST = den matchens avspark passerad
-//     (now >= kickoff). Server-RLS (group_deadline_kickoff = g-X-1) upprätthåller
-//     låset; här härleder vi det BARA för VISNINGEN. EN sanning för ankaret: vi slår
-//     upp gruppens första match i matchplanen (samma g-X-1 som RLS-helpern), inte en
-//     dubblerad tid. Klockan är injicerbar (now), default nuet.
+//   * DEADLINE = GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 14/6 21:59Z).
+//     T53 (#95) förlängde grupp-tipsens deadline: de som inte hann före premiären får
+//     t.o.m. söndag 14/6 23:59 svensk tid. FÖRLÄNG, FÖRKORTA ALDRIG (GREATEST): sena
+//     grupper (G..L, första match 15-17 juni) behåller sitt SENARE egna ankare. Vi
+//     applicerar samma applyExtendedDeadline som RLS-helpern group_deadline_kickoff
+//     (greatest(g-X-1, pool_extended_deadline())), så lås + text är EN sanning, klient
+//     + DB. LÅST = den HÄRLEDDA deadlinen passerad (now >= deadline). Server-RLS
+//     upprätthåller låset; här härleder vi det BARA för VISNINGEN. Klockan injicerbar.
 //   * Varje grupp listar sina 4 lag (för 1:a/2:a-väljarna), i matchplanens/gruppens
 //     ordning. Lag-identiteten är FIFA:s trebokstavskod (code), samma som DB-
 //     constrainten (^[A-Z]{3}$) och bonus-score jämför mot (se decisions.md T16).
 //
 // Vi sorterar grupperna A..L (spelordning) så vyn är stabil och förutsägbar.
 
+import { applyExtendedDeadline } from '../../data/predictions';
 import type { Group, GroupId, Match, Team } from '../../domain/types';
 
 /** Ett lag-val i en grupp-väljare: stabil kod-identitet + visningsnamn. */
@@ -64,7 +68,10 @@ export function selectPredictableGroups(
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((group) => {
       const firstMatch = matchById.get(groupFirstMatchId(group.id));
-      const deadlineIso = firstMatch ? firstMatch.kickoff : null;
+      // GREATEST(g-X-1, fasta söndagstiden): T53-förlängningen. applyExtendedDeadline
+      // bevarar ett senare ankare (sen grupp) och null-fail-safen (saknad match -> null),
+      // exakt som RLS-helpern group_deadline_kickoff. En sanning, klient + DB.
+      const deadlineIso = applyExtendedDeadline(firstMatch ? firstMatch.kickoff : null);
       // FAIL-SAFE för visningen: saknas gruppens första match (oväntat, matchplanen
       // är källåkrad) behandlar vi gruppen som LÅST, så vi aldrig erbjuder ett tips
       // vi inte kan deadline-bevaka. (Server-RLS:ens NULL-deadline nekar ändå skriv.)
