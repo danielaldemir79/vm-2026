@@ -120,6 +120,15 @@ const sepBg = {
 };
 add('Accent-separator 45% (UI-dekor) mot fond', sepBg, bgBase, 1.0);
 
+// 6) LÄNK-UNDERLINE (T39, #68): namnet "Daniel Aldemir" är nu en länk till sajten. SJÄLVA
+//    TEXTEN är oförändrad full --vm-fg (17:1+ mot fond, redan mätt i rad 2 ovan), så ingen
+//    ny BRÖDTEXT-kontrast tillkommer. Den nya ytan är den SOLIDA accent-underline:en som
+//    tänds vid hover/focus (decoration-accent, full opacitet) = ett icke-text indikator-
+//    element. WCAG 1.4.11 (non-text contrast) kräver >=3:1 mot intilliggande färg (fonden);
+//    vi mäter accent-strecket mot fonden. Vid TANGENTBORD är dessutom :focus-visible-ringen
+//    (accent, index.css) den primära affordansen.
+add('Länk-underline (accent, full) mot fond [1.4.11 non-text >=3]', tok('accent'), bgBase, 3.0);
+
 // --- KONTROLL: vad den GAMLA stylingen (fg-muted/80) gav, för att visa varför vi byter.
 const muted80 = {
   dark: tint(T.dark.fgMuted, 80, T.dark.bg),

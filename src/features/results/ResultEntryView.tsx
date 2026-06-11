@@ -15,8 +15,9 @@
 // motion-primitiver, reducerad rörelse respekteras redan i kroken). Funktionellt
 // fungerar inmatningen helt utan firandet, det är ren glädje-yta.
 
-import { useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Match, Team } from '../../domain/types';
+import { ExpandToggle } from '../../components/ExpandToggle';
 import { formatDayHeading, useTodayKey } from '../daily';
 import { triggerResultFeedback, useFeedbackSettings } from '../app-settings';
 import { useGoalCelebration, type GoalCelebration } from './goal-celebration';
@@ -29,83 +30,6 @@ import type { ResultEntry } from './validate-result';
 /** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista). */
 function indexTeams(teams: readonly Team[]): Map<string, Team> {
   return new Map(teams.map((t) => [t.id, t]));
-}
-
-interface ExpandToggleProps {
-  /** true = listan är utfälld (knappen säger "Visa färre"). */
-  expanded: boolean;
-  /** Antal matcher som DÖLJS i ihopfällt läge (för etiketten). */
-  hiddenCount: number;
-  /** Id på listan knappen styr (aria-controls). */
-  controls: string;
-  /** Växla utfälld/ihopfälld. */
-  onToggle: () => void;
-  /** Ref till knappens DOM-element (för fokus-flytt vid ihopfällning, a11y). */
-  buttonRef?: Ref<HTMLButtonElement>;
-  /** Skiljer den DUBBLERADE kontrollens två instanser åt (top/bottom) i data-attr. */
-  position: 'top' | 'bottom';
-}
-
-/**
- * Ihopfäll-/expandera-KONTROLLEN (T28/#42, "lättåtkomlig ihopfällning").
- *
- * VARFÖR en delad komponent (inte två handkopierade knappar): kontrollen är
- * DUBBLERAD (en uppe + en nere) så användaren ALLTID når en toggle utan att
- * skrolla till slutet av en utfälld 72-korts-lista. De två måste bära IDENTISK
- * semantik (samma aria-expanded, samma aria-controls, samma etikett), annars
- * driver de isär och en skärmläsare får motstridig info. Genom att de delar
- * EN markup-källa kan de aldrig drifta (DRY, en sanning för kontrollen).
- *
- * Den visuella finishen (accent-tint + chevron) är #39:s, ÄRVD oförändrad så
- * design-frontends premium-styling och de uppmätta AA-värdena gäller fortfarande.
- */
-function ExpandToggle({
-  expanded,
-  hiddenCount,
-  controls,
-  onToggle,
-  buttonRef,
-  position,
-}: ExpandToggleProps) {
-  return (
-    <button
-      ref={buttonRef}
-      type="button"
-      onClick={onToggle}
-      aria-expanded={expanded}
-      aria-controls={controls}
-      data-results-toggle={expanded ? 'collapse' : 'expand'}
-      data-results-toggle-position={position}
-      className="group/toggle inline-flex items-center gap-2.5 self-center rounded-pill border border-[color-mix(in_srgb,var(--color-accent)_42%,var(--color-border))] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))] px-6 py-3 font-display text-sm font-semibold text-fg shadow-[var(--vm-shadow-card)] transition-[background-color,border-color,box-shadow] duration-200 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_60%,var(--color-border))] hover:bg-[color-mix(in_srgb,var(--color-accent)_20%,var(--color-surface))] hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
-    >
-      <span>
-        {expanded
-          ? 'Visa färre'
-          : `Visa alla matcher (${hiddenCount} ${hiddenCount === 1 ? 'dold' : 'dolda'})`}
-      </span>
-      {/* Chevron: pekar ner = "det finns mer", vänds upp i utfällt läge.
-          aria-hidden (etiketten + aria-expanded bär betydelsen åt skärmläsare),
-          ren affordans. Accent-färgad så den drar ögat utan extra text. */}
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 16 16"
-        // Tailwind v4:s rotate-180 sätter CSS-egenskapen `rotate` (inte den
-        // gamla transform-axeln), så övergången måste rikta in sig på `rotate`
-        // för att animera mjukt i stället för att snappa. Reduced-motion nollar
-        // transition-duration globalt (index.css), så vridningen blir momentan
-        // men korrekt riktad för den som bett om minskad rörelse (WCAG 2.3.3).
-        className={`h-4 w-4 transition-[rotate] duration-200 ${expanded ? 'rotate-180' : ''}`}
-        style={{ color: 'var(--color-accent)' }}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.25}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M4 6l4 4 4-4" />
-      </svg>
-    </button>
-  );
 }
 
 export interface ResultEntryViewProps {
@@ -280,6 +204,7 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
           onToggle={toggleExpanded}
           buttonRef={topToggleRef}
           position="top"
+          name="results"
         />
       ) : null}
 
@@ -386,6 +311,7 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
           controls={listId}
           onToggle={toggleExpanded}
           position="bottom"
+          name="results"
         />
       ) : null}
 

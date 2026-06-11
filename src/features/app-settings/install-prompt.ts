@@ -81,9 +81,18 @@ export function resolveInstallMode(ctx: InstallContext): InstallUiMode {
 /**
  * Är appen redan installerad/körs i standalone-läge?
  *
- * Två signaler kombineras: display-mode: standalone (Chrome/Android/desktop) och
- * navigator.standalone (iOS Safaris egen, icke-standardiserade flagga). Båda
- * läses defensivt (matchMedia kan saknas i testmiljö).
+ * TRE signaler kombineras (de tre standard-sätten att upptäcka installerat läge,
+ * web.dev "Detect if your app is installed"):
+ *   1. display-mode: standalone (Chrome/Android/desktop installerad PWA).
+ *   2. navigator.standalone === true (iOS Safaris egen, icke-standard flagga).
+ *   3. document.referrer börjar med "android-app://" (appen startad som en
+ *      Trusted Web Activity / via en Android-app-wrapper, där display-mode kan
+ *      rapporteras annorlunda men referrern avslöjar app-ursprunget).
+ * Alla läses defensivt (matchMedia/referrer kan saknas/kasta i testmiljö).
+ *
+ * Källa: web.dev "Detect if your app is installed"
+ * (https://web.dev/learn/pwa/detection) som listar just dessa tre signaler.
+ * Källhänvisat i docs/decisions.md (T39).
  */
 export function detectStandalone(win: Window): boolean {
   try {
@@ -94,12 +103,18 @@ export function detectStandalone(win: Window): boolean {
       return true;
     }
   } catch {
-    // matchMedia saknas/kastar (testmiljö): faller vidare till iOS-flaggan.
+    // matchMedia saknas/kastar (testmiljö): faller vidare till nästa signal.
   }
   // iOS Safari: navigator.standalone === true i installerat läge. Egenskapen är
   // icke-standard, så vi når den via en smal typ-vidgning i stället för `any`.
   const nav = win.navigator as Navigator & { standalone?: boolean };
-  return nav.standalone === true;
+  if (nav.standalone === true) {
+    return true;
+  }
+  // TWA/Android-app-wrapper: referrern börjar med "android-app://". document
+  // kan saknas i en ren Window-stub (testmiljö), så läs defensivt.
+  const referrer = win.document?.referrer ?? '';
+  return referrer.startsWith('android-app://');
 }
 
 /**
