@@ -5,6 +5,113 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T43/#74 (PWA smidig auto-uppdatering + bygg-versionsstämpel) KLAR - PR #77 väntar på merge
+
+**Branch:** `feature/T43-pwa-autoupdate` @ HEAD `a222ce0`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/77 mot `develop` (Closes #74, state: OPEN)
+**Board:** issue #74 i "In Review" (korrekt). Dirigenten stänger issue #74 MANUELLT och flyttar kort #74 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**Varför T43 spelar roll:** Daniel rapporterade "man ser ju inte tippning delen alls längre efter senaste merge". Rotorsaken var Daniels enhets-cachade gamla PWA service worker. T43 är rotfixen: från och med nu får alla en "Ny version finns"-prompt, ingen fastnar på en gammal cache. Footern visar vilken build man kör. Daniel "väntar med att dela tills detta är fixat."
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `40bdf8e` - test(predictions): paritetsguard, tips-vyn och resultatvyn delar samma fönster
+- `94c4ee8` - feat(pwa): smidig SW-uppdaterings-prompt + bygg-version-stämpel (#74)
+- `98a723a` - fix(pwa): no-op SW-registrerare vid injicerad api (#74, C1+C2)
+- `280287a` - fix(pwa): logga misslyckad SW-registrering i stället för tyst svälj (#74, C3)
+- `2830902` - fix(pwa): ta bort mellanslag före komma i SW-varningslogg (#74, C5)
+- `c91eb3a` - T43: scope update-prompt live region to text block only (copilot R4)
+- `a222ce0` - T43: updateApp() clears both prompt flags (copilot R5, HEAD)
+
+**Vad som byggdes:**
+- `registerType` bytt från `'autoUpdate'` till `'prompt'` (vite.config.ts): ny SW installeras men väntar, användaren väljer att ta i bruk.
+- `src/features/app-settings/use-app-update.ts` - testbar hook med injicerbart register-API.
+- `src/features/app-settings/register-sw.ts` - tunn seam till virtual:pwa-register, fail-loud vid registreringsfel.
+- `src/features/app-settings/UpdatePrompt.tsx` - diskret "Ny version finns, ladda om"-banner (role=status/aria-live på textblocket).
+- `src/pwa/build-info.ts` + `src/pwa/app-version.ts` + `src/components/VersionStamp.tsx` - bygg-SHA-stämpel (CF_PAGES_COMMIT_SHA -> git rev-parse -> "unknown"), versionsrad i footern (data-app-version).
+- `src/features/predictions/predictions-results-window-parity.test.tsx` - regressionsguard: tips-vyn och resultatvyn delar samma 3-dagars fönster.
+- Design-frontend EJ involverad: UpdatePrompt fick en funktionell/tillgänglig bas.
+
+**Verifiering:** build ok, lint ok, format:check ok. 1109 gröna tester + 8 skippade (119 filer). Copilot 5 rundor (sista runda 1 trivial finding åtgärdad). Lokal panel: grön.
+
+**Alla 3/3 acceptanskriterier bockade i issue #74** (journalisten 2026-06-11).
+
+**Daniels delnings-läge (läget nu):**
+- T39 klar: install-knappen funkar, döljs i app-läge, signatur länkas, tips-fönster klar
+- T43 klar: ingen fastnar längre på gammal cache, footern visar build-SHA
+- Kvar för att Daniel ska kunna dela: **T42 (#72) - global facit + admin-login** (se nedan)
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping - editor flippar LF->CRLF (träffat T38+T39). Kort i Ready. HÖG-prioritet att avbryta mönstret.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bär framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort #56 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T42 F1 (Supabase-dashboard):** Daniel måste göra 2 steg i Supabase-dashboarden INNAN admin-login funkar - (1) sätt e-postmallen till `{{ .Token }}`, (2) lägg till redirect-URLs. Dokumenteras i T42-handoff.
+
+**IMPROVEMENTS-kandidater (dirigenten skriver i IMPROVEMENTS.md):**
+1. "När en task medvetet pinnar konsument-seamen till en senare task, kräv att data-/identitets-KONTRAKTET skrivs där funktionen DEFINIERAS, inte bara i decisions.md." (F1-fällan: code-vs-id tyst noll hade hindrats av ett kontrakt vid definitions-stället.)
+2. "Supabase deadline-lås + sekretess-RLS-mönstret (rls-tidslås-sekretess-mot-kallankrad-referenstabell) verifierat 3 gånger (T14/T15/T16) med 3 rena RLS-pass. Playbook-post nu på Förekomst 2 - nästa förekomst triggar Förekomst >= 3 och befordransregeln. Kandidat för senior-developer-rekommendation i README."
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #77 (T43/#74, feature/T43-pwa-autoupdate) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 77 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #74 manuellt (`gh issue close 74`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #74 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar en versionsrad i footern (data-app-version) med en SHA-sträng.
+>
+> Om PR #77 REDAN mergad:
+> T43 är klar och mergad. PWA-uppdaterings-prompt + bygg-SHA-stämpel levererade. Ingen fastnar längre på gammal cache.
+> **Nästa blockerare för att Daniel ska kunna dela: #72 (T42 - global facit + admin-login, TÄVLINGSINTEGRITET, HÖG-RISK RLS).**
+> T42 är BYGGD men EJ mergad (finns redan på en branch). Behöver bredare review-panel + copilot-loop + merge + deploy.
+> Rotorsak: alla rumsmedlemmar kan nu mata in/ändra facit - bara ägaren (Daniel/admin) ska kunna det.
+> **F1 (Behöver Daniel FÖRE admin-login funkar):** Daniel måste göra 2 steg i Supabase-dashboarden:
+>   1. Sätt e-postmallen till `{{ .Token }}` (magic-link OTP-format).
+>   2. Lägg till redirect-URLs för magic-link-autentisering.
+>   Dokumenteras i T42-handoff/issue. Daniel behöver T42 för att mata in kvällens matchresultat.
+> **Därefter: #76 (T45 - admin-statistikverktyg + vanliga medlemmar ser bara facit).**
+> Daniel vill ha T45 snart: admin ser alla rum + medlemmar + vem tippar bäst. Vanliga medlemmar utan sim = bara facit + 3-dagars matchlista, ingen inmatning utom i simuleringsläge.
+> **Prioritetsordning (pre-share-polish):**
+> - #72 (T42 ägar-facit, BLOCKERAR DELNING) - merga + deploy + F1 Supabase-steg
+> - #76 (T45 admin-statistik + read-only-vy för vanliga) - Daniel vill ha snart
+> - #69 (T40 resultat-rätt-feedback på kortet + topplista synlig för alla)
+> - #62 (T34 poängskala + "Så funkar poängen"-UI)
+> - #63 (T35 tippnings-lås gråmarkerat + deadline-tydlighet)
+> - #64 (T36 Play Protect TWA)
+> - #70 (T41 .gitattributes EOL-housekeeping)
+> - #48/#56 (plockas när de passar)
+> - T18-T25 därefter
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **#56 (delad modal-primitiv):** kort i Ready, plockas när rule-of-three nås.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T42-F1 Supabase-dashboard-steg.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T39/#68 (Install-fix + app-läge + hemsidelänk + tips-fönster) KLAR - PR #73 väntar på merge
 
 **Branch:** `feature/T39-install-fix` @ HEAD `c7fab69`
