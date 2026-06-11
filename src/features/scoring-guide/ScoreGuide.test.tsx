@@ -80,6 +80,20 @@ describe('ScoreGuide, "Så funkar poängen"-knapp + a11y-dialog', () => {
     expect(document.querySelector('[data-score-guide-overlay="topplista"]')).not.toBeNull();
     expect(document.querySelector('[data-score-guide-dialog="topplista"]')).not.toBeNull();
   });
+
+  it('surface med whitespace id-saniteras i aria-id:n (IDREF tål inte mellanslag)', async () => {
+    // Copilot R1: aria-labelledby/-describedby är space-separerade IDREF-listor, så ett
+    // surface som "topplista v2" får inte läcka in rått i id:na. Dialogen ska fortfarande
+    // ha sitt accessible name (rubriken) via det saniterade id:t.
+    render(<ScoreGuide surface="topplista v2" />);
+    fireEvent.click(screen.getByRole('button', { name: /Så funkar poängen/i }));
+    const dialog = await screen.findByRole('dialog');
+    const labelledby = dialog.getAttribute('aria-labelledby');
+    expect(labelledby).not.toBeNull();
+    expect(labelledby).not.toMatch(/\s/);
+    expect(document.getElementById(labelledby as string)).not.toBeNull();
+    expect(dialog).toHaveAccessibleName(/Så funkar poängen/i);
+  });
 });
 
 // MUTATIONS-VAKT i UI:t (HARD-krav, #62): den RENDERADE poäng-texten ska vara exakt

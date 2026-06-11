@@ -1400,7 +1400,7 @@ body {
    aldrig på full peak. Grön 0.16 / guld 0.10 är de redan AA-mätta alforna ur §9
    (samma surface-raised-fond, samma tokens), så ingen text i bandet kan sänka
    kontrasten under AA, även rakt på en glow-topp (texten ligger ändå på opak
-   surface under bandet, glow:en är ren stämning). En default sätts inte här , inga
+   surface under bandet, glow:en är ren stämning). En default sätts inte här, inga
    dynamiska hue:er används (förklaringen är lagsneutral, till skillnad från §7).
    -------------------------------------------------------------------------- */
 
