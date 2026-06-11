@@ -81,10 +81,10 @@ function tint(tokenHex, alphaPct, baseHex) {
 }
 
 const cases = [];
-function add(label, fgRgb, bgRgb, threshold) {
+function add(label, fgRgb, bgRgb, threshold, control = false) {
   const dark = contrast(fgRgb.dark, bgRgb.dark);
   const light = contrast(fgRgb.light, bgRgb.light);
-  cases.push({ label, dark, light, threshold });
+  cases.push({ label, dark, light, threshold, control });
 }
 
 const tok = (name) => ({ dark: hexToRgb(T.dark[name]), light: hexToRgb(T.light[name]) });
@@ -125,11 +125,13 @@ const muted80 = {
   dark: tint(T.dark.fgMuted, 80, T.dark.bg),
   light: tint(T.light.fgMuted, 80, T.light.bg),
 };
-add('[GAMMAL] fg-muted vid 80% opacitet på fond', muted80, bgBase, 4.5);
+add('[GAMMAL] fg-muted vid 80% opacitet på fond', muted80, bgBase, 4.5, true);
 
 // --- Rapport ------------------------------------------------------------------
 let minDark = Infinity;
 let minLight = Infinity;
+let gammalDark = null;
+let gammalLight = null;
 let fails = 0;
 console.log('\nT38 signatur-kontrast (canvas-komposit, VÄRSTA fall = sidans FOND, BÅDA teman)\n');
 console.log(
@@ -142,7 +144,13 @@ console.log(
 for (const c of cases) {
   const ok = c.dark >= c.threshold && c.light >= c.threshold;
   if (!ok) fails++;
-  if (c.threshold >= 4.5) {
+  // MIN-beräkningen mäter de FAKTISKA signatur-ytorna. GAMMAL-raden är den gamla
+  // a11y-buggen vi demonstrerar (fg-muted/80), inte en yta vi levererar, så den
+  // EXKLUDERAS här och rapporteras separat nedan.
+  if (c.control) {
+    gammalDark = c.dark;
+    gammalLight = c.light;
+  } else if (c.threshold >= 4.5) {
     minDark = Math.min(minDark, c.dark);
     minLight = Math.min(minLight, c.light);
   }
@@ -154,9 +162,11 @@ for (const c of cases) {
     (ok ? 'OK' : 'FAIL').padStart(8)
   );
 }
-console.log(`\nMIN över normal-text-ytor (>=4.5, exkl. GAMMAL-kontrollen): se rader ovan`);
 console.log(
-  `MIN (inkl. GAMMAL-raden, visar varför /80 byts): mörkt ${minDark.toFixed(2)}:1 / ljust ${minLight.toFixed(2)}:1`
+  `\nMIN över normal-text-ytor (>=4.5, exkl. GAMMAL-kontrollen): mörkt ${minDark.toFixed(2)}:1 / ljust ${minLight.toFixed(2)}:1`
+);
+console.log(
+  `GAMMAL-kontrollen (fg-muted/80, visar varför /80 byts): mörkt ${gammalDark.toFixed(2)}:1 / ljust ${gammalLight.toFixed(2)}:1`
 );
 console.log(
   fails === 0
