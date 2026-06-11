@@ -5,6 +5,89 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T41/#70 (EOL-normalisering) KLAR - PR #105 väntar på merge
+
+**Branch:** `feature/T41-eol-normalisering` @ HEAD `da4f540`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/105 mot `develop` (Closes #70, state: OPEN)
+**Board:** issue #70 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #70 MANUELLT och flyttar kort #70 till Done EFTER merge.
+
+**Vad T41 levererade:**
+- `.gitattributes`: `* text=auto eol=lf` + binär-undantag (png/woff2), commit 5d45550.
+- Prettier `endOfLine: auto -> lf`: format:check fångar nu CRLF-flippar, commit 5d45550.
+- Renormalisering av 14 CRLF-filer i SEPARAT commit de61b5a - noll-innehall bevisat (numstat --ignore-all-space = tom).
+- Gold-source-filerna (Annexe C, FIFA-regler) byte-identiska efter normalisering, alla källjämförelse-tester gröna.
+- `docs/decisions.md` uppdaterad med EOL-beslutet, commit da4f540.
+- DoD-exkludering av 4 pre-existerande röda tester dokumenterad i #70-kommentar + PR-text.
+
+**Commits:**
+- `5d45550` - T41: lagg EOL-normalisering (.gitattributes + Prettier endOfLine lf)
+- `de61b5a` - T41: normalisera alla radslut till LF (git add --renormalize)
+- `da4f540` - T41: dokumentera EOL-normaliserings-beslutet i decisions.md (HEAD)
+
+**Verifiering:** build/lint/format gröna. Tester: noll NYA röda (4 pre-existerande röda på develop bevisat orelaterade, stash-bekräftade, spåras i #102). Reviewer: PASS utan fynd (C1-C5 empiriskt, binärer byte-identiska, gold-source intakt, CRLF-prob bevisade nya grinden). Copilot: R1 1 process-nit (DoD vs 4 kända röda) löst via uttrycklig DoD-exkludering i #70-kommentar + PR-text, exit.
+
+**Acceptanskriterier issue #70 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: .gitattributes med text=auto eol=lf, Prettier endOfLine lf (commit 5d45550)
+- [x] AC#2: git add --renormalize kört, 14 CRLF-filer LF-normaliserade (commit de61b5a, noll-innehall bevisat)
+- [x] AC#3: En liten test-edit ger proportionerlig diff (empiriskt verifierat av reviewer: proportionerlig diff, inte hel-fil-rewrite)
+- [x] AC#4: Bygger grönt, lint rent, format rent, tester gröna (build/lint/format ok, noll NYA röda)
+
+**OBS for efterföljande tasks:** Alla brancher skapade FORE T41-merge far en engångs-renormalisering vid rebase/pull (editor-flippar LF->CRLF). Detta är förväntat och ofarligt.
+
+**PINNADE punkter (oförändrade, bärs framåt):**
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bärs framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready.
+- **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 handrullade dialoger). Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **BEFORDRAN 3 (senior-developer-mönstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Förekomst 3 (nu 4 efter T53). Typ: agent-beteende -> senior-developers fil. Väntar Daniels godkännande.
+- **IMPROVEMENTS-kandidat:** reviewerns förslag - commit-msg-git-hook som scannar svenska diakritik-substitut. Pipeline-ändring = kräver Daniels godkännande. Notera för dirigenten att skriva i `C:/Repo/agent-kit/IMPROVEMENTS.md`.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge väntar.
+- **2 mosade temp-filer städade:** `board_items` + `proj2items` låg i repo-roten och städades bort av subagenter. Mönstret värt att se upp med i framtida tasks.
+- **editor-flippar-radslut (senior-developer lesson):** mönstret är nu adresserat på repo-nivå med .gitattributes + endOfLine lf. Dirigenten bör notera för senior-developer-lessonen att vakten är byggd.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #105 (T41/#70, feature/T41-eol-normalisering) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 105 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #70 manuellt (`gh issue close 70`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #70 till Done på boarden (nu i "In Review", projekt 2).
+> Merga även äldre öppna PR:er om de fortfarande är öppna: PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #105 REDAN mergad:
+> T41 klar. Nästa task i kön: **#98 (T57 levande dag/nästa match/resultat-bläddring)**.
+> Därefter: #99 (T58 poäng i tips-vyn + detaljsektion) -> #100 (T56 levande träd) -> #102 (T60 röda tester) -> #93 (T54) -> #18 -> #76 -> #19 -> #24 -> #64 -> D-resten.
+> OBS: alla brancher skapade FÖRE T41-merge kan behöva en engångs-renormalisering vid rebase/pull - förväntat, ofarligt.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3+), IMPROVEMENTS-kandidat (diakritik-commit-hook), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T55/#96 (Andras tips avslöjas vid avspark) KLAR - PR #104 väntar på merge
 
 **Branch:** `feature/T55-reveal-vid-avspark` @ HEAD `d83a434`
