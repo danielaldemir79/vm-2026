@@ -18,10 +18,12 @@
 // kvällsljus-familj som resten av rummet. Varje käll-rum är en rad med ett kopiera-
 // affordans (en ⧉-glyf, samma som CopyButton) och ett pågår-läge med en lugn spinner.
 // Utfallet får en TON ur rapportens FAKTISKA siffror (inte ur strängen), så de tre
-// utfallen syns direkt utan att skrika: kopierade = positivt (grön bock), inget
-// kopierat = neutralt-informativt (dämpad ton), fel = danger (utan alarmism). All
-// färg är BACKUP, glyfen + texten bär betydelsen (färg-oberoende a11y). Tonerna är
-// AA-mätta mot tokens per tema (rooms.css §7, decisions.md T52).
+// utfallen syns direkt utan att skrika. Fel vinner först: failade skrivningar = danger
+// (utan alarmism), även när engine:n sväljer dem per item och inget kastar, och även
+// vid delframgång; annars kopierade = positivt (grön bock); annars inget kopierat =
+// neutralt-informativt (dämpad ton). All färg är BACKUP, glyfen + texten bär
+// betydelsen (färg-oberoende a11y). Tonerna är AA-mätta mot tokens per tema
+// (rooms.css §7, decisions.md T52).
 
 import { useState } from 'react';
 import { useRoomsStore } from './rooms-context';
@@ -32,11 +34,20 @@ import { summarizeCopyReport } from './copy-report-summary';
  * Resultatets TON, härledd ur rapportens FAKTISKA totaler (inte ur den ärliga
  * texten, som ägs av copy-report-summary). Tonen styr bara den VISUELLA signalen
  * (glyf + färg); själva beskedet är oförändrat. Tre lägen så de tre utfallen går att
- * skilja på direkt utan alarmism:
- *  - 'positive'  , något kopierades (copied > 0): en lugn grön bock.
- *  - 'neutral'   , inget kopierades men inget gick fel (allt var låst/redan tippat,
+ * skilja på direkt utan alarmism. Ordningen är AVSIKTLIG , fel vinner alltid:
+ *  - 'negative'  , något FAILADE (report.total.failed > 0): danger-ton. Engine:n
+ *                  (copyMyPredictions) sväljer per-item-SKRIVfel medvetet (delfel-
+ *                  robusthet) och KASTAR inte, så ett äkta fel-utfall (en eller flera
+ *                  failade skrivningar) når success-grenen i handleCopy, inte catch.
+ *                  Därför härleds danger ur `failed`, inte bara ur en kastad läsmiss.
+ *                  Detta gäller ÄVEN vid delframgång (copied > 0 OCH failed > 0): ett
+ *                  äkta fel ska aldrig maskeras av att något annat lyckades.
+ *  - 'positive'  , inget failade OCH något kopierades (copied > 0): en lugn grön bock.
+ *  - 'neutral'   , inget failade OCH inget kopierades (allt var låst/redan tippat,
  *                  eller källan var tom): en dämpad info-ton, INTE ett fel.
- *  - 'negative'  , en LÄSmiss kastade (fail-loud): danger-ton.
+ *
+ * En kastad LÄSmiss (listMy* failar) ger 'negative' direkt via handleCopy:s catch,
+ * utan att gå via denna funktion.
  */
 type ResultTone = 'positive' | 'neutral' | 'negative';
 
@@ -61,9 +72,16 @@ const BTN_COPY =
   'focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] ' +
   'active:translate-y-px disabled:cursor-progress disabled:opacity-70';
 
-/** Härled resultat-tonen ur rapportens totaler (ren funktion av siffrorna). */
+/**
+ * Härled resultat-tonen ur rapportens totaler (ren funktion av siffrorna). Fel vinner
+ * först: `failed > 0` ger alltid 'negative' (även vid delframgång och även om inget
+ * kastade, eftersom engine:n sväljer per-item-skrivfel), därefter `copied > 0`
+ * 'positive', annars 'neutral'. Se ResultTone-docstringen för hela tillstånds-tabellen.
+ */
 function toneFromReport(report: CopyReport): ResultTone {
-  return report.total.copied > 0 ? 'positive' : 'neutral';
+  if (report.total.failed > 0) return 'negative';
+  if (report.total.copied > 0) return 'positive';
+  return 'neutral';
 }
 
 /** Liten besked-glyf (dekor, aria-hidden , texten bär betydelsen). Medan det PÅGÅR
