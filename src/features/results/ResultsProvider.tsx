@@ -278,26 +278,37 @@ export function ResultsProvider({
   // listan) så vävningen är idempotent och ett ändrat/borttaget facit-resultat
   // backar korrekt.
   //
-  // KÖR BARA VID EN FAKTISK FACIT-/RUMS-ÄNDRING: vi jämför mot förra rendrets
-  // facit-referens (+ rum-id, för att fånga ett rums-byte i fixtures-läge) och
-  // hoppar om inget ändrats. VARFÖR (kritiskt): seed-effekten gör redan den FÖRSTA
-  // vävningen, och setMatches-seamen (T18 realtid + test-harness) skriver den
-  // riktiga datan direkt. Skulle denna effekt köra på BLOTTA seed/mount (utan en
-  // verklig ändring) skulle den väva om från basen och STOMPA en setMatches som just
-  // körts (t.ex. en realtids-push eller ett test som setMatches:ar en färdig
-  // matchlista). Genom att bara reagera på en ÄKTA ändring av facit/rum rör vi aldrig
+  // KÖR BARA VID EN FAKTISK FACIT-ÄNDRING: vi jämför mot förra rendrets facit-referens
+  // (+ rum-id) och hoppar om inget facit-relevant ändrats. VARFÖR (kritiskt): seed-
+  // effekten gör redan den FÖRSTA vävningen, och setMatches-seamen (T18 realtid +
+  // test-harness) skriver den riktiga datan direkt. Skulle denna effekt köra på BLOTTA
+  // seed/mount (utan en verklig ändring) skulle den väva om från basen och STOMPA en
+  // setMatches som just körts (t.ex. en realtids-push eller ett test som setMatches:ar
+  // en färdig matchlista). Genom att bara reagera på en ÄKTA facit-ändring rör vi aldrig
   // den lokala/setMatches-drivna vägen, bara när facit-källan faktiskt ger ny data.
+  //
+  // RUM-BYTE PÅVERKAR FACIT BARA I FIXTURES-LÄGE (Copilot R2): facit-källan är
+  // `live ? officialResults : sharedResults` (se facitResults ovan). Rummets resultat
+  // är alltså bara facit i FIXTURES-läge; i LIVE-läge är facit de globala officiella
+  // resultaten, OBEROENDE av vilket rum som är aktivt. Ett rent rums-byte i live byter
+  // därför inte facit och ska INTE väva om (officialResults-referensen är oförändrad,
+  // så resultsChanged är redan false; vi gatar dessutom roomChanged på !live så ett
+  // rums-byte i live aldrig kan trigga en omväving i onödan). I FIXTURES räknas rums-
+  // bytet som förr: byter man rum byter facit-källan och vi väver om.
   const prevFacitRef = useRef<{ roomId: string | null; results: RoomMatchResult[] }>({
     roomId: activeRoomId,
     results: facitResults,
   });
   useEffect(() => {
     const prev = prevFacitRef.current;
-    const roomChanged = prev.roomId !== activeRoomId;
+    // Rum-bytet är facit-relevant BARA i fixtures-läge (rummet driver facit då). I
+    // live-läge driver de globala officiella resultaten facit, så ett rums-byte är
+    // inte en facit-ändring och ska inte väva om.
+    const roomChanged = !live && prev.roomId !== activeRoomId;
     const resultsChanged = prev.results !== facitResults;
     prevFacitRef.current = { roomId: activeRoomId, results: facitResults };
     if (!roomChanged && !resultsChanged) {
-      return; // inget facit-/rums-relaterat ändrades: rör inte den lokala/setMatches-vägen
+      return; // inget facit-relevant ändrades: rör inte den lokala/setMatches-vägen
     }
     if (status !== 'ready') {
       return; // basen är inte seedad än; seed-effekten väver med facitResultsRef
@@ -305,7 +316,7 @@ export function ResultsProvider({
     const woven = applyRoomResults(seededBaseRef.current, facitResults);
     matchesRef.current = woven;
     setRealMatchesState(woven);
-  }, [status, facitResults, activeRoomId]);
+  }, [status, facitResults, activeRoomId, live]);
 
   // Mata in/redigera ETT resultat: validera, och vid ok uppdatera matchlistan
   // optimistiskt (direkt i minnet, vyerna räknar om reaktivt). Vid fel ändras
