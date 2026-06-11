@@ -5,6 +5,49 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T55 (#96): tips-avslöjandet visas vid AVSPARK, inte först vid slutsignal
+
+**Symptom (Daniels rapport 2026-06-11, live under öppningsmatchen):** "Mexico-matchen startade men man
+ser inte vad de andra tippat den matchen, skulle inte det synas?"
+
+**Rotorsak 1 (primär), bekräftad mot kod + live-DB:** `buildMatchReveal` (`reveal.ts`) krävde TIDIGARE
+BÅDE låst (avspark passerad) OCH avgjort (ett `MatchFacit` fanns, vilket bara skapas för
+`status === 'finished'` i `derive-facit.ts`). En LÅST men PÅGÅENDE match (`status === 'live'`) saknar
+facit, så den hoppades över, och avslöjandet dök upp först efter SLUTSIGNAL. Men sekretessen släpper
+redan vid AVSPARK: RLS-villkoret är matchens kickoff, inte slutresultatet (verifierat live, 5 tips på
+g-A-1 syns i ewrmdt-rummet efter passerad kickoff).
+
+**Regel (gissas inte, källa):** tips-INNEHÅLLET får visas så snart matchen är LÅST (`now >= kickoff`,
+`isMatchLocked`), samma grind som tips-SKRIVNINGEN och RLS-reveal-villkoret. Poäng får däremot BARA
+visas/räknas på AVGJORT facit (ett tips ger poäng först när matchen är klar). **Källa:** denna logg T17
+§2 ("avslöjande-gaten ... låst för sekretess; avgjord för att visa poäng") + T15 §4 (RLS-sekretess på
+kickoff) + `isMatchLocked` (T15, predictions-api.ts).
+
+**Fix:** `buildMatchReveal` avslöjar nu varje LÅST match. Facit/poäng-delen är NULLABLE via en
+diskriminerad union `RevealedMatch = PendingRevealedMatch ('live') | FinishedRevealedMatch ('finished')`
+(samma typ-kontrakt-anda som domänens `Match`-union, T3): en 'live'-match bär `actual: null` och picks
+UTAN poäng-fält, en 'finished'-match bär facit + poäng + `pointType` som förut. Diskriminanten gör det
+STRUKTURELLT omöjligt att läsa/gissa poäng på en pågående match (HARD: ärligt "Pågår", aldrig en gissad
+poäng). Topplistans poäng-aggregering (`aggregate-scores.ts`) rör INTE detta, den läser fortsatt bara
+`facit.matches` (finished-only), så inga poäng tickar in på en pågående match.
+
+**Rotorsak 2 (sekundär):** `LeaderboardProvider` hämtade andras tips bara vid mount/rumsbyte (fetch-deps
+`[supabase, activeRoomId]`). En app som stått öppen sedan FÖRE avspark fick aldrig in de RLS-nyligen-
+släppta raderna utan en manuell reload. **Fix:** härled `lockedMatchCount` ur den BEFINTLIGA minut-
+ticken (`useDeadlineTick`/`evalNow`, T15 C1) och lägg i fetch-deps. Talet ökar när en match passerar
+avspark, så PRECIS den övergången triggar en (1) ny hämtning, inte varje minut-tick (talet är stabilt
+mellan avsparker). INGEN ny polling, INGEN realtime (det är T18/#18). Bevisat med mock-klocka +
+mutationstest (utan `lockedMatchCount` i deps failar re-fetch-testet rött, `expected 2, got 1`).
+
+**HARD-kontroll (sekretess FÖRE avspark intakt):** en OLÅST match avslöjar ALDRIG andras tips, oavsett
+om facit/tips råkar finnas i datan. `now >= kickoff` är den enda synlighets-grinden. Negativ kontroll
+testad (olåst match, status live, picks i datan -> 0 avslöjade).
+
+**UX-platsen (picks vid matchkortet, rotorsak 3 i issuen):** medvetet UTANFÖR denna task (#99/T58 tar
+helheten). reveal-ändringen är gjord ÅTERANVÄNDBAR därifrån (exporterad union + pending-typer i
+`leaderboard/index.ts`). Pågår-lägets premium-finish poleras av design-frontend ovanpå data-attribut-
+hakarna (`data-reveal-status="live"`, `data-reveal-live-pick`, `data-reveal-pending`).
+
 ## 2026-06-12 , T59 (#97): listMyRooms filtrerar på EGEN user_id (dubblett-rum-bugg)
 
 **Symptom (Daniels skärmdump 2026-06-12):** kopiera-tips-sektionen + rum-väljaren visade samma

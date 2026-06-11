@@ -34,6 +34,7 @@ function renderView(s: LeaderboardStore) {
 
 const revealedMatch: RevealedMatch = {
   matchId: 'g-A-1',
+  status: 'finished',
   homeTeamId: 'mex',
   awayTeamId: 'kor',
   kickoff: '2026-06-12T18:00:00Z',
@@ -53,6 +54,20 @@ const revealedMatch: RevealedMatch = {
       points: 0,
       pointType: 'miss',
     },
+  ],
+};
+
+// T55 (#96): en LÅST men PÅGÅENDE match, allas tips synliga UTAN facit/poäng.
+const pendingMatch: RevealedMatch = {
+  matchId: 'g-A-1',
+  status: 'live',
+  homeTeamId: 'mex',
+  awayTeamId: 'kor',
+  kickoff: '2026-06-12T18:00:00Z',
+  actual: null,
+  picks: [
+    { userId: 'u1', displayName: 'Anna', predicted: { homeGoals: 2, awayGoals: 1 } },
+    { userId: 'u2', displayName: 'Bertil', predicted: { homeGoals: 0, awayGoals: 0 } },
   ],
 };
 
@@ -154,5 +169,49 @@ describe('RevealView, FÄRG-OBEROENDE facit-markörer (premium-finish)', () => {
     // Orsaken står som ren text (läses även av skärmläsare), med poängtillägget: 0 utan
     // plustecken (ingen vinst), vinster med +.
     expect(reasons).toEqual(['Exakt resultat +3', 'Rätt vinnare +1', 'Miss 0']);
+  });
+});
+
+describe('RevealView, PÅGÅR-läget (T55: avslöja vid avspark, inget facit/poäng)', () => {
+  it('en pågående match markeras data-reveal-status="live" och visar "Pågår", inget facit-tal', () => {
+    const { container } = renderView(store({ reveal: [pendingMatch] }));
+    const card = container.querySelector('[data-reveal-match]');
+    expect(card?.getAttribute('data-reveal-status')).toBe('live');
+    // Inget facit-tal (matchen är inte avgjord), men en synlig "Pågår"-markör.
+    expect(container.querySelector('[data-reveal-actual]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-reveal-pending]')).toHaveTextContent('Pågår');
+  });
+
+  it('visar allas tips UTAN poäng/utfalls-markör (ärligt pågår, ingen gissad poäng)', () => {
+    const { container } = renderView(store({ reveal: [pendingMatch] }));
+    const picks = container.querySelectorAll('[data-reveal-pick]');
+    expect(picks).toHaveLength(2);
+    // Pågående picks bär INGEN poäng-/utfalls-attribut och ingen VARFÖR-etikett.
+    for (const pick of Array.from(picks)) {
+      expect(pick.getAttribute('data-reveal-live-pick')).not.toBeNull();
+      expect(pick.getAttribute('data-points')).toBeNull();
+      expect(pick.getAttribute('data-outcome')).toBeNull();
+    }
+    expect(container.querySelector('[data-reveal-reason]')).not.toBeInTheDocument();
+    expect(container.querySelector('.vm-reveal-mark')).not.toBeInTheDocument();
+    // Men namn + gissad ställning syns (det är poängen med avslöjandet vid avspark).
+    expect(screen.getByText('Anna')).toBeInTheDocument();
+    expect(screen.getByText('Bertil')).toBeInTheDocument();
+  });
+
+  it('en pågående match utan tips visar "ingen tippade", ingen krasch', () => {
+    const noPicks: RevealedMatch = { ...pendingMatch, picks: [] };
+    const { container } = renderView(store({ reveal: [noPicks] }));
+    expect(
+      container.querySelector('[data-reveal-status]')?.getAttribute('data-reveal-status')
+    ).toBe('live');
+    expect(container.querySelector('[data-reveal-no-picks]')).toBeInTheDocument();
+  });
+
+  it('blandad lista: en pågående + en färdig match renderas båda, var med rätt status', () => {
+    const finished: RevealedMatch = { ...revealedMatch, matchId: 'g-A-2' };
+    const { container } = renderView(store({ reveal: [pendingMatch, finished] }));
+    const cards = Array.from(container.querySelectorAll('[data-reveal-match]'));
+    expect(cards.map((c) => c.getAttribute('data-reveal-status'))).toEqual(['live', 'finished']);
   });
 });
