@@ -84,6 +84,20 @@ describe('TeamProfilePanel, öppnas och visar källånkrad profil', () => {
     // Sverige spelar 3 gruppmatcher -> 3 rader i vägen.
     expect(within(path).getAllByRole('listitem')).toHaveLength(3);
   });
+
+  it('visar det FULLA namnet i profilen, även för ett lag med kortform (T50)', async () => {
+    // Lagprofilen är den RYMLIGA ytan: här står hela "Bosnien och Hercegovina",
+    // medan de trånga ytorna (grupptabell/matchkort) visar kortformen "Bosnien".
+    renderWithProviders(<OpenButton teamId="bih" label="öppna Bosnien" />);
+    fireEvent.click(screen.getByText('öppna Bosnien'));
+
+    const dialog = await screen.findByRole('dialog');
+    // Rubriken (och dialogens a11y-namn) bär det FULLA landsnamnet.
+    expect(within(dialog).getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Bosnien och Hercegovina'
+    );
+    expect(dialog).toHaveAccessibleName(/Bosnien och Hercegovina/);
+  });
 });
 
 describe('TeamProfilePanel, stängning (a11y-dialog)', () => {

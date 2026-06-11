@@ -27,11 +27,24 @@ import { GROUP_IDS } from '../../domain/types';
 import type { TeamRef } from './team-profiles-parser';
 
 /**
- * De 48 lagen, grupperade A-L i lottnings-positionsordning (position 1-4).
- * Bara namn + kod här (den verifierade rå-datan); id/grupp härleds nedan.
- * Definieras grupp för grupp för läsbarhet; de platta listorna byggs nedan.
+ * En rå lag-rad i lottnings-datan: fullt namn + FIFA-kod, plus ett VALFRITT kort
+ * namn (`shortName`) för lag vars fulla namn är för långt för appens trånga ytor
+ * (grupptabell/matchkort/slutspelsträd). Sätts bara där det behövs (default = `name`).
  */
-const TEAMS_BY_GROUP: Record<GroupId, ReadonlyArray<{ name: string; code: string }>> = {
+interface RawTeam {
+  name: string;
+  code: string;
+  /** Kort visningsnamn för trånga ytor, t.ex. "Bosnien". Default = `name`. */
+  shortName?: string;
+}
+
+/**
+ * De 48 lagen, grupperade A-L i lottnings-positionsordning (position 1-4).
+ * Bara namn + kod (+ ev. kort namn) här (den verifierade rå-datan); id/grupp
+ * härleds nedan. Definieras grupp för grupp för läsbarhet; de platta listorna
+ * byggs nedan.
+ */
+const TEAMS_BY_GROUP: Record<GroupId, ReadonlyArray<RawTeam>> = {
   // Grupp A: värdnation Mexiko på A1 (förbestämd).
   A: [
     { name: 'Mexiko', code: 'MEX' },
@@ -42,7 +55,12 @@ const TEAMS_BY_GROUP: Record<GroupId, ReadonlyArray<{ name: string; code: string
   // Grupp B: värdnation Kanada på B1 (förbestämd).
   B: [
     { name: 'Kanada', code: 'CAN' },
-    { name: 'Bosnien och Hercegovina', code: 'BIH' },
+    // Det fulla, verifierade landsnamnet (lottnings-data, lagprofilen) + ett kort
+    // visningsnamn för trånga ytor: "Bosnien och Hercegovina" tryckte ihop
+    // grupptabellens kolumner (T50, Daniels live-feedback). "Bosnien" är den
+    // vedertagna svenska kortformen för landet. Enda laget i VM 2026:s 48 vars
+    // namn är så långt att en kortform behövs; övriga ryms i de trånga ytorna.
+    { name: 'Bosnien och Hercegovina', code: 'BIH', shortName: 'Bosnien' },
     { name: 'Qatar', code: 'QAT' },
     { name: 'Schweiz', code: 'SUI' },
   ],
@@ -119,6 +137,8 @@ export function teamId(code: string): string {
 export interface TeamBase {
   id: string;
   name: string;
+  /** Kort visningsnamn för trånga ytor (valfritt, default = name). Se Team i types.ts. */
+  shortName?: string;
   code: string;
   group: GroupId;
 }
@@ -130,9 +150,15 @@ export interface TeamBase {
  * insättningsordning). teams.ts berikar dessa till fullständiga Team-objekt.
  */
 export const WC2026_TEAM_BASES: readonly TeamBase[] = GROUP_IDS.flatMap((group) =>
-  TEAMS_BY_GROUP[group].map(
-    (t): TeamBase => ({ id: teamId(t.code), name: t.name, code: t.code, group })
-  )
+  TEAMS_BY_GROUP[group].map((t): TeamBase => {
+    const base: TeamBase = { id: teamId(t.code), name: t.name, code: t.code, group };
+    // Bär bara med shortName när källan satt ett (default = name via teamShortName),
+    // så bas-objektet inte får ett tomt/odefinierat fält för de flesta lagen.
+    if (t.shortName !== undefined) {
+      base.shortName = t.shortName;
+    }
+    return base;
+  })
 );
 
 /**
