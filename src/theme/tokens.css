@@ -1332,6 +1332,69 @@ body {
   border-left: 2px solid transparent;
 }
 
+/* TIPS-AVSLÖJANDET, PÅGÅR-KORTET (T55, #96): en LÅST men PÅGÅENDE match. Samma
+   reveal-kort-surface, men en BESLÄKTAD MEN EGEN identitet: där facit-kortet bär
+   guld ("domen är fälld, kvällsljus"), bär pågår-kortet appens PITCH-GRÖNA accent
+   ("matchen lever, tipsen ligger på bordet"). Grön = turneringens energi-identitet
+   (samma roll som live-nedräkningens prick i dagshero:n, T7), guld = det avgjorda.
+   Så en seende skiljer de två kort-typerna på en blink UTAN att läsa, och formen
+   (puls-prick + "Pågår"-pill kontra solid facit-bricka) bär skillnaden även i
+   gråskala / för en färgblind användare.
+
+   KONTRAST-VAKT (lessons aa-...-varsta-fall + guld/accent-på-tint-fällan): kortets
+   accent-glow sitter i NEDRE VÄNSTRA hörnet, "Pågår"-pillen uppe till HÖGER, så de
+   möts ALDRIG på en glow-topp (samma motsatta-hörn-disciplin som score-guide-hero:n
+   §17). Pill-texten är därför accent på en REN 9%-accent-tint (ingen glow under),
+   UPPMÄTT: accent-text på 9%-tint = 8.10:1 mörkt (#1fe082 på #113123) / 4.77:1 ljust
+   (#0e7a44 på #e9f3ee), båda >= 4.5:1 (normal text). Tinten är medvetet LÄTT (pillen
+   ska kännas levande, inte vara en tung solid-bricka som facit-talet), men texten
+   bär ändå full AA i båda teman. */
+.vm-reveal-card--live {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(
+    120% 90% at 0% 100%,
+    rgb(var(--vm-glow-accent) / 0.08),
+    transparent 60%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--color-accent) 32%, transparent);
+}
+
+/* "PÅGÅR"-PILLEN: en lätt, levande accent-pill (9% accent-tint + hårfin accent-kant)
+   som bär en pulsande prick + ordet "Pågår". Den LÄTTA tinten (kontra facit-talets
+   solida guld-bricka) signalerar "ännu inte avgjort", och accent-tonen + den
+   pulsande pricken signalerar "lever just nu". Text-AA mätt ovan (8.10:1 / 4.77:1). */
+.vm-reveal-pending {
+  background-color: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+  color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
+}
+
+/* DEN PULSANDE PRICKEN i pillen: en liten solid accent-prick med en lugn andnings-
+   puls (samma vm-pulse-keyframe + samma idé som dagshero:ns .vm-live-dot, T7, DRY).
+   Pulsen stannar vid reducerad rörelse (index.css), då blir den en STATISK prick,
+   FORMEN (prick + "Pågår"-ord) bär budskapet ändå, så pågår-läget aldrig hänger på
+   rörelse ELLER enbart färg (WCAG 2.3.3 + 1.4.1). Solid accent på pill-tinten ligger
+   långt över 3:1 (UI-komponent), uppmätt 8.10:1 mörkt / 4.77:1 ljust. */
+.vm-pending-dot {
+  display: inline-block;
+  height: 0.4375rem;
+  width: 0.4375rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+  animation: vm-pulse 2s ease-in-out infinite;
+}
+
+/* PÅGÅR-radens hårfina vänsterkant: en svag accent-list så pågående tips läser som
+   "ligger på bordet, ännu inte dömda" (skild från facit-kortets gröna EXAKT-kant /
+   guld-UTFALL-kant, som är starkare och bär ett avgjort utfall). Ingen text färgas,
+   namnet + ställningen bär fg-kontrast som förut. */
+.vm-reveal-pick--live {
+  border-left: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
 /* =============================================================================
    18. UPPHOVS-SIGNATUREN, footerns avsändarrad (T38, issue #67).
    [VÄRDE, ej @theme-kontrakt]
