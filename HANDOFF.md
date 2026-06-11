@@ -5,6 +5,87 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T55/#96 (Andras tips avslöjas vid avspark) KLAR - PR #104 väntar på merge
+
+**Branch:** `feature/T55-reveal-vid-avspark` @ HEAD `d83a434`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/104 mot `develop` (Closes #96, state: OPEN)
+**Board:** issue #96 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #96 MANUELLT och flyttar kort #96 till Done EFTER merge.
+
+**Vad T55 levererade:**
+- Rotorsak: reveal-unionen visade bara finished-matcher (slutade matcher), inte live-matcher. Fix: union inkluderar nu bade live och finished - andras tips syns fran avspark, inte bara fran slutsignal.
+- Tyst re-fetch utan loading-flimmer: lockedMatchCount bevakas i useEffect, re-fetch sker i bakgrunden (ingen loading-spinner), `loadedRoomIdRef` forhindrar parallella anrop.
+- Gron live-identitet: pulsande grona punkter (Tailwind animate-pulse) med AA-kontrast 8.10:1 (puls) och 4.77:1 (text) for pagaende matcher.
+- Sekretessen fore avspark bevisad med mutationstest (gate bort -> negativ kontroll rodnar).
+- 35 tester fran senior-dev + 4 nya fran copilot R2 (tyst re-fetch utan flimmer), 1339 pass totalt.
+- 4 kanda pre-existerande roda tester pa develop (orelaterade, stash-bekraftade, #102 skapad for stadning).
+
+**Commits:**
+- `b82b0fd` - fix(reveal): visa andras tips vid avspark, inte forst vid slutsignal (#96)
+- `fd1d47e` - style(reveal): levande pagars-lage med gron accent-identitet (#96)
+- `ea59f4a` - T55: copilot R1, sann sekretess-kommentar efter live-varianten + 8.10 konsekvent (#96)
+- `d83a434` - fix(leaderboard): avspark-triggad re-fetch ar tyst, inget loading-flimmer (#96) - HEAD
+
+**Verifiering:** 1339 pass (4 kanda pre-existerande roda, stash-bekraftade orelaterade). Lint/format/build rent. Lokal panel: PASS (sekretess-gaten mutationstestades akt med negativ kontroll). Copilot: R1 2 fynd, R2 1 fynd, R3 0 fynd, exit.
+
+**Acceptanskriterier issue #96 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: Rotorsaken identifierad och dokumenterad (decisions.md - reveal-union inkluderade bara finished, inte live)
+- [x] AC#2: Under/efter pagaende match ser rumsmedlemmar varandras tips utan manuell reload (commit b82b0fd, re-fetch pa lockedMatchCount)
+- [x] AC#3: Sekretess fore avspark intakt - RLS-bevis, mutationstest av gaten (commit ea59f4a, negativ kontroll)
+- [x] AC#4: Tester + gront, reviewad (1339 pass, lint/format/build rent, lokal panel PASS, copilot R3 noll fynd)
+
+**PINNADE punkter (oforandrade, bars framat):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping, editor flippar LF->CRLF. Kort i Ready. UPPLYFT: monster kostade tid 4:e gangen - rotorsak nu, bygge i T60-kons grannskap.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stangt i T17, bars framat som konvention.
+- **#35 (arena/stad):** `Match.venue` = platsallare tills #35 fyller med verifierad per-match-kalla.
+- **FNV-hash:** 2 anvandningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 anvandningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-ko.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready.
+- **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 handrullade dialoger). Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lagg till manualChunks om LCP-problem uppstar.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behover Daniel"-ko (oforandrad):**
+- Push-notiser T22: kraver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-monstret):** `uttommande-test-vaktar-svagare-invariant` Forekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Vantar Daniels godkannande.
+- **BEFORDRAN 2 (journalist-monstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Forekomst 3. Typ: agent-beteende -> journalistens fil. Vantar Daniels godkannande.
+- **BEFORDRAN 3 (senior-developer-monstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Forekomst 3 (nu 4 efter T53). Typ: agent-beteende -> senior-developers fil. Vantar Daniels godkannande.
+- **IMPROVEMENTS-kandidat:** reviewerns forslag - commit-msg-git-hook som scannar svenska diakritik-substitut. Pipeline-andring = kraver Daniels godkannande. Notera for dirigenten att skriva i `C:/Repo/agent-kit/IMPROVEMENTS.md`.
+- **FIFA-juni-ranking:** aprilutgavan 2026 anvands. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: andra rank-varden + `npm run gen:team-profiles`.
+- **Release-gransen:** develop -> main + release-cleanup-skillen vantar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge vantar.
+- **2 mosade temp-filer stadade:** `board_items` + `proj2items` lag i repo-roten och stadades bort av subagenter. Monstret vart att se upp med i framtida tasks.
+
+**FORTSATTNINGS-PROMPT (autonom ko):**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #104 (T55/#96, feature/T55-reveal-vid-avspark) ANNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 104 --merge --repo danielaldemir79/vm-2026`.
+> Stang issue #96 manuellt (`gh issue close 96`) - auto-close funkar inte mot develop nar default-branch ar main.
+> Flytta kort #96 till Done pa boarden (nu i "In Review", projekt 2).
+> Om PR #103 (T59/#97) fortfarande ar oppen: merga den ocksa och stang issue #97.
+>
+> Om PR #104 REDAN mergad:
+> T55 klar. Nasta task i kon: **#70 (T41 .gitattributes EOL, UPPLYFT: monstret kostade tid 4:e gangen)**.
+> Darefter: #98 (T57 levande dag) -> #99 (T58 poang i tips-vyn) -> #100 (T56 levande trad) -> #102 (T60 roda tester) -> #93 (T54) -> #18 -> #76 -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bar framat (alla tasks):
+> - **#35 (arena/stad):** venue = platsallare.
+> - **FNV-hash:** konsolidera vid 3:e anvandning.
+> - **Stegnings-dubblett:** extrahera vid 3:e anvandning.
+> - **#48 (demo-chip a11y):** kort i Ready.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behover Daniel"-ko:** push-notiser (T22), 3 befordringar (Forekomst 3+), IMPROVEMENTS-kandidat (diakritik-commit-hook), FIFA-juni-ranking, release-gransen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbaddning:** SKIPPAD, stangd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vagen till slutet (Daniel ger go for release-gransen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T59/#97 (Dubblerade kopiera-tips-knappar) KLAR - PR #103 väntar på merge
 
 **Branch:** `feature/T59-dubblettrum` @ HEAD `f30222a`

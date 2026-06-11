@@ -20,6 +20,7 @@ import {
   listRoomPredictions,
   listRoomGroupPredictions,
   listRoomBracketPredictions,
+  isMatchLocked,
   type Prediction,
   type GroupPrediction,
   type BracketPrediction,
@@ -98,8 +99,28 @@ export function LeaderboardProvider({
   // match som låses (avspark passeras) dyker upp i avslöjandet utan omladdning.
   const evalNow = useDeadlineTick(now ?? new Date());
 
+  // T55 (#96), rotorsak 2: re-fetcha andras tips NÄR en match passerar avspark. RLS
+  // släpper andras tips-RADER först efter kickoff, så en app som stått öppen sedan FÖRE
+  // avspark har ett svar UTAN dem; utan en ny hämtning ser man inget förrän en reload.
+  // Vi pollar INTE och öppnar ingen realtime (det är T18/#18): vi härleder bara ANTALET
+  // LÅSTA matcher ur den BEFINTLIGA minut-ticken (evalNow). Talet ökar när en match
+  // passerar avspark, och eftersom det ligger i fetch-effektens deps triggar just den
+  // övergången en (1) ny hämtning, så de nyligen avslöjade raderna kommer in.
+  const lockedMatchCount = useMemo(
+    () => data.matches.filter((m) => isMatchLocked(m.kickoff, evalNow)).length,
+    [data.matches, evalNow]
+  );
+
   // EPOCH-vakt: ett snabbt rumsbyte får aldrig låta ett föråldrat svar visa fel rum.
   const loadTokenRef = useRef(0);
+
+  // Vilket rum den NU laddade datan tillhör (null = ingen data laddad än). Skiljer en
+  // SYNLIG laddning (initial / rumsbyte: datan saknas eller hör till fel rum -> visa
+  // 'loading') från en TYST re-fetch (avspark: samma rum, datan finns redan -> behåll
+  // 'ready' + datan under hämtningen, byt bara ut den när svaret kommer). Vi läser inte
+  // av predictionsStatus/predictions i effekten (det skulle kräva dem i deps och kunna
+  // loopa); den här ref:en uttrycker invarianten "datan tillhör rätt rum" direkt.
+  const loadedRoomIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const token = ++loadTokenRef.current;
@@ -107,10 +128,19 @@ export function LeaderboardProvider({
       setPredictions(EMPTY_PREDICTIONS);
       setPredictionsStatus('idle');
       setPredictionsError(null);
+      loadedRoomIdRef.current = null;
       return;
     }
-    setPredictionsStatus('loading');
-    setPredictionsError(null);
+    // TYST RE-FETCH (T55 #96, rotorsak): en avspark-triggad omhämtning (lockedMatchCount
+    // ändrades) i SAMMA rum vi redan har data för ska INTE flimra 'loading' och tömma
+    // topplistan/avslöjandet, den ska bara KOMPLETTERA med de RLS-nyligen-släppta raderna.
+    // 'loading' visas bara vid INITIAL hämtning (ingen data än) och vid RUMSBYTE (datan
+    // hör till fel rum); då är det rätt att blanka och visa laddning.
+    const isSilentRefetch = loadedRoomIdRef.current === activeRoomId;
+    if (!isSilentRefetch) {
+      setPredictionsStatus('loading');
+      setPredictionsError(null);
+    }
     // Ladda rummets RLS-synliga tips för ALLA tre typer parallellt. RLS gör att vi
     // bara får egna + redan-avslöjade rader (sekretessen är server-side).
     Promise.all([
@@ -124,15 +154,33 @@ export function LeaderboardProvider({
         }
         setPredictions({ match, group, bracket });
         setPredictionsStatus('ready');
+        loadedRoomIdRef.current = activeRoomId;
       })
       .catch((err: unknown) => {
         if (token !== loadTokenRef.current) {
           return;
         }
+        // FELVÄG, TYST RE-FETCH: en avspark-triggad omhämtning som failar får ALDRIG
+        // kasta bort den befintliga (giltiga, om än något inaktuella) topplistan. Vi
+        // behåller datan + 'ready' och loggar felet (fail-loud i konsolen, samma
+        // [VM2026]-warn-konvention som övriga icke-fatala fel), i stället för att sätta
+        // 'error' som hade blankat hela vyn för en transient avspark-poll. Nästa avspark
+        // (eller rumsbyte/reload) försöker igen. En INITIAL/rumsbyte-fetch som failar har
+        // däremot ingen data att skydda, då är 'error' rätt (fail loud, PRINCIPLES §8).
+        if (isSilentRefetch) {
+          console.warn(
+            '[VM2026] Tyst omhämtning av topplistan (avspark) misslyckades, behåller befintlig data:',
+            err
+          );
+          return;
+        }
         setPredictionsError(err instanceof Error ? err.message : 'Kunde inte ladda topplistan.');
         setPredictionsStatus('error');
       });
-  }, [supabase, activeRoomId]);
+    // lockedMatchCount (T55 #96): re-fetcha när en match passerar avspark, så RLS-
+    // nyligen-släppta tips kommer in utan reload. ENDAST när talet ÄNDRAS (en ny match
+    // låstes) körs effekten om, inte varje minut-tick (talet är stabilt mellan avspark).
+  }, [supabase, activeRoomId, lockedMatchCount]);
 
   // VÄVD status: topplistan är 'ready' först när BÅDE facit-datan OCH tipsen laddat.
   // Felet från endera lagret fail-loud:ar. Idle/loading speglas så vyn visar laddning.
