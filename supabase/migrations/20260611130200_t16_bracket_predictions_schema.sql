@@ -17,7 +17,7 @@
 --
 --   * VM-VINNAR-TIPS (mästaren): EN separat tippning, gjord FÖRE turneringen,
 --     låst vid turneringens FÖRSTA match (g-A-1). Detta är "vem vinner hela VM"
---     -momentet och ger störst bonus. Lagras som en rad med match_id = 'champion'.
+--     -momentet och ger störst bonus. Lagras som en rad med slot_id = 'champion'.
 --
 -- Per-slot-modellen tippar alltså LAGET som avancerar, inte målställningen (det
 -- är T15:s predictions). Poäng: scoreBracketAdvance (stigande per runda) +
