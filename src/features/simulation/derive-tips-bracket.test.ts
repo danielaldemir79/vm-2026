@@ -90,7 +90,7 @@ describe('deriveTipsBracket, tippad 1:a/2:a hamnar i rätt slot', () => {
     expect(matchOf(state, 'M75').away.teamId).toBe('mar');
   });
 
-  it('matar Daniels exempel: 1A mot 2B möts i M73 (sextondelen)', () => {
+  it('matar Daniels exempel: 2A mot 2B möts i M73 (sextondelen)', () => {
     // M73 = 2:a grupp A v 2:a grupp B. Daniels kärnvärde: SE vilka som möts.
     const picks = new Map<string, GroupTipPick>([
       ['A', { winnerCode: 'MEX', runnerUpCode: 'RSA' }],
@@ -221,6 +221,29 @@ describe('deriveTipsBracket, robusthet + renhet', () => {
     // 1:an (ZZZ, finns inte) -> tbd. 2:an (RSA) -> placerad.
     expect(matchOf(state, 'M79').home.resolution).toBe('tbd');
     expect(matchOf(state, 'M73').home.teamId).toBe(id('RSA'));
+  });
+
+  it('räknar inte en ogiltig grupp-nyckel som tippad grupp (max 12, aldrig "13 av 12")', () => {
+    // Fullt tips för alla 12 grupper + en korrupt/legacy-nyckel ('Z', 'ABC') med
+    // ett komplett-SER-ut tips. Den giltiga räkningen är 12, de ogiltiga nycklarna
+    // får ALDRIG bidra (annars 13/14 av 12). Källa för giltiga grupp-id: GROUP_IDS.
+    const picks = fullTips();
+    picks.set('Z', { winnerCode: 'MEX', runnerUpCode: 'RSA' });
+    picks.set('ABC', { winnerCode: 'CAN', runnerUpCode: 'SUI' });
+    const state = deriveTipsBracket(picks, TEAMS);
+    expect(state.tippedGroupCount).toBe(12);
+  });
+
+  it('en ogiltig grupp-nyckel placerar inget lag (bara A..L har slots i trädet)', () => {
+    // En ogiltig nyckel kan inte motsvara någon slot i bracket-strukturen, så den
+    // får varken räknas eller placeras. Bara den giltiga gruppen A:s tips syns.
+    const picks = new Map<string, GroupTipPick>([
+      ['A', { winnerCode: 'MEX', runnerUpCode: 'RSA' }],
+      ['Z', { winnerCode: 'CAN', runnerUpCode: 'SUI' }],
+    ]);
+    const state = deriveTipsBracket(picks, TEAMS);
+    expect(state.tippedGroupCount).toBe(1); // bara grupp A, inte 'Z'
+    expect(matchOf(state, 'M79').home.teamId).toBe(id('MEX')); // 1:a grupp A placerad
   });
 
   it('muterar inte sina argument', () => {

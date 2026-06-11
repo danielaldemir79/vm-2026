@@ -1,10 +1,19 @@
 // React-hook som matar den SIMULERADE slutspelsbilden ur grupp-tipsen (T51, #88).
 //
-// Ansvar (tunt, en sak): läsa MINA grupp-tips (ur grupp-tips-storen) + lag-listan,
-// adaptera tipsen till deriveTipsBracket-formen och härleda bilden reaktivt. Exakt
-// samma härledd-state-mönster som useBracketData (T9): tipsen ändras -> useMemo
-// räknar om bilden, inget lagras dubbelt. Hooken skriver ALDRIG, den läser bara
-// tipsen och härleder en vy (de riktiga resultaten/facit rörs inte).
+// Ansvar (tunt, en sak): läsa MINA grupp-tips (ur grupp-tips-storen) + ta emot den
+// redan-laddade lag-/turneringsdatan, adaptera tipsen till deriveTipsBracket-formen
+// och härleda bilden reaktivt. Exakt samma härledd-state-mönster som useBracketData
+// (T9): tipsen ändras -> useMemo räknar om bilden, inget lagras dubbelt. Hooken
+// skriver ALDRIG, den läser bara tipsen och härleder en vy (de riktiga
+// resultaten/facit rörs inte).
+//
+// EN LADDNING (T51 Copilot-fynd): lag-/turneringsdatan (GroupPredictableData)
+// INJICERAS av anroparen i stället för att laddas här. GroupPredictionsView laddar
+// redan exakt samma data via useGroupPredictableData, så om vi laddade den IGEN
+// skulle det bli dubbla fetchar mot datakällan + en extra loading-cykel. Genom att
+// ta emot den redan-laddade datan sker EN laddning, och status/teams är samma
+// referens som värd-vyn redan har. Hooken behåller sitt fail-loud-kontrakt: den
+// härleder bara en bild när datan är 'ready', annars är bracket null (stale-skydd).
 //
 // IDENTITETS-RYMD vid seamen: grupp-tipsen bär winnerTeamId/runnerUpTeamId som
 // Team.CODE (versal "BRA", se group-predictions-api / team-code.ts). Vi skickar
@@ -12,13 +21,12 @@
 // (en sanning för den översättningen), så hooken behöver inte känna till rymden.
 //
 // MÅSTE renderas inuti en <GroupPredictionsProvider> (useGroupPredictionsStore
-// fail-loud:ar annars). Lag-listan tas via useGroupPredictableData (samma seam
-// grupp-tips-vyn redan använder, DRY).
+// fail-loud:ar annars), eftersom den läser mina tips ur storen.
 
 import { useMemo } from 'react';
 import type { Team } from '../../domain/types';
 import { useGroupPredictionsStore } from '../group-predictions/group-predictions-context';
-import { useGroupPredictableData } from '../group-predictions/use-group-predictable-data';
+import type { GroupPredictableData } from '../group-predictions/use-group-predictable-data';
 import { deriveTipsBracket, type GroupTipPick, type TipsBracketState } from './derive-tips-bracket';
 
 /** Det hooken exponerar till den simulerade slutspels-vyn. */
@@ -32,14 +40,17 @@ export interface TipsBracketData {
 }
 
 /**
- * Härled den simulerade slutspelsbilden ur mina grupp-tips + lag-listan.
+ * Härled den simulerade slutspelsbilden ur mina grupp-tips + den redan-laddade
+ * turneringsdatan.
  *
- * @param env Injicerbar env (testbarhet), default import.meta.env (vidare till
- *            lag-datat). Tipsen kommer ur storen (redan rum-/env-medveten).
+ * @param predictableData Den STATISKA turneringsdatan (grupper/lag/matcher + status)
+ *                        som värd-vyn (GroupPredictionsView) redan laddat via
+ *                        useGroupPredictableData. Injiceras hit så EN laddning sker
+ *                        (ingen dubbel fetch). Tipsen själva läses ur storen.
  */
-export function useTipsBracketData(env: ImportMetaEnv = import.meta.env): TipsBracketData {
+export function useTipsBracketData(predictableData: GroupPredictableData): TipsBracketData {
   const store = useGroupPredictionsStore();
-  const { status, teams } = useGroupPredictableData(env);
+  const { status, teams } = predictableData;
 
   // Adaptera mina grupp-tips (groupId -> GroupPrediction, code-bärande) till
   // deriveTipsBracket-formen (groupId -> 1:a/2:a som code). Vi behåller koderna
