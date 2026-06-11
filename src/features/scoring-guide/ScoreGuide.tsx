@@ -46,11 +46,21 @@ import {
 
 export interface ScoreGuideProps {
   /**
-   * Data-attribut-namnrymd (`data-score-guide-${surface}-*`), så de TVÅ mount-
-   * punkterna (tippning, topplista) får stabila, egna test-/styling-krokar utan
-   * att kollidera. Samma mönster som ExpandToggle:s `name`. Default 'tips'.
+   * Mount-yta-markör. Ligger som VÄRDE i de fasta data-attributen
+   * (`data-score-guide-open={surface}`, `-overlay`, `-dialog`, `-close`), så de TVÅ
+   * mount-punkterna (tippning, topplista) får stabila, egna test-/styling-krokar utan
+   * att kollidera. Används också (id-saniterad) i dialogens aria-id:n. Default 'tips'.
    */
   surface?: string;
+}
+
+/**
+ * Gör surface säkert som HTML-id-fragment: aria-labelledby/-describedby är
+ * space-separerade IDREF-listor, så ett surface med whitespace ("topplista v2")
+ * skulle annars peka på flera/ogiltiga id:n och dialogen tappa sitt accessible name.
+ */
+function toIdSafeSurface(surface: string): string {
+  return surface.replace(/[^A-Za-z0-9_-]/g, '-');
 }
 
 /**
@@ -169,8 +179,10 @@ function ScoreGuideDialog({
   onDialogKeyDown: (e: ReactKeyboardEvent<HTMLDivElement>) => void;
   motionEnabled: boolean;
 }) {
-  const headingId = `score-guide-rubrik-${surface}`;
-  const introId = `score-guide-intro-${surface}`;
+  // Id-saniterad form i alla aria-id:n (copilot R1): IDREF tål inte whitespace.
+  const idSurface = toIdSafeSurface(surface);
+  const headingId = `score-guide-rubrik-${idSurface}`;
+  const introId = `score-guide-intro-${idSurface}`;
   // Härled förklaringen ur konstanterna EN gång per öppning (rent, inga sidoeffekter).
   const sections = buildScoreExplainer();
 
@@ -278,7 +290,7 @@ function ScoreGuideDialog({
 
 /** En grupp regel-rader under en rubrik (matcherna, grupperna, slutspelet, mästaren). */
 function ScoreSection({ surface, section }: { surface: string; section: ScoreExplainerSection }) {
-  const headingId = `score-guide-${surface}-${section.id}`;
+  const headingId = `score-guide-${toIdSafeSurface(surface)}-${section.id}`;
   return (
     <section aria-labelledby={headingId} data-score-guide-section={section.id}>
       <h3

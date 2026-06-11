@@ -16,8 +16,10 @@ header (`PredictionsView`) OCH vid topplistan (`LeaderboardSummary`). Varför in
 till den": i en router-lös PWA blir en länk en scroll-/flik-navigering och ger en asymmetrisk
 upplevelse (förklaringen "bor" i en vy, den andra pekar dit). En delad komponent ger i stället EN
 sanning för texten (kan aldrig drifta mellan ytorna) och samma upplevelse på båda, samma KISS-val som
-"modal, inte routad vy" (T10). En `surface`-prop ger varje mount-punkt egna data-attribut-krokar
-(`data-score-guide-*-tips` / `-topplista`), samma mönster som ExpandToggle:s `name`.
+"modal, inte routad vy" (T10). En `surface`-prop ger varje mount-punkt egna test-/styling-krokar:
+fasta attributnamn med ytan som VÄRDE (`data-score-guide-open="tips"` respektive `"topplista"`,
+samma form för `-overlay`/`-dialog`/`-close`), och en id-saniterad form av `surface` används i
+dialogens aria-id:n (IDREF tål inte whitespace). Samma mönster som ExpandToggle:s `name`.
 
 **Talen HÄRLEDS ur konstanterna (HARD-krav, ingen hårdkodad dubblett):** `buildScoreExplainer`
 (`score-explainer-items.ts`) läser `PREDICTION_POINTS` (3/1), `GROUP_PREDICTION_POINTS` (3/2),
