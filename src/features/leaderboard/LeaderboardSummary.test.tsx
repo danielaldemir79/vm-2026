@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { LeaderboardSummary } from './LeaderboardSummary';
 import { LeaderboardStoreContext, type LeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
@@ -78,31 +78,29 @@ describe('LeaderboardSummary, egen-poäng-panel (ÖVERST)', () => {
   });
 });
 
-describe('LeaderboardSummary, "Så funkar poängen"-förklaring', () => {
-  it('förklarar match-poängen 3 / 1 / 0 i klartext', () => {
+// "Så funkar poängen" vid topplistan är nu den DELADE ScoreGuide:n (T34, #62), samma
+// komponent som vid tippningen, så den fulla förklaringen (match/grupp/slutspel/mästare
+// med tal ur konstanterna) testas EN gång i ScoreGuide.test.tsx. Här vaktar vi bara
+// integrationen: knappen finns, är nåbar oavsett egen rad, och öppnar dialogen.
+describe('LeaderboardSummary, "Så funkar poängen" (delad ScoreGuide)', () => {
+  it('visar ScoreGuide-knappen vid topplistan (surface "topplista")', () => {
     const { container } = renderView(store({ leaderboard: board, currentUserId: 'u3' }));
-    const legend = container.querySelector('[data-leaderboard-score-legend]');
-    expect(legend).not.toBeNull();
-    const text = (legend as HTMLElement).textContent ?? '';
-    expect(text).toContain('3 p');
-    expect(text).toContain('exakt resultat');
-    expect(text).toContain('1 p');
-    expect(text).toContain('rätt vinnare');
-    expect(text).toContain('0 p');
+    expect(container.querySelector('[data-leaderboard-score-guide]')).not.toBeNull();
+    const trigger = screen.getByRole('button', { name: /Så funkar poängen/i });
+    expect(trigger).toHaveAttribute('data-score-guide-open', 'topplista');
   });
 
-  it('NÄMNER att special-tips (gruppvinnare, VM-vinnare) finns/kommer', () => {
-    const { container } = renderView(store({ leaderboard: board, currentUserId: 'u3' }));
-    const legend = container.querySelector('[data-leaderboard-score-legend]');
-    const text = (legend as HTMLElement).textContent ?? '';
-    expect(text).toContain('gruppvinnare');
-    expect(text).toContain('VM-vinnare');
-  });
-
-  it('förklaringen visas även UTAN en känd egen rad (currentUserId null)', () => {
+  it('knappen finns även UTAN en känd egen rad (currentUserId null)', () => {
     // "Så funkar poängen" hör inte ihop med den egna raden, den ska finnas oavsett.
     const { container } = renderView(store({ leaderboard: board, currentUserId: null }));
     expect(container.querySelector('[data-leaderboard-self-summary]')).toBeNull();
-    expect(container.querySelector('[data-leaderboard-score-legend]')).not.toBeNull();
+    expect(container.querySelector('[data-leaderboard-score-guide]')).not.toBeNull();
+  });
+
+  it('knappen öppnar förklarings-dialogen', async () => {
+    renderView(store({ leaderboard: board, currentUserId: 'u3' }));
+    fireEvent.click(screen.getByRole('button', { name: /Så funkar poängen/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
   });
 });

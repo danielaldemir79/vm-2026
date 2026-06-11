@@ -5,6 +5,88 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T34/#62 (Så funkar poängen-UI) KLAR - PR #89 väntar på merge
+
+**Branch:** `feature/T34-poang-ui` @ HEAD `e876604`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/89 mot `develop` (Closes #62, state: OPEN)
+**Board:** issue #62 i "In Review" (satt av journalisten 2026-06-11). Dirigenten stänger issue #62 MANUELLT och flyttar kort #62 till Done EFTER merge.
+
+**Vad T34 levererade:**
+- `ScoreGuide`-komponent med konstant-härledd text (tal från `POINTS_EXACT`, `POINTS_WINNER`, `GROUP_*`, `ROUND_ADVANCE_POINTS`, `CHAMPION_PREDICTION_POINTS`) - ingen hårdkodad siffra som kan drifta
+- Mutations-vakt i test: mutera konstanten, verifiera att UI-texten förändras, återställ (F1-bevis äkta)
+- Ersatte T46:s `ScoreLegend` (hårdkodade/inaktuella siffror) med `ScoreGuide` i `PredictionsSummary` och `LeaderboardView`
+- Design-polering: tokens.css §19, premium-finish, verifierad live i 5 bredder x 2 teman med Playwright + pathToFileURL
+- Copilot R1: id-sanitering av `surface` i aria-id:n (`score-guide-${id}` -> alltid giltigt XML-id), sann JSDoc, komma-nit i copy
+- Regressionstest: +1 nytt test utöver mutations-vakten
+- `vm-board-self-summary` pre-existerande i LeaderboardView F2: avvisad med motivering
+
+**Commits:**
+- `75c3a74` - T34: "Så funkar poängen", delad förklaring vid tippning + topplista (#62)
+- `7f38cb9` - style(scoring-guide): premium-finish pa "Så funkar poängen" (#62)
+- `e876604` - T34: copilot R1 (id-sanitera surface i aria-id:n + sann JSDoc/decisions + komma-nit) (#62) - HEAD
+
+**Verifiering:** 1204 pass + 29 env-skip (hela sviten), lint/format/build rent. Lokal panel PASS (F1 mutations-vakt äkta-bevisad, F2 pre-existerande avvisad, F3 komma-nit åtgärdad). Copilot R1: 4 fynd alla åtgärdade, R2: 0 fynd, exit nådd.
+
+**Acceptanskriterier issue #62 (bockade av journalisten 2026-06-11):**
+- [x] AC#1: Synlig "Så funkar poängen"-förklaring vid tippningen, enkel och inbjudande (commit 75c3a74)
+- [x] AC#2: Samma förklaring nåbar vid topplistan (commit 75c3a74)
+- [x] AC#3: Talen hämtas från poäng-konstanterna, ingen hårdkodad siffer-dubblett (commit 75c3a74, mutations-vakt bevisar)
+- [x] AC#4: Inga poängtal ändrade, befintliga tester orörda gröna + nya UI-tester (1204 pass)
+- [x] AC#5: Bygger grönt, lint rent, reviewad, inga olösta findings (R2 = 0 fynd, exit nådd)
+
+**Viktig pin: modal-extraktion rule-of-three PASSERAD**
+ScoreGuide är 4:e handrullade a11y-dialogen (TeamProfilePanel / Onboarding / SettingsControl / ScoreGuide). Rule-of-three är passerad. Issue #56 (delad modal-primitiv) är motiverad som en riktig refaktor-task, flaggad av senior-dev och design-frontend.
+
+**PINNADE punkter (oförändrade, bärs framåt):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping, editor flippar LF->CRLF. Kort i Ready.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bärs framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready.
+- **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 handrullade dialoger). Kort i Ready, nu starkare motiverat.
+- **KA-F4-notering:** bundle ca 717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **BEFORDRAN 3 (senior-developer-mönstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Förekomst 3. Typ: agent-beteende -> senior-developers fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge väntar.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #89 (T34/#62, feature/T34-poang-ui) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 89 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #62 manuellt (`gh issue close 62`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #62 till Done på boarden.
+>
+> Om PR #89 REDAN mergad:
+> T34 klar. Nästa task i kön: **#63 (T35 - lås-tydlighet, gråmarkerat tippnings-lås + deadline-tydlighet)**.
+> Därefter: #88 (T51 slutspels-sim ur grupp-tipsen, Daniels feedback - se issue #88), sedan #18, #76, #19, #24, #64, D-kategorin.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready, starkare motiverat.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T50/#86 (Kortnamn trånga ytor) KLAR - PR #87 väntar på merge
 
 **Branch:** `feature/T50-bosnien-kortnamn` @ HEAD `8a70e81`

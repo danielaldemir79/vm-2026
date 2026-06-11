@@ -1,5 +1,5 @@
-// SAMMANFATTNING ÖVERST (T46, #79): aktuell användares totala poäng + placering, plus en
-// kort "Så funkar poängen"-förklaring. FUNKTIONELLT + a11y-lager (senior-dev); premium-
+// SAMMANFATTNING ÖVERST (T46, #79): aktuell användares totala poäng + placering, plus
+// "Så funkar poängen"-förklaringen. FUNKTIONELLT + a11y-lager (senior-dev); premium-
 // finish (design-frontend) ovanpå data-attribut-seamen, samma arbetsdelning som T15/T16/T42.
 //
 // VARFÖR ÖVERST (Daniels begäran, pre-share-blockerare): man ska se SINA EGNA poäng utan
@@ -7,11 +7,15 @@
 // HÄRLEDD vy av topplistan (deriveSelfSummary), ingen ny poäng-källa, så den kan aldrig
 // drifta från listan längre ner.
 //
-// "SÅ FUNKAR POÄNGEN": kort och tydlig (3p exakt / 1p rätt vinnare / 0 miss). Special-tips
-// (gruppvinnare, VM-vinnare) NÄMNS att de finns/kommer, men deras inmatnings-UI + full
-// poäng-wiring är en SEPARAT kommande task (T47), inte här.
+// "SÅ FUNKAR POÄNGEN" (T34, #62): den DELADE ScoreGuide-komponenten, samma som vid
+// tippningen, så förklaringen är EN sanning på båda ytorna och täcker hela den låsta
+// skalan (match 3/1, grupp 3/2, slutspel 1-5, VM-vinnare 20). Talen HÄRLEDS ur poäng-
+// konstanterna, aldrig hårdkodade här. Detta ERSATTE T46:s lokala, hårdkodade legend
+// som bara täckte match-poängen och felaktigt utlovade special-tips som "kommer" (de
+// är nu live, T49). Se docs/decisions.md T34.
 
 import { useMemo } from 'react';
+import { ScoreGuide } from '../scoring-guide';
 import { useLeaderboardStore } from './leaderboard-context';
 import { deriveSelfSummary } from './self-summary';
 
@@ -53,50 +57,16 @@ function SelfScorePanel() {
   );
 }
 
-/** En rad i poäng-förklaringen: poängvärde + vad som ger det. */
-function ScoreRule({ value, children }: { value: string; children: string }) {
-  return (
-    <li className="flex items-baseline gap-2">
-      <span className="shrink-0 font-display text-sm font-semibold tabular-nums">{value}</span>
-      <span className="text-fg-muted">{children}</span>
-    </li>
-  );
-}
-
-/**
- * "Så funkar poängen": kort förklaring av match-poängen (3/1/0). Poängvärdena är de
- * BEFINTLIGA (PREDICTION_POINTS, score.ts), de ändras inte här. Special-tipsen nämns att
- * de finns/kommer (T47), utan att utlova poängvärden som inte är wirade än.
- */
-function ScoreLegend() {
-  return (
-    <details data-leaderboard-score-legend="" className="vm-board-legend rounded-card px-4 py-3">
-      <summary className="cursor-pointer font-display text-sm font-semibold">
-        Så funkar poängen
-      </summary>
-      <div className="mt-3 flex flex-col gap-3 text-sm">
-        <div>
-          <p className="m-0 mb-1.5 font-medium">Resultat-tips, per match:</p>
-          <ul className="m-0 flex list-none flex-col gap-1 p-0">
-            <ScoreRule value="3 p">exakt resultat (rätt antal mål för båda lagen)</ScoreRule>
-            <ScoreRule value="1 p">rätt vinnare (rätt 1X2, men fel siffror)</ScoreRule>
-            <ScoreRule value="0 p">fel vinnare (miss)</ScoreRule>
-          </ul>
-        </div>
-        <p className="m-0 text-fg-muted">
-          Snart kommer även special-tips att ge poäng: gruppvinnare och VM-vinnare. Då kan du plocka
-          extrapoäng utöver matchresultaten.
-        </p>
-      </div>
-    </details>
-  );
-}
-
 /**
  * Sammanfattnings-blocket ÖVERST i topplista-sektionen: egen-poäng-panelen + "Så funkar
- * poängen". Renderas bara i ready-läge (samma gate som topplistan); panelen inuti gatar
- * dessutom på en känd egen rad. Utan rum / under laddning visar toppliste-vyn själv sina
- * lägen, så här renderar vi inget då.
+ * poängen"-knappen (delade ScoreGuide:n). Renderas bara i ready-läge (samma gate som
+ * topplistan); panelen inuti gatar dessutom på en känd egen rad. Utan rum / under laddning
+ * visar toppliste-vyn själv sina lägen, så här renderar vi inget då.
+ *
+ * VARFÖR ScoreGuide (inte en lokal legend, T34/#62): förklaringen ska vara IDENTISK med
+ * den vid tippningen och täcka hela den låsta skalan med tal som följer konstanterna.
+ * Den delade komponenten ger båda (EN sanning, mutations-säkrad), så den ersatte T46:s
+ * hårdkodade match-only-legend här.
  */
 export function LeaderboardSummary() {
   const store = useLeaderboardStore();
@@ -107,7 +77,9 @@ export function LeaderboardSummary() {
   return (
     <div data-leaderboard-summary="" className="mt-4 flex flex-col gap-3">
       <SelfScorePanel />
-      <ScoreLegend />
+      <div data-leaderboard-score-guide="">
+        <ScoreGuide surface="topplista" />
+      </div>
     </div>
   );
 }

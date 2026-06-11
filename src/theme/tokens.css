@@ -1360,3 +1360,145 @@ body {
     transparent
   );
 }
+
+/* =============================================================================
+   19. "SÅ FUNKAR POÄNGEN"-FÖRKLARINGEN, premium-finish (T34, issue #62).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET: förklaringen är den vänliga "så här funkar det"-rutan en kompis
+   öppnar innan hen tippar (Daniels huvudkrav, #62). Den ska kännas inbjudande
+   och tydlig, inte som en regel-paragraf. Samma "arena i kvällsljus"-familj som
+   resten av appen (SPEC §7), så förklaringen hör tydligt hemma i samma värld som
+   lag-profilen (§7), onboarding-strippen (§9) och slutspels-hjälten (§12), men i
+   sitt lugnaste, mest pedagogiska tonläge.
+
+   Tre rena dekor-lager (ingen bär läsbar text, samma disciplin som hero-syskonen):
+   - TRIGGER-KNAPPEN (.vm-score-trigger): en guld-tonad pill med ett litet
+     guld-frågesigill, som en vänlig "läs reglerna"-affordans. Hover lyfter den en
+     aning varmare (samma "ta upp kupongen"-känsla som .vm-coupon-card).
+   - HERO-BANDET (.vm-score-guide-hero): dialogens topp, en grön + guld arena-glow
+     mot surface-raised med ett pokal-emblem, exakt samma radial-glow-recept som
+     champion-hjälten (§12) och profil-hero:n (§7).
+   - POÄNG-BRICKAN (.vm-score-points): varje regels poäng som en STOLT solid guld-
+     bricka med mörk ink, den färg-oberoende solid-bricka-formen (T9/T11/T15/T16/T17).
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall + guld-på-tint-fällan, som
+   står 2 ggr i design-frontend-lessons): ALL läsbar text (rubrik, eyebrow, intro,
+   sektions-rubriker, regel-etiketter) står på den OPAKA surface/surface-raised-
+   fonden, ALDRIG på guld/grön-glow:en. POÄNG-TALEN står som mörk ink på en SOLID
+   guld-yta (--vm-coupon-ink på --vm-gold), aldrig som ljus guld-text på en tint,
+   så de undviker exakt den gold-on-tint-fälla som lessons-filen flaggat (det GAMLA
+   utseendet la guld-tint + fg-text; den nya solid-bricka-formen är AA-proven i hela
+   appen: --vm-coupon-ink på --vm-gold = 10.90:1 mörkt / 5.03:1 ljust, decisions.md
+   T15/T17-visuellt, DRY mot .vm-coupon-mine/.vm-reveal-actual). Glow-/emblem-/kant-
+   lagren bär ALDRIG text.
+
+   HERO-GLOW-ALFAN ÄR KONTRAST-LÅST (samma disciplin + samma värden som onboarding-
+   strippen §9 och profil-hero:n §7, som båda mätts): de TVÅ radialerna sitter i
+   MOTSATTA hörn (grön övre vänster 0% 0%, guld nedre höger 100% 100%) så de möts
+   aldrig på full peak. Grön 0.16 / guld 0.10 är de redan AA-mätta alforna ur §9
+   (samma surface-raised-fond, samma tokens), så ingen text i bandet kan sänka
+   kontrasten under AA, även rakt på en glow-topp (texten ligger ändå på opak
+   surface under bandet, glow:en är ren stämning). En default sätts inte här, inga
+   dynamiska hue:er används (förklaringen är lagsneutral, till skillnad från §7).
+   -------------------------------------------------------------------------- */
+
+/* TRIGGER-KNAPPEN: en guld-tonad pill (samma kupong-/hejarklacks-värme som tips-
+   världen) med ett litet frågesigill. En hårfin guld-kant + en mjuk hover-lyft gör
+   den till en inbjudande "läs reglerna"-affordans, inte en grå systemknapp. Text +
+   sigill-ink bär full kontrast (mätt i app:ens befintliga guld-roller); fonden är
+   ren dekor. Hover/övergång gatad på reduced-motion via index.css svep-regeln. */
+.vm-score-trigger {
+  background-color: color-mix(in srgb, var(--vm-gold) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--vm-gold) 30%, var(--color-border));
+  box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 18%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-score-trigger {
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+}
+
+.vm-score-trigger:hover {
+  background-color: color-mix(in srgb, var(--vm-gold) 15%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--vm-gold) 45%, var(--color-border));
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 30%, transparent),
+    0 4px 14px -6px color-mix(in srgb, var(--vm-gold) 45%, transparent);
+}
+
+/* FRÅGE-SIGILLET i triggern: ett pyttelitet guld-frågetecken-emblem (solid guld-yta
+   + mörk ink, den färg-oberoende solid-bricka-formen). Ger knappen ett tydligt
+   "här finns en förklaring"-ankare utan en bildasset (noll nätverk). */
+.vm-score-trigger-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.35),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+
+/* HERO-BANDET: dialogens topp som en lugn grön + guld arena-glow mot surface-raised
+   (samma radial-recept + samma AA-mätta alfor som onboarding-strippen §9). Det ÖVRE
+   ljuset är turneringens pitch-grön (mästerskaps-identiteten), det NEDRE varm guld
+   (hejarklacks-tonen). Ett mjukt ljus-svep (.vm-hero-sheen, index.css) kan väva in
+   över bandet; det stannar vid reducerad rörelse (WCAG 2.3.3). Bär ingen text. */
+.vm-score-guide-hero {
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(120% 140% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 60%),
+    radial-gradient(
+      100% 140% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 10%, transparent),
+      transparent 58%
+    );
+}
+
+/* POKAL-EMBLEMET i hero:n: en rund guld-bricka som bär en liten pokal/poäng-glyf
+   (solid guld-yta + mörk ink, samma form som .vm-champion-trophy/medaljerna, DRY).
+   Mjuk inre högdager + yttre ring ger relief utan en bild. Glyfen läses i båda
+   teman (ink på opak guld, aldrig guld-text på tint). */
+.vm-score-guide-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.4),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 2px 8px -2px color-mix(in srgb, var(--vm-gold) 60%, transparent);
+}
+
+/* POÄNG-BRICKAN per regel-rad: poäng-talet som en STOLT solid guld-bricka med mörk
+   ink (samma färg-oberoende solid-bricka-form som .vm-coupon-mine/.vm-reveal-actual,
+   AA-proven: --vm-coupon-ink på --vm-gold = 10.90:1 mörkt / 5.03:1 ljust). Detta
+   ERSÄTTER det gamla guld-tint + fg-text-utseendet som föll i exakt den gold-on-tint-
+   fälla design-frontend-lessons flaggat 2 ggr. tabular-nums (i markup) håller talen
+   stadiga. Mjuk inre högdager ger brickan samma präglade känsla som medaljerna. */
+.vm-score-points {
+  display: inline-flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.32),
+    0 1px 2px rgb(0 0 0 / 0.18);
+}
