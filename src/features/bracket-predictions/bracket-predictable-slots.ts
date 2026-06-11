@@ -12,15 +12,17 @@
 //     "lagen avgörs av tidigare resultat" och slotten är otippbar , samma princip
 //     som T9:s bothTeamsKnown och T15:s predictable-matches (gissa aldrig laget).
 //   * EN champion-slot (slot_id = 'champion', CHAMPION_SLOT_ID): vem vinner HELA VM.
-//     Tippas FÖRE turneringen bland ALLA 48 lagen (KISS, dokumenterat val nedan),
-//     låst vid turneringens FÖRSTA match (g-A-1).
+//     Tippas bland ALLA 48 lagen (KISS, dokumenterat val nedan). Deadline sedan T53:
+//     den FÖRLÄNGDA tiden, se nästa punkt.
 //
-//   * DEADLINE = slottens egen avspark (M73..M104:s kickoff), champion = g-A-1:s
-//     kickoff. EN sanning för ankaret: vi återanvänder `bracketDeadlineMatchId`
-//     (bracket-predictions-api), som SPEGLAR RLS-helpern bracket_deadline_kickoff
-//     EXAKT, och slår upp den matchens kickoff i matchplanen , ingen dubblerad tid.
-//     LÅST = now >= den kickoffen. Server-RLS är det riktiga låset; här härleds det
-//     BARA för VISNINGEN. Klockan är injicerbar (now), default nuet.
+//   * DEADLINE = slottens egen avspark (M73..M104:s kickoff). Champion (T53, #95):
+//     GREATEST(g-A-1:s kickoff, den fasta förlängda söndagstiden) via
+//     `applyExtendedDeadline` , samma regel som RLS-helpern bracket_deadline_kickoff
+//     efter T53-migrationen. EN sanning för ankaret: `bracketDeadlineMatchId`
+//     (bracket-predictions-api) ger ankar-matchen, kickoffen slås upp i matchplanen,
+//     och förlängningen appliceras BARA på champion-grenen , ingen dubblerad tid.
+//     LÅST = now >= den härledda deadlinen. Server-RLS är det riktiga låset; här
+//     härleds det BARA för VISNINGEN. Klockan är injicerbar (now), default nuet.
 //
 // LAG-IDENTITET (HARD, T16 F1-fällan , se docs/decisions.md): det HÄRLEDDA facit
 // (deriveBracket) bär Team.id (GEMEN "bra"), men ett bracket-tips LAGRAS som
@@ -81,16 +83,17 @@ export interface PredictableSlotRound {
  *
  * URVAL = ALLA 48 lagen (KISS, dokumenterat val, docs/decisions.md T16b): innan
  * gruppspelet vet ingen vilka som tar sig långt, så ett fritt val bland alla lag är
- * det enkla, rättvisa momentet , inte en konstruerad delmängd. Låst vid g-A-1.
+ * det enkla, rättvisa momentet , inte en konstruerad delmängd. Låst vid den
+ * förlängda champion-deadlinen (T53: GREATEST(g-A-1, fasta söndagstiden)).
  */
 export interface ChampionSlot {
   /** Alltid CHAMPION_SLOT_ID ('champion'). */
   slotId: string;
   /** Alla lag att välja VM-vinnare bland (code-val), i lag-listans ordning. */
   teams: SlotTeamOption[];
-  /** true om turneringen har börjat (now >= g-A-1): champion-tipset låst. */
+  /** true när champion-deadlinen passerats (T53: GREATEST(g-A-1, förlängd tid)). */
   locked: boolean;
-  /** Champion-deadline (turneringsstart, g-A-1:s avspark), ISO. null om matchen saknas. */
+  /** Champion-deadline (T53-förlängd, se modul-doc), ISO. null om ankar-matchen saknas. */
   deadlineIso: string | null;
 }
 
