@@ -11,6 +11,7 @@
 
 import { createContext, useContext } from 'react';
 import type { RoomMatchResult, RoomMember, RoomResultInput, RoomSummary } from '../../data/rooms';
+import type { CopyReport } from '../../data/predictions';
 
 /** Laddningstillstånd för rums-lagret (samma vokabulär som results-storen). */
 export type RoomsStatus = 'loading' | 'ready' | 'error';
@@ -48,6 +49,14 @@ export interface RoomsStore {
   refresh: () => Promise<void>;
   /** Spara ett delat matchresultat i det aktiva rummet. */
   saveResult: (input: RoomResultInput) => Promise<void>;
+  /**
+   * Kopiera MINA tips (match + grupp + bracket) FRÅN ett annat rum jag är med i TILL
+   * det AKTIVA rummet (T52, #91). Fyller bara tomma tips i målet (skriver aldrig över),
+   * hoppar låsta, och returnerar en ärlig rapport (X kopierade, Y låsta, Z redan tippade,
+   * ev. fel). Kastar vid en LÄSmiss (kan inte kopiera blint); enskilda skrivfel fångas
+   * per item och stoppar inte resten.
+   */
+  copyMyTips: (sourceRoomId: string) => Promise<CopyReport>;
 }
 
 /**

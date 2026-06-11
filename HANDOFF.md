@@ -5,6 +5,93 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T52/#91 (Kopiera mina tips) KLAR - PR #94 väntar på merge
+
+**Branch:** `feature/T52-kopiera-tips` @ HEAD `3b8a3cc`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/94 mot `develop` (Closes #91, state: OPEN)
+**Board:** issue #91 i "In Review" (satt av journalisten 2026-06-11). Dirigenten stanger issue #91 MANUELLT och flyttar kort #91 till Done EFTER merge.
+
+**Vad T52 levererade:**
+- `copy-predictions`-engine: lasta alla egna tips fran kallrummet, klassificera matchtyp (match/grupp/bracket/champion), pre-klassificera las med SAMMA avspark-ankare som RLS (verifierat rad-for-rad mot t15/t16-migrationerna), skriv bara TOMMA tips i malrummet (skriver aldrig over befintliga - dokumenterat beslut i decisions.md)
+- Kopiera mina tips-knapp i rum-panelen: valj kallrum ur egna rum, starta kopiering
+- Rapport-UI: tre sarbarhets-toner (fel vinner alltid fargsignalen - F1 fran lokal panel atgardad, 4 nya ton-tester), AA-matt, reduced motion
+- Delfels-robust: ett fel stoppar inte resten, rapporten speglar exakt utfall (X kopierade, Y lasta, Z redan tippade, N kunde inte kopieras)
+- 36 nya tester (32 senior-dev + 4 ton-tester via reviewer/copilot), acyklisk import, rum-bytes-race med ref-guard
+- Totalt 1294 pass + 17 env-skip (141 filer) efter alla fixar
+
+**Commits (aldst till nyaste):**
+- `6d1b838` - T52: engine + las-harledning + rapport + kontroll, 32 tester, las-ankare verifierade mot t15/t16-RLS (#91)
+- `ff365a0` - T52: design, premium-finish, AA ratt-attribuerat (#91)
+- `a0a5c0e` - T52: reviewer F1, fel vinner fargsignalen + 4 ton-tester (#91)
+- `4c948e2` - T52: copilot R1, acyklisk import, rum-bytes-race med ref-guard + 3 tester, villkorlig alert/status (#91)
+- `3b8a3cc` - T52: copilot R2, kommentar-sanning (#91) - HEAD
+
+**Verifiering:** 1294 pass + 17 env-skip (141 filer), lint/format/build rent. Lokal panel: PASS med pinnat F1 atgardad samma varv. Copilot: R1 5 fynd atgardade, R2 1 trivialt atgardade, exit.
+
+**Acceptanskriterier issue #91 (bockade av journalisten 2026-06-11):**
+- [x] AC#1: Anvandare med tips i rum A kan kopiera dem till rum B via tydlig UI-atgard (commit 6d1b838 + ff365a0)
+- [x] AC#2: Bara egna tips, las respekteras, resultatet rapporteras arligt (commit 6d1b838 + a0a5c0e)
+- [x] AC#3: Beteende vid befintliga tips dokumenterat och testat - fyller bara tomma, beslut i decisions.md (commit 6d1b838)
+- [x] AC#4: Tester (inkl. las-granser + fel-vagar), gront bygge/lint, reviewad (1294 pass, copilot R2 exit)
+
+**Ny info fran Daniel (kvaells-feedback) - paverkar NAESTA tasks:**
+- **#95 (T53 - NAESTA task direkt efter merge):** grupp- + champion-tips forlangda till FAST deadline sondag 2026-06-14 23:59 svensk tid (2026-06-14T21:59:00Z). RLS-migration + klient-harledning i samma sanning. RLS-bevis med riktiga sessioner. Las issue #95 noga.
+- **#96 (T55 - EFTER T53, akut bugg):** andras tips syns inte efter avspark. ROTORSAK UTREDD: (1) reveal kraver match finished i stallet for last (reveal.ts/derive-facit.ts), (2) ingen re-fetch nar match passerar avspark (LeaderboardProvider deps), (3) avslojandet bara i topplist-sektionen. RLS frikand med live-bevis. Fix-plan i issue #96.
+- **#93 (T54 - efter T55):** glasklar kom-igang/installations-guide per plattform.
+- **Ko darefter:** #18 -> #76 -> #19 -> #24 -> #64 -> D-kategorin.
+- **Kryss-fraaga besvarad:** 1p for ratt kryss fungerar redan (outcomeOf/pointTypeOf verifierat). Ordvals-fix noterad pa #69 ("Ratt vinnare +1" bor vara utfalls-neutral).
+
+**PINNADE punkter (oforandrade, bars framat):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping, editor flippar LF->CRLF. Kort i Ready.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stangt i T17, bars framat som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshallare tills #35 fyller med verifierad per-match-kalla.
+- **FNV-hash:** 2 anvandningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 anvandningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-ko.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready.
+- **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 handrullade dialoger). Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lagg till manualChunks om LCP-problem uppstar.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behover Daniel"-ko (oforandrad):**
+- Push-notiser T22: kraver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-monster):** `uttommande-test-vaktar-svagare-invariant` Forekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Vantar Daniels godkannande.
+- **BEFORDRAN 2 (journalist-monster):** `pastar-att-filer-saknas-utan-att-lista-dem` Forekomst 3. Typ: agent-beteende -> journalistens fil. Vantar Daniels godkannande.
+- **BEFORDRAN 3 (senior-developer-monster):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Forekomst 3. Typ: agent-beteende -> senior-developers fil. Vantar Daniels godkannande.
+- **IMPROVEMENTS-kandidat:** reviewerns forslag - commit-msg-git-hook som scannar svenska diakritik-substitut (fil-innehalls-vakten fangar inte commit-meddelanden, F3 slank igenom just dar). Pipeline-andring = kraver Daniels godkannande. Notera for dirigenten att skriva i `C:/Repo/agent-kit/IMPROVEMENTS.md`.
+- **FIFA-juni-ranking:** aprilutgavan 2026 anvands. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: andra rank-varden + `npm run gen:team-profiles`.
+- **Release-gransen:** develop -> main + release-cleanup-skillen vantar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge vantar.
+
+**FORTSATTNINGS-PROMPT (autonom ko):**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #94 (T52/#91, feature/T52-kopiera-tips) ANNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 94 --merge --repo danielaldemir79/vm-2026`.
+> Stang issue #91 manuellt (`gh issue close 91`) - auto-close funkar inte mot develop nar default-branch ar main.
+> Flytta kort #91 till Done pa boarden (nu i "In Review", projekt 2).
+>
+> Om PR #94 REDAN mergad:
+> T52 klar. Naesta task i kon: **#95 (T53 - grupp/champion-deadline forlangd till sondag 14 juni 23:59, las issue #95 noga)**.
+> Darefter: #96 (T55 - andras tips syns inte efter avspark, rotorsak utredd, las issue #96), #93 (T54 installations-guide), sedan #18 -> #76 -> #19 -> #24 -> #64 -> D-kategorin.
+>
+> Bar framat (alla tasks):
+> - **#35 (arena/stad):** venue = platshallare.
+> - **FNV-hash:** konsolidera vid 3:e anvandning.
+> - **Stegnings-dubblett:** extrahera vid 3:e anvandning.
+> - **#48 (demo-chip a11y):** kort i Ready.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behover Daniel"-ko:** push-notiser (T22), 3 befordringar (Forekomst 3), IMPROVEMENTS-kandidat (diakritik-commit-hook), FIFA-juni-ranking, release-gransen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbaddning:** SKIPPAD, stangd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vagen till slutet (Daniel ger go for release-gransen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T51/#88 (Slutspelet ur dina tips) KLAR - PR #92 väntar på merge
 
 **Branch:** `feature/T51-slutspel-ur-tips` @ HEAD `09e14ca`

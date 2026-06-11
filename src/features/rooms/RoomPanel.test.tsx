@@ -31,6 +31,15 @@ function stubStore(overrides: Partial<RoomsStore> = {}): RoomsStore {
     leaveRoom: async () => {},
     refresh: async () => {},
     saveResult: async () => {},
+    copyMyTips: async () => ({
+      items: [],
+      total: { copied: 0, skippedLocked: 0, skippedExisting: 0, failed: 0 },
+      byCategory: {
+        match: { copied: 0, skippedLocked: 0, skippedExisting: 0, failed: 0 },
+        group: { copied: 0, skippedLocked: 0, skippedExisting: 0, failed: 0 },
+        bracket: { copied: 0, skippedLocked: 0, skippedExisting: 0, failed: 0 },
+      },
+    }),
     ...overrides,
   };
 }

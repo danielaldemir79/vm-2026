@@ -9,3 +9,6 @@ export {
   type RoomsStatus,
   type RoomsSync,
 } from './rooms-context';
+// T52 (#91): kopiera mina tips mellan rum (UI-kontroll + ren rapport-sammanfattning).
+export { CopyTipsControl } from './CopyTipsControl';
+export { summarizeCopyReport } from './copy-report-summary';
