@@ -160,3 +160,127 @@
     var(--vm-shadow-card),
     inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 16%, transparent);
 }
+
+/* -----------------------------------------------------------------------------
+   7. KOPIERA-MINA-TIPS-KONTROLLEN (T52, #91). [design-frontend premium-finish]
+
+   Kontrollen är en EGEN underzon längst ner i biljett-kroppen ("Kopiera dina tips
+   hit"). Den avgränsas med en hårfin guld topp-list (samma kvällsljus-detalj som
+   formulären/biljetten ovan), så den känns som en naturlig del av rummet utan att
+   konkurrera med hero:n. Inbjudande, inte skrikig.
+
+   KONTRAST-VAKT (WCAG AA, UPPMÄTT mot tokens per tema, decisions.md T52, sRGB-
+   luminans, lessons aa-kontrast: mät VARJE tema separat, kasta inte om etiketterna):
+   ALL läsbar besked-text + glyf står på en OPAK yta (surface + en låg-alfa ton-tint
+   över surface). De tre utfalls-tonerna är mätta mot surface i BÅDA teman, attribuerade
+   mot tokenens faktiska värde i respektive tema (ljust: success #0f766e, danger #c4302c;
+   mörkt: success #5ad1a0, danger #fb7287). Glyfen + texten bär betydelsen (färg-oberoende),
+   tonen är bara förstärkning. Knappens text är fg (full kontrast) på en accent-tint;
+   accent-tonen lever bara i yta + kant (samma .vm-rooms-action-recept som kopiera/dela).
+   -------------------------------------------------------------------------- */
+
+/* Underzonens topp-list: en svag guld-skiftning i border-tonen (kvällsljus), så
+   gränsen mellan "Lämna rummet"-raden och kopiera-zonen läses som en mjuk avdelare,
+   inte en hård linje. Ren dekor (kant), bär ingen text. */
+.vm-rooms-copy-tips {
+  border-top-color: color-mix(in srgb, var(--vm-gold) 22%, var(--color-border));
+}
+
+/* Heading-glyfen ("⧉" kopiera-in): en liten accent-tonad bricka, samma accent-
+   familj som action-knapparna. Dekor (aria-hidden i TSX). */
+.vm-rooms-copy-mark {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  color: color-mix(in srgb, var(--color-accent) 60%, var(--color-fg));
+}
+
+/* Källrums-knappen ärver .vm-rooms-action (accent-tint yta + kant + hover-lyft).
+   Här bara den lilla extra finishen: medan ett kopp PÅGÅR (aria-busy) håller vi
+   knappen still (ingen hover-lyft) så den inte ser klickbar ut. */
+.vm-rooms-copy-btn[aria-busy='true'] {
+  box-shadow: none;
+}
+
+.vm-rooms-copy-btn[aria-busy='true']:hover {
+  /* Ingen hover-uppvärmning medan det pågår (knappen är disabled ändå). */
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  box-shadow: none;
+}
+
+/* Pågår-spinnern: en lugn ring som roterar (accent-tonad), samma kvällsljus-accent.
+   Byggd ur en konisk gradient så den inte kräver någon asset. Stannar helt vid
+   prefers-reduced-motion (index.css-grinden nollar animationen; vi nollar den
+   explicit nedan så ringen blir en stilla, hel accent-prick i stället för en
+   halv-roterad frusen båge). */
+.vm-rooms-copy-spinner {
+  border-radius: var(--radius-pill);
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    color-mix(in srgb, var(--color-accent) 70%, transparent) 300deg,
+    var(--color-accent) 360deg
+  );
+  /* Mask till en RING (hål i mitten) så det läses som en spinner, inte en tårta. */
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 0);
+  animation: vm-rooms-copy-spin 0.7s linear infinite;
+}
+
+@keyframes vm-rooms-copy-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Ingen rotation vid reducerad rörelse: ringen blir en stilla, hel accent-prick
+     (en lugn "pågår"-markör) i stället för en frusen halv-roterad båge. */
+  .vm-rooms-copy-spinner {
+    animation: none !important;
+    background: var(--color-accent);
+  }
+}
+
+/* RESULTAT-BESKEDET, tre skiljbara toner (taskens punkt 2). Tonen kommer ur
+   rapportens FAKTISKA siffror (data-result-tone i TSX), glyfen + texten bär
+   betydelsen, tonen är förstärkning. Default (ingen tint) = neutralt; tonerna
+   nedan lägger en LÅG-alfa ton-tint + en matchande glyf-färg. Alla AA-mätta. */
+.vm-rooms-copy-result {
+  background-color: color-mix(in srgb, var(--color-fg) 6%, var(--color-surface));
+  color: var(--color-fg-muted);
+}
+
+.vm-rooms-copy-result-glyph {
+  color: var(--color-fg-muted);
+}
+
+/* POSITIVT (något kopierades): en lugn success-ton. Text = fg (full kontrast),
+   glyf = success-tonen (dark 6.97:1 / light 4.63:1 på success-12%-tinten, mätt).
+   "Lugn bekräftelse", inte konfetti. */
+.vm-rooms-copy-result[data-result-tone='positive'] {
+  background-color: color-mix(in srgb, var(--color-success) 12%, var(--color-surface));
+  color: var(--color-fg);
+}
+
+.vm-rooms-copy-result[data-result-tone='positive'] .vm-rooms-copy-result-glyph {
+  color: var(--color-success);
+}
+
+/* NEUTRALT (inget kopierades men inget gick fel , allt låst/redan tippat eller tomt):
+   en dämpad info-ton, INTE ett fel. Text = fg-muted på en svag neutral fg-tint
+   (dark 6.42:1 / light 5.78:1, mätt). Ingen alarmism, bara ett sakligt besked. */
+.vm-rooms-copy-result[data-result-tone='neutral'] {
+  background-color: color-mix(in srgb, var(--color-fg) 6%, var(--color-surface));
+  color: var(--color-fg-muted);
+}
+
+/* FEL (en LÄSmiss kastade, fail-loud): danger-ton, samma fel-recept som RoomPanel:s
+   notis. Text + glyf = danger (dark 5.61:1 / light 4.81:1 på danger-9%-tinten, mätt). */
+.vm-rooms-copy-result[data-result-tone='negative'] {
+  background-color: color-mix(in srgb, var(--color-danger) 9%, transparent);
+  color: var(--color-danger);
+}
+
+.vm-rooms-copy-result[data-result-tone='negative'] .vm-rooms-copy-result-glyph {
+  color: var(--color-danger);
+}
