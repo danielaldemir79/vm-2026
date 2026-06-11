@@ -5,6 +5,75 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T38 (#67): rum-persistens, senast valda rummet återställs över sidladdning
+
+**Beslut (persistens-modell):** Det AKTIVA rummets id persistas i localStorage under nyckeln
+`vm2026-active-room` (samma `vm2026-`-prefix som tema + app-settings), och återställs vid app-mount.
+Multi-rum: bara ETT id lagras, det SENAST valda (skapa / gå-med / välj skriver alltid över), så det
+är det rummet som återställs nästa gång. Persistens-primitiven bor i `active-room-storage.ts` och
+bygger på `safe-storage` (T13), så blockerad/kastande storage (privat läge, sandbox) aldrig kraschar
+appen, persistensen hoppas bara över.
+
+**Återställnings-regel (verifiera, gissa aldrig):** vid mount läses det sparade id:t och VERIFIERAS
+mot `listMyRooms` (rooms-api). Bara om id:t fortfarande finns bland mina rum (rummet finns OCH jag är
+medlem) väljs det. Finns det inte (rummet borttaget, eller jag har lämnat på en annan enhet) faller vi
+RENT till no-room och RENSAR det inaktuella id:t. Att lämna det aktiva rummet rensar också id:t.
+Återställningen tar samma epoch-token (`loadTokenRef`) som övriga laddningar, så ett manuellt rumsbyte
+under laddningen alltid vinner (stale-vakten från T14 KA-F2 bevaras).
+
+**Varför:** utan persistens tappade appen vilket rum man stod i vid sidladdning, så efter en
+uppdatering stod man i INGET rum och de delade inmatningarna syntes inte (de fanns kvar i molnet, men
+man var inte i rummet). Kritisk UX-bug före delning. Auto-val efter skapa/gå-med fanns redan (T14),
+men valet persisterades inte; nu gör det det.
+
+**T38-visuellt (upphovs-signaturen + LIVE-bevis för persistensen, design-frontend):**
+
+*Signaturen (footerns avsändarrad).* Daniels stolta lilla avsändarrad i "arena i kvällsljus"-
+estetiken: ett "DA"-monogram-SIGILL (liten rund accent-bricka med mörk/vit ink = den färg-oberoende
+solid-bricka-formen, samma recept som DU-brickan/primärknappen) + en hårfin accent-tick som diskret
+separator, sen "Made by" dämpat (fg-muted) och NAMNET "Daniel Aldemir" i full fg/display-vikt så det
+läses stolt, inte som en eftertanke. Diskret men närvarande, aldrig skrikig. Monogrammet är
+aria-hidden (ren dekor) så skärmläsaren läser den rena meningen "Made by Daniel Aldemir" (även
+`title`-attribut). Stylingen bor i `tokens.css` §18 (`.vm-signature-seal`, `.vm-signature-tick`).
+
+*Kontrast (UPPMÄTT, scripts/contrast-t38.mjs, canvas-komposit, VÄRSTA basytan = sidans FOND --vm-bg
+eftersom footern står direkt i <main>, inte i en Panel; BÅDA teman):*
+- "Made by"-prefixet (--vm-fg-muted, FULL opacitet): 8.39:1 mörkt / 5.92:1 ljust. AA-säkert.
+- Namnet "Daniel Aldemir" (--vm-fg, full): 17.04:1 mörkt / 16.25:1 ljust.
+- Monogram "DA" (accent-fg-ink på SOLID accent-bricka): 10.85:1 mörkt / 5.40:1 ljust.
+- Tick:en bär ingen text (ren dekor, aria-hidden). Alla text-ytor >= 4.5:1 (normal text).
+
+*FYND (a11y-bug i den ursprungliga signatur-stylingen, åtgärdad):* senior-devs funktionella bas
+satte `text-fg-muted/80` (80% opacitet PÅ fg-muted). Uppmätt: det faller till 3.83:1 i LJUST tema =
+UNDER AA, exakt token-som-text-med-opacitet-fällan (lessons-familjen aa-kontrast-...-varsta-fall: en
+token som redan ligger nära tröskeln tippar under när man lägger opacitet på den, och bara i ETT
+tema). Design-frontend bytte till full opacitet på fg-muted för "Made by" + full fg för namnet, så
+raden klarar AA i båda teman med marginal. Verifierad i browsern (computed color `rgb(156,178,166)` =
+#9cb2a6 full opacitet i mörkt, `rgb(79,98,88)` = #4f6258 i ljust).
+
+*LIVE-VERIFIERING av rum-persistensen (bevisad i browsern, inte bara enhetstest).* Dev-server i
+LIVE-läge (lokal `.env.local` med produktionens Supabase-URL + anon-nyckel, raderad efteråt; INTE
+committad) + Playwright mot en isolerad anonym testidentitet (INTE Daniels rum ewrmdt). Simulerat
+exakt taskens scenario:
+1. Skapade rum "DESIGN-TEST rum-persistens" (kod vh65f2). Direkt efter skapa: rummet AKTIVT,
+   MEDLEMMAR (1) (skaparen är DB-medlem, INTE members=0), och `localStorage['vm2026-active-room']`
+   satt till rummets id.
+2. LADDADE OM sidan (full `page.goto`). Efter omladdning + rooms-load: rummet fortfarande AKTIVT
+   ("Aktivt rum: DESIGN-TEST rum-persistens"), MEDLEMMAR (1), samma id i localStorage. Detta är
+   precis buggen som fixen löser: FÖRE fixen hamnade man i INGET rum (members=0) efter en refresh.
+3. Negativ väg (verifiera-gissa-aldrig-grenen): lämnade rummet -> localStorage-id:t RENSAT (null),
+   ingen "AKTIVT", rummet borta ur MINA RUM. Persistensens hela livscykel (skriv vid val, återställ
+   vid mount mot listMyRooms, rensa vid lämna) bevisad live.
+
+*Responsivitet + a11y + reduced-motion (verifierat live):* signaturen är en enkel flex-rad utan
+animation. 280px (vikbar cover): ingen horisontell scroll (docScrollWidth 265 < 280), sigillet en
+crisp 20x20px disc, raden fits i viewport. 1440px: ingen horisontell scroll, renderar rent. Seal +
+tick har `animationName: none` (inget att nolla för reduced-motion; tick:en är aria-hidden text-lös
+dekor). Båda teman verifierade (computed colors matchar token-värdena ovan).
+
+*Städning:* DESIGN-TEST-rummet RADERAT ur produktion efter testet (medlemslöst, exakt id-villkorat
+DELETE), verifierat: 0 DESIGN-TEST-rum kvar, Daniels rum ewrmdt orört. Inget för dirigenten att städa.
+
 ## 2026-06-11 , T17 (#17, Copilot C1+C2): slutspels-matchtips poängsätts + sr-only-interpunktion
 
 **C1 (korrekthetsbug, källmedveten fix):** `deriveMatchFacit` (derive-facit.ts) filtrerade på
