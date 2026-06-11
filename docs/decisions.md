@@ -5,6 +5,49 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T16b (#59): bracket-/slutspels-tips-VYN (tippbarhet, deadline, champion-urval)
+
+**Kontext:** T16 byggde HELA datakärnan (bracket_predictions schema/RLS/API + bonus-score +
+`TeamCode`). T16b bygger BARA UI:t + provider + tester ovanpå den, spegel av T16:s grupp-tips-
+feature (Provider/View/Form/Section/context + ren urvalslogik), med samma epoch-vakt/stale-save-
+vakt/deadline-tick-rigor. Ny feature: `src/features/bracket-predictions/`. Tre modell-/UI-beslut,
+alla med samma anti-fusk-/"gissa aldrig laget"-anda som T16:
+
+**1. TIPPBARHET PER SLOT (källmedvetet, gissas inte):** en slutspels-slot (M73..M104) är TIPPBAR
+först när BÅDA dess lag är KÄNDA (T9:s `deriveBracket` ger `resolution === 'resolved'` + `teamId`
+på home OCH away). Innan dess visas "Lagen avgörs av tidigare resultat" och slotten är otippbar.
+Samma princip som T15:s `predictable-matches` (`bothTeamsKnown`) och T9:s slot-resolver, vi tippar
+aldrig ett lag som inte är fastställt. Champion-slotten är ALLTID tippbar (alla 48 lag kända före
+start). **Källa:** T9 derive-bracket.ts (slot-resolution-modellen) + decisions.md T16 §2.
+
+**2. DEADLINE-MODELL (EN sanning, speglar RLS):** per-slot-lås = slottens EGEN avspark (M73..M104:s
+kickoff), champion-lås = turneringsstart (g-A-1:s kickoff). Klient-vyn slår upp ankaret via den
+BEFINTLIGA `bracketDeadlineMatchId` (bracket-predictions-api), som speglar RLS-helpern
+`bracket_deadline_kickoff` EXAKT, sen slår vi upp den matchens kickoff i matchplanen, ingen
+dubblerad tid. LÅST = `now >= kickoff`, härlett BARA för visningen (server-RLS är det riktiga
+låset). FAIL-SAFE: saknas ankar-matchen (oväntat) behandlas slotten som låst (samma riktning som
+T16 §4:s NULL-deadline-fail-safe). Minut-tick (useDeadlineTick, T15 C1) så ett lås flippar utan
+omladdning. **Källa:** `bracket-predictions-api.ts` + decisions.md T16 §4.
+
+**3. CHAMPION-URVAL = ALLA 48 LAGEN (KISS, dokumenterat val):** taskens fråga var "alla 48, eller
+bara de man tippat långt?". Valt: FRITT VAL bland alla lag. Skäl: champion tippas FÖRE gruppspelet,
+då ingen vet vilka som tar sig långt, så en konstruerad delmängd vore både svårare att bygga och
+godtycklig. Fritt val är det enkla, rättvisa momentet (KISS/YAGNI). **Källa:** taskens design-
+vägledning (#59) + vedertagen VM-pool-standard (man tippar VM-vinnaren bland alla lag).
+
+**LAG-IDENTITET (HARD, F1-seamen):** det härledda facit (`deriveBracket`) bär Team.id (GEMEN "bra"),
+men ett bracket-tips LAGRAS som Team.code (VERSAL "BRA"). Urvalslogiken (`bracket-predictable-slots`)
+mappar därför Team.id -> Team.code via lag-listan och bär `TeamCode` i slot-valen; vyn brandar value
+-> `teamCode()` vid UI-gränsen innan `saveBracketPrediction`. Negativ kontroll (mutation: läck gemen
+id) bevisar att `teamCode()` fail-loud:ar (`^[A-Z]{3}$`) i stället för att tyst ge ett ogiltigt tips
+(seam-testet failar rött). **Källa:** reviewer-lärdom T16 F1 + `src/domain/team-code.ts`.
+
+**DISPOSITION:** per-slot-tippningen + champion byggda FULLT (taskens kärna), inget pinnat. UI:t är
+det funktionella + a11y-lagret (stabila roller + data-attribut som seam); premium-finish (kupong-
+formspråk, flaggor, träd-känsla) lämnas till design-frontend ovanpå, samma arbetsdelning som T16.
+
+---
+
 ## 2026-06-11 , T16b (#16, C1+C2): tips-API-fälten typade `TeamCode` (branded), namnen slutade ljuga
 
 **Beslut (Copilot C1+C2, samma rot som F1):** API-fälten `winnerTeamId`/`runnerUpTeamId`
