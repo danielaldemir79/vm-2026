@@ -5,6 +5,103 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T49/#84 (Champion 20p) KLAR - PR #85 väntar pa merge
+
+**Branch:** `feature/T49-champion-20p` @ HEAD `e9af0071`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/85 mot `develop` (Ref #84, state: OPEN)
+**Board:** issue #84 i "In Review" (satt av journalisten). Dirigenten stanger issue #84 MANUELLT och flyttar kort #84 till Done EFTER merge.
+
+**T48-status sedan forsta blocket:** PR #83 (T48/#81, feature/T48-results-cleanup) MERGAD 17:10.
+LIVE-VERIFIERAD pa vm-2026.pages.dev (version 6e24622): vanner ser ingen login-affordans, read-only-noten visas, #arrangor faller fram inloggningen, verifierat i farsk browser via Playwright.
+Issue #81 fortsatt OPPEN (T48b recoverable login aterstaar).
+
+**Vad T49 levererade:**
+- `CHAMPION_PREDICTION_POINTS` andrad 8 -> 20 i `src/data/predictions/bonus-score.ts`
+- 6 filer berorda: bonus-score.ts (konstant + VARFOR-kommentar + modul-header), tester (konstant-assertion + summa-test omraknat 17 -> 29), docs/decisions.md, supabase/README.md, migration-kommentar
+- Summa-testet omraknat: 3+5+1+20=29 (matchar poangkedjan gruppvinnare+grupptvaa+bracket+champion)
+- DB-tillstandet orort (ingen ny migration)
+
+**Verifiering:** 1162 pass + 34 skippade, lint/format/build rent. Lokal reviewer: PASS.
+F1/F2/F3 alla verifierade-losta: poangkedjan 3+5+1+20=29 sparad, inga missade speglingar,
+ingen dubbelrakning champion vs final-slot M104 (det ar tva separata tips = 25p mojligt, avsiktligt).
+
+**Copilot-loopen hoppas over (Daniels uttryckliga tidsbeslut):** "vi far spara lite tid pa copilot nu... efter lansering kor vi pa som vanligt". Beslutet loggat har. Full process aterupptas efter lansering.
+
+**Acceptanskriterier issue #84 (bockade av journalisten 2026-06-11):**
+- [x] AC#1: Konstanten ar 20 i src/data/predictions/bonus-score.ts (commit e9af0071)
+- [x] AC#2: Alla tester som laser champion-poangen uppdaterade och grona (1162 pass + 34 skippade)
+- [x] AC#3: Ingen UI-text visade siffran 8 eller 20 - inget att andra, levererat i den bemarkelsen att ingen atgard kravdes
+
+**RISK att hantera direkt efter merge+deploy:**
+Daniel har raderat den installerade appen. Om webblaasarens site-data for vm-2026.pages.dev ocksa raderats ar hans anonyma identitet (med admin-rollen seedat pa user_id) borta.
+Verifiera: besok vm-2026.pages.dev -> kolla `select * from app_admins` via Supabase MCP.
+Om hans gamla user_id saknas: seeda om det med hans nuvarande anonyma user_id.
+Hans tips/visningsnamn ar knutna till gamla identiteten (ny anonym = blank slate).
+
+**NASTA ARBETE (efter merge+deploy av PR #85):**
+1. Verifiera Daniels admin-session (se RISK ovan). Om ny user_id -> seeda om i app_admins via Supabase MCP + tips/visningsnamn knutna till gamla identiteten.
+2. Ge Daniel installerings-klartecken.
+3. **DELNING MOJLIG** efter ovanstaaende.
+4. #76 T45 admin-statistik, #75 T44 footer-promo, T48b (recoverable signInWithOtp, issue #81 oppen), ovriga (#69/#62/#63/#64/#70/#48/#56, T18-T25).
+
+**PINNADE punkter (oforandrade, bars framat):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping, editor flippar LF->CRLF. Kort i Ready.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stangt i T17, bars framat som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshallare tills #35 fyller med verifierad per-match-kalla.
+- **FNV-hash:** 2 anvandningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 anvandningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-ko.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready.
+- **#56 (delad modal-primitiv):** F4 fran T32-panelen, rule-of-three ej nadd. Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lagg till manualChunks om LCP-problem uppstar.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behover Daniel"-ko (uppdaterad):**
+- Push-notiser T22: kraver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-monster):** `uttommande-test-vaktar-svagare-invariant` Forekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Vantar Daniels godkannande.
+- **BEFORDRAN 2 (journalist-monster):** `pastar-att-filer-saknas-utan-att-lista-dem` Forekomst 3. Typ: agent-beteende -> journalistens fil. Vantar Daniels godkannande.
+- **BEFORDRAN 3 (senior-developer-monster):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Forekomst 3. Typ: agent-beteende -> senior-developers fil. Vantar Daniels godkannande.
+- **FIFA-juni-ranking:** aprilutgavan 2026 anvands. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: andra rank-varden + `npm run gen:team-profiles`.
+- **Release-gransen:** develop -> main + release-cleanup-skillen vantar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge vantar.
+
+**FORTSATTNINGS-PROMPT (autonom session):**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #85 (T49/#84, feature/T49-champion-20p) ANNU INTE mergad:
+> Dirigenten har Daniels uttryckliga go. Merga mot develop: `gh pr merge 85 --merge --repo danielaldemir79/vm-2026`.
+> Stang issue #84 manuellt (`gh issue close 84`) - auto-close funkar inte mot develop nar default-branch ar main.
+> Flytta kort #84 till Done pa boarden.
+> Verifiera att vm-2026.pages.dev bygger och deployas (Cloudflare Pages).
+>
+> Om PR #85 REDAN mergad:
+> T49 ar klar och mergad. Champion-poangen ar 20. Nasta steg (kritiskt fore delning):
+> 1. Verifiera Daniels admin-session: besok vm-2026.pages.dev, kolla att hans user_id fortfarande har admin-roll i `app_admins` via Supabase MCP (`select * from app_admins`). Om hans gamla user_id saknas: seeda om det med hans nuvarande anonyma user_id. RISK: om site-data raderats ar hans anonyma identitet + admin-roll + tips borta - da omseedas hans NYA user_id i app_admins via Supabase MCP/SQL + tips/visningsnamn ar knutna till gamla identiteten (ny anonym = blank slate).
+> 2. Ge Daniel installations-klartecken.
+> 3. **DELNING MOJLIG** efter ovanstaaende.
+>
+> Prioritetsordning efter delning:
+> - #76 T45 admin-statistik + read-only-vy
+> - #75 T44 footer-promo
+> - T48b recoverable signInWithOtp (AC#3, issue #81 halls oppen for detta)
+> - #69/#62/#63/#64/#70/#48/#56 i backlog-ordning
+> - T18-T25 darefter
+>
+> Bars framat (alla tasks):
+> - **#35 (arena/stad):** venue = platshallare.
+> - **FNV-hash:** konsolidera vid 3:e anvandning.
+> - **Stegnings-dubblett:** extrahera vid 3:e anvandning.
+> - **#48 (demo-chip a11y):** kort i Ready.
+> - **#56 (delad modal-primitiv):** kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behover Daniel"-ko:** push-notiser (T22), 3 befordringar (Forekomst 3), FIFA-juni-ranking, release-gransen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbaddning:** SKIPPAD, stangd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vagen till slutet (Daniel ger go for release-gransen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T48/#81 (Pre-share cleanup) KLAR - PR #83 väntar på merge
 
 **Branch:** `feature/T48-results-cleanup` @ HEAD `bea4b48`
