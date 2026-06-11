@@ -39,6 +39,20 @@ avspark, så PRECIS den övergången triggar en (1) ny hämtning, inte varje min
 mellan avsparker). INGEN ny polling, INGEN realtime (det är T18/#18). Bevisat med mock-klocka +
 mutationstest (utan `lockedMatchCount` i deps failar re-fetch-testet rött, `expected 2, got 1`).
 
+**Rotorsak 2, uppföljning (copilot R2, #96):** fetch-effekten satte ALLTID `predictionsStatus = 'loading'`
+vid start. Med `lockedMatchCount` i deps betydde det att VARJE avspark blankade topplistan/sammanfattningen
+("Laddar...") och tömde RevealView tyst, trots att giltig data redan fanns och bara skulle KOMPLETTERAS.
+**Fix:** avspark-triggade re-fetchar är nu TYSTA. En `loadedRoomIdRef` skiljer en SYNLIG laddning (initial:
+ingen data än; rumsbyte: datan hör till fel rum -> visa `loading`, blanka) från en TYST re-fetch (samma rum,
+datan finns redan -> behåll `ready` + datan, byt bara ut den när svaret kommer). **Felväg (val, ärlighet):**
+en TYST re-fetch som FAILAR kastar inte bort den befintliga (giltiga, om än något inaktuella) topplistan,
+den behåller data + `ready` och loggar `console.warn` (`[VM2026]`-konventionen, fail-loud i konsolen utan att
+blanka UI:t för en transient avspark-poll). En INITIAL/rumsbyte-fetch som failar går till `error` som förut
+(ingen data att skydda, fail loud PRINCIPLES §8). Bevisat med deferred-klocka: status förblir `ready` under
+re-fetchen (gamla picks kvar), `loading` syns aldrig efter första `ready`, mutationsverifierat (återinförd
+ovillkorlig `loading` -> flimmer-testet rött); rumsbyte/initial visar `loading` som förut; misslyckad tyst
+re-fetch behåller datan.
+
 **HARD-kontroll (sekretess FÖRE avspark intakt):** en OLÅST match avslöjar ALDRIG andras tips, oavsett
 om facit/tips råkar finnas i datan. `now >= kickoff` är den enda synlighets-grinden. Negativ kontroll
 testad (olåst match, status live, picks i datan -> 0 avslöjade).
