@@ -100,8 +100,8 @@ tillfälligt i det förflutna och återställda. Klient-delarna: `pool-predictio
 tiden bor i `pool_extended_deadline()` (= `2026-06-14T21:59:00Z` = sön 14/6 23:59 svensk). FÖRLÄNG,
 FÖRKORTA ALDRIG: sena grupper (G..L, första match efter 14/6) behåller sitt senare ankare. SLOT-grenen
 (M73..M104) + match-tipsen är OFÖRÄNDRADE (egna avsparks-lås). FAIL-SAFE bevarad (explicit null-gren).
-Applicerad 1:1 från den committade filen via `apply_migration` (namn `t53_extended_deadline_group_and_
-champion` i `list_migrations`, samma SQL). Bevisat live: read-only-frågor (alla 12 gruppers deadline =
+Applicerad 1:1 från den committade filen via `apply_migration` (samma SQL; namnet i
+`list_migrations` är `t53_extended_deadline_group_and_champion`). Bevisat live: read-only-frågor (alla 12 gruppers deadline =
 GREATEST, ingen förkortad; champion = fasta tiden; M73 oförändrad) + ett hårt skriv-prov genom riktig
 anonym session i ett isolerat test-rum (grupp A + champion skriver nu igenom RLS, städat efteråt).
 Klient-spegel: `src/data/predictions/prediction-deadline.ts`. Se `docs/decisions.md` T53.
