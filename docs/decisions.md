@@ -45,6 +45,19 @@ resten. Rapporten (`CopyReport`) bär per-item-utfall + totaler; UI:t sammanfatt
 `summarizeCopyReport` ("X tips kopierade, Y hoppades över (låsta), Z redan tippade, W kunde inte
 kopieras"). En LÄSmiss (kan inte kopiera blint) fail-loud:ar däremot hela jobbet.
 
+**Copilot runda 1, härdning (3 beslut):**
+- *Ingen cirkulär import i data-lagret:* `copy-predictions.ts` importerar de återanvända
+  API-funktionerna DIREKT ur sina käll-moduler (`predictions-api` / `group-predictions-api` /
+  `bracket-predictions-api`), INTE via barrel:n `./index` (som re-exporterar copy-predictions och
+  därmed gav en cirkel). Beroende-grafen är nu riktad: `index -> copy-predictions -> *-api`.
+- *Inget stale kopierings-resultat vid rumsbyte:* RoomPanel remountar inte `CopyTipsControl` när det
+  aktiva (mål-)rummet byts, så per-rad-tillståndet (knutet till FÖRRA rummet) nollställs nu via en
+  `useEffect` på `activeRoom.id`, och en asynkron kopiering som löser EFTER ett rumsbyte släpps tyst
+  (ref-jämförelse i BÅDE success- och catch-grenen), så ett gammalt utfall aldrig dyker upp i fel rum.
+- *A11y, villkorlig live-region:* ett fel-utfall (failad skrivning ELLER kastad läsmiss, tone
+  'negative') annonseras som `role="alert"` (assertive), lyckat/neutralt som `role="status"` (polite),
+  i linje med resten av RoomPanel.
+
 ## 2026-06-11 , T51 (#88): simulerad slutspelsbild ur grupp-tipsen (treorna lämnas öppna, gissas aldrig)
 
 Daniels live-feedback efter att ha tippat grupperna: "Tippade grupperna men fick ingen simulering på
