@@ -27,9 +27,12 @@
 -- klientens. Fail-safe bevaras: en okänd grupp/slot ger fortfarande NULL-deadline
 -- (now() < NULL = NULL => skriv nekas; now() >= NULL = NULL => andras tips dolda).
 
--- En sanning för den fasta söndagstiden i DB-skiktet: en STABLE-funktion (inte en
--- magisk literal upprepad på två ställen). Mirror av klientens POOL_EXTENDED_DEADLINE_ISO
--- (src/data/predictions/prediction-deadline.ts), samma instant, dokumenterat på båda håll.
+-- En sanning för den fasta söndagstiden i DB-skiktet: en IMMUTABLE funktion, en ren
+-- konstant (inte en magisk literal upprepad på två ställen). Mirror av klientens
+-- POOL_EXTENDED_DEADLINE_ISO (src/data/predictions/prediction-deadline.ts), samma
+-- instant, dokumenterat på båda håll. OBS: denna kommentarrad rättades (STABLE ->
+-- IMMUTABLE, copilot R2) EFTER att migrationen applicerats live; skillnaden mot
+-- den lagrade live-kopian är enbart denna kommentartext, SQL-definitionen är identisk.
 create or replace function public.pool_extended_deadline()
 returns timestamptz
 language sql
