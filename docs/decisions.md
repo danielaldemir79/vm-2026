@@ -5,6 +5,38 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T42 (#72): admin-UI (funktionell bas) + T42b-split + Behöver-Daniel
+
+**UI-DISPOSITION (funktionell bas här, premium-design -> T42b, samma som T16/T16b):** admin-sektionen
+(`src/features/admin/`) byggdes som den FUNKTIONELLA + tillgängliga basen (stabil semantik + data-
+attribut som seam), gatad på live-läge precis som tips-/topplistesektionerna:
+- **AdminLogin:** diskret arrangörs-inloggning (e-post -> 6-siffrig kod -> bekräfta). Delar facit-storens
+  klient/session (`store.client`) så uppgraderingen syns direkt; `onUpgraded` -> `store.refresh()`
+  laddar om admin-status så vyn växlar till inmatningen utan sidladdning.
+- **AdminResultEntry (BARA admins):** välj match + mål (+ status, + straffar för avgjort slutspel),
+  validerat med T6:s RENA `validateResultEntry` (samma regler som lokal inmatning, DRY), sparar till
+  GLOBAL facit via `saveOfficialResult`. Bara matcher med BÅDA lag kända är valbara (gissa aldrig laget).
+- **Icke-admin:** read-only-not ("resultaten matas in av arrangören ... poängen räknas ut åt dig") +
+  den lågmälda arrangörs-inloggningen. Simuleringen (T12) är OFÖRÄNDRAD och öppen för alla.
+
+**TILL T42b (premium-design, ej kärna):** arena-estetiken på admin-läget, en rikare facit-/match-lista
+(t.ex. 3-dagars fönster som resultatinmatningen), och inmatnings-finishen. Kärnan (datamodell, RLS,
+RLS-bevis, poäng-källbyte, auth, funktionell admin-bas) är KLAR och testad här. Inget pinnat i kärnan.
+
+**BEHÖVER DANIEL (dashboard, blockerar INTE koden):**
+1. **6-siffrig kod i mejlet:** för att admin-inloggningens KOD-väg (verifyOtp, in-page) ska funka måste
+   e-postmallen "Change email address" innehålla `{{ .Token }}` (Supabase Dashboard -> Authentication ->
+   Email Templates). Utan den skickas bara en länk (som också funkar via detectSessionInUrl + en
+   allowlistad redirect-URL, men kod-vägen är enklare). EN gång.
+2. **E-post-sändning (free tier):** Supabase free tier har en INBYGGD, hårt rate-limitad sändning (några
+   mejl/timme, avsedd för test). För pålitlig admin-inloggning kan Daniel koppla en egen SMTP
+   (Dashboard -> Authentication -> SMTP Settings). Räcker ofta med inbyggda för Daniels enstaka inloggning.
+3. **Redirect-URL (bara om länk-vägen används):** lägg `https://vm-2026.pages.dev` i Auth -> URL
+   Configuration -> Redirect URLs om magic-LÄNKEN (inte koden) ska kunna klickas. Kod-vägen kräver inte detta.
+
+Daniels admin-roll är REDAN seedad på hans nuvarande user_id (stabilt över e-post-länkningen, se §5),
+så facit-skrivningen funkar direkt efter hans första inloggning.
+
 ## 2026-06-11 , T42 (#72): GLOBAL facit + admin via e-post (TÄVLINGSINTEGRITET, HÖG-RISK)
 
 Daniels beslut: BARA admin (Daniel) matar in de officiella matchresultaten EN gång, och de gäller

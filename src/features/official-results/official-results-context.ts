@@ -9,6 +9,7 @@
 
 import { createContext, useContext } from 'react';
 import type { OfficialMatchResult, OfficialResultInput } from '../../data/official';
+import type { VmSupabaseClient } from '../../data/supabase-browser';
 
 /** Laddningstillstånd för facit-lagret (samma vokabulär som övriga stores). */
 export type OfficialResultsStatus = 'loading' | 'ready' | 'error';
@@ -24,9 +25,15 @@ export interface OfficialResultsStore {
   results: OfficialMatchResult[];
   /** Är den inloggade användaren app-admin (får mata in facit)? Null tills känt. */
   isAdmin: boolean | null;
+  /**
+   * Den aktiva Supabase-klienten (eller null i lokalt läge). Exponerad så admin-
+   * inloggningsflödet (AdminLogin) kan dela EXAKT samma klient/session som facit-
+   * laddningen, så en lyckad uppgradering syns direkt i samma klient.
+   */
+  client: VmSupabaseClient | null;
   /** Admin sparar/ändrar ETT officiellt resultat. Kastar vid fel (UI fångar). */
   saveOfficialResult: (input: OfficialResultInput) => Promise<void>;
-  /** Ladda om facit (fokus/online-event). */
+  /** Ladda om facit + admin-status (fokus/online-event, eller efter inloggning). */
   refresh: () => Promise<void>;
 }
 
