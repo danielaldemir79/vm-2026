@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { type ComponentProps } from 'react';
 import { GroupPredictionForm } from './GroupPredictionForm';
 import type { GroupTeamOption } from './group-predictable-data';
 
@@ -10,7 +11,7 @@ const TEAMS: GroupTeamOption[] = [
   { code: 'CZE', name: 'Tjeckien' },
 ];
 
-function renderForm(overrides: Partial<React.ComponentProps<typeof GroupPredictionForm>> = {}) {
+function renderForm(overrides: Partial<ComponentProps<typeof GroupPredictionForm>> = {}) {
   const onSubmit = overrides.onSubmit ?? vi.fn().mockResolvedValue(undefined);
   render(
     <GroupPredictionForm
