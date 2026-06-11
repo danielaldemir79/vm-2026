@@ -19,6 +19,7 @@ import { ScenarioView } from './features/scenarios';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
+import { OfficialResultsProvider } from './features/official-results';
 import { PredictionSection } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
@@ -57,8 +58,15 @@ export default function App() {
     // RoomsProvider omsluter hela appen (T14): det sociala rums-lagret + auth.
     // Är Supabase inte konfigurerat är det inaktivt (enabled=false) och appen
     // fungerar lokalt precis som förr. Online-indikatorn läser dess synk-läge.
+    //
+    // OfficialResultsProvider (T42, #72): det GLOBALA facit-lagret + admin-status.
+    // Ligger INNANFÖR RoomsProvider (delar auth-sessionen) och OMSLUTER hela appen
+    // så topplistan (facit-källan), resultat-feedback och admin-inmatningen alla
+    // läser SAMMA globala facit. Vilande utan Supabase, precis som rums-lagret.
     <RoomsProvider>
-      <AppShell />
+      <OfficialResultsProvider>
+        <AppShell />
+      </OfficialResultsProvider>
     </RoomsProvider>
   );
 }
