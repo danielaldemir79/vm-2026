@@ -1,5 +1,5 @@
-// BRACKET-/SLUTSPELS-TIPS-VYN (FUNKTIONELLT + a11y-lager, T16b, #59). Systerfil till
-// GroupPredictionsView.tsx (T16).
+// BRACKET-/SLUTSPELS-TIPS-VYN (FUNKTIONELLT + a11y-lager + VISUELL premium-finish,
+// T16b, #59). Systerfil till GroupPredictionsView.tsx (T16).
 //
 // FOKUS (senior-devs lager): rätt slots, rätt lägen, tillgänglig struktur. Visar
 // CHAMPION-väljaren (VM-vinnaren) överst + ett bracket-tips-formulär per slutspels-
@@ -16,8 +16,13 @@
 // LAG-IDENTITET: formulärets value är lagets CODE (TeamCode), brandas vid UI-gränsen
 // (teamCode()) innan store.saveBracketPrediction, så API:t garanterat får en code.
 //
-// VISUELL premium-finish (kupong-formspråk, flaggor, träd-känsla) lämnas till design-
-// frontend ovanpå; här bevaras stabila roller + data-attribut som seam.
+// VISUELL DESIGN (design-frontend, T16b): "VÄGEN TILL BUCKLAN". Rubriken bär pool-
+// identiteten (guld-eyebrow + motiverande öppen-räknare). CHAMPION är HJÄLTE-momentet
+// (egen guld-pokal-hero, variant="champion"). Slot-tipsen är en rund-grupperad kupong-
+// grid där varje runda får en rubrik-marker vars intensitet BYGGER mot finalen (samma
+// per-stage-guld som slutspelsträdet, bracket.css). "Gå med i ett rum"-läget är en
+// INBJUDANDE guld-tonad port (pokal-ikon + tydlig väg framåt), inte en grå rad.
+// Stabila roller + data-attribut bevaras (senior-devs seam + testkontrakt).
 
 import { useMemo } from 'react';
 import { useBracketPredictionsStore } from './bracket-predictions-context';
@@ -26,6 +31,7 @@ import { selectPredictableBracket } from './bracket-predictable-slots';
 import { BracketPredictionForm } from './BracketPredictionForm';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
 import { teamCode } from '../../domain/team-code';
+import type { BracketSlotState } from '../bracket';
 
 export interface BracketPredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -37,6 +43,43 @@ export interface BracketPredictionsViewProps {
 /** Människo-läsbar etikett för en slutspels-slot (rund-namn + matchnummer). */
 function slotLabel(roundLabel: string, slotId: string): string {
   return `${roundLabel} ${slotId}`;
+}
+
+/**
+ * Rund-markörens innehåll: en stigande "intensitet" mot finalen, ekar slutspelsträdet
+ * (bracket.css). De tidiga rundorna får ett ordningstal (1..4), bronsmatchen en brons-
+ * prick och finalen en pokal-glyf, så rubrik-raden bygger mot trädets krona. Ren dekor.
+ */
+function RoundMarkerContent({ stage }: { stage: BracketSlotState['stage'] }) {
+  // Ordnings-numret i slutspelet (sextondel = 1 ... semifinal = 4). Bronsmatch + final
+  // bär symboler i stället för siffror (de är "slutet").
+  const ORDINAL: Partial<Record<BracketSlotState['stage'], string>> = {
+    'round-of-32': '1',
+    'round-of-16': '2',
+    'quarter-final': '3',
+    'semi-final': '4',
+  };
+  if (stage === 'final') {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 4h10v4a5 5 0 0 1-10 0z" />
+        <path d="M7 5H4.5a1.5 1.5 0 0 0 0 5H7M17 5h2.5a1.5 1.5 0 0 1 0 5H17" />
+        <path d="M12 13v3M9 20h6M9.5 20a2.5 2.5 0 0 1 5 0" />
+      </svg>
+    );
+  }
+  if (stage === 'third-place') {
+    return <span className="text-[0.6875rem] font-bold leading-none">3</span>;
+  }
+  return <span className="text-[0.6875rem] font-bold leading-none">{ORDINAL[stage] ?? ''}</span>;
 }
 
 export function BracketPredictionsView({
@@ -113,20 +156,43 @@ export function BracketPredictionsView({
         </p>
       </header>
 
-      {/* UTAN aktivt rum (taskens punkt 3): bracket-tips är per rum. Samma inbjudande
-          formspråk som grupp-tips-vyn (T16). */}
+      {/* UTAN aktivt rum (taskens punkt 3): bracket-tips är per rum. En INBJUDANDE
+          guld-tonad port med en pokal-ikon + tydlig väg framåt, inte en grå rad, den
+          ska kännas som en inbjudan att vara med och tippa bucklan, inte ett fel. */}
       {!store.enabled ? (
         <div
           data-bracket-predictions-no-room=""
-          className="mt-4 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_6%,var(--color-surface))] p-4 sm:p-5"
+          className="mt-4 flex items-start gap-3 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_6%,var(--color-surface))] p-4 sm:p-5"
         >
-          <p className="m-0 font-display text-sm font-semibold text-fg">
-            Gå med i ett rum för att tippa slutspelet
-          </p>
-          <p className="m-0 mt-1 text-sm text-fg-muted">
-            Bracket-tipsen är per rum, du och kompisarna gissar VM-vinnaren och vem som går vidare,
-            och jämför sen. Skapa eller gå med i ett rum ovanför, så öppnar slottarna här.
-          </p>
+          {/* Guld-tonad pokal-ikon i en rund bricka. Ikon-färgen är --color-warning
+              (AA-säker guld-text-ton), tinten är dekor. aria-hidden, rubriken bär text. */}
+          <span
+            aria-hidden="true"
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--vm-gold)_14%,transparent)] text-warning"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M7 4h10v4a5 5 0 0 1-10 0z" />
+              <path d="M7 5H4.5a1.5 1.5 0 0 0 0 5H7M17 5h2.5a1.5 1.5 0 0 1 0 5H17" />
+              <path d="M12 13v3M9 20h6M9.5 20a2.5 2.5 0 0 1 5 0" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <p className="m-0 font-display text-sm font-semibold text-fg">
+              Gå med i ett rum för att tippa slutspelet
+            </p>
+            <p className="m-0 mt-1 text-sm text-fg-muted">
+              Bracket-tipsen är per rum, du och kompisarna gissar VM-vinnaren och vem som går
+              vidare, och jämför sen. Skapa eller gå med i ett rum ovanför, så öppnar slottarna här.
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -154,9 +220,9 @@ export function BracketPredictionsView({
       ) : null}
 
       {ready ? (
-        <div className="mt-5 flex flex-col gap-6">
-          {/* CHAMPION-VÄLJAREN (VM-vinnaren): överst, det största enskilda tipset.
-              Alla 48 lag (KISS), låst vid turneringsstart. */}
+        <div className="mt-5 flex flex-col gap-7">
+          {/* CHAMPION-VÄLJAREN (VM-vinnaren): HJÄLTE-momentet, överst, det största
+              enskilda tipset. Alla 48 lag (KISS), låst vid turneringsstart. */}
           <div data-bracket-predictions-champion="">
             <BracketPredictionForm
               slotId={champion.slotId}
@@ -165,13 +231,15 @@ export function BracketPredictionsView({
               teamsKnown
               current={myChampion ? myChampion.advancingTeamId : null}
               locked={champion.locked}
+              variant="champion"
               onSubmit={handleSave}
             />
           </div>
 
           {/* SLUTSPELS-SLOTSEN, rund-grupperade (sextondel -> final). Varje runda en
-              rubrik + en responsiv grid av slot-formulär. Öppna, låsta och okända-lag-
-              slots alla synliga (med sina respektive lägen), så trädet känns helt. */}
+              rubrik-marker (intensitet bygger mot finalen) + en responsiv kupong-grid.
+              Öppna, låsta och okända-lag-slots alla synliga (med sina respektive lägen),
+              så hela vägen till bucklan känns helt. */}
           {predictable.rounds.map((round) => (
             <section
               key={round.stage}
@@ -179,7 +247,14 @@ export function BracketPredictionsView({
               aria-label={round.label}
               className="flex flex-col gap-3"
             >
-              <h3 className="font-display text-sm font-bold uppercase tracking-wide text-fg-muted">
+              <h3 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-fg-muted">
+                <span
+                  aria-hidden="true"
+                  data-round={round.stage}
+                  className="vm-tips-round-marker h-6 w-6"
+                >
+                  <RoundMarkerContent stage={round.stage} />
+                </span>
                 {round.label}
               </h3>
               <ol className="grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
