@@ -62,7 +62,7 @@ function buildIdToCode(teams: readonly Team[]): ReadonlyMap<string, TeamCode> {
  * Facit-formerna (allt i CODE-rymden efter mappning).
  * ------------------------------------------------------------------ */
 
-/** Facit för EN avgjord gruppmatch: matchens id + den ordinarie målställningen. */
+/** Facit för EN avgjord match (grupp el. slutspel): matchens id + ordinarie målställning. */
 export interface MatchFacit {
   matchId: string;
   actual: Scoreline;
@@ -85,7 +85,7 @@ export interface BracketFacit {
 
 /** Hela facit för poäng-aggregeringen, i CODE-rymden. */
 export interface PoolFacit {
-  /** Avgjorda gruppmatcher (för match-tipsen, scorePrediction). */
+  /** Avgjorda matcher, grupp OCH slutspel (för match-tipsen, scorePrediction). */
   matches: MatchFacit[];
   /** Klara grupper (för grupp-tipsen, scoreGroupPrediction). */
   groups: GroupFacit[];
@@ -100,14 +100,30 @@ export interface PoolFacit {
  * ------------------------------------------------------------------ */
 
 /**
- * Avgjorda GRUPPMATCHER: bara färdigspelade gruppmatcher bidrar (ett tips ger
- * poäng FÖRST när matchen är avgjord, det är poäng-/avslöjande-modellen). En
- * scheduled/live-match har inget facit än och hoppas över.
+ * Avgjorda MATCHER (grupp OCH slutspel): varje färdigspelad match bidrar med ett
+ * matchfacit (ett tips ger poäng FÖRST när matchen är avgjord, det är poäng-/
+ * avslöjande-modellen). En scheduled/live-match har inget facit än och hoppas över.
+ *
+ * VARFÖR ÄVEN SLUTSPEL (källmedvetet, gissas inte): matchtipset poängsätts på den
+ * ORDINARIE målställningen i ALLA tippbara matcher, grupp som slutspel, mot exakt
+ * samma scorePrediction. En slutspelsmatch är tippbar så snart båda lag är kända
+ * (predictable-matches `bothTeamsKnown`), så ett färdigspelat slutspel ska ge
+ * matchpoäng på samma plan som gruppspelet. Filtrerade vi på `stage === 'group'`
+ * missade topplistan + reveal alla slutspelsmatchers poäng (T17-buggen Copilot C1).
+ * KÄLLA: docs/decisions.md T15 §2 "UTFALL (1X2) PÅ ORDINARIE MÅL, inkl. slutspel"
+ * + score.ts modul-doc ("alla tips bedöms på samma plan, oavsett grupp/slutspel").
+ *
+ * INGEN DUBBELRÄKNING mot bracket-facit: detta facit jämför den ORDINARIE mål-
+ * ställningen (scorePrediction), medan bracket-facit (deriveBracketFacit) jämför
+ * VEM SOM AVANCERADE inkl. straffar (scoreBracketAdvance, FIFA Art. 14). Två skilda
+ * tips-typer mot två skilda facit-kartor (matchByMatchId vs bracketBySlotId), ingen
+ * delar utfall. Ett straff-avgjort slutspel räknas här som den ordinarie ställningen
+ * (t.ex. 1-1 = 'draw'), exakt som T15 §2 föreskriver.
  */
 function deriveMatchFacit(matches: readonly Match[]): MatchFacit[] {
   const facit: MatchFacit[] = [];
   for (const match of matches) {
-    if (match.stage !== 'group' || match.status !== 'finished') {
+    if (match.status !== 'finished') {
       continue;
     }
     facit.push({

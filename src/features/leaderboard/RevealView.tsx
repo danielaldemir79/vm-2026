@@ -156,7 +156,11 @@ export function RevealView() {
                       </span>
                       <span className="min-w-0 flex-1 truncate">
                         {pick.displayName}
-                        <span className="sr-only"> , {outcome.label}</span>
+                        {/* sr-only-mening: kommatecknet sitter ihop med namnet (ingen
+                            ledande blanksteg), annars läser skärmläsaren "Anna kommatecken".
+                            Detta är interpunktion i en uppläst mening, inte husstilens
+                            " , "-titel-separator. */}
+                        <span className="sr-only">, {outcome.label}</span>
                       </span>
                       <span className="shrink-0 tabular-nums text-fg-muted">
                         {formatScore(pick.predicted)}

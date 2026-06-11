@@ -5,6 +5,27 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T17 (#17, Copilot C1+C2): slutspels-matchtips poängsätts + sr-only-interpunktion
+
+**C1 (korrekthetsbug, källmedveten fix):** `deriveMatchFacit` (derive-facit.ts) filtrerade på
+`stage === 'group'` och tappade ALLA slutspelsmatcher ur matchfacit, så topplistan + reveal missade
+matchpoäng för färdigspelade slutspelsmatcher. **Regel + källa (gissas inte):** matchtipset
+poängsätts på den ORDINARIE målställningen i ALLA tippbara matcher, grupp SOM slutspel, mot exakt
+samma `scorePrediction`. **Källa:** T15 §2 i denna logg ("UTFALL (1X2) PÅ ORDINARIE MÅL, inkl.
+slutspel ... alla tips bedöms på samma plan, grupp som slutspel") + `score.ts` modul-doc. En
+slutspelsmatch är tippbar så snart båda lag är kända (`predictable-matches` `bothTeamsKnown`), så ett
+färdigspelat slutspel ska ge matchpoäng. **Fix:** matchfacit inkluderar nu varje `status==='finished'`
+match (grupp + slutspel). **Ingen dubbelräkning mot bracket-facit:** matchfacit jämför ordinarie mål
+(`scorePrediction`), bracket-facit jämför vem som avancerade inkl. straffar (`scoreBracketAdvance`,
+FIFA Art. 14), skilda tips-typer mot skilda facit-kartor (matchByMatchId vs bracketBySlotId). Ett
+straff-avgjort slutspel räknas i matchfacit som ordinarie ställning (1-1 = 'draw'), exakt T15 §2.
+Regression-test: avgjort slutspel ger matchfacit + matchpoäng i aggregeringen, additivt med bracket-tips.
+
+**C2 (a11y):** sr-only-etiketten i RevealView hade ledande blanksteg före komma (" ,") -> skärmläsare
+läser "namn kommatecken". Det är interpunktion i en uppläst mening, inte husstilens " , "-titel-
+separator, så kommatecknet skrivs nu ihop med namnet (inget ledande blanksteg). Övriga aria-strängar
+i leaderboard/ skannades, inga fler träffar (LeaderboardView:s `aria-label` är ren).
+
 ## 2026-06-11 , T17 (#17): topplista + tips-avslöjande (poäng-aggregering + sekretess-gate)
 
 VM-poolens kröning: vem tippar bäst (topplista med rörelse-animation) + vad alla gissade
