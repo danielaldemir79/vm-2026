@@ -15,7 +15,7 @@
 -- redan källåkrade matchplanen (src/data/wc2026/matches.ts, värde-låst mot den
 -- svenska TV-tablån i match-schedule-source.test.ts). Seed-raderna genereras ur
 -- matches.ts av scripts/generate-kickoff-seed.ts och värde-låses av
--- match-kickoffs-seed.test.ts (regenerera-och-diffa), så DB-tiderna aldrig kan
+-- kickoff-seed.test.ts (regenerera-och-diffa), så DB-tiderna aldrig kan
 -- drifta från klient-bundlens tider. match_id-formatet är samma constraint som
 -- room_match_results (g-A-1..g-L-6 + M73..M104), så de två tabellerna kan aldrig
 -- referera olika id-rymder.
