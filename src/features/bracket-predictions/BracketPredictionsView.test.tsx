@@ -173,15 +173,23 @@ describe('BracketPredictionsView', () => {
     expect(m73.querySelector('[data-bracket-prediction-lock]')).not.toBeNull();
   });
 
-  it('CHAMPION-LÅS: efter turneringsstart (g-A-1) är champion låst', () => {
-    renderView(store({}), new Date('2026-06-11T18:00:00.000Z'));
-    const champion = document.querySelector('[data-slot-id="champion"]')!;
-    expect(champion.querySelector('[data-bracket-prediction-lock]')).not.toBeNull();
+  it('CHAMPION-LÅS (T53): ÖPPEN igen efter turneringsstart, fram till den förlängda söndagen', () => {
+    // 12/6 (efter turneringsstart 11/6 men FÖRE söndagen): champion ska vara ÖPPEN igen
+    // (reopen), inte låst , de som inte hann före premiären får tippa VM-vinnare t.o.m. söndag.
+    renderView(store({}), new Date('2026-06-12T08:00:00.000Z'));
+    const championOpen = document.querySelector('[data-slot-id="champion"]')!;
+    expect(championOpen.querySelector('[data-bracket-prediction-lock]')).toBeNull();
   });
 
-  it('AC#3 DEADLINE: öppen slot visar slottens egen avspark, champion visar turneringsstart (g-A-1)', () => {
+  it('CHAMPION-LÅS (T53): LÅST efter den förlängda söndagen (14/6 21:59Z)', () => {
+    renderView(store({}), new Date('2026-06-15T08:00:00.000Z'));
+    const championLocked = document.querySelector('[data-slot-id="champion"]')!;
+    expect(championLocked.querySelector('[data-bracket-prediction-lock]')).not.toBeNull();
+  });
+
+  it('AC#3 DEADLINE (T53): slot visar EGEN avspark (oförändrad), champion visar FÖRLÄNGD söndag', () => {
     renderView(store({}), new Date('2026-06-01T00:00:00Z')); // allt öppet
-    // M73:s deadline = slottens egen avspark (1 juli 16:00Z = 18:00 svensk).
+    // M73:s deadline = slottens egen avspark (1 juli 16:00Z = 18:00 svensk). OFÖRÄNDRAD av T53.
     const m73Notice = document
       .querySelector('[data-slot-id="M73"]')!
       .querySelector('[data-deadline-notice]');
@@ -189,13 +197,14 @@ describe('BracketPredictionsView', () => {
     expect(m73Notice!.getAttribute('data-deadline-iso')).toBe('2026-07-01T16:00:00.000Z');
     expect(m73Notice).toHaveTextContent(/Låses/);
     expect(m73Notice).toHaveTextContent(/1 juli kl 18:00/);
-    // Champion: turneringsstart g-A-1 (11 juni 16:00Z = 18:00 svensk).
+    // Champion: FÖRLÄNGD till söndag 14/6 23:59 svensk (21:59Z), g-A-1 (11/6) ligger före.
     const champNotice = document
       .querySelector('[data-slot-id="champion"]')!
       .querySelector('[data-deadline-notice]');
     expect(champNotice).not.toBeNull();
-    expect(champNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-11T16:00:00.000Z');
+    expect(champNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-14T21:59:00.000Z');
     expect(champNotice).toHaveTextContent(/Tippningen låses/);
+    expect(champNotice).toHaveTextContent(/söndag 14 juni kl 23:59/);
   });
 
   it('AC#3: en LÅST slot visar ingen öppen deadline-rad (låst-etikett tar över)', () => {
