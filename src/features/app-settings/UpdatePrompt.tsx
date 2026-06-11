@@ -7,10 +7,13 @@
 // i appens "arena i kvällsljus"-uttryck. Design-frontend ger finputs ovanpå; en
 // funktionell, tillgänglig bas räcker här.
 //
-// TILLGÄNGLIGHET: role="status" + aria-live="polite" så en skärmläsare hör att en
-// ny version finns utan att fokus flyttas. Knapparna bär synlig text som matchar
-// sitt tillgängliga namn (WCAG 2.5.3). Fäst längst ner (fixed) så den aldrig
-// tränger sönder layouten; pointer-events styrs så den inte blockerar appen när dold.
+// TILLGÄNGLIGHET: role="status" + aria-live="polite" ligger på TEXTBLOCKET (rubrik +
+// beskrivning), inte på ytterramen. En live-region är till för icke-interaktivt
+// statusinnehåll; läggs den runt knapparna kan vissa skärmläsare läsa upp knapp-
+// texter/roller som en del av statusmeddelandet. Genom att skopa regionen till
+// enbart texten hörs "Ny version finns ..." rent, och knapparna ligger utanför.
+// Knapparna bär synlig text som matchar sitt tillgängliga namn (WCAG 2.5.3). Hela
+// prompten fästs längst ner (fixed) så den aldrig tränger sönder layouten.
 
 import { useAppUpdate, type AppUpdateApi } from './use-app-update';
 import type { RegisterAppSw } from './register-sw';
@@ -83,8 +86,6 @@ export function UpdatePrompt({ api }: UpdatePromptProps) {
 
   return (
     <div
-      role="status"
-      aria-live="polite"
       data-update-prompt={showRefresh ? 'refresh' : 'offline-ready'}
       className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
     >
@@ -96,7 +97,7 @@ export function UpdatePrompt({ api }: UpdatePromptProps) {
       >
         <div className="flex items-center gap-3">
           <UpdateIcon />
-          <div className="flex flex-col gap-0.5">
+          <div role="status" aria-live="polite" className="flex flex-col gap-0.5">
             <p className="font-display text-sm font-bold sm:text-base">
               {showRefresh ? 'Ny version finns' : 'Klar att användas offline'}
             </p>
