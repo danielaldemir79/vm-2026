@@ -5,6 +5,98 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T50/#86 (Kortnamn trånga ytor) KLAR - PR #87 väntar på merge
+
+**Branch:** `feature/T50-bosnien-kortnamn` @ HEAD `8a70e81`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/87 mot `develop` (Closes #86, state: OPEN)
+**Board:** issue #86 i "In Review" (satt av journalisten 2026-06-11). Dirigenten stänger issue #86 MANUELLT och flyttar kort #86 till Done EFTER merge.
+
+**Vad T50 levererade:**
+- Nytt valfritt `shortName`-fält på `Team`-typen + helper `teamShortName` (en sanning: shortName om det finns, annars name)
+- `GroupTable` + match-display (matchkort och bracket-vy) visar kortnamn i trånga ytor
+- Lagprofilen behåller fulla namnet (fullnamn kvar där utrymme finns)
+- Endast BIH (Bosnien och Hercegovina -> "Bosnien") av 48 lag har shortName, data-låst test vaktar det
+- Lokal reviewer PASS (TeamCode-kontraktet intakt, shortName end-to-end-probat, EOL-ren diff)
+- F1 (orelaterad barrel-export-städning i computeStandings): AVVISAD, verifierat ofarlig
+- F2 (RevealView/bracket-summary visar fullnamn, radbryter snyggt, ej pinch): AVVISAD med motivering, pinnad som kandidat om Daniel vill ha kortnamn även i RevealView-rubriker
+
+**Commits:**
+- `fee2a1e` - T50: kort visningsnamn (shortName) för trånga ytor (#86) - bygge
+- `8a70e81` - T50: copilot R1, håll kod-spannet för filsökvägen på en rad i decisions.md (#86) - HEAD
+
+**Verifiering:** 1199 pass + 9 env-skippade, lint/format/build rent. Copilot R1: 1 trivialt docs-fynd, åtgärdat, tråd löst, exit nådd.
+
+**Acceptanskriterier issue #86 (bockade av journalisten 2026-06-11):**
+- [x] AC#1: Grupp B-tabellen visar "Bosnien" och kolumnerna får plats (commit fee2a1e)
+- [x] AC#2: Lösningen är generell - shortName-helper + fält på Team, inte hårdkodad specialregel (commit fee2a1e)
+- [x] AC#3: Fulla namnet finns kvar i lagprofilen (commit fee2a1e, verifierat av reviewer)
+
+**PINNADE punkter (oförändrade, bärs framåt):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping, editor flippar LF->CRLF. Kort i Ready.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bärs framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn även i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **BEFORDRAN 3 (senior-developer-mönstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Förekomst 3. Typ: agent-beteende -> senior-developers fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge väntar.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #87 (T50/#86, feature/T50-bosnien-kortnamn) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 87 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #86 manuellt (`gh issue close 86`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #86 till Done på boarden.
+>
+> Om PR #87 REDAN mergad:
+> T50 klar. Nästa task i kön: **#62 (T34 - poängskala + "Så funkar poängen"-UI)**.
+> OBS: issue-texten för #62 har GAMLA poängskalan (10/3/50). Faktiska låsta skalorna är:
+>   - Match: 3p exakt / 1p rätt vinnare / 0p miss
+>   - Grupp: 5p gruppvinnare (3+2) / 0p annars
+>   - Bracket: 1-5p stigande per runda
+>   - Champion: 20p
+> Uppdatera issue-texten i #62 INNAN bygge startar, så senior-developer bygger mot rätt siffror.
+>
+> Prioritetsordning i kön (efter #62):
+> - #63 (T35 lås-tydlighet)
+> - #18 (realtid)
+> - #76 (T45 admin-statistik)
+> - #19 (gamification)
+> - #24 (reaktioner)
+> - #64 (TWA)
+> - D-kategorin: FIFA juni-ranking, #25 prestanda/E2E/a11y, #70 EOL/.gitattributes, #56 modal, #48 demo-chip
+>
+> Daniels beslut som väntar vid slutet av kön: release develop->main, post-VM-vyn #39-F1, 3 minnes-befordringar.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready.
+> - **#56 (delad modal-primitiv):** kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T49/#84 (Champion 20p) KLAR - PR #85 väntar pa merge
 
 **Branch:** `feature/T49-champion-20p` @ HEAD `e9af0071`
