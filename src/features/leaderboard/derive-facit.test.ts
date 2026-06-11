@@ -56,7 +56,7 @@ function finishedGroupMatches(g: GroupId, teamIds: readonly string[]): Match[] {
   ];
 }
 
-describe('derivePoolFacit, matchfacit (avgjorda gruppmatcher)', () => {
+describe('derivePoolFacit, matchfacit (avgjorda matcher, grupp OCH slutspel)', () => {
   it('tar bara FÄRDIGSPELADE gruppmatcher (scheduled/live ger inget facit)', () => {
     const matches: Match[] = [
       groupMatch('A', teamId('MEX'), teamId('RSA'), 2, 1),
@@ -74,7 +74,12 @@ describe('derivePoolFacit, matchfacit (avgjorda gruppmatcher)', () => {
     });
   });
 
-  it('ignorerar slutspelsmatcher i matchfacit (bara gruppmatcher)', () => {
+  // KORREKTHETS-REGRESSION (Copilot C1): matchtipset poängsätts på ORDINARIE mål i
+  // ALLA tippbara matcher, grupp SOM slutspel (docs/decisions.md T15 §2). Ett
+  // färdigspelat slutspel MÅSTE därför ge ett matchfacit, annars missar topplistan
+  // + reveal slutspelets matchpoäng. (Tidigare bugg: deriveMatchFacit filtrerade på
+  // stage === 'group' och tappade alla slutspelsmatcher.)
+  it('INKLUDERAR färdigspelade SLUTSPELS-matcher i matchfacit (ordinarie mål, T15 §2)', () => {
     const matches: Match[] = [
       {
         id: 'M73',
@@ -89,7 +94,34 @@ describe('derivePoolFacit, matchfacit (avgjorda gruppmatcher)', () => {
       },
     ];
     const facit = derivePoolFacit(TEAMS, WC2026_GROUPS, matches);
-    expect(facit.matches).toHaveLength(0);
+    expect(facit.matches).toHaveLength(1);
+    expect(facit.matches[0]).toEqual({
+      matchId: 'M73',
+      actual: { homeGoals: 1, awayGoals: 0 },
+    });
+  });
+
+  // STRAFF-AVGJORT SLUTSPEL: matchfacit bär ORDINARIE ställning (1-1 = 'draw'),
+  // straffarna styr bara slutspelsTRÄDET (bracket-facit), inte matchpoängen. Bevisar
+  // att match- och bracket-facit är skilda plan (ingen dubbelräkning), T15 §2 + §4.
+  it('straff-avgjort slutspel: matchfacit är ORDINARIE ställning, straffar ignoreras', () => {
+    const matches: Match[] = [
+      {
+        id: 'M73',
+        stage: 'round-of-32',
+        groupId: null,
+        homeTeamId: teamId('BRA'),
+        awayTeamId: teamId('ARG'),
+        kickoff: '2026-07-01T19:00:00Z',
+        venue: 'Arena',
+        status: 'finished',
+        result: { homeGoals: 1, awayGoals: 1, penalties: { homeGoals: 4, awayGoals: 3 } },
+      },
+    ];
+    const facit = derivePoolFacit(TEAMS, WC2026_GROUPS, matches);
+    expect(facit.matches).toHaveLength(1);
+    // Ordinarie mål 1-1, INTE straffarna. scorePrediction läser detta som 'draw'.
+    expect(facit.matches[0].actual).toEqual({ homeGoals: 1, awayGoals: 1 });
   });
 });
 

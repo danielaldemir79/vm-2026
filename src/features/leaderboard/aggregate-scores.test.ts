@@ -4,10 +4,12 @@
 
 import { describe, expect, it } from 'vitest';
 import type { RoomMember } from '../../data/rooms';
+import type { Match, Team } from '../../domain/types';
 import { asTeamCode, type TeamCode } from '../../domain/team-code';
 import { buildLeaderboard, type MemberPredictions } from './aggregate-scores';
-import { CHAMPION_SLOT_ID } from './derive-facit';
+import { CHAMPION_SLOT_ID, derivePoolFacit } from './derive-facit';
 import type { PoolFacit } from './derive-facit';
+import { WC2026_GROUPS, WC2026_TEAM_BASES, teamId } from '../../data/wc2026/team-refs';
 
 /* ------------------------------------------------------------------ *
  * Test-hjälpare.
@@ -148,6 +150,117 @@ describe('buildLeaderboard, summa över de tre tips-typerna mot facit', () => {
     const board = buildLeaderboard([member('u1', 'Anna')], preds, facit);
     // Trots gemen facit ger normaliseringen full grupp-poäng (5).
     expect(board[0].points).toBe(5);
+  });
+});
+
+describe('buildLeaderboard, SLUTSPELS-matchtips ger matchpoäng (Copilot C1, T15 §2)', () => {
+  /** Produktions-lagen som Team[] (för derivePoolFacit:s id -> code-mappning). */
+  const TEAMS: Team[] = WC2026_TEAM_BASES.map((b) => ({
+    id: b.id,
+    name: b.name,
+    code: b.code,
+    group: b.group,
+  }));
+
+  /** En färdigspelad slutspelsmatch (kända lag) med given ordinarie ställning. */
+  function knockoutMatch(id: string, hg: number, ag: number, penalties = false): Match {
+    return {
+      id,
+      stage: 'round-of-32',
+      groupId: null,
+      homeTeamId: teamId('BRA'),
+      awayTeamId: teamId('ARG'),
+      kickoff: '2026-07-01T19:00:00Z',
+      venue: 'Arena',
+      status: 'finished',
+      result: penalties
+        ? { homeGoals: hg, awayGoals: ag, penalties: { homeGoals: 4, awayGoals: 3 } }
+        : { homeGoals: hg, awayGoals: ag },
+    };
+  }
+
+  it('ett EXAKT matchtips på en avgjord slutspelsmatch ger matchpoäng (3p) i aggregeringen', () => {
+    // Hela kedjan: derivePoolFacit MÅSTE ge ett matchfacit för M73 (slutspel), och
+    // aggregeringen poängsätter matchtipset mot det. Före C1-fixen var facit.matches
+    // tomt för slutspel -> 0 poäng (buggen). 1-0 exakt = 3p.
+    const facit = derivePoolFacit(TEAMS, WC2026_GROUPS, [knockoutMatch('M73', 1, 0)]);
+    expect(facit.matches).toHaveLength(1); // slutspels-matchfacit finns (regression)
+
+    const preds = new Map<string, MemberPredictions>([
+      [
+        'u1',
+        {
+          ...emptyPreds('u1'),
+          matchPredictions: [
+            { matchId: 'M73', userId: 'u1', homeGoals: 1, awayGoals: 0, updatedAt: '' },
+          ],
+        },
+      ],
+    ]);
+    const board = buildLeaderboard([member('u1', 'Anna')], preds, facit);
+    expect(board[0].points).toBe(3); // exakt match-resultat på SLUTSPEL = 3p
+    expect(board[0].exactHits).toBe(1);
+  });
+
+  it('straff-avgjort slutspel: matchtipset bedöms på ORDINARIE mål (1-1 = draw), inte straffarna', () => {
+    // Ordinarie 1-1 (straffar 4-3). Ett tippat 1-1 ska ge EXAKT (3p), ett tippat
+    // hemmavinst ska ge 0 (fel utfall mot 'draw'), oavsett straff-vinnaren. T15 §2.
+    const facit = derivePoolFacit(TEAMS, WC2026_GROUPS, [knockoutMatch('M73', 1, 1, true)]);
+    const exactDraw = new Map<string, MemberPredictions>([
+      [
+        'u1',
+        {
+          ...emptyPreds('u1'),
+          matchPredictions: [
+            { matchId: 'M73', userId: 'u1', homeGoals: 1, awayGoals: 1, updatedAt: '' },
+          ],
+        },
+      ],
+    ]);
+    expect(buildLeaderboard([member('u1', 'A')], exactDraw, facit)[0].points).toBe(3);
+
+    const wrongOutcome = new Map<string, MemberPredictions>([
+      [
+        'u1',
+        {
+          ...emptyPreds('u1'),
+          matchPredictions: [
+            { matchId: 'M73', userId: 'u1', homeGoals: 2, awayGoals: 0, updatedAt: '' },
+          ],
+        },
+      ],
+    ]);
+    expect(buildLeaderboard([member('u1', 'A')], wrongOutcome, facit)[0].points).toBe(0);
+  });
+
+  it('matchtips + bracket-tips på SAMMA slutspelsmatch summeras additivt (skilda plan, ingen dubbelräkning)', () => {
+    // Match-tips (ordinarie mål) och bracket-tips (vem avancerar) är två SKILDA tips
+    // mot två SKILDA facit. Båda rätt -> matchpoäng (3) + slot-poäng (1) = 4, inte
+    // en dubblering av samma utfall. Vi bygger facit manuellt så bracketSlot finns.
+    const facit: PoolFacit = {
+      matches: [{ matchId: 'M73', actual: { homeGoals: 1, awayGoals: 0 } }],
+      groups: [],
+      bracketSlots: [{ slotId: 'M73', stage: 'round-of-32', advancingTeam: code('BRA') }],
+      champion: null,
+    };
+    const preds = new Map<string, MemberPredictions>([
+      [
+        'u1',
+        {
+          ...emptyPreds('u1'),
+          matchPredictions: [
+            { matchId: 'M73', userId: 'u1', homeGoals: 1, awayGoals: 0, updatedAt: '' },
+          ],
+          bracketPredictions: [
+            { slotId: 'M73', userId: 'u1', advancingTeamId: code('BRA'), updatedAt: '' },
+          ],
+        },
+      ],
+    ]);
+    const board = buildLeaderboard([member('u1', 'Anna')], preds, facit);
+    // 3 (exakt match-resultat) + 1 (rätt avancerare R32) = 4. Distinkta, additiva.
+    expect(board[0].points).toBe(4);
+    expect(board[0].exactHits).toBe(1); // bara match-tipset räknas som exakt träff
   });
 });
 
