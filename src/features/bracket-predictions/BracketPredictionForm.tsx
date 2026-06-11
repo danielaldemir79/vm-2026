@@ -318,21 +318,24 @@ export function BracketPredictionForm({
         className="vm-champion-hero flex flex-col gap-4 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_30%,var(--color-border))] p-5 sm:p-6"
       >
         <fieldset className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0" disabled={locked}>
-          <div className="flex items-center gap-3">
+          {/* legend namnger inmatningen för skärmläsare; den ÄR hjälte-rubriken och
+              ligger som direkt barn till fieldset (a11y: legend måste vara direkt barn
+              för pålitlig fieldset-association, C1/#59). legend bär själv flex-raden
+              som div:en bar förut: pokal-emblem + textkolumn (eyebrow + label). */}
+          <legend className="m-0 flex w-full items-center gap-3 p-0">
             {/* Pokal-emblemet: solid guld-bricka med mörk ink (AA-säker, T9/T11-form). */}
             <span aria-hidden="true" className="vm-champion-trophy h-12 w-12 shrink-0 rounded-pill">
               <TrophyIcon />
             </span>
-            <div className="min-w-0">
-              <p className="m-0 flex items-center gap-1.5 font-display text-[0.625rem] font-bold uppercase leading-none tracking-[0.22em] text-warning">
+            <span className="flex min-w-0 flex-col">
+              <span className="flex items-center gap-1.5 font-display text-[0.625rem] font-bold uppercase leading-none tracking-[0.22em] text-warning">
                 VM-finalen
-              </p>
-              {/* legend namnger inmatningen för skärmläsare; visuellt hjälte-rubriken. */}
-              <legend className="m-0 mt-1.5 p-0 font-display text-xl font-bold leading-tight text-fg sm:text-2xl">
+              </span>
+              <span className="mt-1.5 font-display text-xl font-bold leading-tight text-fg sm:text-2xl">
                 {label}
-              </legend>
-            </div>
-          </div>
+              </span>
+            </span>
+          </legend>
 
           <p className="m-0 max-w-prose text-sm text-fg-muted">
             Vem lyfter bucklan? Välj laget du tror tar sig hela vägen och vinner VM 2026, du tippar
