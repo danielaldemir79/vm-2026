@@ -6,3 +6,12 @@ export { getDataSource, getDataSourceMode, isSupabaseConfigured, LIVE_READY } fr
 
 // Fixtures exponeras för tester och för UI som vill visa platshållar-data direkt.
 export { fixtureTeams, fixtureGroups, fixtureMatches } from './fixtures';
+
+// T42 (#72): GLOBAL facit + admin-status (officiella matchresultat, en sanning för alla).
+export {
+  listOfficialResults,
+  upsertOfficialResult,
+  isAppAdmin,
+  type OfficialMatchResult,
+  type OfficialResultInput,
+} from './official';
