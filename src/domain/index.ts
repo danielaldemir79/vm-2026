@@ -31,6 +31,10 @@ export type {
 } from './types';
 
 export { GROUP_IDS } from './types';
+// Lag-IDENTITETEN "FIFA-code" som typat kontrakt (T16b/C1+C2): tips-fälten bär
+// Team.code (versal "BRA"), inte Team.id, så de typas TeamCode (en rå sträng/ett
+// gemen id blir då ett kompileringsfel). Se domain/team-code.ts.
+export { teamCode, asTeamCode, TEAM_CODE_PATTERN, type TeamCode } from './team-code';
 export { computeStandings } from './standings/compute-standings';
 
 // Slutspels-/treeplats-motorn (T4, SPEC §5). Strukturell seedning av de 8 bästa

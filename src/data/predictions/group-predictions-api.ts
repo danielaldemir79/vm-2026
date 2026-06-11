@@ -18,23 +18,35 @@
 import type { VmSupabaseClient } from '../supabase-browser';
 import type { Database } from '../supabase-types';
 import { ensureSession } from '../rooms/auth';
+import { asTeamCode, type TeamCode } from '../../domain/team-code';
 
 type GroupPredictionRow = Database['public']['Tables']['group_predictions']['Row'];
+
+// OBS LAG-IDENTITET (C1+C2): fälten heter `winnerTeamId`/`runnerUpTeamId` (speglar
+// DB-kolumnerna `winner_team_id`/`runner_up_team_id`), men de bär Team.CODE (versal
+// "BRA", constraint ^[A-Z]{3}$), INTE Team.id (gemen "bra"). Därför är de typade
+// `TeamCode`, så en konsument som skickar ett rått Team.id får ett kompileringsfel i
+// stället för tyst fel poäng (samma rot som F1, se docs/decisions.md T16). Kolumn-
+// namnen behålls (ingen DB-migration); det är TYPEN som bär sanningen.
 
 /** Ett grupp-tips så som UI:t ser det (projektion av group_predictions-raden). */
 export interface GroupPrediction {
   groupId: string;
   userId: string;
-  winnerTeamId: string;
-  runnerUpTeamId: string;
+  /** Tippad gruppvinnare som FIFA-code (Team.code "BRA"), inte Team.id. */
+  winnerTeamId: TeamCode;
+  /** Tippad grupptvåa som FIFA-code (Team.code "BRA"), inte Team.id. */
+  runnerUpTeamId: TeamCode;
   updatedAt: string;
 }
 
 /** Inmatning vid skriv av ett grupp-tips (UI -> API). user_id sätts av API:t (auth). */
 export interface GroupPredictionInput {
   groupId: string;
-  winnerTeamId: string;
-  runnerUpTeamId: string;
+  /** Gruppvinnar-tips som FIFA-code (Team.code, brandas vid UI-gränsen via teamCode()). */
+  winnerTeamId: TeamCode;
+  /** Grupptvåa-tips som FIFA-code (Team.code, brandas vid UI-gränsen via teamCode()). */
+  runnerUpTeamId: TeamCode;
 }
 
 /** Kasta ett begripligt fel ur ett Supabase-fel (fail loud, svensk text). */
@@ -111,13 +123,17 @@ export async function upsertMyGroupPrediction(
   return projectGroupPrediction(data);
 }
 
-/** Projicera en DB-rad till den klient-vänliga GroupPrediction-formen. */
+/**
+ * Projicera en DB-rad till den klient-vänliga GroupPrediction-formen. `*_team_id`-
+ * kolumnerna är DB-validerade som versal code (constraint ^[A-Z]{3}$ på write), så
+ * de brandas till TeamCode utan re-validering (asTeamCode, betrodd DB-gräns).
+ */
 function projectGroupPrediction(row: GroupPredictionRow): GroupPrediction {
   return {
     groupId: row.group_id,
     userId: row.user_id,
-    winnerTeamId: row.winner_team_id,
-    runnerUpTeamId: row.runner_up_team_id,
+    winnerTeamId: asTeamCode(row.winner_team_id),
+    runnerUpTeamId: asTeamCode(row.runner_up_team_id),
     updatedAt: row.updated_at,
   };
 }
