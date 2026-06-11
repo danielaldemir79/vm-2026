@@ -16,6 +16,7 @@
 
 import { useId, useMemo, useRef, useState } from 'react';
 import { ExpandToggle } from '../../components/ExpandToggle';
+import { ScoreGuide } from '../scoring-guide';
 import { useTodayKey } from '../daily';
 import { windowMatches } from '../results/result-window';
 import { usePredictionsStore } from './predictions-context';
@@ -164,6 +165,12 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
           Gissa resultaten före avspark. Exakt resultat ger mest, rätt vinnare ger en poäng. Du och
           kompisarna tippar blint, sen jämför ni.
         </p>
+        {/* "Så funkar poängen": en synlig, inbjudande väg till hela poäng-förklaringen
+            redan vid tippningen (Daniels huvudkrav, #62). Samma komponent monteras vid
+            topplistan, så texten är EN sanning. Talen härleds ur poäng-konstanterna. */}
+        <div className="mt-1">
+          <ScoreGuide surface="tips" />
+        </div>
       </header>
 
       {/* UTAN aktivt rum: tips är per rum, så peka INBJUDANDE mot rums-flödet. En

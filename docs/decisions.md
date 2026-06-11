@@ -5,6 +5,44 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T34 (#62): "Så funkar poängen", en delad förklaring vid tippningen + topplistan
+
+Daniels huvudkrav: TYDLIGHET, en synlig, inbjudande förklaring av poängen där man tippar OCH vid
+topplistan, i enkelt språk. Poäng-skalan är LÅST och live (T49), denna task ändrar INGA tal.
+
+**Beslut, EN komponent monterad på TVÅ ställen (inte sektion + länk):** förklaringens innehåll är
+identiskt på båda ytorna. En delad `ScoreGuide` (`src/features/scoring-guide/`) monteras i tips-vyns
+header (`PredictionsView`) OCH vid topplistan (`LeaderboardSummary`). Varför inte "en sektion + länk
+till den": i en router-lös PWA blir en länk en scroll-/flik-navigering och ger en asymmetrisk
+upplevelse (förklaringen "bor" i en vy, den andra pekar dit). En delad komponent ger i stället EN
+sanning för texten (kan aldrig drifta mellan ytorna) och samma upplevelse på båda, samma KISS-val som
+"modal, inte routad vy" (T10). En `surface`-prop ger varje mount-punkt egna data-attribut-krokar
+(`data-score-guide-*-tips` / `-topplista`), samma mönster som ExpandToggle:s `name`.
+
+**Talen HÄRLEDS ur konstanterna (HARD-krav, ingen hårdkodad dubblett):** `buildScoreExplainer`
+(`score-explainer-items.ts`) läser `PREDICTION_POINTS` (3/1), `GROUP_PREDICTION_POINTS` (3/2),
+`BRACKET_ROUND_POINTS` (intervallets min-max, härlett, inte hårdkodat "1-5") och
+`CHAMPION_PREDICTION_POINTS` (20) ur `src/data/predictions`. UI:t innehåller inga egna siffror.
+Mutations-vakt: `score-explainer-items.test.ts` + `ScoreGuide.test.tsx` jämför mot KONSTANTERNA (inte
+mot förväntade litteral-siffror), så en skala-ändring slår igenom på både förväntan och renderad text,
+och en hårdkodad siffra skulle rödna. Källa till varje tal: score.ts (match) + bonus-score.ts
+(grupp/bracket/champion), bekräftbar inline vid varje rad.
+
+**Ersatte T46:s lokala legend (DRY + sanning):** `LeaderboardSummary` hade en egen `ScoreLegend`
+(T46/#79) som (a) HÅRDKODADE "3 p / 1 p / 0 p", (b) bara täckte match-poängen, och (c) felaktigt
+utlovade special-tips som "snart kommer", fast de nu är live (T49). Den ersattes av `ScoreGuide`, som
+täcker hela skalan med tal ur konstanterna. Den oanvända CSS-haken `vm-board-legend` /
+`data-leaderboard-score-legend` (aldrig stylad) togs bort, inget dött spår lämnas.
+
+**Modal-primitiv (rule-of-three, kort #56):** `ScoreGuide`-dialogen är nu den FJÄRDE handrullade
+a11y-dialogen med identiskt kontrakt (TeamProfilePanel T10, OnboardingDialog T13, SettingsControl T32,
+denna). Kontraktet (role=dialog, aria-modal, Escape, klick-utanför, fokus in/ut, fokus-fälla, portal
+till body, reduced-motion-grind) är medvetet KOPIERAT i denna task, inte lyft till en delad `<Modal>`,
+för att inte bygga abstraktionen på spek och röra tre testade filer i en förklarings-task. Att
+tröskeln nu passerats flaggas till dirigenten som en egen refaktor-task (se handoff Improvement).
+
+---
+
 ## 2026-06-11 , T50 (#86): kort visningsnamn (shortName) för trånga ytor
 
 Daniels live-feedback: "Bosnien och Hercegovina" (grupp B) tryckte ihop grupptabellens övriga
