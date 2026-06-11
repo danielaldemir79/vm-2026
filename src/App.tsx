@@ -19,6 +19,7 @@ import { ScenarioView } from './features/scenarios';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
+import { PredictionSection } from './features/predictions';
 import {
   InstallBanner,
   OnboardingDialog,
@@ -217,6 +218,18 @@ function AppShell() {
             lokalt läge syns ingenting, så appen fungerar precis som förr. */}
         <Slide direction="up">
           <RoomSection surface={(children) => <Panel>{children}</Panel>} />
+        </Slide>
+
+        {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
+            så PredictionSection visar tips-vyn när det sociala lagret är konfigurerat
+            (live-läge), med "gå med i ett rum för att tippa" tills ett rum är aktivt.
+            Deadline-låset (inget tips efter avspark) + tips-sekretessen (andras tips
+            dolda före avspark) upprätthålls SERVER-SIDE av RLS, bevisat med riktiga
+            sessioner. Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik
+            + data-attribut, samma #39-formspråk som resultatinmatningen); design-
+            frontend ger premium-finish ovanpå. */}
+        <Slide direction="up">
+          <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
         </Slide>
 
         <footer className="border-t border-border pt-6 text-sm text-fg-muted">
