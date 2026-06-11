@@ -5,6 +5,244 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T16b (#16, C1+C2): tips-API-fälten typade `TeamCode` (branded), namnen slutade ljuga
+
+**Beslut (Copilot C1+C2, samma rot som F1):** API-fälten `winnerTeamId`/`runnerUpTeamId`
+(group-predictions-api) + `advancingTeamId` (bracket-predictions-api), liksom row-projektionernas
+`*_team_id`, BÄR faktiskt Team.**code** (versal "BRA", DB-constraint `^[A-Z]{3}$`), inte Team.id
+(gemen "bra"). Namnen ljög, så en framtida konsument (T16b/T17) kunde skicka ett rått Team.id och få
+TYST fel poäng. **Fix låst vid TYP-nivå (ingen DB-migration, kolumnerna behåller `*_team_id`):** ny
+delad branded typ `TeamCode = string & { __brand: 'TeamCode' }` i `src/domain/team-code.ts` (med
+`teamCode()` = validerad brandning, fail-loud mot `^[A-Z]{3}$`, och `asTeamCode()` = betrodd cast vid
+DB-gränsen). Tips-fälten typas `TeamCode`, så en rå sträng / ett gemen id blir ett KOMPILERINGSFEL
+(bevisat negativt i team-code.test.ts med `@ts-expect-error`). UI:t brandar vid sin gräns
+(GroupPredictionsView: `teamCode(winnerCode)` ur `<option value={t.code}>`).
+
+**Val branded type FRAMFÖR fält-omdöpning (`...Code`):** omdöpningen ripplat genom ~12 filer (UI-vy/
+provider/form + tester) och krockat med DB-kolumnernas `*_team_id`-namn. Branded type är minst churn
+och tydligast: namnen står kvar, men TYPEN bär sanningen. **F1:s normalisering i bonus-score BEHÅLLS
+(defense in depth):** poängfunktionerna tar medvetet kvar `string` + `normalizeTeamRef`/`sameTeam`,
+branded type stoppar felet vid kompilering på write-/API-ytan, normaliseringen är skyddet om en
+otypad sträng ändå slinker in via en seam. De två lagren kompletterar varandra, ersätter inte.
+
+**Källa till regeln (gissas inte):** identitets-rymds-driften + den rekommenderade branded-type-fixen
+är reviewer-lärdomen `tva-identitetsrymder-moter-forst-vid-otestad-poang-seam` (T16 F1) +
+`mock-foljer-konsumenttyp` (memory/lessons/senior-developer.md). `^[A-Z]{3}$` speglar DB-constrainten
+(`..._t16_group_predictions_schema/rls.sql` + bracket-motsvarigheten). Decisions.md T16 F1-raden
+förutsåg detta ("branded type kan läggas ovanpå senare utan att ändra kontraktet"), C1+C2 realiserar det.
+
+## 2026-06-11 , T16-visuellt (#16): gruppvinnar-tips premium-finish, PODIUM-KUPONG (design-frontend)
+
+Det visuella lagret ovanpå senior-devs funktionella grupp-tips-UI. Mål: "tippa hela gruppspelet"-
+momentet , VM-kupongen man fyller i med kompisarna , ska kännas KUL och tydligt, utan att lämna
+"arena i kvällsljus"-familjen eller bryta senior-devs data-attribut/test-kontrakt.
+
+**1. IDENTITET, "PODIUM-KUPONG" (taskens punkt 1, DRY mot T15):** grupp-tipset ärver HELA T15:s
+tips-kupong-fond (`.vm-coupon-card` i tokens.css §10: guld-hörn-glow, inset guld-topplist, hover-lyft,
+låst-dämpning), så grupp-tipset och match-tipset hör tydligt till SAMMA kupong-familj , en sanning för
+"det här är en tips-kupong", ingen andra-kort-fond. Ovanpå läggs en egen PODIUM-metafor (tokens.css §11
+`.vm-pool-*`): 1:a = GULD-medalj, 2:a = SILVER-medalj. Guld + silver = en pallplats, det universella
+"vem stod överst". Varje plats-rad får sin medalj + en medalj-tonad vänsterkant + en TeamFlag-
+förhandsvisning (T7-discen, återbrukad) av det valda laget, så valet syns visuellt direkt , inte två
+grå dropdowns. "POOL"-eyebrow + biljett-ikon + guld kupong-prick i legenden ärver T15:s signatur.
+
+**2. SELECT BEHÅLLS (a11y + testkontrakt, INTE chip-knappar):** taskens "chips/rader" tolkas som det
+VISUELLA lagret (medalj + flagga + ton) ovanpå senior-devs semantiska `<select>`, inte en ersättning.
+Att byta `<select>` mot chip-knappar skulle bryta 6 tester (`getByLabelText` -> select, `.value`-
+assertions) OCH tappa den inbyggda tangentbords-/skärmläsar-semantiken ett native `<select>` ger gratis.
+Native select = bäst a11y + testkontraktet hålls; medalj/flagga/podium-lagret bär "kul"-känslan.
+
+**3. MITT TIPS, ett STOLT podium (taskens punkt 1):** ett sparat/seedat grupp-tips visas som en kompakt
+pallplats-rad , guld-medalj + 1:ans lag, silver-medalj + 2:ans lag (`.vm-pool-podium`). Medalj-siffrorna
+(1/2) står som mörk ink på en SOLID medalj-yta (färg-OBEROENDE solid-bricka-formen, T9/T11/T15), AA-säker
+i båda teman , aldrig guld/silver-som-text-på-tint (den kända fällan, lessons aa-kontrast). Sparat-
+brickan ("Sparat" + bock) återbrukar T15:s `.vm-coupon-mine` (solid guld + near-black ink).
+
+**4. LÅST-LÄGET, elegant + POSITIVT (taskens punkt 2):** efter gruppens första match dämpas kupongen
+(guld-till-neutral, ingen hover-lyft, "inlämnad/avgjord"-känsla) och en låst-etikett med HÄNGLÅS
+(`.vm-coupon-lock-icon`, lugn engångs-puls, nollad vid reducerad rörelse) visas: "Låst vid gruppens
+första match, så alla tippar blint." POSITIV inramning (spelets rättvisa), inte frustration. Mitt podium
+står KVAR synligt under etiketten. Dämpnings-receptet är T15:s `.vm-coupon-card`-låst-regel, UTÖKAD att
+matcha BÅDA nycklarna (`data-prediction-locked` OCH `data-group-prediction-locked`) , en sanning, samma
+recept för båda kupong-typerna. Väljarna renderas fortfarande (disabled via fieldset, men `sr-only` när
+låst) så låst-kontraktet håller (väljare finns + disabled) och en skärmläsare ser vad jag tippat , samma
+kontrakt-anda som T15.
+
+**5. "GÅ MED I ETT RUM"-läget, INBJUDANDE (taskens punkt 3):** porten är en guld-tonad ruta med en rund
+kupong-ikon-bricka + tydlig rubrik + en väg framåt ("Skapa eller gå med i ett rum ovanför, så öppnar
+kupongerna här"), inte en grå rad. En inbjudan, inte ett fel. `data-group-predictions-no-room` bevarat.
+
+**6. NYA SILVER-TONER (för podiumets 2:a-medalj, samma guld/silver-på-ljus-disciplin):** guld bärs redan
+av appen (`--vm-gold`/`--color-warning`). Silver är NYTT: `--vm-silver` (medalj-fyllnad, DEKOR),
+`--vm-silver-ink` (near-black ink PÅ en fylld silver-medalj), `--vm-silver-text` (silver som TEXT/ikon,
+en SEPARAT ton , i ljust tema en djup slate #52606e, eftersom den ljusa platinan faller under AA som
+text på vit yta, exakt guld-på-ljus-fällan). Egna tokens per tema, mätning bunden till silver-hue:n.
+
+**7. RESPONSIV GRID:** grupp-korten är `grid-cols-1 sm:grid-cols-2 xl:grid-cols-3` , 1 kolumn på smal
+mobil/vikbar cover, 2 på surfplatta, 3 på bred skärm (12 grupper läses bättre i 3 kolumner). KRITISK
+overflow-fix: ett `<select>` krymper inte under sin längsta `<option>` (intrinsisk min-content) i en
+flex-rad , utan `min-w-0` på fieldset + flex-raden + select:en spränger ett långt lagnamn ("Bosnien och
+Hercegovina") kolumnen på 280px. `min-w-0` låter select:en följa `w-full` och options-texten trunceras.
+
+**KONTRAST UPPMÄTT (canvas-komposit, VÄRSTA fall, alfa-blend över base-yta, BÅDA teman, ej typfall):**
+varje text-/ikon-yta mätt mot den FAKTISKT komponerade fonden (guld-glow/tint inräknad), inte mot
+token-hex:en. ALLA klarar WCAG AA som NORMAL text (>= 4.5:1), inkl. de vars formella krav bara är 3:1
+(ikoner). MIN-värden: **mörkt tema 5.61:1, ljust tema 4.78:1** (4.78 är no-room-ikonen, krav 3:1; lägsta
+4.5-krav-element är fel-texten 4.81 ljust). Per yta (mörkt / ljust):
+- Eyebrow "POOL" + 1:a-etikett (warning) på kupong-fond: 8.40 / 5.37
+- 2:a-etikett (--vm-silver-text) på kupong-fond: 8.75 / 5.84
+- Grupp-rubrik + podium-lagnamn (fg) på kupong-/podium-fond: 12.68-13.26 / 16.22-16.59
+- Guld-medalj-siffra (coupon-ink) på SOLID guld: 10.90 / 5.03
+- Silver-medalj-siffra (silver-ink) på SOLID silver: 10.99 / 8.40
+- Låst-rubrik (fg) / låst-förklaring (fg-muted) på låst-yta (guld 7% / bg): 15.16, 7.46 / 15.12, 5.51
+- Hänglås-ikon (warning) på låst-yta [krav 3:1]: 10.03 / 5.00
+- Sparat-bricka ink (coupon-ink) på SOLID guld: 10.90 / 5.03
+- Spar-knapp (accent-fg) på accent: 10.85 / 5.40
+- Öppen-räknare (fg-muted) på guld-8%-chip: 6.39 / 5.97
+- "Gå med i rum"-rubrik (fg) / brödtext (fg-muted) på guld-6%-yta: 13.56, 6.67 / 16.77, 6.11
+- "Gå med i rum"-kupong-ikon (warning) på guld-14%-bricka [krav 3:1]: 6.53 / 4.78
+- Fel-text (danger) på danger-9%/OPAK-surface: 5.61 / 4.81
+Metod: WCAG relativ luminans + ratio, color-mix som gamma-sRGB-interpolation (per CSS-spec), alfa-
+komposit source-over i gamma-rummet (som webbläsaren). Engångsprob, raderad efter (samma mönster som
+T15-mätningen; delade element matchar T15:s siffror exakt, t.ex. guld-medalj 10.90/5.03, accent-knapp
+10.85/5.40).
+
+**RESPONSIVT + A11Y VERIFIERAT LIVE (Playwright mot dev-render, isolerad harness, raderad efter):**
+ingen horisontell overflow på 280 (vikbar cover) / 375 / 768 / 1440 px i BÅDA teman (scrollW == clientW
+överallt , bekräftat EFTER `min-w-0`-fixen; FÖRE fixen sprängde select:ens min-content kolumnen till
+454px). Fokus-ring bevisad LIVE: select ger `:focus-visible == true` + `outline: solid 2px` (accent-ring,
+index.css). Reduced-motion: hänglås-pulsen + slot-border-transition gatade under `@media (prefers-
+reduced-motion: no-preference)` / nollade vid `reduce`. Tester: alla 912 gröna, senior-devs data-attribut
++ strängar + select-semantik bevarade.
+
+---
+
+## 2026-06-11 , T16 (#16, F1): poängfunktionerna identitets-rymd-ROBUSTA (code vs id-drift, tyst noll)
+
+**Beslut (korrekthets-fynd, latent kritisk):** ett pool-tips LAGRAS som versal FIFA-code ("BRA",
+DB-constraint `^[A-Z]{3}$`, hela write-kedjan UI->API->DB), men det FAKTISKA facit härleds ur
+`computeStandings`/`deriveBracket`, vars `teamId`/`winnerTeamId` är Team.id = GEMEN kod ("bra",
+`teamId(code)=code.toLowerCase()` i team-refs.ts). Poängfunktionerna (`scoreGroupPrediction`/
+`scoreBracketAdvance`/`scoreChampionPrediction`) jämförde rena strängar (`a === b`), så när T17/T16b
+matar ett standings-härlett `actual` (id) mot ett code-lagrat tips blir det TYST 0p för ALLA tips
+(`'BRA' === 'bra'` är false), inte ett fel. Probe-bevisat: `scoreGroupPrediction({BRA,ARG},{bra,arg})`
+gav 0, borde vara 5. **Fix (strukturell, inte pinnad):** en liten `normalizeTeamRef` (toUpperCase) +
+`sameTeam` normaliserar BÅDA sidor till samma rymd FÖRE jämförelse, så driften strukturellt inte kan
+uppstå oavsett om konsumenten matar code eller id. **Kanon-rymd = VERSAL** (toUpperCase) för att det
+är tipsens lagrings-form och DB-constraintens form (`^[A-Z]{3}$`), så normaliseringen drar mot
+write-sidans sanning. Kontraktet är låst i docstrings PÅ poängfunktionerna ("accepterar både code BRA
+och id bra, normaliserar"). Test som NÅR seamen: kör de RIKTIGA `computeStandings`/`deriveBracket` på
+en fixture, plockar härlett `teamId`/`winnerTeamId` (gemen id), matar mot ett code-lagrat tips, kräver
+full poäng. Bevisat true regression: utan normaliseringen failar testet rött med `expected +0 to be 5`.
+Detta SLÅR ev. framtida `TeamCode`-branded-type-ambition (lärdomens alternativ a): normaliseringen är
+robust även om en otypad sträng slinker in, branded type kan läggas ovanpå senare utan att ändra
+kontraktet. (Källa till id-rymden: `teamId` i src/data/wc2026/team-refs.ts; reviewer-lärdom T16 F1.)
+
+## 2026-06-11 , T16 (#16): pool-tipsen, gruppvinnar-tips + bracket-/slutspels-tips (modell + poäng + RLS)
+
+VM-poolens kärna (SPEC §6: GroupPrediction + BracketPrediction). Bygger PÅ T15:s mönster
+(scorePrediction, match_kickoffs-deadline-lås, sekretess-RLS, T9:s bracket-struktur), bygger
+INTE om. Fyra modell-/regelbeslut, alla med dataintegritet/anti-fusk i fokus (HARD).
+
+**1. GRUPP-TIPS-MODELLEN (källmedvetet):** ett grupp-tips är en gissad (1:a, 2:a) per grupp
+(A..L), per rum, per användare. SPEC §6 (GroupPrediction) säger "gissad gruppvinnare/tvåa per
+grupp". De TVÅ platserna är de enda direkt-kvalificerade (3:orna seedas av FIFA Annexe C, T4,
+inte ett tippnings-moment). Ny tabell `group_predictions` (PK room+group+user, upsert), constraints:
+group_id A..L, lag-id = FIFA trebokstavskod `^[A-Z]{3}$`, 1:a <> 2:a.
+
+**2. BRACKET-TIPS-MODELLEN (källmedvetet, det klurigaste valet):** slutspelet börjar EFTER
+gruppspelet, så lagen i en tidig slutspels-slot är delvis okända när man vill tippa. Man KAN INTE
+tippa "Brasilien vinner sin sextondel" innan man vet att Brasilien hamnar där. **Standard-VM-pool
+löser det, och vi följer det:**
+  - **PER-SLOT "GÅR VIDARE"-TIPS:** ett tips per slutspelsmatch-slot (M73..M104), man tippar
+    vilket LAG som går vidare ur slotten. Låses per matchens EGEN avspark (exakt T15:s deadline-
+    modell), så man kan tippa när slottens lag är kända men FÖRE matchen, robust mot att lagen
+    avslöjas gradvis under slutspelet.
+  - **VM-VINNAR-TIPS (mästaren):** EN separat tippning FÖRE turneringen, låst vid turneringens
+    FÖRSTA match (g-A-1). Lagras som slot_id = 'champion'. Detta är "vem vinner hela VM"-momentet
+    (störst bonus). Ny tabell `bracket_predictions` (PK room+slot+user, upsert), constraint slot_id
+    `^(M(7[3-9]|8[0-9]|9[0-9]|10[0-4])|champion)$` (slutspelsmatcherna + champion, INGA gruppmatcher),
+    lag-id `^[A-Z]{3}$`.
+
+**3. BONUS-POÄNGREGLERNA (SPEC tyst på exakta tal -> vedertagen VM-pool-standard, dokumenterad
+som medvetet val, INTE gissning):** SPEC §4/§12 säger bara "bonuspoäng" + "rätt utfall vs exakt
+resultat" på rubriknivå, inga exakta bonustal. Vi följer den VEDERTAGNA pool-standarden, samma
+"mer specifikt/svårare rätt belönas högre"-gradient som T15:s "exakt > utfall":
+  - **Grupp:** rätt gruppvinnare (1:a) = **3p**, rätt grupptvåa (2:a) = **2p**, OBEROENDE per
+    position (rätt lag fel position ger 0, positionen ÄR tipset, KISS). 1:a väger mer än 2:a (den
+    är svårare att pricka), vedertaget i grupp-pooler.
+  - **Bracket per-slot:** rätt lag VIDARE ur en slutspelsmatch = poäng som STIGER med rundan
+    (R32=1, R16=2, kvart=3, semi=4, brons/final=5). Standard i bracket-pooler (t.ex. ESPN
+    Tournament Challenge-familjen: poängen ökar/dubblas per runda); vi väljer en enkel linjär
+    1..5, INTE en härmning av en specifik produkts exakta tal.
+  - **Mästaren:** rätt VM-vinnare = **8p** (störst, ett svårt enskilt tips).
+  **Källa:** vedertagen VM-pool-/bracket-standard (1:a > 2:a; djupare runda väger tyngre; mästaren
+  ger störst bonus). Rena funktioner `scoreGroupPrediction` / `scoreBracketAdvance` /
+  `scoreChampionPrediction` (`src/data/predictions/bonus-score.ts`), uttömmande testade.
+  **VIKTIGT (anti-dubbelräkning):** ett bracket-tips poängsätts mot vem som AVANCERADE (T9:s
+  vinnar-härledning inkl. straffar, FIFA Art. 14), INTE mot målställningen, det är skilt från T15:s
+  scorePrediction som poängsätter ordinarie mål och räknar ett straff-avgjort slutspel som 'draw'.
+  De två tipsformerna mäter olika saker.
+
+**4. DEADLINE-LÅS + SEKRETESS ÄR SERVER-SIDE (RLS), samma anti-fusk-modell som T15 (HARD):** ett
+klient-lås räcker inte (anon-rollen är enda rollen, RLS enda skyddet). Klockan = DB:ns `now()`,
+aldrig klientens. Deadline-ankarena slås upp i den befintliga `match_kickoffs`-referenstabellen
+(T15, redan seedad med alla 104 kickoffs) via TVÅ nya SECURITY DEFINER-helpers (samma härdning som
+`match_kickoff`/`is_room_member`: search_path='', EXECUTE för anon/authenticated eftersom RLS-uttryck
+körs i anroparens roll):
+  - `group_deadline_kickoff(group_id)` = gruppens första match `g-X-1` (per-grupp-lås, inte globalt,
+    så grupp L kan tippas efter att grupp A börjat). **Källmedvetet val:** per-grupp är rättvisare
+    och KISS, dokumenterat.
+  - `bracket_deadline_kickoff(slot_id)` = slottens egen avspark för M73..M104, eller `g-A-1`
+    (turneringsstart) för 'champion'.
+  Sekretessen: andras tips DOLDA före respektive deadline (SELECT-policy: eget alltid, andras bara
+  efter deadline + medlemskap). FAIL-SAFE: en okänd grupp/slot ger NULL-deadline => `now() < NULL` =
+  NULL => skriv NEKAS, `now() >= NULL` = NULL => andras tips DOLDA. Ett saknat kickoff kan aldrig
+  öppna ett fusk-fönster. Migrationer: `..._t16_group_predictions_schema/rls.sql` +
+  `..._t16_bracket_predictions_schema/rls.sql`.
+
+**RLS BEVISAD SERVER-SIDE FÖRE KLIENT-KODEN (playbook-receptet, samma som T14/T15):** senior-
+developern bevisade alla garantier med RIKTIGA roller (`set role authenticated` + jwt-claims, ett
+självstädande DO/EXCEPTION-block) mot det levande projektet (kmzhyblzxangpxydufve), med tre
+kickoff-tider tillfälligt satta i det förflutna och återställda efteråt. **9 prov, alla gröna:**
+(G1) medlem får tippa öppen grupp, (G2) deadline-låset NEKAR grupp-tips efter gruppstart
+(insufficient_privilege), (G3) förfalskning (grupp-tips i annans namn) nekas, (G4) sekretess: medlem
+ser BARA sitt eget grupp-tips på en öppen grupp, (G5) utomstående nekas läs+skriv, (B6) medlem får
+tippa öppen slot + champion, (B7) per-slot-deadline NEKAR efter slottens avspark, (B8) champion-
+deadline NEKAR efter turneringsstart, (B9) bracket-sekretess: medlem ser bara sitt eget. Proof-data
+städades, kickoff-tiderna återställda (verifierat 104 rader, g-A-1/g-K-1/M73 åter på sina riktiga
+värden). Klient-integrationstestet (`pool-predictions-rls.integration.test.ts`) täcker det som är
+bevisbart via klient-API:t mot en öppen grupp/slot (skippas offline, env-gated, som T14/T15).
+
+**LAG-IDENTITET = `code` (uppercase FIFA-kod), inte `id` (lowercase):** Team.id är gemen landskod
+(t.ex. "swe"), Team.code är versal FIFA-kod (t.ex. "SWE"). Pool-tipsen lagrar `code` (matchar
+constraint `^[A-Z]{3}$` + är den stabila publika 3-bokstavskoden). bonus-score jämför lag-id-strängar
+(vilken konsekvent identitet som helst funkar); UI + framtida T17-aggregering MÅSTE använda `code`
+konsekvent.
+
+**TYP-SANNING (samma som T15:s match_kickoff, Copilot C7):** `group_deadline_kickoff` och
+`bracket_deadline_kickoff` har TS-typ `Returns: string | null` (hand-rättat i supabase-types.ts), INTE
+`string` som generatorn skriver. NULL är fail-safe-regeln ovan; typen måste tillåta null annars antar
+framtida konsumenter non-null och tappar säkerhets-invariantens kontrakt.
+
+**ADVISOR-NOTERINGAR (medvetna, samma klass som T14/T15):** `get_advisors (security)` flaggar WARN för
+(a) anonym åtkomst-policy på `group_predictions`/`bracket_predictions` och (b) att de två nya
+deadline-helpers (SECURITY DEFINER) är anropbara av anon/authenticated. Båda MEDVETNA: anonyma vänner
+ÄR användarna, och helpers MÅSTE vara körbara (RLS-uttryck i anroparens roll). Inga nya ERROR-nivå-
+fynd, inga "RLS disabled".
+
+**DISPOSITION (medveten halvering, taskens "bygg kärnan solitt"-tillåtelse):** DATAKÄRNAN (schema +
+RLS + poäng + klient-API + tester) är byggd FULLT för BÅDE grupp- OCH bracket-tips, det är den
+HÖG-RISK-delen (dataintegritet/anti-fusk). UI:t är levererat FULLT för GRUPP-tipsen
+(GroupPredictionSection -> Provider -> View -> Form, mounted i App), med samma epoch-vakt/deadline-
+tick-rigor som T15. BRACKET-tipsens UI är en PINNAD FORTSÄTTNING (T16b): API:t `bracket-predictions-api`
++ poängreglerna finns och är testade, men en interaktiv bracket-tips-vy (välj vinnare per slutspels-
+slot + mästar-väljare, ovanpå BracketView-strukturen från T9) är inte byggd. Skäl: två fulla
+provider/view/form-trippler med T15:s rigor är mer än en rimlig task; hellre en solid halva (grupp-UI
++ HELA datakärnan för båda) än två halvfärdiga UI:n. Se HANDOFF.
+
+---
+
 ## 2026-06-11 , T15 (#15, C14): stale-request-vakt på savePrediction (samma epoch-mönster som T14 KA-F2)
 
 **Beslut (C14, dataintegritets-fynd):** `PredictionsProvider.savePrediction` gjorde en optimistisk

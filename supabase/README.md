@@ -14,6 +14,8 @@ Bara **delad, muterbar** state ligger i Supabase:
 | `room_match_results` | Delade matchresultat per rum (vännerna fyller i ihop). |
 | `predictions` (T15) | Tips: en gissad målställning per (rum, match, användare). |
 | `match_kickoffs` (T15) | Referensdata: matchernas avsparkstider, deadline-låsets klocka. |
+| `group_predictions` (T16) | Pool-tips: gissad 1:a + 2:a per grupp (A till L). |
+| `bracket_predictions` (T16) | Slutspels-tips: vem går vidare per slot + VM-vinnaren. |
 
 **Statisk turneringsdata (lag, grupper, spelschema) stannar i klient-bundlen.**
 Den är källåkrad och verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare,
@@ -69,6 +71,35 @@ NAMN i `list_migrations`, samma SQL). En nyans: version-STÄMPLARNA skiljer (fil
 `20260611120000..120400`, live fick MCP-genererade stämplar vid apply), men namnen + innehållet
 är 1:1, så en fresh-replay av filträdet kör exakt samma steg i samma ordning. Ingen konsolidering,
 ingen drift i slutläget (verifierat mot `list_tables`/`pg_indexes` + RLS-proven).
+
+## T16 (#16): pool-tipsen, gruppvinnar-tips + bracket-/slutspels-tips
+
+Två nya tabeller ovanpå T15:s mönster (bygger PÅ, bygger inte om):
+
+- **`group_predictions`** (PK `room_id, group_id, user_id`): gissad 1:a + 2:a per grupp A..L.
+  Deadline = gruppens FÖRSTA match `g-X-1` (per-grupp-lås) via ny helper `group_deadline_kickoff`.
+- **`bracket_predictions`** (PK `room_id, slot_id, user_id`): vem går VIDARE per slutspels-slot
+  (M73..M104) + VM-vinnaren (`slot_id = 'champion'`). Deadline = slottens egen avspark, eller
+  `g-A-1` (turneringsstart) för champion, via ny helper `bracket_deadline_kickoff`.
+
+Båda låsen + sekretessen är RLS, klockan = DB:ns `now()`, ankarena slås upp i den befintliga
+`match_kickoffs` (T15, redan seedad med alla 104 kickoffs, ingen ny seed behövs). De två nya
+helpers är SECURITY DEFINER med samma härdning som `match_kickoff`/`is_room_member`
+(`search_path=''`, EXECUTE för anon/authenticated). FAIL-SAFE: okänd grupp/slot => NULL-deadline =>
+skriv nekas + andras tips dolda. Poängreglerna (3p/2p grupp, 1..5 bracket-runda, 8p mästare) är
+rena funktioner i `src/data/predictions/bonus-score.ts`. Allt i `docs/decisions.md` (T16).
+
+Bevisat SERVER-SIDE med riktiga roller (DO-block, 9 prov: medlemskap, deadline-lås per grupp/slot/
+champion, förfalskning, sekretess, utomstående) av senior-developern, med tre kickoff-tider
+tillfälligt i det förflutna och återställda. Klient-delarna: `pool-predictions-rls.integration.test.ts`.
+
+**Migration-historik (T16, samma nyans som T15):** de fyra T16-migrationerna applicerades 1:1 från
+de committade filerna via `apply_migration` i samma ordning: `t16_group_predictions_schema`,
+`t16_group_predictions_rls`, `t16_bracket_predictions_schema`, `t16_bracket_predictions_rls` (samma
+fyra NAMN i `list_migrations`, samma SQL). Version-STÄMPLARNA skiljer (filerna har
+`20260611130000..130300`, live fick MCP-genererade stämplar `20260611002406..002434` vid apply), men
+namnen + innehållet är 1:1, så en fresh-replay kör exakt samma steg. Ingen konsolidering, ingen drift
+i slutläget (verifierat mot `list_tables` + RLS-proven).
 
 **Index på `predictions` (Copilot C10):** bara primärnyckeln `predictions_pkey
 (room_id, match_id, user_id)` finns kvar. De ursprungliga `predictions_room_idx (room_id)` och
