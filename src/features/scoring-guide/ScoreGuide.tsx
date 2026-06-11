@@ -129,24 +129,13 @@ export function ScoreGuide({ surface = 'tips' }: ScoreGuideProps) {
         aria-haspopup="dialog"
         aria-expanded={open}
         data-score-guide-open={surface}
-        className="inline-flex items-center gap-1.5 rounded-pill border border-[color-mix(in_srgb,var(--vm-gold)_30%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_8%,var(--color-surface))] px-3 py-1.5 font-display text-xs font-semibold text-fg outline-none transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--vm-gold)_16%,var(--color-surface))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+        className="vm-score-trigger inline-flex items-center gap-2 rounded-pill border px-3.5 py-1.5 font-display text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
       >
-        {/* Liten fråge-cirkel som affordans (dekorativ, etiketten bär betydelsen). */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          className="h-3.5 w-3.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.6}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ color: 'var(--vm-gold)' }}
-        >
-          <circle cx="8" cy="8" r="6.5" />
-          <path d="M6.2 6.1a1.8 1.8 0 0 1 3.5.6c0 1.2-1.7 1.5-1.7 2.6" />
-          <path d="M8 11.4h.01" />
-        </svg>
+        {/* Guld-frågesigill (solid bricka + mörk ink) som tydlig "här finns en
+            förklaring"-affordans. Dekorativt, etiketten bär betydelsen. */}
+        <span aria-hidden="true" className="vm-score-trigger-seal h-4 w-4 text-[0.625rem]">
+          ?
+        </span>
         Så funkar poängen
       </button>
 
@@ -210,40 +199,76 @@ function ScoreGuideDialog({
         initial={panelInitial}
         animate={panelAnimate}
         transition={motionEnabled ? springs.gentle : transitions.quick}
-        className="relative flex max-h-[92dvh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-t-card border border-border bg-surface p-6 shadow-[var(--vm-shadow-raised)] sm:max-h-[88dvh] sm:rounded-card sm:p-7"
+        className="relative flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-card border border-border bg-surface shadow-[var(--vm-shadow-raised)] sm:max-h-[88dvh] sm:rounded-card"
       >
-        <header className="flex items-start justify-between gap-3 pr-1">
-          <div className="flex flex-col gap-1">
-            <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-warning">
-              Poängen
-            </p>
-            <h2 id={headingId} className="font-display text-xl font-bold sm:text-2xl">
-              Så funkar poängen
-            </h2>
-          </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Stäng förklaringen"
-            data-score-guide-close={surface}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-pill border border-border bg-surface text-fg-muted outline-none transition-colors hover:bg-surface-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
-          >
-            <span aria-hidden="true" className="text-lg leading-none">
-              ×
+        {/* Stäng-knappen (stabil fokus-startpunkt) svävar över hero-bandet med egen
+            fond, så den syns mot den ljustonade arena-glow:en. Samma grepp som
+            lag-profilen (T10). */}
+        <button
+          ref={closeButtonRef}
+          type="button"
+          onClick={onClose}
+          aria-label="Stäng förklaringen"
+          data-score-guide-close={surface}
+          className="absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-pill border border-border bg-surface/80 text-fg-muted outline-none backdrop-blur-sm transition-colors hover:bg-surface-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+        >
+          <span aria-hidden="true" className="text-lg leading-none">
+            ×
+          </span>
+        </button>
+
+        {/* Scroll-region: hero + intro + sektioner. Kroppen får aldrig svämma över
+            overlayns kant (max-h på panelen + intern scroll här). */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {/* HERO-BANDET: "arena i kvällsljus" i grön + guld (samma familj som lag-
+              profilen och slutspels-hjälten). Pokal-emblem + eyebrow + rubrik. All
+              text står på den opaka surface-raised-fonden, glow:en är ren stämning. */}
+          <header className="vm-score-guide-hero flex items-center gap-4 border-b border-border px-6 pb-5 pt-6 pr-14 sm:px-7 sm:pt-7">
+            {/* Pokal-emblem (solid guld + mörk ink). Dekorativt, rubriken bär betydelsen. */}
+            <span
+              aria-hidden="true"
+              className="vm-score-guide-emblem h-11 w-11 rounded-pill sm:h-12 sm:w-12"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M7 4h10v3a5 5 0 0 1-10 0V4Z" />
+                <path d="M7 5H4.5a2.5 2.5 0 0 0 2.5 4M17 5h2.5a2.5 2.5 0 0 1-2.5 4" />
+                <path d="M12 12v3M9 19h6M10 19v-1.2a2 2 0 0 1 4 0V19" />
+              </svg>
             </span>
-          </button>
-        </header>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-warning">
+                Poängen
+              </p>
+              <h2
+                id={headingId}
+                className="font-display text-xl font-bold leading-tight sm:text-2xl"
+              >
+                Så funkar poängen
+              </h2>
+            </div>
+          </header>
 
-        <p id={introId} className="text-sm leading-relaxed text-fg-muted">
-          Du samlar poäng genom att tippa rätt. Här ser du vad varje rätt gissning ger, ju svårare
-          och mer exakt, desto mer.
-        </p>
+          {/* KROPP: intro + sektionerna, generös andning. */}
+          <div className="flex flex-col gap-5 px-6 py-5 sm:px-7 sm:py-6">
+            <p id={introId} className="text-sm leading-relaxed text-fg-muted">
+              Du samlar poäng genom att tippa rätt. Här ser du vad varje rätt gissning ger, ju
+              svårare och mer exakt, desto mer.
+            </p>
 
-        <div className="flex flex-col gap-4">
-          {sections.map((section) => (
-            <ScoreSection key={section.id} surface={surface} section={section} />
-          ))}
+            <div className="flex flex-col gap-5">
+              {sections.map((section) => (
+                <ScoreSection key={section.id} surface={surface} section={section} />
+              ))}
+            </div>
+          </div>
         </div>
       </motion.div>
     </motion.div>,
@@ -266,9 +291,11 @@ function ScoreSection({ surface, section }: { surface: string; section: ScoreExp
       <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {section.items.map((item) => (
           <li key={item.id} data-score-guide-rule={item.id} className="flex items-baseline gap-3">
-            {/* Poäng-brickan: HÄRLEDD text ur konstanten (formatScorePoints), aldrig
-                en hårdkodad siffra. tabular-nums så talen står stadigt. */}
-            <span className="inline-flex shrink-0 items-baseline rounded-pill bg-[color-mix(in_srgb,var(--vm-gold)_14%,var(--color-surface-raised))] px-2.5 py-0.5 font-display text-sm font-bold tabular-nums text-fg">
+            {/* Poäng-brickan: HÄRLEDD text ur konstanten (formatScorePoints), aldrig en
+                hårdkodad siffra. STOLT solid guld-bricka med mörk ink (.vm-score-points),
+                samma färg-oberoende, AA-säkra solid-bricka-form som kupongens/facitets
+                tal, så den undviker guld-på-tint-fällan. tabular-nums = stadiga tal. */}
+            <span className="vm-score-points min-w-[2.75rem] justify-center rounded-pill px-2.5 py-0.5 text-sm tabular-nums">
               {formatScorePoints(item.points)}
             </span>
             <span className="text-sm leading-relaxed text-fg-muted">{item.label}</span>
