@@ -1,0 +1,34 @@
+# EOL-normalisering (T41, issue #70)
+#
+# VARFÖR: utan .gitattributes avgör varje utvecklares lokala editor/OS radslutet.
+# På Windows skriver editorn om en tidigare-LF-fil med CRLF vid minsta ändring, så
+# git ser HELA filen som ändrad (varje rad får nytt radslut). En 12-raders ändring
+# blev en 186-raders hel-fil-rewrite i diffen (T38), vilket gör review svårare och
+# döljer den äkta ändringen. Mönstret återkom i T38/T50/T51/T55/T59+ och krävde en
+# manuell numstat-vakt varje gång. Denna fil eliminerar roten en gång för alla.
+#
+# `text=auto eol=lf`: git normaliserar ALLA textfiler till LF i repot (i index och
+# vid checkout), oavsett plattform. Kombineras med Prettier `endOfLine: "lf"` så att
+# format:check FÅNGAR en CRLF-flip (med `endOfLine: "auto"` var grinden blind).
+* text=auto eol=lf
+
+# Binär-undantag: dessa får ALDRIG radslut-normaliseras (de innehåller inga radslut
+# i textmening; en "normalisering" skulle korrumpera bytes). `binary` = `-text -diff`.
+# Faktiska binärtyper i repot idag: .png (4 st), .woff2 (1 st) under public/.
+# Övriga är defensiva: vanliga bild-/font-/media-format en framtida task kan lägga
+# till, så vakten håller utan att behöva röras igen.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.avif  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.otf   binary
+*.pdf   binary
+*.mp4   binary
+*.webm  binary
