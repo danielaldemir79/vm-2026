@@ -9,7 +9,10 @@ import type { GroupPrediction } from '../../data/predictions';
 import type { Group, Match, Team } from '../../domain/types';
 import { teamCode } from '../../domain/team-code';
 
-// Mocka data-laddnings-hooken (vi testar vyns LÄGEN, inte I/O:t).
+// Mocka data-laddnings-hooken (vi testar vyns LÄGEN, inte I/O:t). Hooken är en
+// vi.fn() så vi kan RÄKNA anrop: efter T51-fixen (en laddning, ingen dubbel fetch)
+// ska den anropas exakt EN gång per render av vyn, inte två (den tips-härledda
+// vyn laddar inte längre samma turneringsdata igen, den får den injicerad).
 const dataState = vi.hoisted(() => ({
   status: 'ready' as 'loading' | 'ready' | 'error',
   groups: [] as Group[],
@@ -17,8 +20,9 @@ const dataState = vi.hoisted(() => ({
   matches: [] as Match[],
   error: null as string | null,
 }));
+const useGroupPredictableDataMock = vi.hoisted(() => vi.fn());
 vi.mock('./use-group-predictable-data', () => ({
-  useGroupPredictableData: () => dataState,
+  useGroupPredictableData: useGroupPredictableDataMock,
 }));
 
 const TEAMS: Team[] = [
@@ -78,6 +82,8 @@ beforeEach(() => {
   dataState.teams = TEAMS;
   dataState.matches = MATCHES;
   dataState.error = null;
+  useGroupPredictableDataMock.mockReset();
+  useGroupPredictableDataMock.mockReturnValue(dataState);
 });
 
 describe('GroupPredictionsView', () => {
@@ -130,6 +136,18 @@ describe('GroupPredictionsView', () => {
     expect(bNotice).toHaveTextContent(/Tippningen låses/);
     expect(bNotice).toHaveTextContent(/12 juni kl 21:00/);
     expect(aForm.querySelector('[data-deadline-notice]')).toBeNull();
+  });
+
+  it('EN LADDNING: turneringsdatan laddas exakt en gång, den tips-härledda vyn får den injicerad', () => {
+    // T51 Copilot-fynd 5: den simulerade slutspels-vyn laddade tidigare samma
+    // turneringsdata IGEN (egen useGroupPredictableData) -> dubbel fetch + extra
+    // loading-cykel. Nu skickar värd-vyn ned sin redan-laddade data, så hooken
+    // anropas exakt EN gång och sim-sektionen renderas i samma render.
+    renderView(store({}), new Date('2026-06-10T00:00:00Z'));
+    expect(useGroupPredictableDataMock).toHaveBeenCalledTimes(1);
+    // Sim-sektionen är monterad (ready), driven av den injicerade datan.
+    expect(document.querySelector('[data-tips-bracket-section]')).not.toBeNull();
+    expect(screen.getByText('Slutspelet ur dina tips')).toBeInTheDocument();
   });
 
   it('seedar formuläret från mitt befintliga grupp-tips', () => {
