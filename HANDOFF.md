@@ -5,6 +5,90 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T38/#67 (Rum-persistens + signatur) KLAR - PR #71 väntar på merge
+
+**Branch:** `feature/T38-pre-share` @ HEAD `4b8a330`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/71 mot `develop` (Closes #67, state: OPEN)
+**Board:** issue #67 i "In Review" (korrekt). Dirigenten stänger issue #67 MANUELLT och flyttar kort #67 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `5633140` - feat(rooms): rum-persistens i localStorage (aktivt rum sparas + återställs, robust mot kastande storage och borttaget rum)
+- `8760d40` - feat(app): "Made by Daniel Aldemir"-signatur i footern (diskret, estetisk)
+- `541b8e9` - fix(a11y): a11y-fix för signatur
+- `4b8a330` - fix(rooms): Copilot C1 script-fix (HEAD)
+
+**Verifiering:** 1018 gröna + 29 env-skippade. Lokal panel: godkänd (rum-persistens probe:ad + negativ kontroll + live-verifierad, EOL-housekeeping pinnat som egen task #70). Copilot 2 rundor (1 -> 0). Build/lint/format rent.
+
+**Alla 6/6 acceptanskriterier bockade i issue #67** (journalisten 2026-06-11).
+
+**Daniels delnings-läge (verifierat tryggt):**
+- ewrmdt-rummet: 85 tips, data i molnet, rum-ID bevaras nu via localStorage
+- Daniels visningsnamn "Daniel Aldemir" - DB-fixat separat
+- Identitet stabil per enhet (persistSession på, anon-auth OK)
+- T37 (lagstorlek) - STÄNGD/SKIPPAD (kort-utrymme vann)
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping pinnades av lokal panel, kort i Ready.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bär framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort #56 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+
+**IMPROVEMENTS-kandidater (dirigenten skriver i IMPROVEMENTS.md):**
+1. "När en task medvetet pinnar konsument-seamen till en senare task, kräv att data-/identitets-KONTRAKTET skrivs där funktionen DEFINIERAS, inte bara i decisions.md." (F1-fällan: code-vs-id tyst noll hade hindrats av ett kontrakt vid definitions-stället.)
+2. "Supabase deadline-lås + sekretess-RLS-mönstret (rls-tidslås-sekretess-mot-kallankrad-referenstabell) verifierat 3 gånger (T14/T15/T16) med 3 rena RLS-pass. Playbook-post nu på Förekomst 2 - nästa förekomst triggar Förekomst >= 3 och befordransregeln. Kandidat för senior-developer-rekommendation i README."
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #71 (T38/#67, feature/T38-pre-share) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 71 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #67 manuellt (`gh issue close 67`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #67 till Done på boarden.
+> Verifiera att vm-2026.pages.dev bevarar rum-valet vid sidladdning och visar "Made by Daniel Aldemir"-signaturen i footern.
+>
+> Om PR #71 REDAN mergad:
+> T38 är klar och mergad. Rum-persistens + signatur levererade. Daniel kan nu dela appen.
+> **Nästa task: #68 (T39, install-knappen funkar + döljs i app-läge) - BLOCKERAR Daniels delning.**
+> Rotorsaka varför install-knappen inte triggar prompten (deferredPrompt-flöde), dölj affordansen i standalone-läge, verifiera live. Se issue #68 för fullständigt scope.
+> **Därefter i prioritetsordning:**
+> - #69 (T40 resultat-rätt-feedback på kortet + topplista synlig)
+> - #62 (T34 poängskala + "Så funkar poängen"-UI)
+> - #63 (T35 tippnings-lås/fönster/deadline)
+> - #64 (T36 Play Protect TWA)
+> - #70 (T41 .gitattributes EOL-housekeeping)
+> - #48/#56 (plockas när de passar)
+> - T18-T25 därefter
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **#56 (delad modal-primitiv):** kort i Ready, plockas när rule-of-three nås.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T17/#17 (Topplista + tips-avslöjande) KLAR - PR #66 väntar på merge
 
 **Branch:** `feature/T17-topplista` @ HEAD `2702e6e`
