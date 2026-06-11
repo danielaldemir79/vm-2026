@@ -5,6 +5,111 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T16 (#16): pool-tipsen, gruppvinnar-tips + bracket-/slutspels-tips (modell + poäng + RLS)
+
+VM-poolens kärna (SPEC §6: GroupPrediction + BracketPrediction). Bygger PÅ T15:s mönster
+(scorePrediction, match_kickoffs-deadline-lås, sekretess-RLS, T9:s bracket-struktur), bygger
+INTE om. Fyra modell-/regelbeslut, alla med dataintegritet/anti-fusk i fokus (HARD).
+
+**1. GRUPP-TIPS-MODELLEN (källmedvetet):** ett grupp-tips är en gissad (1:a, 2:a) per grupp
+(A..L), per rum, per användare. SPEC §6 (GroupPrediction) säger "gissad gruppvinnare/tvåa per
+grupp". De TVÅ platserna är de enda direkt-kvalificerade (3:orna seedas av FIFA Annexe C, T4,
+inte ett tippnings-moment). Ny tabell `group_predictions` (PK room+group+user, upsert), constraints:
+group_id A..L, lag-id = FIFA trebokstavskod `^[A-Z]{3}$`, 1:a <> 2:a.
+
+**2. BRACKET-TIPS-MODELLEN (källmedvetet, det klurigaste valet):** slutspelet börjar EFTER
+gruppspelet, så lagen i en tidig slutspels-slot är delvis okända när man vill tippa. Man KAN INTE
+tippa "Brasilien vinner sin sextondel" innan man vet att Brasilien hamnar där. **Standard-VM-pool
+löser det, och vi följer det:**
+  - **PER-SLOT "GÅR VIDARE"-TIPS:** ett tips per slutspelsmatch-slot (M73..M104), man tippar
+    vilket LAG som går vidare ur slotten. Låses per matchens EGEN avspark (exakt T15:s deadline-
+    modell), så man kan tippa när slottens lag är kända men FÖRE matchen, robust mot att lagen
+    avslöjas gradvis under slutspelet.
+  - **VM-VINNAR-TIPS (mästaren):** EN separat tippning FÖRE turneringen, låst vid turneringens
+    FÖRSTA match (g-A-1). Lagras som slot_id = 'champion'. Detta är "vem vinner hela VM"-momentet
+    (störst bonus). Ny tabell `bracket_predictions` (PK room+slot+user, upsert), constraint slot_id
+    `^(M(7[3-9]|8[0-9]|9[0-9]|10[0-4])|champion)$` (slutspelsmatcherna + champion, INGA gruppmatcher),
+    lag-id `^[A-Z]{3}$`.
+
+**3. BONUS-POÄNGREGLERNA (SPEC tyst på exakta tal -> vedertagen VM-pool-standard, dokumenterad
+som medvetet val, INTE gissning):** SPEC §4/§12 säger bara "bonuspoäng" + "rätt utfall vs exakt
+resultat" på rubriknivå, inga exakta bonustal. Vi följer den VEDERTAGNA pool-standarden, samma
+"mer specifikt/svårare rätt belönas högre"-gradient som T15:s "exakt > utfall":
+  - **Grupp:** rätt gruppvinnare (1:a) = **3p**, rätt grupptvåa (2:a) = **2p**, OBEROENDE per
+    position (rätt lag fel position ger 0, positionen ÄR tipset, KISS). 1:a väger mer än 2:a (den
+    är svårare att pricka), vedertaget i grupp-pooler.
+  - **Bracket per-slot:** rätt lag VIDARE ur en slutspelsmatch = poäng som STIGER med rundan
+    (R32=1, R16=2, kvart=3, semi=4, brons/final=5). Standard i bracket-pooler (t.ex. ESPN
+    Tournament Challenge-familjen: poängen ökar/dubblas per runda); vi väljer en enkel linjär
+    1..5, INTE en härmning av en specifik produkts exakta tal.
+  - **Mästaren:** rätt VM-vinnare = **8p** (störst, ett svårt enskilt tips).
+  **Källa:** vedertagen VM-pool-/bracket-standard (1:a > 2:a; djupare runda väger tyngre; mästaren
+  ger störst bonus). Rena funktioner `scoreGroupPrediction` / `scoreBracketAdvance` /
+  `scoreChampionPrediction` (`src/data/predictions/bonus-score.ts`), uttömmande testade.
+  **VIKTIGT (anti-dubbelräkning):** ett bracket-tips poängsätts mot vem som AVANCERADE (T9:s
+  vinnar-härledning inkl. straffar, FIFA Art. 14), INTE mot målställningen, det är skilt från T15:s
+  scorePrediction som poängsätter ordinarie mål och räknar ett straff-avgjort slutspel som 'draw'.
+  De två tipsformerna mäter olika saker.
+
+**4. DEADLINE-LÅS + SEKRETESS ÄR SERVER-SIDE (RLS), samma anti-fusk-modell som T15 (HARD):** ett
+klient-lås räcker inte (anon-rollen är enda rollen, RLS enda skyddet). Klockan = DB:ns `now()`,
+aldrig klientens. Deadline-ankarena slås upp i den befintliga `match_kickoffs`-referenstabellen
+(T15, redan seedad med alla 104 kickoffs) via TVÅ nya SECURITY DEFINER-helpers (samma härdning som
+`match_kickoff`/`is_room_member`: search_path='', EXECUTE för anon/authenticated eftersom RLS-uttryck
+körs i anroparens roll):
+  - `group_deadline_kickoff(group_id)` = gruppens första match `g-X-1` (per-grupp-lås, inte globalt,
+    så grupp L kan tippas efter att grupp A börjat). **Källmedvetet val:** per-grupp är rättvisare
+    och KISS, dokumenterat.
+  - `bracket_deadline_kickoff(slot_id)` = slottens egen avspark för M73..M104, eller `g-A-1`
+    (turneringsstart) för 'champion'.
+  Sekretessen: andras tips DOLDA före respektive deadline (SELECT-policy: eget alltid, andras bara
+  efter deadline + medlemskap). FAIL-SAFE: en okänd grupp/slot ger NULL-deadline => `now() < NULL` =
+  NULL => skriv NEKAS, `now() >= NULL` = NULL => andras tips DOLDA. Ett saknat kickoff kan aldrig
+  öppna ett fusk-fönster. Migrationer: `..._t16_group_predictions_schema/rls.sql` +
+  `..._t16_bracket_predictions_schema/rls.sql`.
+
+**RLS BEVISAD SERVER-SIDE FÖRE KLIENT-KODEN (playbook-receptet, samma som T14/T15):** senior-
+developern bevisade alla garantier med RIKTIGA roller (`set role authenticated` + jwt-claims, ett
+självstädande DO/EXCEPTION-block) mot det levande projektet (kmzhyblzxangpxydufve), med tre
+kickoff-tider tillfälligt satta i det förflutna och återställda efteråt. **9 prov, alla gröna:**
+(G1) medlem får tippa öppen grupp, (G2) deadline-låset NEKAR grupp-tips efter gruppstart
+(insufficient_privilege), (G3) förfalskning (grupp-tips i annans namn) nekas, (G4) sekretess: medlem
+ser BARA sitt eget grupp-tips på en öppen grupp, (G5) utomstående nekas läs+skriv, (B6) medlem får
+tippa öppen slot + champion, (B7) per-slot-deadline NEKAR efter slottens avspark, (B8) champion-
+deadline NEKAR efter turneringsstart, (B9) bracket-sekretess: medlem ser bara sitt eget. Proof-data
+städades, kickoff-tiderna återställda (verifierat 104 rader, g-A-1/g-K-1/M73 åter på sina riktiga
+värden). Klient-integrationstestet (`pool-predictions-rls.integration.test.ts`) täcker det som är
+bevisbart via klient-API:t mot en öppen grupp/slot (skippas offline, env-gated, som T14/T15).
+
+**LAG-IDENTITET = `code` (uppercase FIFA-kod), inte `id` (lowercase):** Team.id är gemen landskod
+(t.ex. "swe"), Team.code är versal FIFA-kod (t.ex. "SWE"). Pool-tipsen lagrar `code` (matchar
+constraint `^[A-Z]{3}$` + är den stabila publika 3-bokstavskoden). bonus-score jämför lag-id-strängar
+(vilken konsekvent identitet som helst funkar); UI + framtida T17-aggregering MÅSTE använda `code`
+konsekvent.
+
+**TYP-SANNING (samma som T15:s match_kickoff, Copilot C7):** `group_deadline_kickoff` och
+`bracket_deadline_kickoff` har TS-typ `Returns: string | null` (hand-rättat i supabase-types.ts), INTE
+`string` som generatorn skriver. NULL är fail-safe-regeln ovan; typen måste tillåta null annars antar
+framtida konsumenter non-null och tappar säkerhets-invariantens kontrakt.
+
+**ADVISOR-NOTERINGAR (medvetna, samma klass som T14/T15):** `get_advisors (security)` flaggar WARN för
+(a) anonym åtkomst-policy på `group_predictions`/`bracket_predictions` och (b) att de två nya
+deadline-helpers (SECURITY DEFINER) är anropbara av anon/authenticated. Båda MEDVETNA: anonyma vänner
+ÄR användarna, och helpers MÅSTE vara körbara (RLS-uttryck i anroparens roll). Inga nya ERROR-nivå-
+fynd, inga "RLS disabled".
+
+**DISPOSITION (medveten halvering, taskens "bygg kärnan solitt"-tillåtelse):** DATAKÄRNAN (schema +
+RLS + poäng + klient-API + tester) är byggd FULLT för BÅDE grupp- OCH bracket-tips, det är den
+HÖG-RISK-delen (dataintegritet/anti-fusk). UI:t är levererat FULLT för GRUPP-tipsen
+(GroupPredictionSection -> Provider -> View -> Form, mounted i App), med samma epoch-vakt/deadline-
+tick-rigor som T15. BRACKET-tipsens UI är en PINNAD FORTSÄTTNING (T16b): API:t `bracket-predictions-api`
++ poängreglerna finns och är testade, men en interaktiv bracket-tips-vy (välj vinnare per slutspels-
+slot + mästar-väljare, ovanpå BracketView-strukturen från T9) är inte byggd. Skäl: två fulla
+provider/view/form-trippler med T15:s rigor är mer än en rimlig task; hellre en solid halva (grupp-UI
++ HELA datakärnan för båda) än två halvfärdiga UI:n. Se HANDOFF.
+
+---
+
 ## 2026-06-11 , T15 (#15, C14): stale-request-vakt på savePrediction (samma epoch-mönster som T14 KA-F2)
 
 **Beslut (C14, dataintegritets-fynd):** `PredictionsProvider.savePrediction` gjorde en optimistisk
