@@ -102,14 +102,17 @@ export function OfficialResultsProvider({
     };
   }, [enabled, supabase, loadResults]);
 
-  // OM-HÄMTNING vid fokus/online (ingen polling, samma som RoomsProvider). En ny
-  // admin-skrivning på en annan enhet syns när användaren kommer tillbaka till fliken.
+  // OM-HÄMTNING vid fokus/online (ingen polling, samma som RoomsProvider) OCH efter
+  // en admin-inloggning. Laddar om BÅDE facit OCH admin-status: efter att Daniel
+  // uppgraderat sin session (AdminLogin) blir is_app_admin() plötsligt true, så
+  // vyn ska växla till inmatningen utan en sidladdning.
   const refresh = useCallback(async () => {
     if (!supabase) {
       return;
     }
-    const loaded = await loadResults();
+    const [loaded, admin] = await Promise.all([loadResults(), isAppAdmin(supabase)]);
     setResults(loaded);
+    setIsAdmin(admin);
   }, [supabase, loadResults]);
 
   // Stabil ref till refresh så fokus/online-lyssnaren inte avregistreras per render.
@@ -157,8 +160,17 @@ export function OfficialResultsProvider({
   );
 
   const store: OfficialResultsStore = useMemo(
-    () => ({ enabled, status, error, results, isAdmin, saveOfficialResult, refresh }),
-    [enabled, status, error, results, isAdmin, saveOfficialResult, refresh]
+    () => ({
+      enabled,
+      status,
+      error,
+      results,
+      isAdmin,
+      client: supabase,
+      saveOfficialResult,
+      refresh,
+    }),
+    [enabled, status, error, results, isAdmin, supabase, saveOfficialResult, refresh]
   );
 
   return (
