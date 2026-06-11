@@ -5,6 +5,72 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T17 (#17): topplista + tips-avslöjande (poäng-aggregering + sekretess-gate)
+
+VM-poolens kröning: vem tippar bäst (topplista med rörelse-animation) + vad alla gissade
+(tips-avslöjande efter avspark). Bygger PÅ T15:s scorePrediction + T16:s bonus-score + de tre
+list-API:erna, bygger INTE om poänglogiken. Fyra modell-beslut, alla källmedvetna.
+
+**1. FACIT-KÄLLAN (vilken sanning poängen jämför mot, dokumenterat val):** rummets DELADE,
+inmatade resultat (`room_match_results`, vävda ovanpå den källåkrade planen via `applyRoomResults`,
+T14 KA-F3) är facit. Rummet lovar "ni fyller i matchresultaten TILLSAMMANS", så den delade
+matchlistan är den ENDA sanningen alla medlemmar delar. Grupptabeller + slutspelsträd härleds i
+sin tur ur EXAKT samma matchlista (`computeStandings`/`deriveBracket`, SPEC §6 "härledd state"),
+ingen ny sanning införs. **Källa:** T14 KA-F3 (apply-room-results.ts) + SPEC §6.
+
+**2. POÄNG-/AVSLÖJANDE-MODELLEN (KISS, löser sekretess-paradoxen):** taskens fråga var "hur
+beräknas andras totalpoäng innan deras tips avslöjats?". Svar: poäng räknas BARA på AVGJORDA/låsta
+utfall, ett tips ger poäng FÖRST när dess match/grupp/slot är avgjord (facit innehåller bara
+avgjorda utfall). Det gör topplistans POÄNG meningsfull LÖPANDE (tickar in när matcher avgörs)
+utan att läsa andras OAVGJORDA tips-innehåll. RLS döljer andras tips-RADER tills deadline, så
+`listRoom*`-API:erna returnerar bara egna + redan-avslöjade rader, aggregeringen kan strukturellt
+bara se det som FÅR ses. Tips-INNEHÅLLET avslöjas SEPARAT (avslöjande-vyn), per avgjord+låst match.
+**Avslöjande-gaten kräver BÅDE låst (`now >= kickoff`, sekretess) OCH avgjord (facit finns, för
+att kunna visa poäng).** Server-RLS är det RIKTIGA skyddet (bevisat T15/T16); klient-gaten gör bara
+VISNINGEN sann. **Källa:** T15 §4 (tips-sekretess RLS) + T16 §4 + isMatchLocked (T15).
+
+**3. LAG-IDENTITET (HARD, T16 F1-seamen, code-vs-id tyst-noll):** pool-tipsen LAGRAS som versal
+Team.CODE ("BRA", DB-constraint `^[A-Z]{3}$`), men det härledda facit (`computeStandings.teamId`,
+`deriveBracket.winnerTeamId`) bär gemen Team.ID ("bra", `teamId(code)=toLowerCase`). Möts de två
+rymderna otransformerat ger det TYST 0 poäng för ALLA tips. **Fix: facit-modulen (derive-facit.ts)
+mappar id -> CODE (branded `TeamCode`) VID KÄLLAN, via lag-listan, INNAN facit lämnar modulen.** Då
+bär BÅDA sidor versal code; en gemen id kan strukturellt inte nå poängfunktionen, och kontraktet är
+i TYPEN (TeamCode), inte bara en docstring. bonus-score:s egen normalisering blir defense-in-depth.
+**BEVIS (att seamen NÅS):** ett seam-test kör de RIKTIGA `computeStandings`/`deriveBracket` på en
+produktions-grupp-fixture, plockar härlett `teamId`/`winnerTeamId` (gemen id), och kräver full poäng
+mot ett code-lagrat tips. Mutationstestat: med id->id-mappning (omappat) failar seam-testet RÖTT
+(`expected +0 to be 5`), med id->code är det grönt. En FAIL-LOUD-vakt kastar om ett härlett facit-id
+saknar code i lag-listan (brutet referens-kontrakt), aldrig tyst. **Källa:** reviewer-lärdom T16 F1
+(`tva-identitetsrymder-moter-forst-vid-otestad-poang-seam`) + docs/decisions.md T16 + team-code.ts.
+
+**4. RANGORDNING + TIEBREAK (källmedvetet, edge-testat):** sortera på total poäng FALLANDE, LIKA
+poäng = DELAD placering (samma rank, nästa distinkta hoppar fram, "1,1,3"-stilen, standard för
+delade placeringar). **Tiebreak (visnings-ordning INOM en delad grupp, inte en rank-skiljare):**
+(1) fler EXAKTA match-resultat (3-poängare) först, en KVALITETS-skillnad som speglar skickligare
+tippande (samma anda som poängregelns "exakt > utfall"), (2) därefter visningsnamn ALFABETISKT
+(svensk locale), en stabil förutsägbar ordning så listan aldrig "flaxar". Tiebreaket bryter ALDRIG
+den delade placeringen, lika poäng = samma rank oavsett tiebreak. **Källa:** vedertagen poolspel-
+standard (delad placering vid lika; mer specifikt rätt väger tyngre); SPEC anger ingen avvikande
+regel, så standarden är förvalet, inte en gissning.
+
+**RÖRELSE-ANIMATION (taskens punkt 1):** topplistans rader är `motion.li` med `layout='position'`,
+så de GLIDER till sin nya plats när poäng/ordning ändras. Reduced-motion: `MotionConfig
+reducedMotion="user"` (MotionProvider) stänger AUTOMATISKT av layout-/transform-animationer, OCH
+`layout` gatas explicit på `useReducedMotion` (dubbelt skydd, WCAG 2.3.3). Funktionellt lager:
+stabil semantik (`<ol>`, aria-label "Placering N") + data-attribut (`data-leaderboard-row/-rank/
+-points`, `data-user-id` som stabil animations-key); premium-finish (medaljer, glow) -> design-frontend.
+
+**ARKITEKTUR (DRY, lägsta koppling):** tre RENA moduler (derive-facit / aggregate-scores / reveal,
+React-fritt, fristående testbara) + en LÄS-ONLY provider (T17 skriver inga tips, aggregerar de
+befintliga). Provider:n läser facit-källan via `useLeaderboardData` (laddar statisk data + väver in
+`useRoomsSync.sharedResults` med SAMMA `applyRoomResults` som ResultsProvider, så facit är IDENTISKT
+och sektionen kan ligga UTANFÖR ResultsProvider, alongside tips-sektionerna). Epoch-vakt mot rumsbyte
+(samma mönster som T15 C14 / T16). Sektionen gatas på `rooms.enabled` (samma som T15/T16-sektionerna).
+
+**DISPOSITION:** topplistan + tips-avslöjandet byggda FULLT (taskens kärna). Realtids-synk (T18) +
+mini-ligor (T20) out of scope. Premium-finish (medaljer, rörelse-polish) lämnas till design-frontend
+ovanpå data-attribut-seamen (samma arbetsdelning som T15/T16).
+
 ## 2026-06-11 , T16b-visuellt (#59): bracket-tips-lagrets premium-finish ("vägen till bucklan")
 
 **Kontext:** ovanpå senior-devs funktionella lager (data-attribut-seam + semantik + tester) la
