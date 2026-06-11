@@ -61,7 +61,14 @@ export function useAppUpdate(register: RegisterAppSw = registerAppSw): AppUpdate
     // Dölj prompten direkt (knappen ska kännas responsiv) och be SW:n ta över +
     // ladda om. updateSW() sköter reload, men vi nollar tillståndet ändå ifall
     // omladdningen fördröjs/uteblir i en miljö utan riktig SW.
+    //
+    // Nolla BÅDA flaggorna (Copilot R5): kan offlineReady redan ha hunnit bli true
+    // i SAMMA sid-laddning (förstagångs-install som står öppen tills en ny version
+    // dyker upp), skulle enbart-nolla-needRefresh få prompten att växla över till
+    // offline-redo-beskedet i stället för att försvinna. updateApp = "ta nya
+    // versionen + ladda om", och då ska INGET av beskeden ligga kvar och ge fel signal.
     setNeedRefresh(false);
+    setOfflineReady(false);
     void updateSW(true);
   }, [updateSW]);
 
