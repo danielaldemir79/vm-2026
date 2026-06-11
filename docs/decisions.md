@@ -5,7 +5,26 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
-## 2026-06-11 , T53 (#95): FÖRLÄNGD deadline till söndag 14 juni (gruppvinnare + champion)
+## 2026-06-12 , T59 (#97): listMyRooms filtrerar på EGEN user_id (dubblett-rum-bugg)
+
+**Symptom (Daniels skärmdump 2026-06-12):** kopiera-tips-sektionen + rum-väljaren visade samma
+källrum flera gånger ("VM 2026" x7, "Rhodos Champs" x3). Antalet dubbletter = medlemsantalet i rummet.
+
+**Rotorsak (bekräftad):** `listMyRooms` (`src/data/rooms/rooms-api.ts`) frågade `room_members` och
+joinade `rooms` UTAN `.eq('user_id', <jag>)`. RLS-policyn på `room_members` låter en medlem se ALLA
+medlemsrader i rum hen själv är med i (designat så medlemslistan kan visa de andra deltagarna, se
+`supabase/migrations` is_room_member-grant + T14-besluten i denna logg). Utan egen-identitet-filtret
+joinades därför `rooms` en gång PER medlemsrad, så varje rum dök upp x medlemsantalet. Pre-existerande
+sedan T14 (#14), ofarligt så länge rummen hade en medlem, ytade när de fick flera. Ingen
+integritetsbugg: varje kopiera-knapp kopierar bara användarens EGNA tips (user_id-bundet i engine +
+RLS), bara visningen var trasig.
+
+**Fix:** (1) `.eq('user_id', identity.userId)` på queryn (identiteten fanns redan via ensureSession,
+returvärdet kastades tidigare) , roten, en rad per rum. (2) Defensiv dedupe på `room.id` via en Map i
+mappningen, så en framtida query-/RLS-ändring inte tyst kan återinföra dubbletter. Konsumenterna
+(RoomPanel-väljaren, CopyTipsControl) hade inga egna dedupes att städa och räknar inte på rå listans
+längd, så de blev rätt utan ändring. Regressionstest: flera medlemsrader för samma rum -> exakt en
+RoomSummary per rum (`rooms-api.test.ts`).
 
 **Daniels beslut 2026-06-11 (källa, gissas inte):** de som inte hann tippa före premiären ska få
 till och med SÖNDAG 2026-06-14 23:59 svensk tid på sig att tippa GRUPPVINNARE/TVÅA och VM-VINNARE

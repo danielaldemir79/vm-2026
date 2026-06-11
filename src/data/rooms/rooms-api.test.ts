@@ -154,6 +154,50 @@ describe('listMyRooms', () => {
     ]);
   });
 
+  it('filtrerar på EGEN user_id (rotorsak T59 #97: annars en rad per medlem)', async () => {
+    // Roten till dubblett-buggen: utan .eq('user_id', <jag>) släpper RLS igenom ALLA
+    // medlemsrader i rum man är med i, så rummen joinas en gång per medlem. Detta test
+    // låser fast att vi frågar room_members filtrerat på den EGNA identiteten
+    // (ensureSession-mockens uid = 'me'), så queryn ger en rad per rum, inte per medlem.
+    const chain = builder({
+      data: [{ rooms: { id: 'r1', name: 'A', code: 'aaa11' } }],
+      error: null,
+    });
+    const from = vi.fn().mockReturnValue(chain);
+
+    await listMyRooms(mockClient({ from }));
+
+    expect(from).toHaveBeenCalledWith('room_members');
+    expect(chain.eq).toHaveBeenCalledWith('user_id', 'me');
+  });
+
+  it('dedupar samma rum till EN post när queryn ger flera medlemsrader (regression T59 #97)', async () => {
+    // Regressionsskydd för den defensiva dedupen: även om queryn (RLS-drift eller en
+    // framtida select-ändring) skulle ge flera rader för SAMMA rum (en per medlem, precis
+    // det bugg-symptomet, "VM 2026 x7"), ska listan visa rummet exakt EN gång. Här:
+    // 'rVM' tre gånger + 'rR' två gånger -> exakt två RoomSummary, en per distinkt room.id.
+    const from = vi.fn().mockReturnValue(
+      builder({
+        data: [
+          { rooms: { id: 'rVM', name: 'VM 2026', code: 'vm0001' } },
+          { rooms: { id: 'rVM', name: 'VM 2026', code: 'vm0001' } },
+          { rooms: { id: 'rR', name: 'Rhodos Champs', code: 'rho002' } },
+          { rooms: { id: 'rVM', name: 'VM 2026', code: 'vm0001' } },
+          { rooms: { id: 'rR', name: 'Rhodos Champs', code: 'rho002' } },
+        ],
+        error: null,
+      })
+    );
+
+    const rooms = await listMyRooms(mockClient({ from }));
+
+    // Exakt en post per rum (AC 1), i joined_at-ordning (första förekomsten vinner).
+    expect(rooms).toEqual([
+      { id: 'rVM', name: 'VM 2026', code: 'vm0001' },
+      { id: 'rR', name: 'Rhodos Champs', code: 'rho002' },
+    ]);
+  });
+
   it('fail loud:ar på fel', async () => {
     const from = vi.fn().mockReturnValue(builder({ data: null, error: { message: 'fel' } }));
     await expect(listMyRooms(mockClient({ from }))).rejects.toThrow(/Hämta mina rum misslyckades/);
