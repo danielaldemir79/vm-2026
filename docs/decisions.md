@@ -5,6 +5,68 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T42 (#72): GLOBAL facit + admin via e-post (TÄVLINGSINTEGRITET, HÖG-RISK)
+
+Daniels beslut: BARA admin (Daniel) matar in de officiella matchresultaten EN gång, och de gäller
+för ALLA rum och ALLA användare. Tidigare var facit per-rum (`room_match_results`, vem som helst i
+rummet kunde skriva), vilket bröt tävlingsintegriteten. Sex modell-/säkerhets-beslut, alla
+källverifierade och RLS-bevisade.
+
+**1. DATAMODELL (global facit, ingen room_id):** ny tabell `official_match_results` (`match_id` PK,
+`home_goals`/`away_goals` smallint >= 0, `penalties_*`, `status`, `updated_by`, `updated_at`). INGEN
+`room_id` , facit är ETT, delat av alla. `match_id`-formatet är SAMMA källverifierade constraint som
+`room_match_results` + `match_kickoffs` (`^(g-[A-L]-[1-6]|M(7[3-9]|8[0-9]|9[0-9]|10[0-4]))$`, en
+sanning för id-rymden, 72 gruppmatcher g-A-1..g-L-6 + 32 slutspel M73..M104). Straffar-constrainten är
+den STRIKTA paired-formen (T14 C1: en CHECK passerar på TRUE eller NULL, så båda måste vara NOT NULL,
+annars läcker ett halvt par in). Migration: `20260611140000_t42_official_results_admin_schema.sql`.
+
+**2. ADMIN-ALLOWLIST + helper:** ny tabell `app_admins` (`user_id` PK) + RLS-helper `is_app_admin()`
+(SECURITY DEFINER, `search_path=''`, EXECUTE för anon/authenticated). Samma härdning som
+`is_room_member` (T14): definer-läge så policyn kan fråga `app_admins` utan att fastna i RLS, och
+EXECUTE krävs för anon/authenticated eftersom RLS-uttryck evalueras i ANROPARENS roll (T14, empiriskt).
+
+**3. RLS (källan till skyddet, gissas inte):** `official_match_results` SELECT = `using (true)` (facit
+är OFFENTLIG fakta, alla ser den UTAN rum-medlemskap, till skillnad från `room_match_results`).
+INSERT/UPDATE/DELETE = `is_app_admin()`, och INSERT/UPDATE `with check` binder `updated_by =
+auth.uid()` (en admin kan inte signera i en annan admins namn, samma anti-förfalskning som T14:s
+`rmr_insert_member`). `app_admins`: SELECT bara sin egen rad (`user_id = auth.uid()`, klienten kan visa
+admin-läget utan att rad-skanna listan), INGEN skriv-policy => RLS default-deny på skriv => ingen kan
+befordra sig själv (hela tävlingsintegriteten hänger på det). Migration:
+`20260611140100_t42_official_results_admin_rls.sql`.
+
+**4. RLS-BEVIS med RIKTIGA roller FÖRE klient-koden (playbook `rls-bevis-med-riktiga-sessioner-fore-
+klient-koden` + `tidslas-och-sekretess-i-rls`):** kört som EN transaktion (DO-block + `set local role`
++ `request.jwt.claims` med `sub`/`role`) mot det levande projektet, sedan ROLLBACK (noll proof-data
+kvar, verifierat: 0 facit-rader / 0 admin-rader efter). En admin-test-user lades tillfälligt i
+`app_admins`. BEVISAT (9/9):
+- admin INSERT facit -> TILLÅTEN; admin UPDATE facit -> TILLÅTEN.
+- admin försöker sätta `updated_by` = annans id -> NEKAD (`with check`, "violates row-level security").
+- icke-admin INSERT facit -> NEKAD; icke-admin UPDATE av admins rad -> 0 rader berörda (USING blockar).
+- icke-admin SER facit -> 1 rad; ANON (anon-roll, ingen jwt) SER facit -> 1 rad (SELECT öppen).
+- icke-admin försöker befordra sig själv (INSERT app_admins) -> NEKAD (ingen skriv-policy).
+- icke-admin SELECT på app_admins -> 0 rader (ser inte andras admin-rad, select_self).
+
+**5. ADMIN-IDENTITET (e-post magic-link, anonym uppgradering):** admin loggar in via e-post-magic-link
+/ OTP. Daniel UPPGRADERAR sin BEFINTLIGA anonyma session med `supabase.auth.updateUser({ email })`, som
+LÄNKAR en e-postidentitet till SAMMA user-rad , user_id ändras INTE, så Daniels user_id
+(`f4ab8398-d061-47ff-b152-4ed1eebbaf2e`) OCH hans 85 tips (FK på user_id) BEHÅLLS. Källa: Supabase
+"Anonymous Sign-Ins -> Convert an anonymous user to a permanent user"
+(https://supabase.com/docs/guides/auth/auth-anonymous). Eftersom id:t är stabilt över länkningen
+seedas Daniels admin-roll REDAN nu på det anonyma id:t (migration
+`20260611140200_t42_seed_daniel_admin.sql`, idempotent), så facit-skrivningen funkar direkt efter
+hans första magic-link-inloggning. Vanliga användare rör INTE detta (förblir anonyma, bara tippar).
+
+**6. POÄNG-KÄLLAN BYTER (facit-källa) + `room_match_results`-ödet:** topplistan/avslöjandet/
+resultat-feedback poängsätter nu mot GLOBALA `official_match_results` i stället för per-rum
+`room_match_results`. `derivePoolFacit` (T17) är ÅTERANVÄND oförändrad i sin logik, bara FACIT-KÄLLAN
+(matchlistan den får) byts: leaderboard-hooken väver nu in de GLOBALA officiella resultaten
+(`applyRoomResults` återanvänd, döpt i kontext, samma rena vävning) i stället för rummets. TeamCode-
+kontraktet (id->code vid facit-källan, T16 F1) är ORÖRT (samma `derivePoolFacit`). `room_match_results`
+BEHÅLLS i schemat (raderas inte) , dels för historik, dels för att simuleringen (T12, klient-overlay)
+inte rör DB:n alls. Den FASAS UT för facit-syftet (resultatinmatningen blir admin-only, se UI). Den
+enda befintliga raden i produktion var en `scheduled` 0-0-platshållare (g-A-1) i ewrmdt, inget facit
+att migrera. **Behöver Daniel (dashboard):** se "Behöver Daniel"-raden nedan om e-post-SMTP-sändning.
+
 ## 2026-06-11 , T39 (#68): tips-listan får 3-dagars fönster + expandera (delad ExpandToggle)
 
 **Beslut (Daniels begäran):** tips-listan (`PredictionsView`) får SAMMA 3-dagars fönster + "Visa alla /

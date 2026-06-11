@@ -17,6 +17,22 @@ export type Database = {
   };
   public: {
     Tables: {
+      // T42 (#72): admin-allowlist (vilka user_id som är app-admin = får skriva facit).
+      app_admins: {
+        Row: {
+          added_at: string;
+          user_id: string;
+        };
+        Insert: {
+          added_at?: string;
+          user_id: string;
+        };
+        Update: {
+          added_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       // T16 (#16): bracket-/slutspels-tips (vem går vidare per slot + VM-vinnaren).
       bracket_predictions: {
         Row: {
@@ -105,6 +121,41 @@ export type Database = {
         Update: {
           kickoff?: string;
           match_id?: string;
+        };
+        Relationships: [];
+      };
+      // T42 (#72): GLOBALA officiella matchresultat (facit). INGEN room_id, gäller
+      // alla rum/användare. Skriv bara admin (RLS is_app_admin), SELECT öppen.
+      official_match_results: {
+        Row: {
+          away_goals: number;
+          home_goals: number;
+          match_id: string;
+          penalties_away: number | null;
+          penalties_home: number | null;
+          status: string;
+          updated_at: string;
+          updated_by: string;
+        };
+        Insert: {
+          away_goals: number;
+          home_goals: number;
+          match_id: string;
+          penalties_away?: number | null;
+          penalties_home?: number | null;
+          status: string;
+          updated_at?: string;
+          updated_by: string;
+        };
+        Update: {
+          away_goals?: number;
+          home_goals?: number;
+          match_id?: string;
+          penalties_away?: number | null;
+          penalties_home?: number | null;
+          status?: string;
+          updated_at?: string;
+          updated_by?: string;
         };
         Relationships: [];
       };
@@ -267,6 +318,8 @@ export type Database = {
       // (g-X-1). Returns string | null (okänd grupp => NULL => skriv nekas, andras
       // tips dolda), samma fail-safe-kontrakt som match_kickoff.
       group_deadline_kickoff: { Args: { p_group_id: string }; Returns: string | null };
+      // T42 (#72): "är den anropande användaren app-admin?" (RLS-helper för facit-skrivskydd).
+      is_app_admin: { Args: never; Returns: boolean };
       is_room_member: { Args: { p_room_id: string }; Returns: boolean };
       join_room_by_code: {
         Args: { p_code: string; p_display_name: string };
