@@ -58,6 +58,48 @@ Recept för T15 (tips: predictions per rum, samma `auth.uid() + medlemskap`-RLS)
 samma refresh-seam). Källa: T14 (`supabase/migrations/`, `src/data/rooms/`, `src/features/rooms/`,
 `rooms-rls.integration.test.ts`).
 
+### tidslas-och-sekretess-i-rls-mot-en-kallankrad-referenstabell (Supabase, VM 2026)
+
+**Recept (ett anti-fusk-deadline-lås + ett sekretess-fönster, SERVER-SIDE, BEVISAT inte påstått):**
+
+1. **Klient-lås räcker ALDRIG för anti-fusk.** I en anon-auth-app är RLS enda skyddet, en vän kan
+   kringgå klienten och skriva rakt mot Supabase. Tidsregler (deadline: får inte ändras efter ett
+   ögonblick) + synlighetsregler (andras data dold före ett ögonblick) MÅSTE bo i RLS.
+2. **Klockan är DB:ns `now()`, aldrig klientens.** En klient kan ljuga om sin tid men inte om serverns.
+   RLS-policyn jämför `now()` (transaction_timestamp) mot tidströskeln.
+3. **RLS kan bara läsa data i DATABASEN, så spegla tröskel-tiderna till en REFERENSTABELL.** Är
+   tröskeln (här matchens avspark) statisk klient-data, seeda en liten referenstabell (`match_id ->
+   kickoff`) som policyn slår upp via en SECURITY DEFINER-helper (`match_kickoff(match_id)`, samma
+   härdning som `is_room_member`: `search_path=''`, EXECUTE för anon/authenticated, RLS-uttryck
+   evalueras i anroparens roll). VARFÖR tabell+policy över en RPC som bär regeln: det gör låset till
+   en DEKLARATIV RLS-invariant reviewern kan BEKRÄFTA mot källan, inte gömd procedurkod.
+4. **Referenstabellen är REFERENSDATA, inte användardata:** RLS SELECT för alla, men INGEN skriv-policy
+   (=> RLS default-deny på skriv för anon/authenticated). Bara migrationer (table owner) seedar, så en
+   klient kan aldrig flytta en deadline genom att skriva en ny tröskel-tid.
+5. **KÄLLÅNKRA seeden mot den enda sanningen.** Tröskel-tiderna genereras 1:1 ur den redan källåkrade
+   klient-datan (här `matches.ts`) av ett generator-skript (`vite-node`), och värde-låses i CI
+   (regenerera-och-diffa + mutationstest), så DB-tröskeln ALDRIG kan drifta från klient-bundlens (annars:
+   "öppen" i DB men "stängd" i klienten). Samma källåkrings-mönster som datan själv.
+6. **Deadline-låset i skriv-policyerna:** INSERT/UPDATE/DELETE `with check`/`using` kräver `now() <
+   tröskel` (+ medlemskap + `user_id = auth.uid()` mot förfalskning). Sekretess-fönstret i SELECT:
+   eget alltid, andras BARA efter tröskeln (`now() >= tröskel`). FAIL-SAFE: en rad utan tröskel ger NULL
+   -> `now() < NULL` = NULL = skriv nekas, `now() >= NULL` = NULL = andras dolt. Ett saknat tröskel-värde
+   kan aldrig öppna ett fusk-fönster.
+7. **BEVISA med riktiga roller FÖRE klient-koden** (samma anda som rums-receptets punkt 5): kör
+   `set role authenticated` + JWT-claims (`sub`/`role`) i DO-block mot det levande projektet, med en rad
+   vars tröskel tillfälligt sätts i det förflutna (om all riktig data ligger i framtiden) och återställs
+   efteråt. Bevisa BÅDE nekad (skriv efter tröskel = insufficient_privilege; UPDATE efter tröskel rör 0
+   rader) OCH tillåten (skriv före tröskel), plus sekretessen (medlem ser bara sitt eget före tröskel,
+   alla efter). Städa proof-data + återställ tröskel-tiderna.
+
+**Varför:** ett tidsbaserat anti-fusk (tipsdeadline) och ett sekretess-fönster (andras tips dolda) är
+exakt den klass av regler som ser ut att kunna lösas i klienten men MÅSTE vara server-side i en delad
+app, och de måste BEVISAS mot databasen. Referenstabell + källåkrad seed gör låset till en deklarativ,
+reviewbar, drift-säker invariant i stället för en gissad procedur. Återanvänds av T16 (bracket-tips
+har egna deadlines) och T17 (topplistan poängsätter med `scorePrediction`). Källa: T15
+(`supabase/migrations/*t15*`, `src/data/predictions/`, `src/data/wc2026/kickoff-seed.ts`,
+`scripts/generate-kickoff-seed.ts`, `predictions-rls.integration.test.ts`).
+
 ### no-flash-tema-i-react-vite-utan-duplicerade-strängar
 
 **Recept (en sanning, ingen FOUC):**

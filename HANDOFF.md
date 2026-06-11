@@ -5,6 +5,82 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T15/#15 (Tips-motor) KLAR - PR #58 väntar på merge
+
+**Branch:** `feature/T15-tips-motor` @ HEAD `2aa2a34`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/58 mot `develop` (Closes #15, state: OPEN)
+**Board:** issue #15 i "In Review" (korrekt). Dirigenten stänger issue #15 MANUELLT och flyttar kort #15 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `a402a02` - feat(tips): tips-motor - DB-schema + RLS + tips-UI + poangberakning (#15, bygge)
+- `e2f0367` - feat(tips): fortsattning bygge (#15)
+- `68729fc` - feat(tips): slutfor tips-motor-bygge (#15)
+- `2b9c241` - feat(tips): fler tester och fixar (#15)
+- `0cbed91` - design: premium-finish tips-UI (#15)
+- `cfef6ae` - fix(tips): C1 deadline-tick-granularitet + C2 (#15, Copilot runda 1)
+- `eedd15d` - fix(tips): C3-C6 plural/fail-loud/docstring (#15, Copilot runda 2)
+- `871b381` - fix(tips): C7-C9 typer (#15, Copilot runda 3)
+- `133eb14` - fix(tips): C10-C13 redundanta index/visibilitychange/precision/RLS-test (#15, Copilot runda 4)
+- `d2c03f9` - fix(tips): C14 stale-token-vakt i savePrediction (#15, Copilot runda 5)
+- `8b00293` - fix(tips): kommentar-typo-stad (#15, Copilot runda 6)
+- `2aa2a34` - fix(tips): kommentar-typo-stad del 2 (#15, HEAD)
+
+**Verifiering:** 862 tester gröna + 20 env-skippade (+54 nya). Bredare panel (2 oberoende linser, hög-risk): NOLL fynd - korrekthets-linsen + säkerhets-linsen (RLS adversariellt verifierat, referenstabellen read-only bevisad, SECURITY DEFINER härdad, inga advisor-ERROR). Build/lint/format rent.
+
+**Copilot-loop: 6 rundor** (över skillens max-5). Alla fynd genuina och åtgärdade, inga återkommande. Trenden: 2 -> 4 -> 3 -> 4 -> 1 -> 2. C14 (runda 5) var ett äkta dataintegritets-race (stale-token vid rumsbyte under spar, samma mönster som T14 KA-F2). Dirigenten bedömde att merga med ett känt dataintegritets-race vore sämre än att överskrida processgränsen - NOTERA detta som ett observerat mönster, se IMPROVEMENTS-kandidaten nedan.
+
+**Alla 4/4 acceptanskriterier bockade i issue #15** (journalisten 2026-06-11).
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort #56 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+
+**IMPROVEMENTS-kandidat (dirigenten skriver i IMPROVEMENTS.md):**
+Stora data/RLS-tasks med många rörliga delar (match_kickoffs-referenstabell, 3 RLS-policyer, sekretess-fönster, poängberäkning) genererade 6 Copilot-rundor (max-5 i skillen). Alla fynd genuina men ofta pedantiska nits (plural-stavningar, docstring-format). Förslag: för hög-risk-data-tasks: tillåt upp till 7 rundor, ELLER inför en "gruppera-triviala-nits"-strategi i Copilot-loopen så varje runda handskas med nits i bunt och de substantiella fynden (C14-race) inte dunklas av mängden.
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #58 (T15/#15, feature/T15-tips-motor) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 58 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #15 manuellt (`gh issue close 15`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #15 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar tips-kupong med deadline-lås och att poängberäkning fungerar.
+>
+> Om PR #58 REDAN mergad:
+> T15 är klar och mergad. Plocka nästa task.
+> **Nästa task: T16 (#16, slutspels- och gruppvinnar-tips)** - bygger på T15:s scorePrediction + sekretess-RLS. Därefter T17 (topplista, avslöjar tips via samma RLS). Se issue #16 för fullständigt scope.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **#56 (delad modal-primitiv):** kort i Ready, plockas när rule-of-three nås.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-10 , T32/#54 (Daniels feedback 4) KLAR - PR #57 väntar på merge
 
 **Branch:** `feature/T32-feedback4` @ HEAD `e6c8a4e`

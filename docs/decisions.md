@@ -5,6 +5,221 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T15 (#15, C14): stale-request-vakt på savePrediction (samma epoch-mönster som T14 KA-F2)
+
+**Beslut (C14, dataintegritets-fynd):** `PredictionsProvider.savePrediction` gjorde en optimistisk
+`setMyPredictions` efter `await upsertMyPrediction` UTAN att kolla att det aktiva rummet fortfarande var
+detsamma. `myPredictions` är bara keyad på `matchId`, så bytte vännen rum (A -> B) medan upserten var i
+flykt skrev A:s svar in i B:s tips-map (förorening + visar fel rums tips). Fix: samma cancellation-/
+epoch-mönster som `RoomsProvider.loadRoomData` (T14, KA-F2) , `savePrediction` bokar `loadTokenRef.current`
+(samma token som load-effekten bumpar vid varje rumsbyte) FÖRE await, och droppar den optimistiska
+uppdateringen tyst om token ändrats efter await. A:s tips persisteras ändå korrekt på servern (room_id i
+upserten), bara den lokala spegeln av ett inaktuellt rum droppas. Load-vägen (`listMyPredictions`-effekten)
+hade redan epoch-vakten, så bara save-vägen saknade den; ingen ny seam uppfanns. Regressionstest: starta
+save i rum A, byt till B under await, asserta att B:s state = exakt {g-B-9} (A:s g-A-1 droppas, ingen
+förorening). Bevisat true regression: utan vakten ger testet `g-A-1,g-B-9`.
+
+## 2026-06-11 , T15 (#15, Copilot C10-C13): fyra review-fynd, disposition
+
+**C10 (åtgärdad) , två tips-index var REDUNDANTA med PK:n, borttagna.** `predictions_room_idx
+(room_id)` och `predictions_room_match_idx (room_id, match_id)` är båda exakt LEDANDE PREFIX av
+primärnyckeln `(room_id, match_id, user_id)`. **KÄLLA (regeln gissas inte):** PostgreSQL
+"Multicolumn Indexes" (https://www.postgresql.org/docs/current/indexes-multicolumn.html) , ett
+btree-index servar sökningar på vilket ledande kolumn-prefix som helst, så PK:ns unika btree-index
+täcker redan de två query-formerna (`where room_id = ?` och `where room_id = ? and match_id = ?`).
+Tredje frågan, `listMyPredictions` (`where room_id = ? and user_id = ?`), servas också av PK:n
+(room_id-prefix + user_id-filter i samma scan), INTE av något av de borttagna indexen. **Bevisat
+mot live (kmzhyblzxangpxydufve) med EXPLAIN (enable_seqscan=off):** efter en DROP-i-transaktion-
+rollback valde planeraren `predictions_pkey` för ALLA tre formerna (Index Cond room_id / room_id+
+match_id / room_id+user_id). De redundanta indexen tillförde bara skriv-amplifiering + lagring.
+Droppade via migration `20260611120400_t15_predictions_drop_redundant_idx.sql` (applicerad via MCP,
+1:1 med filen, samma T15-mönster) + skema-kommentaren uppdaterad. Live har nu bara `predictions_pkey`.
+
+**C11 (åtgärdad) , `use-deadline-tick` räknar bara om vid SHOW, inte hide.** `visibilitychange`
+fyrar både när fliken döljs OCH visas; handlern gatar nu på `document.visibilityState === 'visible'`
+så en hide inte ger en onödig setState/re-render (en dold flik renderas ändå inte). SHOW-grenen
+(räkna om direkt efter strypt PWA-timer) är oförändrad. Test: `use-deadline-tick.test.ts` (hide ger
+INGEN omräkning, show ger det, minut-tick + unmount-städning).
+
+**C12 (åtgärdad) , fail-loud-felet i `PredictionsProvider.savePrediction` skiljer nu på rötterna.**
+Tidigare sa det alltid "inget aktivt rum" även när roten var "ingen Supabase-klient". Nu: `!supabase`
+-> "ingen Supabase-klient (live ej konfigurerat)" (kollas FÖRST, mer grundläggande brist), annars
+`activeRoomId === null` -> "inget aktivt rum". Felsökbart ur texten. Test för BÅDA grenarna.
+
+**C13 (åtgärdad) , RLS-integrationstestets öppna-match-antagande är nu tids-robust.** `OPEN_MATCH`
+flyttat från `g-L-5` (27 juni) till `g-J-6` (Jordanien-Argentina, 2026-06-28T02:00:00Z) , den ALLRA
+sista gruppspelsmatchen, med KÄNDA lag (grupp J fullständigt lottad) och ett giltigt predictions-
+match_id. (Finalen M104 19 juli ligger längre fram men har TBD-lag, därför vald bort.) Avsparken
+DÄRIVERAS ur `WC2026_MATCHES` (en sanning, inte hårdkodad här), och en `matchStillOpen`-grind
+(`Date.now() < kickoff`, instant-jämförelse = tidszons-oberoende) gör att sviten SKIPPAR rent efter
+avspark i stället för att börja falla när RLS låser/döljer matchen. Grinden aktiveras först efter VM:t.
+
+---
+
+## 2026-06-11 , T15 (#15, Copilot C1): tips-låsets re-render kräver en MINUT-tick, inte useTodayKey
+
+**Beslut:** Tipsvyns deadline-lås (`locked = now >= kickoff`, `selectPredictableMatches`) räknas om
+via en egen minut-tick-hook (`features/predictions/use-deadline-tick.ts`), inte via `useTodayKey`.
+`evalNow` (det tickande nuet) ligger nu i `useMemo`-deps för `predictable`/`openCount`.
+**Varför:** `useTodayKey` är referens-STABIL inom en dag (den gatar på dagsbyte), men en avspark
+passerar MITT PÅ DAGEN. En dagsnyckel hade alltså aldrig flippat en match som låses kl 15:00, fältet
+hade frusit öppet tills manuell omladdning. Granulariteten som behövs är alltså minuten (avspark anges
+på hel minut), inte dygnet, men inte heller countdown:ens sekund-tick (overkill, listan ändras bara
+vid avsparks-minuter). Samma PWA-medvetna kadens som `useTodayKey` (minut-`setInterval` +
+`visibilitychange` så en återaktiverad bakgrunds-flik räknar om direkt). Server-RLS är fortfarande det
+RIKTIGA låset; detta gör bara VISNINGEN sann. Regression: PredictionsView.test.tsx (falska timers,
+öppen -> låst när tiden passerar avspark).
+
+## 2026-06-11 , T15-visuellt (#15): tips-UI premium-finish, TIPS-KUPONG-identitet (design-frontend)
+
+Det visuella lagret ovanpå senior-devs funktionella tips-UI. Mål: en EGEN identitet för tips
+(tips =/= resultat), så det känns KUL att tippa, utan att lämna "arena i kvällsljus"-familjen.
+
+**1. IDENTITET, "TIPS-KUPONG" (taskens punkt 1):** resultatinmatningen (#39) är "arenan/scoreboarden"
+(grön pitch, det FAKTISKA spelet). Tips-kortet är "KUPONGEN i handen" , en spelkupong man fyller i
+FÖRE avspark. Samma score-grid-formspråk och fast-bredds-kolonner (#39-invarianten ärvd, lagnamn
+truncar aldrig in i rutorna), men tonad mot den varma pokal-GULDEN i stället för pitch-grönt: guld
+= hopp/vad/hejarklack. Kupong-metaforen bärs av tre RENA dekor-lager (ingen bär text), isolerade i
+`tokens.css` §10 (`.vm-coupon-*`): (a) en guld topp-strip (kupong-huvudets kant, inset box-shadow),
+(b) en streckad "river-linje" (`.vm-coupon-tear`, repeating-linear-gradient = avrivnings-perforering)
+som skiljer kupong-huvudet från ifyllnads-zonen, (c) ett diskret guld-hörn-glow i kort-fonden. Plus
+en "TIPS"-eyebrow + biljett-ikon i huvudet och en guld kupong-prick i legenden (i stället för #39:s
+gröna puls-prick, så identiteten skiljer sig redan i detaljen). Spar-knappen behåller den GRÖNA
+accenten (interaktions-affordans, T7-pin: färg = handling, inte status); kortets signatur är guld.
+
+**2. MITT TIPS, synligt och stolt (taskens punkt 1):** ett sparat tips bekräftas med en FYLLD guld-
+bricka med mörk ink + bock ("Sparat"), inte bara diskret grå text. Brickan använder den FÄRG-OBEROENDE
+solid-form som "Klar"/"Dagens match"-chippen (T9/T11): solid guld-yta + near-black ink, AA-säker i
+BÅDA teman (guld-som-text-på-tint faller annars under AA, den kända fällan). Ny token `--vm-coupon-ink`
+(near-black i BÅDA teman: ljus gold #f3c14e mörkt -> 10.90:1, mörk amber #b07d10 ljust -> 5.03:1).
+I rubriken: en motiverande räknare ("N matcher öppna att tippa", `role=status`), bara när N > 0 (säger
+aldrig "0 öppna", det vore nedslående).
+
+**3. LÅST-LÄGET, elegant + POSITIVT (taskens punkt 2):** efter avspark dämpas kupongen (guld tonas mot
+border-tonen, ingen hover-lyft, "inlämnad/avgjord"-känsla) och en låst-etikett visas med ett HÄNGLÅS
+(`.vm-coupon-lock-icon`, lugn engångs-puls, nollad vid reducerad rörelse) + texten "Låst vid avspark,
+så alla tippar blint, det är spelets rättvisa." Inramningen är POSITIV (en del av spelets rättvisa),
+inte frustrerande. Mitt tips står kvar synligt i låst-etiketten ("Ditt tips: 2-1"). Text-lagret rörs
+inte av dämpningen (full kontrast). Senior-devs data-attribut + strängar bevarade (testerna gröna).
+
+**4. "GÅ MED I ETT RUM"-läget, INBJUDANDE (taskens punkt 3):** porten till tips är en egen guld-tonad
+ruta med en kupong-ikon + tydlig rubrik + förklaring som pekar mot rum-sektionen ("Skapa eller gå med
+i ett rum ovanför, så öppnar tips-kupongerna här"), inte bara en grå rad. Känns som en inbjudan, inte
+ett felmeddelande. `data-predictions-no-room` bevarat.
+
+**5. GULD-TEXT-DISCIPLIN (lessons aa-kontrast + guld-på-ljus-fällan):** rå `--vm-gold` är DEKOR-färg
+(tints, glows, topp-strip, perforering, prickar). All guld-färgad TEXT/ikon som måste LÄSAS (eyebrow,
+"mot"-avdelare, hänglås, no-room-ikon, "Tips-ligan"-eyebrow) använder `--color-warning` , den AA-SÄKRA
+guld-text-tonen per tema (#f3c14e mörkt, djup amber #8a5a05 ljust). Felytan blandas mot OPAK surface
+(inte transparent), så kupongens guld-glow inte sänker fel-textens kontrast (canvas-komposit-fälla).
+
+**KONTRAST UPPMÄTT (canvas-komposit, VÄRSTA fall, alfa-blend över base-yta, BÅDA teman, ej typfall):**
+varje text-/ikon-yta mätt mot den FAKTISKT komponerade fonden (guld-glow/tint inräknad), inte mot
+token-hex:en. ALLA klarar WCAG AA som NORMAL text (>= 4.5:1), inkl. de element vars formella krav
+bara är 3:1 (ikoner). MIN-värden: **mörkt tema 5.61:1, ljust tema 4.81:1.** Per yta (mörkt / ljust):
+- Eyebrow "TIPS" (warning) på kupong-fond: 8.40 / 5.37
+- Legend matchnamn + lagnamn (fg) på kupong-fond: 12.68 / 16.22
+- Kod-chip text (fg) på guld-16%-tint: 8.78 / 13.73
+- "mot"-avdelare (color-mix warning 50% / fg-muted) på kupong-fond: 7.16 / 5.79
+- Låst-rubrik (fg) / låst-förklaring (fg-muted) på låst-yta (guld 7% / bg): 15.16, 7.46 / 15.12, 5.51
+- Hänglås-ikon (warning) på låst-yta [krav 3:1]: 10.03 / 5.00
+- Sparat-bricka ink (near-black) på SOLID guld: 10.90 / 5.03
+- Räknar-chip (fg-muted) på guld-8%-tint: 6.39 / 5.97
+- "Gå med i rum"-rubrik (fg) / brödtext (fg-muted) på guld-6%-yta: 13.56, 6.67 / 16.77, 6.11
+- "Gå med i rum"-kupong-ikon (warning) på guld-12%-tint [krav 3:1]: 6.86 / 4.89
+- Spar-knapp (accent-fg) på accent: 10.85 / 5.40
+- Fel-text (danger) på danger-9%/OPAK-surface: 5.61 / 4.81
+Metod: WCAG relativ luminans + ratio, color-mix som sRGB-linjär interpolation, alfa-komposit
+source-over. Mätt med en engångsprob (raderad efter, samma mönster som tidigare contrast-mätningar).
+
+**RESPONSIVT + A11Y VERIFIERAT LIVE (Playwright mot dev-render, isolerad harness, raderad efter):**
+ingen horisontell overflow på 280 (vikbar cover) / 375 / 768 / 1440 px i BÅDA teman (scrollW == clientW
+överallt). Score-gridens fasta kolumner håller linjeringen kort-för-kort även med långa lagnamn
+("Bosnien och Hercegovina mot Sydkorea" truncar rent). Fokus-ring bevisad LIVE: score-input +
+spar-knapp ger `:focus-visible == true` + `outline: solid 2px` (accent-ring, index.css). Eyebrow-
+färgen verifierad live = `rgb(243,193,78)` (warning-token, inte rå guld). Reduced-motion: hänglås-
+pulsen gatad under `@media (prefers-reduced-motion: no-preference)` -> ingen animation för reduce.
+
+---
+
+## 2026-06-11 , T15 (#15): tips-motorn, poängregel + deadline-lås + tips-sekretess (SERVER-SIDE)
+
+Fas 2:s kärna. Vänner gissar resultat före avspark, poäng och (T17) topplista. Fyra beslut, alla
+med dataintegritet/anti-fusk i fokus (HARD).
+
+**1. POÄNGREGELN (SPEC tyst på detaljnivå -> vedertagen standard, dokumenterad):** SPEC §4/§12 säger
+bara "rätt utfall vs exakt resultat" på rubriknivå, inga exakta poängtal. Vi följer den vedertagna
+tips-standarden som ett MEDVETET val: **exakt resultat = 3p, rätt utfall (1X2) = 1p, annars 0p.**
+Exakt ger 3 (det inkluderar rätt utfall men dubbelräknas inte till 4). Ren funktion `scorePrediction`
+(`src/data/predictions/score.ts`), uttömmande testad (alla 1X2-kombinationer + edge-fall).
+**Källa:** vedertagen poolspel-standard (t.ex. svenska Stryktipset/europatips-pooler: exakt > utfall).
+SPEC anger ingen avvikande regel, så standarden är förvalet, inte en gissning om en specifik regel.
+
+**2. UTFALL (1X2) PÅ ORDINARIE MÅL, inkl. slutspel (källmedvetet val mot SPEC):** ett tips är en
+gissning på den ORDINARIE målställningen (home/away). Straffar tippas INTE (se beslut 4). Därför
+avgörs BÅDE tippets och det faktiska resultatets 1X2 på ORDINARIE mål. Konsekvens (medveten): en
+slutspelsmatch som slutar lika i ordinarie tid och avgörs på straffar räknas som 'draw' (X) i
+poängsättningen, även om FIFA Article 14:s straff-vinnare för fram laget i slutspelsTRÄDET. De är
+två skilda saker: trädet (vem avancerar) styrs av straffar (T9), tips-poängen av den ordinarie
+ställning tipset gällde. Alla tips bedöms på samma plan (ordinarie tid), grupp som slutspel. Detta
+är konsekvent och dokumenterat inline i `score.ts`, ingen gissning.
+
+**3. DEADLINE-LÅSET ÄR SERVER-SIDE (RLS), klockan = DB:ns now() (HARD anti-fusk):** ett klient-lås
+räcker INTE, en vän kan kringgå klienten och skriva rakt mot Supabase (anon-rollen är enda rollen,
+RLS är enda skyddet). Avsparkstiderna är annars STATISK klient-data (`matches.ts`), och en RLS-policy
+kan bara läsa data som finns i DATABASEN. **Val: en seedad referenstabell `match_kickoffs`
+(match_id -> kickoff), inte en RPC som bär tabellen.** Varför tabell+policy över RPC: det gör
+deadline-låset till en deklarativ RLS-invariant (`now() < public.match_kickoff(match_id)` i
+INSERT/UPDATE/DELETE-policyerna) som reviewern kan BEKRÄFTA mot källan, samma modell som resten av
+T14:s RLS, i stället för att gömma regeln i procedurkod. `match_kickoff(text)` är en SECURITY
+DEFINER-helper (samma härdning som `is_room_member`: `search_path=''`, EXECUTE för anon/authenticated
+eftersom RLS-uttryck evalueras i anroparens roll). Klockan är `now()` (transaction_timestamp), aldrig
+klientens, en klient kan ljuga om sin tid men inte om serverns. FAIL-SAFE: en match utan kickoff-rad
+ger NULL -> `now() < NULL` = NULL = skriv NEKAS, och `now() >= NULL` = NULL = andras tips DOLDA, ett
+saknat kickoff kan aldrig öppna ett fusk-fönster.
+
+**4. TIPS-SEKRETESS FÖRE LÅS (HARD, T15:s RLS-ansvar):** andra rumsmedlemmar får INTE läsa ditt tips
+före matchens avspark. SELECT-policyn: eget tips ALLTID, andras BARA efter avspark (`now() >=
+kickoff`) + medlemskap. Avslöjandets UI är T17, men sekretessen lever i T15:s RLS. Bevisat
+server-side (se nedan).
+
+**KÄLLÅNKRAD KICKOFF-SEED:** `match_kickoffs`-tiderna genereras 1:1 ur den redan källåkrade
+`matches.ts` (`scripts/generate-kickoff-seed.ts` -> `..._t15_match_kickoffs_seed.sql`), värde-låst i
+CI av `kickoff-seed.test.ts` (regenerera-och-diffa + mutationstest), så DB-tiden ALDRIG kan drifta
+från klient-bundlens tid (annars: match "öppen" i DB men "stängd" i klienten). Samma källåkrings-
+mönster som matchplanen. `match_id`-formatet återanvänder T14:s constraint (g-A-1..g-L-6 + M73..M104).
+
+**RLS BEVISAD SERVER-SIDE FÖRE KLIENT-KODEN (playbook-receptet):** senior-developern bevisade alla
+garantier med RIKTIGA roller (`set role authenticated` + JWT-claims `sub`/`role`, DO-block) mot det
+levande projektet, med en match vars kickoff tillfälligt sattes i det förflutna (alla riktiga VM-
+matcher ligger i framtiden) och återställdes efteråt. 7 prov, alla gröna: (1) medlem får tippa öppen
+match, (2) deadline-låset NEKAR tips efter avspark (insufficient_privilege), (3) utomstående nekas,
+(4) förfalskning (tips i annans namn) nekas, (5a) sekretess: medlem ser BARA sitt eget tips på en
+öppen match, (5b) avslöjande: efter avspark ser hen alla, (6) UPDATE efter avspark rör 0 rader (kan
+inte ändra ett låst tips), (7) utomstående ser inga tips. Proof-data städades, kickoff-tiderna
+återställdes (verifierat 104 rader, g-A-1/g-L-5 åter på sina riktiga värden). Klient-integrationstestet
+(`predictions-rls.integration.test.ts`) täcker de delar som är bevisbara via klient-API:t mot en öppen
+match (de skippas offline, env-gated, precis som T14).
+
+**PENALTIES UTANFÖR T15:** tips-tabellen bär bara home_goals/away_goals (ordinarie gissning). Slutspels-
+/bracket-tips (vem går vidare, straffar) är T16, out of scope här.
+
+**ADVISOR-NOTERINGAR (medvetna avvägningar, samma som T14):** `get_advisors (security)` flaggar WARN
+för (a) anonym åtkomst-policy på `predictions` + `match_kickoffs` och (b) att `match_kickoff` (SECURITY
+DEFINER) är anropbar av anon/authenticated. Båda MEDVETNA: anonyma vänner ÄR användarna, och
+`match_kickoff` MÅSTE vara körbar av anon/authenticated (RLS-uttryck i anroparens roll, samma som
+`is_room_member`). `match_kickoffs` har INGEN skriv-policy (referensdata, bara migrationer seedar),
+så en klient kan aldrig flytta en deadline. Inga nya ERROR-nivå-fynd, inga "RLS disabled".
+
+**TYP-SANNING `match_kickoff` (#15, Copilot C7):** TS-typen i `supabase-types.ts` är
+`Returns: string | null`, INTE `string`. Källa: RPC:n är `select k.kickoff ... where match_id = ...`
+(`20260611120200_t15_predictions_rls.sql`), vilket ger NULL för en okänd match. Det NULL:et är
+fail-safe-regeln ovan (now() < NULL => skriv nekas, now() >= NULL => andras tips dolda), så typen
+MÅSTE tillåta null, annars antar framtida konsumenter non-null och tappar säkerhets-invariantens
+kontrakt.
+
+---
+
 ## 2026-06-10 , T32 (#54, Daniels feedback 4, fynd 3): hero-etiketten "Dagens match" -> matchens datum när matchen inte är idag
 
 **Beslut:** Etiketten ovanför hero:ns framträdande match (`DailyMatchesView`) säger "Dagens match"
