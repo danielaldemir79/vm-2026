@@ -27,6 +27,9 @@ export type { InstallUiMode, InstallContext } from './install-prompt';
 export { useInstallPrompt } from './use-install-prompt';
 export type { InstallPromptApi } from './use-install-prompt';
 export { InstallBanner } from './InstallBanner';
+// Tidig beforeinstallprompt-fångst, registreras från main.tsx FÖRE React-mount
+// (T39/#68: annars tappas ett tidigt event och install-knappen gör inget).
+export { registerInstallPromptCapture } from './install-prompt-capture';
 
 // Onboarding-tour (ren steg-data + hook + dialog).
 export { ONBOARDING_STEPS, ONBOARDING_STEP_COUNT, isLastStep, nextStepIndex } from './onboarding';
