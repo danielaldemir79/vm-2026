@@ -24,6 +24,10 @@ import { selectPredictableGroups } from './group-predictable-data';
 import { GroupPredictionForm } from './GroupPredictionForm';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
 import { teamCode } from '../../domain/team-code';
+// SIMULERAD slutspelsbild ur tipsen (T51, #88): direkt under kupongerna ser man
+// hur sextondelen (+ vägen mot finalen) blir UR de tippade ettorna/tvåorna.
+// Ligger inuti GroupPredictionsProvider (samma store), så den läser mina tips.
+import { TipsBracketView } from '../simulation';
 
 export interface GroupPredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -189,6 +193,19 @@ export function GroupPredictionsView({
             );
           })}
         </ol>
+      ) : null}
+
+      {/* SIMULERAD slutspelsbild ur tipsen (T51, #88, Daniels live-feedback): så
+          snart grupp-tipsen är laddade ritar vi upp hur slutspelet skulle kunna se
+          ut ur tippade ettor/tvåor (vilka som möts i sextondelen + vägen vidare).
+          En ren härledd vy: den läser mina tips ur SAMMA store och skriver aldrig,
+          så de riktiga resultaten/facit rörs inte. Tydligt märkt SIMULERING; de
+          åtta bästa treorna lämnas öppna (gissas aldrig, FIFA-seedning ur riktiga
+          resultat). Visar en uppmaning tills minst en grupp är tippad. */}
+      {ready ? (
+        <div data-tips-bracket-section="" className="mt-8">
+          <TipsBracketView env={env} />
+        </div>
       ) : null}
     </section>
   );

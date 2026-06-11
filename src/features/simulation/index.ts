@@ -17,3 +17,17 @@ export { SimulationBanner } from './SimulationBanner';
 // App-global visuell ram (ring + tint + sticky markeringsbadge) runt de
 // simulerade vyerna när what-if-läget är PÅ.
 export { SimulationFrame } from './SimulationFrame';
+
+// SIMULERAD slutspelsbild UR grupp-tipsen (T51, #88): se vilka som möts i
+// sextondelen + vägen mot finalen, ur dina tippade ettor/tvåor. Ren härledd vy
+// (skriver aldrig), tydligt märkt simulering, treorna gissas aldrig.
+export {
+  deriveTipsBracket,
+  type GroupTipPick,
+  type TipsBracketState,
+  type TipsMatchState,
+  type TipsSlotState,
+  type TipsSlotResolution,
+} from './derive-tips-bracket';
+export { useTipsBracketData, type TipsBracketData } from './use-tips-bracket-data';
+export { TipsBracketView, type TipsBracketViewProps } from './TipsBracketView';
