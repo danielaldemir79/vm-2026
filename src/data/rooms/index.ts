@@ -1,6 +1,8 @@
 // Publik yta för rums-/auth-lagret (T14, #14). UI:t importerar härifrån.
 
 export { ensureSession, getCurrentIdentity, type AuthIdentity } from './auth';
+// T42 (#72): admin-inloggning via e-post (anonym -> permanent, behåller user_id).
+export { requestAdminEmailUpgrade, confirmAdminEmailUpgrade, signOutAdmin } from './admin-auth';
 export {
   createRoom,
   joinRoomByCode,

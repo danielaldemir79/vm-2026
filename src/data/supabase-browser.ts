@@ -58,9 +58,14 @@ export function getSupabaseClient(env: SupabaseEnv = import.meta.env): VmSupabas
       // uppdatera token automatiskt, så vännens user-id (och rums-medlemskap) lever.
       persistSession: true,
       autoRefreshToken: true,
-      // Vi använder ingen magic-link/OAuth-redirect, så ingen URL-session att
-      // upptäcka, stäng av för att slippa onödig URL-parsning.
-      detectSessionInUrl: false,
+      // T42 (#72): admin-inloggningen kan ske via en magic-LÄNK i e-posten (Daniel
+      // klickar länken -> redirect tillbaka hit med tokens i URL-fragmentet). Med
+      // detectSessionInUrl: true plockar klienten upp den sessionen automatiskt.
+      // (Vanliga vänner berörs inte; de förblir anonyma. Det primära admin-flödet
+      // är dessutom en 6-siffrig KOD via verifyOtp, som inte ens kräver redirect,
+      // se data/rooms/admin-auth.ts.) Tidigare false som mikrooptimering; nu
+      // använder vi e-post-auth, så den måste vara på för länk-vägen.
+      detectSessionInUrl: true,
     },
   });
   cachedUrl = url;
