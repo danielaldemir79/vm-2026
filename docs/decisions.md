@@ -5,6 +5,55 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T51 (#88): simulerad slutspelsbild ur grupp-tipsen (treorna lämnas öppna, gissas aldrig)
+
+Daniels live-feedback efter att ha tippat grupperna: "Tippade grupperna men fick ingen simulering på
+hur 16del kommer se ut osv ... så man kan se potentiella finallag, alltså vilka som möter varandra."
+En ny härledd vy (`src/features/simulation/derive-tips-bracket.ts` + `TipsBracketView.tsx`) placerar
+de tippade ettorna/tvåorna i slutspelsträdets slots, så man SER mötena i sextondelen ("2:a grupp A
+mot 2:a grupp B"). Återanvänder den källhänvisade T4-strukturen (`buildBracket`/`bracket-structure.ts`,
+FIFA Article 12.6-12.11) och definierar ingen ny slutspelsregel. Ren funktion, skriver aldrig: de
+riktiga resultaten/facit rörs inte (egen `picksByGroup`-källa, egen `TipsBracketState`).
+
+**HARD-beslut, bästa treorna lämnas ÖPPNA (gissas ALDRIG):** sextondelarna kräver också de 8 bästa
+treorna, seedade via FIFA:s Annexe C utifrån VILKA grupper treorna kom från (motorn finns:
+`seed-third-places.ts` + `third-place-table.ts`, 495 källlåsta kombinationer, Annexe C). MEN
+grupp-tipsen bär bara 1:a + 2:a per grupp, INTE treor. Det finns alltså ingen ärlig grund för att
+seeda en trea ur tipsen. Varje bästa-trea-slot får därför resolution `'open-third'` och visas som en
+öppen platshållare ("3:a A/B/C/D/F" + märket "Öppen"), aldrig med ett gissat lag. Att gissa en trea
+och visa den som seedad vore precis det facit-sken issue #88 förbjuder ("ingen gissad seedning som
+presenteras som facit"). Källa för treornas roll: FIFA Regulations Article 12.6 (i `bracket-structure.ts`)
++ Annexe C (i `third-place-table.ts`).
+
+**Propageringen stannar ärligt vid sextondelen:** tipsen säger vilka LAG som möts, men inte vem som
+VINNER en match (ett matchresultat, inte ett grupp-tips). Alltså kan inget lag föras vidare till
+åttondelen ur tipsen, ens där båda lagen är kända. Åttondel och framåt visas därför strukturellt
+("Vinnare M73 mot Vinnare M75"), så man ser VÄGEN mot finalen utan att vi hittar på vinnare. Det är
+den ärliga gränsen för vad ett grupp-tips kan säga, och finalen står som två öppna slots (ingen
+"potentiell finallag"-gissning). Identitets-rymd vid seamen: tipsen bär Team.CODE (versal "BRA"),
+trädet/uppslag bär Team.id (gemen "bra"); motorn översätter code -> id internt (samma fälla som
+T16/F1, vaktad av test som assertar i id-rymden).
+
+**Placering:** vyn ligger direkt under grupp-tips-kupongerna i `GroupPredictionsView` (samma
+`GroupPredictionsProvider`, läser mina tips ur samma store), eftersom det är där Daniel var när han
+bad om den. Visar en uppmaning tills minst en grupp är tippad. Design-frontend polerar ovanpå de
+återanvända bracket.css-hakarna (tipped/open-third/tbd via `data-tips-slot-resolution`).
+
+**Copilot runda 1-fixar (samma task, #88):**
+- `tippedGroupCount` räknas nu BARA över kanoniska grupp-id (A..L), via ett `Set` byggt ur
+  `GROUP_IDS` (`domain/types`, EN sanning, ej hårdkodat i sim-modulen). En korrupt/legacy-nyckel i
+  `picksByGroup` (t.ex. ett gammalt rum) får annars räknas som tippad grupp och ge "13 av 12".
+- **EN laddning, ingen dubbel fetch:** den simulerade vyn laddar inte längre samma turneringsdata
+  igen via egen `useGroupPredictableData`. `GroupPredictionsView` skickar ned sin redan-laddade
+  `GroupPredictableData` som `predictableData`-prop, så `useTipsBracketData(predictableData)` härleder
+  ur den injicerade datan. Fail-loud bevarat: utan injicerad data (och utan test-`data`) kastar
+  `TipsBracketView` (det är ett programmeringsfel, inte ett tyst körningsläge).
+- Tomläges-uppmaningen ("Tippa minst en grupp ...") blinkar inte längre fram under laddning:
+  `TipsBracketPresentation` renderar inget tills `data.ready` (bracket är null både vid "laddar" och
+  "tomt tips", så vi får inte gissa "tomt" under laddning).
+
+---
+
 ## 2026-06-11 , T35 (#63): lås-tydlighet, gråmarkerat låst-läge + deadline-budskap (verifierad modell)
 
 Daniels feedback 5: tippnings-upplevelsen ska vara TYDLIG om lås och deadlines. Tre AC. AC#2 (3-dagars
