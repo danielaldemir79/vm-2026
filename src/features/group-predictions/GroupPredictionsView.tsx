@@ -11,7 +11,11 @@
 // låset. Minut-tick (useDeadlineTick) så ett lås flippar utan omladdning (en grupp
 // startar mitt på dagen, useTodayKey vore för grov, T15 C1-lärdomen).
 //
-// DESIGN-FINISH (design-frontend): stabila roller + data-attribut bevaras.
+// VISUELL DESIGN (design-frontend, T16): VM-poolens samlade kupong-vy. Rubriken bär
+// pool-identiteten (guld-eyebrow + motiverande öppen-räknare), grupp-korten är en
+// responsiv kupong-grid (1 kolumn på smal mobil -> 2 -> 3 på bred skärm), och
+// "gå med i ett rum"-läget är en INBJUDANDE guld-tonad port (kupong-ikon + tydlig
+// väg framåt), inte en grå rad. Stabila roller + data-attribut bevaras.
 
 import { useMemo } from 'react';
 import { useGroupPredictionsStore } from './group-predictions-context';
@@ -85,19 +89,41 @@ export function GroupPredictionsView({
         </p>
       </header>
 
-      {/* UTAN aktivt rum: grupp-tips är per rum, peka mot rums-flödet. */}
+      {/* UTAN aktivt rum (taskens punkt 3): grupp-tips är per rum. En INBJUDANDE
+          guld-tonad port med en kupong-ikon + tydlig väg framåt, inte en grå rad,
+          den ska kännas som en inbjudan att vara med och tippa, inte ett fel. */}
       {!store.enabled ? (
         <div
           data-group-predictions-no-room=""
           className="mt-4 flex items-start gap-3 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_6%,var(--color-surface))] p-4 sm:p-5"
         >
+          {/* Guld-tonad kupong-ikon i en rund bricka. Ikon-färgen är --color-warning
+              (AA-säker guld-text-ton), tinten är dekor. aria-hidden, rubriken bär text. */}
+          <span
+            aria-hidden="true"
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--vm-gold)_14%,transparent)] text-warning"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M2 5.5A1 1 0 0 1 3 4.5h10a1 1 0 0 1 1 1v1a1.5 1.5 0 0 0 0 3v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1a1.5 1.5 0 0 0 0-3z" />
+              <path d="M10 4.75v6.5" strokeDasharray="1.4 1.4" />
+            </svg>
+          </span>
           <div className="min-w-0">
             <p className="m-0 font-display text-sm font-semibold text-fg">
               Gå med i ett rum för att tippa grupperna
             </p>
             <p className="m-0 mt-1 text-sm text-fg-muted">
               Grupp-tipsen är per rum, du och kompisarna gissar gruppvinnare och tvåor före
-              gruppspelet och jämför sen. Skapa eller gå med i ett rum ovanför.
+              gruppspelet och jämför sen. Skapa eller gå med i ett rum ovanför, så öppnar kupongerna
+              här.
             </p>
           </div>
         </div>
@@ -130,7 +156,7 @@ export function GroupPredictionsView({
       {ready ? (
         <ol
           data-group-predictions-list=""
-          className="mt-5 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2"
+          className="mt-5 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3"
         >
           {predictableGroups.map(({ groupId, teams: groupTeams, locked }) => {
             const mine = store.myGroupPredictions.get(groupId) ?? null;
