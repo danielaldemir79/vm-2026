@@ -5,6 +5,59 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T52 (#91): kopiera mina tips mellan rum
+
+Daniels live-feedback: "man ska kunna kopiera in sina resultat från ett rum till ett annat rum,
+blir tjatigt att behöva fylla om varenda match varje gång." Implementerat som en ren engine
+(`src/data/predictions/copy-predictions.ts`) som läser MINA tips i källrummet och skriver dem i
+målrummet via de BEFINTLIGA API-funktionerna (`upsertMy*`), plus en UI-kontroll i rum-panelen
+(`CopyTipsControl.tsx`) som kopierar IN till det aktiva rummet.
+
+**HARD-beslut 1, bara EGNA tips:** kopieringen läser BARA via `listMy*` (filtrerar på `user_id` ur
+sessionen) och skriver BARA via `upsertMy*` (sätter `user_id = auth.uid()`). En annans tips kan
+varken läsas hit eller skrivas i deras namn. Källa: RLS-policyerna i
+`supabase/migrations/20260611120200_t15_predictions_rls.sql` (+ t16-grupp/bracket-motsvarigheterna),
+`user_id = (select auth.uid())` i with check, bevisat i `predictions-rls.integration.test.ts`
+(FÖRFALSKNINGS-testet).
+
+**HARD-beslut 2, deadline-lås respekteras + RLS-feltextens tvetydighet:** ett RLS-avslag i Postgres
+ger kod 42501 med texten "new row violates row-level security policy" , SAMMA text oavsett om
+avslaget berodde på deadline-låset eller på något annat (icke-medlemskap, förfalskning). Klienten kan
+alltså INTE av feltexten avgöra VARFÖR en skrivning nekades. Därför PRE-KLASSIFICERAR vi lås på
+klienten med samma sanning tips-vyerna redan visar (`isMatchLocked` + deadline-ankaren) via
+`deriveCopyLocks`, hoppar låsta items utan skrivförsök och rapporterar dem som "låsta". Ett item vi
+ändå försöker skriva och som nekas rapporteras ärligt per item som "kunde inte kopieras" med felets
+text , aldrig en tyst no-op (PRINCIPLES §8). Deadline-ankaren är källåkrade och speglar RLS-helpers
+EXAKT: match-tips -> matchens egen avspark; grupp-tips -> gruppens första match `g-X-1`
+(`group_deadline_kickoff`); bracket-tips -> slottens egen avspark, och `champion` -> turneringsstart
+`g-A-1` (`bracket_deadline_kickoff`). Källa: t15/t16-RLS-migrationerna + `bracketDeadlineMatchId`
+(`bracket-predictions-api.ts`) + `groupFirstMatchId` (`group-predictable-data.ts`).
+
+**HARD-beslut 3, befintliga tips i målrummet skrivs ALDRIG över (fyll bara TOMMA):** valt framför
+"skriv över" och "fråga per match". Motiv: det är FÖRUTSÄGBART och OFÖRSTÖRBART , en kopiering kan
+aldrig råka radera ett tips användaren redan lagt i målrummet, och behöver ingen extra dialog (KISS).
+Items som redan finns i målet hoppas och rapporteras som "redan tippade". Avvägning: en användare som
+VILL skriva över får göra det manuellt i målrummet (sällsynt fall, och det destruktiva alternativet
+ska kräva en medveten handling, inte ske som bieffekt av en bekvämlighets-kopiering).
+
+**Robust mot delfel:** varje skrivning är sin egen try/catch, en låst eller felande match stoppar inte
+resten. Rapporten (`CopyReport`) bär per-item-utfall + totaler; UI:t sammanfattar ärligt via
+`summarizeCopyReport` ("X tips kopierade, Y hoppades över (låsta), Z redan tippade, W kunde inte
+kopieras"). En LÄSmiss (kan inte kopiera blint) fail-loud:ar däremot hela jobbet.
+
+**Copilot runda 1, härdning (3 beslut):**
+- *Ingen cirkulär import i data-lagret:* `copy-predictions.ts` importerar de återanvända
+  API-funktionerna DIREKT ur sina käll-moduler (`predictions-api` / `group-predictions-api` /
+  `bracket-predictions-api`), INTE via barrel:n `./index` (som re-exporterar copy-predictions och
+  därmed gav en cirkel). Beroende-grafen är nu riktad: `index -> copy-predictions -> *-api`.
+- *Inget stale kopierings-resultat vid rumsbyte:* RoomPanel remountar inte `CopyTipsControl` när det
+  aktiva (mål-)rummet byts, så per-rad-tillståndet (knutet till FÖRRA rummet) nollställs nu via en
+  `useEffect` på `activeRoom.id`, och en asynkron kopiering som löser EFTER ett rumsbyte släpps tyst
+  (ref-jämförelse i BÅDE success- och catch-grenen), så ett gammalt utfall aldrig dyker upp i fel rum.
+- *A11y, villkorlig live-region:* ett fel-utfall (failad skrivning ELLER kastad läsmiss, tone
+  'negative') annonseras som `role="alert"` (assertive), lyckat/neutralt som `role="status"` (polite),
+  i linje med resten av RoomPanel.
+
 ## 2026-06-11 , T51 (#88): simulerad slutspelsbild ur grupp-tipsen (treorna lämnas öppna, gissas aldrig)
 
 Daniels live-feedback efter att ha tippat grupperna: "Tippade grupperna men fick ingen simulering på

@@ -32,8 +32,18 @@ import {
 } from '../../data/rooms';
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
 import { isSupabaseConfigured, LIVE_READY } from '../../data';
+import { copyMyPredictions, type CopyReport } from '../../data/predictions';
+import { WC2026_MATCHES } from '../../data/wc2026';
 import { RoomsStoreContext, type RoomsStatus, type RoomsStore } from './rooms-context';
 import { clearActiveRoomId, readActiveRoomId, writeActiveRoomId } from './active-room-storage';
+import { deriveCopyLocks } from './derive-copy-locks';
+
+// Matchplanens avsparkstider (match_id -> kickoff ISO), EN gång på modul-nivå (statisk
+// data). Lås-klassificeraren slår upp deadline-ankaren här (T52). En sanning för
+// tiderna: WC2026_MATCHES (källåkrad matchplan), ingen dubblerad tabell.
+const KICKOFF_BY_MATCH_ID: ReadonlyMap<string, string> = new Map(
+  WC2026_MATCHES.map((m) => [m.id, m.kickoff])
+);
 
 export interface RoomsProviderProps {
   children: ReactNode;
@@ -293,6 +303,32 @@ export function RoomsProvider({
     [supabase]
   );
 
+  // T52 (#91): kopiera MINA tips från ett annat rum till det AKTIVA rummet. Tunt lim:
+  // engine:n (copyMyPredictions) gör allt arbete; här binder vi den till klienten, det
+  // aktiva rummet (målet) och lås-klassificeraren (matchplanens avspark = deadline).
+  const copyMyTips = useCallback(
+    async (sourceRoomId: string): Promise<CopyReport> => {
+      const room = activeRoomRef.current;
+      // Fail loud (PRINCIPLES §8): utan klient eller aktivt rum finns inget mål att
+      // kopiera TILL. UI:t gatar detta (knappen visas bara med ett aktivt rum + ett
+      // annat käll-rum), så detta nås bara vid felaktig wiring, exakt vad felet avslöjar.
+      if (!supabase) {
+        throw new Error(
+          '[VM2026] Kopiera tips misslyckades: ingen Supabase-klient (live ej konfigurerat).'
+        );
+      }
+      if (!room) {
+        throw new Error('[VM2026] Kopiera tips misslyckades: inget aktivt rum att kopiera till.');
+      }
+      // Lås-klassificeraren körs på källans nycklar EFTER att engine:n läst dem (en
+      // läsning). now = nuet (server-RLS är ändå sanningen; detta rapporterar bara ärligt).
+      return copyMyPredictions(supabase, sourceRoomId, room.id, (source) =>
+        deriveCopyLocks(source, KICKOFF_BY_MATCH_ID, new Date())
+      );
+    },
+    [supabase]
+  );
+
   const store: RoomsStore = useMemo(
     () => ({
       enabled,
@@ -309,6 +345,7 @@ export function RoomsProvider({
       leaveRoom,
       refresh,
       saveResult,
+      copyMyTips,
     }),
     [
       enabled,
@@ -325,6 +362,7 @@ export function RoomsProvider({
       leaveRoom,
       refresh,
       saveResult,
+      copyMyTips,
     ]
   );
 
