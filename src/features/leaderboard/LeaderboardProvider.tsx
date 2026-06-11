@@ -201,8 +201,10 @@ export function LeaderboardProvider({
       leaderboard,
       reveal,
       teams: data.teams,
+      // "Du"-framhävningens seam: rummets auth-identitet (null tills sessionen klar).
+      currentUserId: rooms.userId,
     }),
-    [enabled, status, error, activeRoomId, leaderboard, reveal, data.teams]
+    [enabled, status, error, activeRoomId, leaderboard, reveal, data.teams, rooms.userId]
   );
 
   return (

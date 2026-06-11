@@ -33,6 +33,13 @@ export interface LeaderboardStore {
   reveal: readonly RevealedMatch[];
   /** Lag-listan (Team.id -> namn för avslöjande-vyns match-rubriker). */
   teams: readonly Team[];
+  /**
+   * Den inloggade (anonyma) användarens id, eller null innan auth-sessionen är klar.
+   * SEAM för "du"-framhävningen i topplistan: vyn jämför varje rad-userId mot detta
+   * för att färg-OBEROENDE markera den egna raden. Bara en VISNINGS-hak (ingen
+   * sekretess hänger på den, RLS är skyddet); null = ingen rad markeras som "du".
+   */
+  currentUserId: string | null;
 }
 
 /**

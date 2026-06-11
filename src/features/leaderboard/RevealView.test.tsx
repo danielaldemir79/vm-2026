@@ -19,6 +19,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     leaderboard: [],
     reveal: [],
     teams: TEAMS,
+    currentUserId: null,
     ...partial,
   };
 }
@@ -84,5 +85,41 @@ describe('RevealView, avslöjande-vyn', () => {
     const unknown: RevealedMatch = { ...revealedMatch, homeTeamId: null, awayTeamId: 'xyz' };
     renderView(store({ reveal: [unknown] }));
     expect(screen.getByText('Okänt lag mot xyz')).toBeInTheDocument();
+  });
+});
+
+describe('RevealView, FÄRG-OBEROENDE facit-markörer (premium-finish)', () => {
+  const threePicks: RevealedMatch = {
+    ...revealedMatch,
+    picks: [
+      { userId: 'u1', displayName: 'Anna', predicted: { homeGoals: 2, awayGoals: 1 }, points: 3 },
+      { userId: 'u2', displayName: 'Bo', predicted: { homeGoals: 3, awayGoals: 1 }, points: 1 },
+      { userId: 'u3', displayName: 'Cia', predicted: { homeGoals: 0, awayGoals: 0 }, points: 0 },
+    ],
+  };
+
+  it('härleder utfalls-kategori ur poängen (3=exakt, 1=utfall, 0=miss) via data-outcome', () => {
+    const { container } = renderView(store({ reveal: [threePicks] }));
+    const picks = Array.from(container.querySelectorAll('[data-reveal-pick]'));
+    expect(picks.map((p) => p.getAttribute('data-outcome'))).toEqual(['exact', 'outcome', 'miss']);
+  });
+
+  it('varje pick bär en markör som skiljer sig i FORM/IKON, inte bara färg', () => {
+    const { container } = renderView(store({ reveal: [threePicks] }));
+    const marks = Array.from(container.querySelectorAll('.vm-reveal-mark'));
+    // Tre olika markör-klasser (form) + tre olika glyfer (ikon) = färg-oberoende.
+    expect(marks[0].classList.contains('vm-reveal-mark--exact')).toBe(true);
+    expect(marks[1].classList.contains('vm-reveal-mark--outcome')).toBe(true);
+    expect(marks[2].classList.contains('vm-reveal-mark--miss')).toBe(true);
+    const glyphs = marks.map((m) => m.textContent);
+    expect(new Set(glyphs).size).toBe(3); // tre DISTINKTA glyfer
+  });
+
+  it('ger skärmläsaren utfallet i ORD (sr-only), inte bara visuellt', () => {
+    renderView(store({ reveal: [threePicks] }));
+    // De dolda ord-etiketterna finns i DOM:en (färg-oberoende för skärmläsare).
+    expect(screen.getByText(/Exakt rätt/)).toBeInTheDocument();
+    expect(screen.getByText(/Rätt utfall/)).toBeInTheDocument();
+    expect(screen.getByText(/Bom/)).toBeInTheDocument();
   });
 });
