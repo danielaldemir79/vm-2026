@@ -126,24 +126,45 @@ export async function joinRoomByCode(
 }
 
 /**
- * Lista de rum den inloggade användaren är medlem i. RLS gör att bara egna rum
- * returneras (en icke-medlem ser inget). Tom session -> tom lista (ingen identitet).
+ * Lista de rum den inloggade användaren är medlem i, via medlemskap-join
+ * room_members -> rooms.
+ *
+ * EGEN-IDENTITET-FILTER (T59, #97, rotorsak): RLS på room_members tillåter en
+ * medlem att se ALLA medlemsrader i rum hen själv är med i (det är så medlems-
+ * listan kan visa de andra deltagarna). Utan `.eq('user_id', <jag>)` joinar vi
+ * alltså rooms en gång PER medlem, så varje rum dök upp x medlemsantalet (VM 2026
+ * x7, Rhodos Champs x3 i Daniels skärmdump). Vi filtrerar därför på den egna
+ * identiteten: en medlemsrad per rum = ett rum i listan.
+ *
+ * DEFENSIV DEDUPE på room.id (skydd mot framtida query-ändringar): identitets-
+ * filtret ovan ger redan exakt en rad per rum idag, men en framtida ändring av
+ * select/join (eller en RLS-justering) skulle kunna återinföra dubbletter tyst.
+ * En Map keyad på room.id garanterar en RoomSummary per rum oavsett, så
+ * konsumenterna (rum-väljaren, CopyTipsControl) aldrig ser samma rum två gånger.
  */
 export async function listMyRooms(client: VmSupabaseClient): Promise<RoomSummary[]> {
-  await ensureSession(client);
-  // Hämta via medlemskap-join: room_members -> rooms (RLS låter bara egna passera).
+  const identity = await ensureSession(client);
   const { data, error } = await client
     .from('room_members')
     .select('rooms ( id, name, code )')
+    .eq('user_id', identity.userId)
     .order('joined_at', { ascending: true });
   if (error) {
     fail('Hämta mina rum', error.message);
   }
   const rows = data ?? [];
-  return rows
-    .map((r) => r.rooms as { id: string; name: string; code: string } | null)
-    .filter((room): room is { id: string; name: string; code: string } => room !== null)
-    .map((room) => ({ id: room.id, name: room.name, code: room.code }));
+  const byId = new Map<string, RoomSummary>();
+  for (const r of rows) {
+    const room = r.rooms as { id: string; name: string; code: string } | null;
+    if (room === null) {
+      continue; // föräldralös rad (rooms filtrerades bort av RLS) -> hoppa, inte krascha
+    }
+    // Första förekomsten vinner; en ev. dubblett av samma room.id ignoreras tyst.
+    if (!byId.has(room.id)) {
+      byId.set(room.id, { id: room.id, name: room.name, code: room.code });
+    }
+  }
+  return [...byId.values()];
 }
 
 /** Lista medlemmarna i ett rum (RLS: bara om anroparen själv är medlem). */
