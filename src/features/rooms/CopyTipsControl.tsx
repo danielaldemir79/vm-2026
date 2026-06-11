@@ -12,31 +12,69 @@
 //
 // MÅLET = det AKTIVA rummet (store.activeRoom). Vi kopierar alltid IN till det rum man
 // står i, så riktningen är självklar: "jag är i rum B, hämta mina tips från rum A".
+//
+// PREMIUM-FINISH (design-frontend, T52): kontrollen är en EGEN underzon i biljett-
+// kroppen ("Kopiera dina tips hit"), avgränsad med en hårfin guld-list i samma
+// kvällsljus-familj som resten av rummet. Varje käll-rum är en rad med ett kopiera-
+// affordans (en ⧉-glyf, samma som CopyButton) och ett pågår-läge med en lugn spinner.
+// Utfallet får en TON ur rapportens FAKTISKA siffror (inte ur strängen), så de tre
+// utfallen syns direkt utan att skrika: kopierade = positivt (grön bock), inget
+// kopierat = neutralt-informativt (dämpad ton), fel = danger (utan alarmism). All
+// färg är BACKUP, glyfen + texten bär betydelsen (färg-oberoende a11y). Tonerna är
+// AA-mätta mot tokens per tema (rooms.css §7, decisions.md T52).
 
 import { useState } from 'react';
 import { useRoomsStore } from './rooms-context';
 import type { CopyReport } from '../../data/predictions';
 import { summarizeCopyReport } from './copy-report-summary';
 
-/** Visnings-tillstånd per käll-rum: pågår / klar (med besked) / fel. */
+/**
+ * Resultatets TON, härledd ur rapportens FAKTISKA totaler (inte ur den ärliga
+ * texten, som ägs av copy-report-summary). Tonen styr bara den VISUELLA signalen
+ * (glyf + färg); själva beskedet är oförändrat. Tre lägen så de tre utfallen går att
+ * skilja på direkt utan alarmism:
+ *  - 'positive'  , något kopierades (copied > 0): en lugn grön bock.
+ *  - 'neutral'   , inget kopierades men inget gick fel (allt var låst/redan tippat,
+ *                  eller källan var tom): en dämpad info-ton, INTE ett fel.
+ *  - 'negative'  , en LÄSmiss kastade (fail-loud): danger-ton.
+ */
+type ResultTone = 'positive' | 'neutral' | 'negative';
+
+/** Visnings-tillstånd per käll-rum: pågår / klar (med besked + ton) / fel. */
 interface CopyState {
   status: 'idle' | 'busy' | 'done' | 'error';
   message: string;
+  tone: ResultTone;
 }
 
-const IDLE: CopyState = { status: 'idle', message: '' };
+const IDLE: CopyState = { status: 'idle', message: '', tone: 'neutral' };
 
-// Sekundär-knapp i samma formspråk som RoomPanel (kant-knapp, dämpad ton). Design-
-// frontend kan ersätta klasserna; semantiken (knapp + etikett + disabled) är det stabila.
+// Källrums-knappen: samma accent-tonade "action"-pille som RoomPanel:s kopiera/dela-
+// knappar (.vm-rooms-action), så kontrollen känns som EN familj med biljetten. Texten
+// är fg (full kontrast), accent-tonen lever bara i yta + kant. Disabled-läget under
+// kopieringen dämpas, så ett pågående kopp inte ser klickbart ut.
 const BTN_COPY =
-  'inline-flex h-9 items-center justify-center rounded-pill border border-border ' +
-  'bg-surface px-4 font-display text-xs font-semibold text-fg shadow-sm ' +
-  'transition-[transform,box-shadow,border-color] duration-150 outline-none ' +
-  'hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-border))] ' +
-  'hover:shadow-[var(--vm-shadow-raised)] ' +
-  'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] ' +
+  'vm-rooms-action vm-rooms-copy-btn inline-flex h-10 w-full items-center gap-2 ' +
+  'rounded-pill px-4 font-display text-xs font-semibold ' +
+  'transition-[background-color,border-color,box-shadow,transform] duration-150 outline-none ' +
+  'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] ' +
-  'active:translate-y-px disabled:opacity-60 disabled:hover:shadow-none';
+  'active:translate-y-px disabled:cursor-progress disabled:opacity-70';
+
+/** Härled resultat-tonen ur rapportens totaler (ren funktion av siffrorna). */
+function toneFromReport(report: CopyReport): ResultTone {
+  return report.total.copied > 0 ? 'positive' : 'neutral';
+}
+
+/** Liten besked-glyf (dekor, aria-hidden , texten bär betydelsen). Medan det PÅGÅR
+ * visas ingen utfalls-glyf (spinnern på knappen bär pågår-signalen); annars en glyf
+ * per ton: bock (positivt), info (neutralt) eller utrops (fel). */
+function resultGlyph(status: CopyState['status'], tone: ResultTone): string {
+  if (status === 'busy') return '';
+  if (tone === 'positive') return '✓';
+  if (tone === 'negative') return '!';
+  return 'i'; // neutralt-informativt, inte ett fel
+}
 
 /**
  * Kontrollen som låter användaren kopiera sina tips från ett annat rum in i det aktiva.
@@ -62,13 +100,21 @@ export function CopyTipsControl() {
   const handleCopy = async (sourceRoomId: string, sourceName: string) => {
     setStateByRoom((prev) => ({
       ...prev,
-      [sourceRoomId]: { status: 'busy', message: `Kopierar dina tips från ${sourceName} ...` },
+      [sourceRoomId]: {
+        status: 'busy',
+        message: `Kopierar dina tips från ${sourceName} ...`,
+        tone: 'neutral',
+      },
     }));
     try {
       const report: CopyReport = await store.copyMyTips(sourceRoomId);
       setStateByRoom((prev) => ({
         ...prev,
-        [sourceRoomId]: { status: 'done', message: summarizeCopyReport(report, sourceName) },
+        [sourceRoomId]: {
+          status: 'done',
+          message: summarizeCopyReport(report, sourceName),
+          tone: toneFromReport(report),
+        },
       }));
     } catch (err) {
       // En LÄSmiss (kan inte kopiera blint) fail-loud:ar hit. Vi visar felets text,
@@ -78,6 +124,7 @@ export function CopyTipsControl() {
         [sourceRoomId]: {
           status: 'error',
           message: err instanceof Error ? err.message : 'Kunde inte kopiera tipsen.',
+          tone: 'negative',
         },
       }));
     }
@@ -87,33 +134,56 @@ export function CopyTipsControl() {
     <section
       data-rooms-copy-tips
       aria-labelledby="copy-tips-heading"
-      className="vm-rooms-copy-tips"
+      className="vm-rooms-copy-tips mt-5 border-t border-border pt-5"
     >
       <h4
         id="copy-tips-heading"
-        className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-fg-muted"
+        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-fg-muted"
       >
+        {/* Kopiera-IN-glyf (dekor): två staplade ark som pekar inåt, ekar CopyButton:s ⧉. */}
+        <span
+          aria-hidden="true"
+          className="vm-rooms-copy-mark inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-sm leading-none"
+        >
+          ⧉
+        </span>
         Kopiera dina tips hit
       </h4>
-      <p className="mb-3 max-w-prose text-sm text-fg-muted">
+      <p className="mb-3 mt-2 max-w-prose text-sm text-fg-muted">
         Har du redan tippat i ett annat rum? Hämta in dina tips hit i stället för att fylla i allt
         igen. Befintliga tips i det här rummet rörs inte, och matcher som redan låsts hoppas över.
       </p>
       <ul className="flex flex-col gap-3" data-rooms-copy-sources>
         {otherRooms.map((room) => {
           const cs = stateByRoom[room.id] ?? IDLE;
+          const isBusy = cs.status === 'busy';
           return (
             <li key={room.id} data-rooms-copy-source data-source-id={room.id}>
               <button
                 type="button"
                 onClick={() => void handleCopy(room.id, room.name)}
-                disabled={cs.status === 'busy'}
+                disabled={isBusy}
+                aria-busy={isBusy}
                 data-rooms-copy-button
                 className={BTN_COPY}
               >
-                {cs.status === 'busy'
-                  ? `Kopierar från ${room.name} ...`
-                  : `Kopiera mina tips från ${room.name}`}
+                {/* Leading-glyf: en lugn spinner medan det pågår, annars kopiera-ikonen.
+                    aria-hidden , knappens text bär handlingen åt skärmläsaren. */}
+                <span
+                  aria-hidden="true"
+                  className={
+                    isBusy
+                      ? 'vm-rooms-copy-spinner inline-block h-3.5 w-3.5 shrink-0 rounded-pill'
+                      : 'inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-sm leading-none'
+                  }
+                >
+                  {isBusy ? '' : '⧉'}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {isBusy
+                    ? `Kopierar från ${room.name} ...`
+                    : `Kopiera mina tips från ${room.name}`}
+                </span>
               </button>
               {cs.message && (
                 <p
@@ -121,12 +191,18 @@ export function CopyTipsControl() {
                   aria-live="polite"
                   data-rooms-copy-result
                   data-result-status={cs.status}
-                  className="mt-1.5 text-sm"
-                  style={{
-                    color: cs.status === 'error' ? 'var(--color-danger)' : 'var(--color-fg-muted)',
-                  }}
+                  data-result-tone={cs.tone}
+                  className="vm-rooms-copy-result mt-2 flex items-start gap-2 rounded-md px-3 py-2 text-sm"
                 >
-                  {cs.message}
+                  {resultGlyph(cs.status, cs.tone) && (
+                    <span
+                      aria-hidden="true"
+                      className="vm-rooms-copy-result-glyph mt-px font-bold leading-snug"
+                    >
+                      {resultGlyph(cs.status, cs.tone)}
+                    </span>
+                  )}
+                  <span className="leading-snug">{cs.message}</span>
                 </p>
               )}
             </li>
