@@ -58,9 +58,10 @@ describe('RevealView, avslöjande-vyn', () => {
   });
 
   it('visar match-rubrik med lagnamn + facit', () => {
-    renderView(store({ reveal: [revealedMatch] }));
-    expect(screen.getByText('Mexiko mot Sydkorea')).toBeInTheDocument();
+    // En enda render (inte två i samma it), så DOM:en har EN uppsättning noder och
+    // assertionerna inte blir spröka mot dubbletter. Båda kollarna scopas till samma träd.
     const { container } = renderView(store({ reveal: [revealedMatch] }));
+    expect(screen.getByText('Mexiko mot Sydkorea')).toBeInTheDocument();
     expect(container.querySelector('[data-reveal-actual]')).toHaveTextContent('2-1');
   });
 

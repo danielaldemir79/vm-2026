@@ -33,6 +33,14 @@ import type { LeaderboardEntry } from './aggregate-scores';
 /** Spring för layout-glidet: en tävlings-tight men mjuk fjäder (premium, ingen wobble). */
 const LAYOUT_SPRING = { type: 'spring', stiffness: 520, damping: 38, mass: 0.9 } as const;
 
+// Hur länge puls-flaggan (data-rank-changed) hålls innan den nollas. MÅSTE matcha
+// CSS-pulsens längd `vm-board-rank-pulse 1.1s` (tokens.css, .vm-board-row[data-rank-changed]).
+// VARFÖR vi nollar: pulsen är en ENGÅNGS CSS-animation som bara (åter)startar när
+// data-rank-changed togglas av->på. Om flaggan aldrig nollas står den kvar på 'true', och
+// en SENARE omsortering av SAMMA rad kan inte tända pulsen igen (samma attributvärde =
+// ingen omstart). Vi nollar därför efter pulsens längd, så nästa omsortering kan trigga om.
+const RANK_PULSE_MS = 1100;
+
 /** Medalj-modifierare per topp-3-placering (1=guld, 2=silver, 3=brons). DRY mot T16. */
 const MEDAL_CLASS: Record<number, string> = {
   1: 'vm-pool-medal--gold',
@@ -153,8 +161,21 @@ export function LeaderboardView() {
       }
     }
     prevRanksRef.current = next;
-    // Sätt bara state om något faktiskt rörde sig (undvik en tom re-render-loop).
-    setChangedIds(moved.size > 0 ? moved : (curr) => (curr.size > 0 ? new Set() : curr));
+    if (moved.size === 0) {
+      // Inget rörde sig: nolla bara om en gammal flagga ligger kvar (annars ingen re-render).
+      setChangedIds((curr) => (curr.size > 0 ? new Set() : curr));
+      return;
+    }
+    // Något rörde sig: tänd pulsen för de raderna.
+    setChangedIds(moved);
+    // Nolla flaggan när pulsen spelat klart, så en SENARE omsortering av samma rad kan
+    // tända CSS-pulsen igen (engångs-animationen startar bara om vid en av->på-toggling).
+    // Vid reducerad rörelse sätts data-rank-changed aldrig på raden (animateLayout=false),
+    // så pulsen är ändå av, men vi nollar state-flaggan likadant för att hålla den ren.
+    const timer = setTimeout(() => {
+      setChangedIds((curr) => (curr.size > 0 ? new Set() : curr));
+    }, RANK_PULSE_MS);
+    return () => clearTimeout(timer);
   }, [store.leaderboard, ready]);
 
   return (

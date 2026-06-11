@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { act, render, screen, within } from '@testing-library/react';
 import { LeaderboardView } from './LeaderboardView';
 import { LeaderboardStoreContext, type LeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
@@ -150,5 +150,52 @@ describe('LeaderboardView, premium-finish (podium + du + ledare)', () => {
     const { container } = renderView(store({ leaderboard: board, currentUserId: null }));
     expect(container.querySelector('[data-self="true"]')).toBeNull();
     expect(container.querySelector('[data-leaderboard-self]')).toBeNull();
+  });
+});
+
+describe('LeaderboardView, placerings-puls (data-rank-changed nollas så den kan triggas igen)', () => {
+  // C3-regression (Copilot): puls-flaggan måste NOLLAS efter att pulsen spelat, annars
+  // står data-rank-changed kvar på 'true' och en SENARE omsortering av samma rad kan inte
+  // tända CSS-pulsen igen (engångs-animationen startar bara om vid en av->på-toggling).
+  // 1100 ms = pulsens längd (RANK_PULSE_MS i vyn, speglar vm-board-rank-pulse 1.1s i CSS).
+  const rowAttr = (container: HTMLElement, userId: string) =>
+    container
+      .querySelector(`[data-leaderboard-row][data-user-id="${userId}"]`)
+      ?.getAttribute('data-rank-changed') ?? null;
+
+  it('flaggan tänds vid omsortering, nollas efter pulsen, och tänds IGEN vid nästa omsortering', () => {
+    vi.useFakeTimers();
+    try {
+      // Anna 1:a, Bertil 2:a vid första laddningen (ingen puls första gången = inte brus).
+      const before = [entry('u1', 'Anna', 12, 1), entry('u2', 'Bertil', 8, 2)];
+      const { container, rerender } = renderView(store({ leaderboard: before }));
+      const rerenderWith = (leaderboard: LeaderboardEntry[]) =>
+        act(() => {
+          rerender(
+            <LeaderboardStoreContext.Provider value={store({ leaderboard })}>
+              <LeaderboardView />
+            </LeaderboardStoreContext.Provider>
+          );
+        });
+
+      // Första laddningen pulsar INTE (ingen tidigare rank att jämföra mot).
+      expect(rowAttr(container, 'u1')).toBeNull();
+      expect(rowAttr(container, 'u2')).toBeNull();
+
+      // OMSORTERING 1: Bertil går om Anna. Bertil (u2) bytte plats -> pulsen tänds.
+      rerenderWith([entry('u2', 'Bertil', 14, 1), entry('u1', 'Anna', 12, 2)]);
+      expect(rowAttr(container, 'u2')).toBe('true');
+
+      // Pulsen spelar klart -> flaggan NOLLAS (annars kan den aldrig tändas igen).
+      act(() => vi.advanceTimersByTime(1100));
+      expect(rowAttr(container, 'u2')).toBeNull();
+
+      // OMSORTERING 2: Anna går om Bertil igen. Bertil (u2) bytte plats PÅ NYTT.
+      // Eftersom flaggan nollades kan pulsen triggas igen (av->på), det är hela poängen.
+      rerenderWith([entry('u1', 'Anna', 20, 1), entry('u2', 'Bertil', 14, 2)]);
+      expect(rowAttr(container, 'u2')).toBe('true');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
