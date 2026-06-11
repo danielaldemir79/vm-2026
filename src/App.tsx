@@ -21,6 +21,7 @@ import { TeamProfileProvider } from './features/team-profile';
 import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
 import { PredictionSection } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
+import { BracketPredictionSection } from './features/bracket-predictions';
 import {
   InstallBanner,
   OnboardingDialog,
@@ -242,6 +243,16 @@ function AppShell() {
             fortsättning, se T16 HANDOFF + docs/decisions.md. */}
         <Slide direction="up">
           <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
+        </Slide>
+
+        {/* Bracket-/slutspels-tipsen (T16b, #59): tippa VM-vinnaren + vem som går
+            vidare ur varje slutspels-slot (M73-M104). Per rum, deadline per slot
+            (slottens egen avspark) + champion vid turneringsstart, server-side
+            RLS-lås + sekretess (bevisat i T16). En slot tippas först när dess två lag
+            är kända (gissa aldrig laget). Funktionellt + tillgängligt UI byggs här;
+            design-frontend ger finishen ovanpå (datakärnan finns från T16). */}
+        <Slide direction="up">
+          <BracketPredictionSection surface={(children) => <Panel>{children}</Panel>} />
         </Slide>
 
         <footer className="border-t border-border pt-6 text-sm text-fg-muted">

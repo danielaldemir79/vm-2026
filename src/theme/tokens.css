@@ -685,10 +685,12 @@ body {
    på den dekorativa fonden + topplisten (gulden tonas ner mot border-tonen), så
    den positiva "låst = rättvist"-känslan finns kvar utan att skrika. Text-lagret
    rörs inte av dämpningen (låst-etiketten + mitt-tips-talen bär full kontrast).
-   GÄLLER BÅDA kupong-typerna: match-tipset (T15, data-prediction-locked) OCH grupp-
-   tipset (T16, data-group-prediction-locked) , samma dämpnings-recept, en sanning. */
+   GÄLLER ALLA tips-kupong-typerna: match-tipset (T15, data-prediction-locked),
+   grupp-tipset (T16, data-group-prediction-locked) OCH slutspels-tipsets slot-
+   kuponger (T16b, data-bracket-prediction-locked) , samma dämpnings-recept, en sanning. */
 .vm-coupon-card[data-prediction-locked],
-.vm-coupon-card[data-group-prediction-locked] {
+.vm-coupon-card[data-group-prediction-locked],
+.vm-coupon-card[data-bracket-prediction-locked] {
   background-image: radial-gradient(
     120% 90% at 100% 0%,
     color-mix(in srgb, var(--vm-gold) 5%, transparent),
@@ -700,7 +702,8 @@ body {
 }
 
 .vm-coupon-card[data-prediction-locked]:hover,
-.vm-coupon-card[data-group-prediction-locked]:hover {
+.vm-coupon-card[data-group-prediction-locked]:hover,
+.vm-coupon-card[data-bracket-prediction-locked]:hover {
   /* Låst kupong lyfter inte på hover (inget att interagera med), så den känns
      stilla/inlämnad. Samma vilo-skugga som icke-hover. */
   box-shadow:
@@ -844,4 +847,214 @@ body {
     color-mix(in srgb, var(--vm-silver) 45%, transparent),
     transparent
   );
+}
+
+/* =============================================================================
+   12. BRACKET-/SLUTSPELS-TIPSET, "VÄGEN TILL BUCKLAN" (T16b, issue #59).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET (taskens punkt 1+2): det här är SLUTSPELS-tipset, det episka momentet,
+   "vem tror du tar sig hela vägen till final och vinner VM". Två lager:
+
+   A) CHAMPION-VÄLJAREN = HJÄLTE-momentet (pokal, guld, "vem lyfter bucklan"). En
+      egen, större panel ovanför slot-kupongerna: en varm guld arena-glow-hero (samma
+      "arena i kvällsljus"-recept som §6/§7/§10), en pokal-glyf, och ett STOLT guld-
+      vinnar-band när jag valt min mästare. Det är trädets krona, översatt till tips.
+
+   B) PER-SLOT-TIPSEN = TIPSKUPONG-formspråk. Återbrukar HELA tips-kupong-familjen
+      (.vm-coupon-card, river-tear, coupon-eyebrow, lock-ikon, .vm-coupon-mine) som
+      grupp-tipset (T16) och match-tipset (T15) redan etablerat (DRY, PRINCIPLES §4),
+      så slutspels-tipset hör tydligt till SAMMA kupong-värld. De TVÅ möjliga lagen
+      per slot blir ett tydligt binärt val (TeamFlag-förhandsvisning). Rund-grupperat
+      med en intensitet som BYGGER mot finalen (samma per-stage-guld som bracket.css),
+      ett elegant TBD-läge ("lagen avgörs av tidigare resultat", inte tomt) och ett
+      positivt LÅST-läge (hänglås + mitt tips står kvar stolt).
+
+   KONTRAST-VAKT (taskens punkt 4, canvas-komposit, VÄRSTA fall, BÅDA teman,
+   lessons aa-kontrast-...-varsta-fall + glow-i-dekor-strip-skild-fran-text-yta):
+   ALL läsbar text (rubriker, lagnamn, etiketter, mitt-tips, låst, fel) står på den
+   OPAKA surface/surface-raised-fonden, ALDRIG på guld-glow:en. Guld-TEXT använder
+   den AA-mätta --color-warning (aldrig rå --vm-gold, guld-på-ljus-fällan). Vinnar-/
+   mästar-brickorna är SOLID guld-yta med mörk ink (--vm-coupon-ink, samma färg-
+   oberoende solid-bricka-form som T9/T11/T15/T16). Glow-/kant-/river-lagren bär
+   ALDRIG text. Uppmätta MIN-värden står i docs/decisions.md (T16b-visuellt).
+   ========================================================================== */
+
+/* CHAMPION-HJÄLTEN: en guld arena-glow-hero (pokal-momentet). Samma radial-glow-
+   recept som hero:n/kupongen, men varmare och större, mot surface-raised. En hårfin
+   inset guld-kant-glow + en mjuk guld-yt-skugga lyfter panelen som "trädets krona".
+
+   GLOW-ALFAN ÄR KONTRAST-LÅST (mätt, inte gissat, samma disciplin som profil-hero:n
+   §7): de TVÅ guld-radialerna sitter i MOTSATTA hörn (övre höger 100% 0% + nedre
+   vänster 0% 100%) så de möts ALDRIG på full peak, värsta enskilda punkt är en enkel
+   radial. Vid 13% (övre) -> muted-text (fg-muted) på den peaken håller >= 4.5:1 (normal
+   text) i BÅDA teman: 4.68:1 (mörkt) / 5.65:1 (ljust), svept som canvas-komposit över
+   surface-raised (decisions.md T16b-visuellt), inte ett typfall. Så ingen text i hero:n
+   kan sänka kontrasten under AA, även rakt på en glow-topp. */
+.vm-champion-hero {
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(
+      120% 130% at 100% 0%,
+      color-mix(in srgb, var(--vm-gold) 13%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      100% 130% at 0% 100%,
+      color-mix(in srgb, var(--vm-gold) 7%, transparent),
+      transparent 60%
+    );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 0 0 1px color-mix(in srgb, var(--vm-gold) 32%, transparent),
+    0 12px 40px -16px color-mix(in srgb, var(--vm-gold) 40%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-champion-hero {
+    transition:
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+}
+
+/* CHAMPION LÅST (turneringen har börjat): guld-glow:en dämpas mot border-tonen så
+   panelen läser som "inlämnad/avgjord", men behåller sin värme (positivt, inte grått).
+   Text-lagret rörs aldrig av dämpningen (låst-etiketten + mästar-bandet bär kontrast). */
+.vm-champion-hero[data-bracket-prediction-locked] {
+  background-image: radial-gradient(
+    120% 130% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 7%, transparent),
+    transparent 58%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 0 0 1px color-mix(in srgb, var(--vm-gold) 18%, var(--color-border));
+}
+
+/* POKAL-EMBLEMET: en rund guld-bricka som bär pokal-glyfen. SOLID guld-yta med mörk
+   ink (samma färg-oberoende form som medaljerna, T16), så glyfen läses i båda teman.
+   Mjuk inre högdager + yttre ring ger den relief utan en bildasset (noll nätverk). */
+.vm-champion-trophy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.4),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 2px 8px -2px color-mix(in srgb, var(--vm-gold) 60%, transparent);
+}
+
+/* En lugn engångs-glimt över pokalen när champion-tipset just sparats (känns som ett
+   "lyft"), nollad vid reducerad rörelse. Ren dekor, mästar-bandets text bär betydelsen. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-champion-trophy[data-champion-celebrate] {
+    animation: vm-champion-lift 0.6s cubic-bezier(0.16, 1, 0.3, 1) 1;
+  }
+}
+
+@keyframes vm-champion-lift {
+  0% {
+    transform: scale(0.8) translateY(2px);
+  }
+  60% {
+    transform: scale(1.08) translateY(-2px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* MÄSTAR-BANDET, "min VM-vinnare"-bricka: när champion är vald visas laget som en
+   STOLT fylld guld-bricka med mörk ink (samma solid-bricka-form som .vm-coupon-mine,
+   AA-säker i båda teman). Större och varmare än en vanlig sparat-bricka, det här är
+   hela poängen med hjälte-momentet. */
+.vm-champion-band {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.32),
+    0 6px 20px -8px color-mix(in srgb, var(--vm-gold) 65%, transparent);
+}
+
+/* SLUTSPELS-RUNDORNAS rubrik-marker: en liten numrerad/ikon-bricka som ger varje
+   runda en redaktionell rubrik-känsla (samma språk som bracket.css §2). Intensiteten
+   byggs mot finalen via per-stage-modifierarna nedan, default = dämpad kant. */
+.vm-tips-round-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-fg-muted);
+}
+
+/* Per-stage-intensitet (samma anda som bracket.css §3, men på tips-kupongerna):
+   semifinal börjar ta accent, finalen + bronsmatchen får guld-markören, så
+   rund-rubrikerna bygger mot trädets krona. ENBART markören (dekor), aldrig text. */
+.vm-tips-round-marker[data-round='semi-final'] {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  color: var(--color-fg);
+}
+
+.vm-tips-round-marker[data-round='third-place'] {
+  border-color: color-mix(in srgb, var(--vm-gold) 35%, var(--color-border));
+  color: var(--color-warning);
+}
+
+.vm-tips-round-marker[data-round='final'] {
+  border-color: color-mix(in srgb, var(--vm-gold) 60%, var(--color-border));
+  background-color: color-mix(in srgb, var(--vm-gold) 10%, var(--color-surface));
+  color: var(--color-warning);
+}
+
+/* DEN BINÄRA VAL-RADEN i en slot-kupong: de två möjliga lagen som ett tydligt val.
+   En liten "kontra"-skiljare (vs) mellan dem. Ren layout/dekor, ingen text-färg som
+   sänker kontrast (lagnamnen bär fg, väljaren bär affordansen). */
+.vm-tips-versus {
+  color: var(--color-fg-muted);
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* TBD-KUPONGEN (lagen okända än): elegant, inte tomt. En streckad kupong-ram (väntar
+   på att fyllas) med en lugn kompass/klock-ton, så den läser som "kommer snart",
+   inte "trasig". Ärver INTE guld-glow:en (den är vilande tills lagen är kända). */
+.vm-tips-tbd {
+  background-color: color-mix(in srgb, var(--color-fg) 2%, var(--color-surface));
+  background-image: radial-gradient(
+    120% 90% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 4%, transparent),
+    transparent 60%
+  );
+}
+
+/* TBD-IKONENS lugna puls (en väntande "tickar mot resultat"-känsla), nollad vid
+   reducerad rörelse. Ren dekor; TBD-texten bär betydelsen. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-tips-tbd-icon {
+    animation: vm-tips-tbd-breathe 2.8s ease-in-out infinite;
+  }
+}
+
+@keyframes vm-tips-tbd-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-tips-tbd-icon {
+    animation: none !important;
+  }
 }
