@@ -5,6 +5,102 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T48 (#81, skärpning + Copilot R2): DOLD arrangörs-ingång + rums-byte väver inte om i live
+
+Två efterföljande ändringar ovanpå T48-blocket nedan (samma branch/PR), drivna av Daniels skärpta
+krav och ett Copilot-fynd.
+
+**1. ARRANGÖRS-INLOGGNINGEN ÄR NU HELT DOLD (ERSÄTTER den DISKRETA `<details>`-ingången i punkt 4
+nedan):** Daniels skärpta krav inför delning var "inloggningen ska de inte se", inte bara dämpa den.
+Den synliga `<details>`/`<summary>`-ingången ("Är du arrangör? Logga in") togs därför BORT ur icke-
+admin-vyn; en vanlig vän möts nu BARA av den lugna read-only-noten. AdminLogin renderas i stället bara
+när URL:en bär ett hemligt fragment (`#arrangor`), läst via en liten hook `useOrganizerEntry`
+(`src/features/admin/use-organizer-entry.ts`) som följer `hashchange` så Daniel kan skriva in fragmentet
+UTAN reload (samma window-event-mönster som `use-online-status`). **VARFÖR detta är OK säkerhetsmässigt:**
+det är REN UX-diskretion, INGEN säkerhetsgräns , skyddet ligger i RLS/app_admins (T42, RLS-bevisat): den
+som hittar/gissar fragmentet kan ändå inte bli admin utan att finnas i app_admins. Fragmentet behöver
+alltså inte vara hemligt för säkerheten, bara för att hålla ytan undan för otekniska vänner. AdminLogin-
+MEKANIKEN (updateUser/verifyOtp, onUpgraded->refresh) är OFÖRÄNDRAD, bara dess synlighets-villkor är nytt.
+En riktig recoverable sign-in är fortfarande T48b. Test: icke-admin UTAN fragment ser INGEN login-
+affordans (negativ kontroll på texten), MED fragment (eller efter en `hashchange`) ser AdminLogin, admin
+ser AdminResultEntry som förr. **Källa:** Daniels skärpta task-direktiv T48 ("inloggningen ska de inte se").
+
+**2. RUMS-BYTE I LIVE VÄVER INTE OM I ONÖDAN (Copilot R2):** facit-källan är
+`live ? officialResults : sharedResults` (se punkt 1 i T48-blocket nedan), så det aktiva rummet driver
+facit BARA i fixtures-läge. Reweave-effekten i `ResultsProvider` gatade tidigare på `roomChanged` oavsett
+läge, så ett rent rums-byte i LIVE körde en omvävning trots att facit-källan (de globala officiella
+resultaten) är OBEROENDE av rummet. Fix: `roomChanged` gatas nu på `!live` (rum-bytet är facit-relevant
+bara i fixtures), så ett rums-byte i live aldrig kan trigga en omväving. Beteendet i fixtures är
+oförändrat (byter man rum byter facit och vi väver om). Test (`reweave-on-room-change.test.tsx`) låser det
+FAKTISKA invariantet via referens-identitet på `store.matches` (ingen reweave = samma referens; reweave =
+ny referens), och håller käll-referenserna stabila så bara rum-bytes-grenen kan trigga, verifierat rött
+mot den ogatade koden. **Källa:** Copilot-review R2 på PR #83.
+
+---
+
+## 2026-06-11 , T48 (#81): pre-share-städning, facit-källbyte + admin-gatad inmatning + diskret login
+
+Daniels pre-share-blockerare inför delning med otekniska vänner: (1) resultat-inmatningen syntes
+för ALLA och vem som helst i rummet kunde ändra de delade resultaten, (2) arrangörs-inloggningen
+såg prominent ut (oroade fast RLS skyddar), (3) grupptabellerna drevs av rums-/lokal-inmatning, inte
+av Daniels officiella facit (T42). Tre kärn-ändringar, alla med en TYDLIG fixtures-vs-live-gräns så
+lokal utveckling + simulering + befintliga tester är oförändrade.
+
+**1. FACIT-KÄLLAN FÖR LIVE-TRACKERN BYTER (keystone, tävlingsintegritet):** `ResultsProvider` (T6,
+den delade store som GroupStageView/BracketView/ScenarioView härleder ur) vävde tidigare in RUMMETS
+delade resultat (`room_match_results`, vem som helst i rummet kunde skriva) via `applyRoomResults`.
+Nu väljs facit-källan på `mode` (en sanning, samma `getDataSourceMode` som datakälle-märkningen):
+- **LIVE-läge:** de GLOBALA officiella resultaten (`useOfficialResultsSync().officialResults`,
+  `official_match_results`, BARA admin kan skriva, RLS-bevisat T42), så ALLA ser samma riktiga
+  ställning Daniel matar in.
+- **FIXTURES/lokalt:** rummets delade resultat (OFÖRÄNDRAT), så lokal utveckling + simulering +
+  alla befintliga T14-tester driver tabellerna som förr.
+VÄVNINGEN är OFÖRÄNDRAD: `OfficialMatchResult` är strukturellt identisk med `RoomMatchResult`, så
+bara KÄLLAN (`facitResults = live ? official : room`) byts, inte den rena `applyRoomResults` (DRY,
+samma val topplistan redan gjorde i T42, se `use-leaderboard-data.ts`). Konsekvens: i live-läge
+skriver `submitResult` INTE längre till `room_match_results` (gatad på `!liveRef`); admin matar in
+officiellt facit via AdminResultEntry (`saveOfficialResult`), inte via denna väg. `room_match_results`
+behålls i schemat men är nu helt utfasad för facit (jfr T42-beslutet). **Bevis (det STARKA invariantet,
+lessons `uttommande-test-vaktar-svagare-invariant`):** `official-facit-source.integration.test.tsx`
+matar BÅDA källor samtidigt med OLIKA värden för samma match och bevisar att official (5-0) vinner i
+live och rummets (1-1) i fixtures , ett test som bara matade EN källa skulle inte skilja "läser
+official" från "läser room".
+
+**2. RESULTAT-INMATNINGEN (ResultEntryView) GATAD I LIVE TILL "TÄNK OM":** ren regel
+`shouldShowResultEntry(live, simulating)` + tunn wrapper `ResultEntryGate`. FIXTURES: visa alltid
+(oförändrat). LIVE: visa BARA när simulering är PÅ , annars dold för ALLA, även arrangören (Daniels
+feedback F2). Skälet: i live matas de OFFICIELLA resultaten in via den dedikerade `AdminResultEntry`
+(AdminSection); att också visa den lokala ResultEntryView vid sidan om gav admin TVÅ inmatnings-ytor
+("vilken är den riktiga?"). En sanning för officiell inmatning = admin-formen; den lokala vyn är
+renodlat "tänk om". Regeln bor i en EGEN modul (`result-entry-gate-rule.ts`) skild från komponenten
+så ResultEntryView förblir en REN, fristående-testbar vy (renderas i fixtures-paritetstester utan
+facit-lager) och react-refresh-regeln hålls ren. Uttömmande testad (regel: 4 fall; komponent: 3).
+
+**3. SIMULERING (T12) vs OFFICIELL INMATNING , den rena avgränsningen:** simuleringen ÅTERANVÄNDER
+ResultEntryView som sin "tänk om"-input (samma `submitResult`-seam, men i sim-läge går skrivningen till
+sim-OVERLAYN, ALDRIG till DB, redan så i ResultsProvider). Därför löser gate-regeln #4 rent: en vanlig
+vän i live-läge ser INGEN delad/officiell inmatning, MEN kan starta what-if-leken (SimulationBanner är
+kvar öppen för alla) och då dyker ResultEntryView upp INUTI SimulationFrame (violett ram + sticky
+"Simuleringsläge"-badge), tydligt märkt som hypotetiskt. Utanför sim-läge döljs den helt. Ingen ny
+sim-input byggdes; avgränsningen är "var skrivningen tar vägen" (overlay vs official), som redan fanns.
+
+**4. ARRANGÖRS-INLOGGNINGEN BLIR DISKRET:** den prominenta `<AdminLogin>`-rutan i icke-admin-vyn tuckas
+bakom en inbyggd, tillgänglig `<details>`/`<summary>`-utfällning ("Är du arrangör? Logga in"), STÄNGD
+som standard. Den EXISTERANDE e-post-mekaniken (updateUser/verifyOtp) är OFÖRÄNDRAD, bara gömd , en
+riktig recoverable sign-in är separat (T48b). `<details>` ger tangentbord + skärmläsar-stöd utan extra
+aria-plumbing.
+
+**OMFATTNING vs issue #81 (Copilot R1):** T48 levererar AC #1 (resultat-inmatning gatad) + #2 (officiella
+resultat driver tabellerna) + den DISKRETA inloggningen. Issue #81:s AC #3 efterfrågar en RECOVERABLE
+OTP/magic-link-inloggning (`signInWithOtp`) , den är medvetet UTBRUTEN till **T48b** (separat PR), så
+T48-PR:en "Closes" INTE #81. Issue #81 hålls öppen tills T48b mergats; då stängs den.
+
+**Bevarat:** T46 poäng-presentation, tippning + deadline-sekretess (RLS + klient-gate), TeamCode-
+kontraktet (T16, orört , samma `applyRoomResults`/`derivePoolFacit`), auto-update-hotfixen (vite.config
++ register-sw, ej rörd). Premium-design på admin/gate-ytan lämnas till design-frontend (samma arbets-
+delning som T42/T16). **Källa:** Daniels task-direktiv T48 (#81) + T42-beslutet i denna logg (official
+results = facit, RLS-bevisat) + patterns.md `global-admin-gatad-facit` / `inmatning-mot-delad-store`.
+
 ## 2026-06-11 , T46 (#79): resultat-presentation (VARFÖR per tips + sammanfattning överst)
 
 Daniels pre-share-blockerare: man måste skrolla hela vägen ner för att se sina poäng, och

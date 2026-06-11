@@ -14,7 +14,7 @@ import { Wordmark } from './components/Wordmark';
 import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
-import { GoalCelebrationOverlay, ResultEntryView, ResultsProvider } from './features/results';
+import { GoalCelebrationOverlay, ResultEntryGate, ResultsProvider } from './features/results';
 import { ScenarioView } from './features/scenarios';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
@@ -224,17 +224,22 @@ function AppShell() {
                 <SimulationBanner />
               </Slide>
 
+              {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): i live
+                  visas inmatningen BARA när what-if-läget är PÅ, för ALLA inkl.
+                  arrangören (då är den den lokala "tänk om"-leken, skriver aldrig
+                  delat/officiellt facit, se ResultEntryGate). Officiella resultat
+                  matas in via AdminResultEntry (AdminSection). I fixtures-läge är den
+                  oförändrat alltid synlig. ResultEntryGate renderar inget (inkl. Panelen
+                  via `surface`) när vyn ska döljas, så ingen tom ruta blir kvar. Design-
+                  frontends premium-firande kopplas in via render-proppen (kroken styr
+                  trigger/timing/reduced-motion, overlayn ritar bara explosionen). */}
               <Slide direction="up">
-                <Panel>
-                  {/* Design-frontends premium-firande kopplas in via render-proppen.
-                    Kroken (i vyn) styr trigger/timing/reduced-motion, overlayn ritar
-                    bara explosionen, en ren glädje-yta. */}
-                  <ResultEntryView
-                    renderCelebration={(celebration) => (
-                      <GoalCelebrationOverlay celebration={celebration} />
-                    )}
-                  />
-                </Panel>
+                <ResultEntryGate
+                  surface={(children) => <Panel>{children}</Panel>}
+                  renderCelebration={(celebration) => (
+                    <GoalCelebrationOverlay celebration={celebration} />
+                  )}
+                />
               </Slide>
             </SimulationFrame>
           </TeamProfileProvider>
