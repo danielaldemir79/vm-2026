@@ -132,7 +132,12 @@ export function AdminLogin({ client, onUpgraded }: AdminLoginProps) {
             </button>
             <button
               type="button"
-              onClick={flow.reset}
+              onClick={() => {
+                // Nolla även kod-fältet (Copilot R5): annars ligger den gamla koden
+                // kvar i input:en när användaren begär en ny, vilket är förvirrande.
+                setCode('');
+                flow.reset();
+              }}
               className="rounded-pill border border-border px-5 py-2.5 font-display text-sm font-semibold"
             >
               Börja om

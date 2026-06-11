@@ -5,7 +5,7 @@
 // official-results-api / app-admin-api (data/official), provider:n är limmet mot
 // React + UI:t (samma form som RoomsProvider).
 //
-// ENABLED-GIND: facit-lagret kräver en konfigurerad Supabase (live-läge). Är env
+// ENABLED-GRIND: facit-lagret kräver en konfigurerad Supabase (live-läge). Är env
 // inte satt (fixtures/lokal utveckling) är `enabled` false och lagret är vilande
 // (results tomt, isAdmin false), appen fungerar då lokalt precis som förr.
 //
