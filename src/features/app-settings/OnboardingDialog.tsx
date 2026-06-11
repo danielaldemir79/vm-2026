@@ -25,6 +25,12 @@ import { useOnboarding, type OnboardingApi } from './use-onboarding';
  * Genom att skalet äger EN useOnboarding-instans och delar den hit blir det EN
  * sanning, inte två divergerande "open"-tillstånd. Standalone-rendering (tester,
  * isolerad användning) faller tillbaka på den egna hooken.
+ *
+ * OBS: pga rules-of-hooks anropas `useOnboarding()` (ownApi) ALLTID, även när
+ * proppen skickas in. Den egna instansen ANVÄNDS bara som fallback (`onboarding ??
+ * ownApi`); när skalet skickar proppen läses ownApi:s tillstånd aldrig (båda läser
+ * ändå samma localStorage-flagga, så ingen divergens). Det är inte ett extra
+ * "open"-tillstånd i bruk, bara ett oundvikligt extra hook-anrop.
  */
 export function OnboardingDialog({ onboarding }: { onboarding?: OnboardingApi } = {}) {
   const ownApi = useOnboarding();
