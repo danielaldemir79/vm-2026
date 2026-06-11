@@ -87,7 +87,7 @@ export const registerAppSw = (
       // felet tyst: då blir cache-/uppdaterings-problemet osynligt igen. Vi
       // loggar det med [VM2026]-kontext så en felkonfig syns i konsolen.
       console.warn(
-        '[VM2026] Service worker-registreringen misslyckades , appen körs vidare ' +
+        '[VM2026] Service worker-registreringen misslyckades, appen körs vidare ' +
           'utan offline-stöd och utan ny-version-prompt:',
         error
       );
