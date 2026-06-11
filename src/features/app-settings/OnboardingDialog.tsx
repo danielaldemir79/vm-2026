@@ -15,10 +15,20 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { springs, transitions } from '../../motion';
 import { ONBOARDING_STEPS, ONBOARDING_STEP_COUNT } from './onboarding';
 import { OnboardingArt } from './OnboardingArt';
-import { useOnboarding } from './use-onboarding';
+import { useOnboarding, type OnboardingApi } from './use-onboarding';
 
-export function OnboardingDialog() {
-  const { open, stepIndex, onLastStep, next, finish } = useOnboarding();
+/**
+ * Touren kan TA EMOT sitt tillstånd utifrån (`onboarding`-proppen) i stället för
+ * att äga ett eget hook-anrop. VARFÖR (T39/#68, F1): App-skalet behöver veta NÄR
+ * touren är öppen för att gata den fristående install-bannern bakom den (annars
+ * ligger touren ovanpå bannern och install-knappen ser ut att inte göra något).
+ * Genom att skalet äger EN useOnboarding-instans och delar den hit blir det EN
+ * sanning, inte två divergerande "open"-tillstånd. Standalone-rendering (tester,
+ * isolerad användning) faller tillbaka på den egna hooken.
+ */
+export function OnboardingDialog({ onboarding }: { onboarding?: OnboardingApi } = {}) {
+  const ownApi = useOnboarding();
+  const { open, stepIndex, onLastStep, next, finish } = onboarding ?? ownApi;
   const dialogRef = useRef<HTMLDivElement>(null);
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
