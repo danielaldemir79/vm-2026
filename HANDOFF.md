@@ -5,6 +5,84 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T17/#17 (Topplista + tips-avslöjande) KLAR - PR #66 väntar på merge
+
+**Branch:** `feature/T17-topplista` @ HEAD `2702e6e`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/66 mot `develop` (Closes #17, state: OPEN)
+**Board:** issue #17 i "In Review" (korrekt). Dirigenten stänger issue #17 MANUELLT och flyttar kort #17 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**VM-POOLEN KOMPLETT:** Match-tips (T15) + grupp- och bracket-tips (T16) + bracket-tips-UI (T16b) + topplista/avslöjande (T17) är alla klara.
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- Bygge + tester: se PR #66 (+53 nya tester, 1011 gröna + 29 env-skippade)
+- `70996da` - fix: Copilot runda 1 (C1 slutspelsmatchers tips poängsattes inte + C2 sr-only-komma)
+- `2702e6e` - fix: Copilot runda 2 + 3 (C3 rank-puls-flagga nollas + C4 test-dubbelrender), runda 3 = 0 fynd (HEAD)
+
+**Verifiering:** 1011 gröna + 29 env-skippade. Lokal panel: NOLL fynd (code-vs-id-seamen probe:ad + mutationstestad). Copilot 3 rundor (äkta bug C1 + C2/C3/C4 åtgärdade, runda 3 ren). Build/lint/format rent.
+
+**Alla 5/5 acceptanskriterier bockade i issue #17** (journalisten 2026-06-11).
+
+**PIN - RUM-PERSISTENS (KOMMANDE task, Daniels kritiska UX-bug):**
+Aktivt rum sparas INTE i localStorage - vid sidladdning/refresh försvinner rum-valet. Symtom: members=0 visas trots att man är med i rummet. `create_room` gör skaparen till DB-medlem, men rum-ID:t persisteras inte lokalt. Fix: spara valt rum-ID i localStorage, auto-välj vid app-start om rum fortfarande finns (RPC-koll), rensa vid explicit lämna-rum. Inga ändringar i RLS/DB behövs. Dirigenten bygger denna som nästa task.
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17 (derive-facit.ts mappar id->TeamCode fail-loud). Bär framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort #56 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+
+**IMPROVEMENTS-kandidater (dirigenten skriver i IMPROVEMENTS.md):**
+1. "När en task medvetet pinnar konsument-seamen till en senare task, kräv att data-/identitets-KONTRAKTET skrivs där funktionen DEFINIERAS, inte bara i decisions.md." (F1-fällan: code-vs-id tyst noll hade hindrats av ett kontrakt vid definitions-stället.)
+2. "Supabase deadline-lås + sekretess-RLS-mönstret (rls-tidslås-sekretess-mot-kallankrad-referenstabell) verifierat 3 gånger (T14/T15/T16) med 3 rena RLS-pass. Playbook-post nu på Förekomst 2 - nästa förekomst triggar Förekomst >= 3 och befordransregeln. Kandidat för senior-developer-rekommendation i README."
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #66 (T17/#17, feature/T17-topplista) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 66 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #17 manuellt (`gh issue close 17`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #17 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar topplistan med poäng, placeringsanimation och tips-avslöjande.
+>
+> Om PR #66 REDAN mergad:
+> T17 är klar och mergad. VM-poolen komplett (T15 + T16 + T16b + T17).
+> **Nästa task: RUM-PERSISTENS** - Daniels kritiska UX-bug. Aktivt rum-ID persisteras inte i localStorage, rum-val försvinner vid sidladdning (members=0). Bygg: (1) spara valt rum-ID i localStorage vid val/skapa/gå-med, (2) auto-välj vid app-start om rum-ID finns i localStorage och rummet fortfarande finns (RPC-koll mot Supabase), (3) rensa localStorage vid explicit lämna-rum. Inga RLS/DB-ändringar behövs.
+> **Därefter (Daniels prioriterade kö, i ordning):**
+> - #62 (T34 poängsystem-UI: Daniels låsta skala 10p exakt/3p utfall/5p grupp/50p VM-vinnare + "Så funkar poängen"-panel)
+> - #65 (T37 större lag på match-korten)
+> - #63 (T35 tippnings-lås gråmarkerat + 3-dagars fönster + deadline-tydlighet)
+> - #64 (T36 Play Protect TWA-väg)
+> - T18-T25 därefter
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **#56 (delad modal-primitiv):** kort i Ready, plockas när rule-of-three nås.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T16b/#59 (Bracket-tips-UI) KLAR - PR #61 väntar på merge
 
 **Branch:** `feature/T16b-bracket-tips-ui` @ HEAD `47b9881`
