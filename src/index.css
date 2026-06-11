@@ -81,8 +81,11 @@ body {
 
   /* Dekorativa hero-animationer stängs AV helt (inte snappas till slutläget),
      så hero:n är fullständigt statisk vid prefers-reduced-motion (WCAG 2.3.3).
-     vm-live-dot blir en lugn, statisk prick; vm-hero-sheen ett stilla sken. */
+     vm-live-dot + vm-pending-dot blir lugna, statiska prickar; vm-hero-sheen ett
+     stilla sken. Pågår-pricken bär ändå sitt budskap via formen + "Pågår"-ordet,
+     så ingenting tappas när pulsen tystnar. */
   .vm-live-dot,
+  .vm-pending-dot,
   .vm-hero-sheen {
     animation: none !important;
   }

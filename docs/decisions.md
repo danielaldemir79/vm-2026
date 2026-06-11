@@ -48,6 +48,21 @@ helheten). reveal-ändringen är gjord ÅTERANVÄNDBAR därifrån (exporterad un
 `leaderboard/index.ts`). Pågår-lägets premium-finish poleras av design-frontend ovanpå data-attribut-
 hakarna (`data-reveal-status="live"`, `data-reveal-live-pick`, `data-reveal-pending`).
 
+**Design-finish (design-frontend, samma task):** pågår-kortet fick en BESLÄKTAD MEN EGEN identitet mot
+facit-kortet. Facit-kortet bär "kvällsljus"-GULD (det avgjorda, "domen är fälld"); pågår-kortet bär
+appens PITCH-GRÖNA accent (matchen lever, tipsen ligger på bordet), samma gröna live-identitet som
+dagshero:ns nedräknings-prick (T7). De två kort-typerna skiljs alltså på en blink BÅDE i färg (grön mot
+guld) OCH i form, så särskiljningen aldrig hänger på färg ensam (WCAG 1.4.1): "Pågår"-markören är en lätt
+accent-pill med en PULSANDE prick (`.vm-reveal-pending` + `.vm-pending-dot`, samma `vm-pulse`-keyframe som
+`.vm-live-dot`, DRY), kontra facit-talets solida guld-bricka. Pulsen stannar vid reducerad rörelse
+(index.css, `.vm-pending-dot` tillagd i reduce-blocket) och då bär ordet "Pågår" + formen budskapet, ingen
+rörelse krävs (WCAG 2.3.3). Pågående tips får en svag accent-vänsterkant (`.vm-reveal-pick--live`). KONTRAST
+(uppmätt i renderad DOM, per tema, korrekt attribuerat): "Pågår"-pillens accent-text på 9%-accent-tint =
+8.07:1 MÖRKT (ljus accent `#1fe082` mot mörk surface) / 4.77:1 LJUST (mörk accent `#0e7a44` mot vit surface),
+båda >= 4.5:1 (normal text). Det LJUSA temat ger den lägre ratiot (mörk accent på nästan-vit yta), korrekt
+ordning. Kort-glow:en sitter i NEDRE VÄNSTRA hörnet, pillen uppe till HÖGER (motsatta-hörn-disciplinen, §17),
+så glow:en aldrig lyfter pill-ytan och sänker text-kontrasten under AA.
+
 ## 2026-06-12 , T59 (#97): listMyRooms filtrerar på EGEN user_id (dubblett-rum-bugg)
 
 **Symptom (Daniels skärmdump 2026-06-12):** kopiera-tips-sektionen + rum-väljaren visade samma
