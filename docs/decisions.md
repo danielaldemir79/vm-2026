@@ -5,6 +5,101 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T39 (#68): tips-listan får 3-dagars fönster + expandera (delad ExpandToggle)
+
+**Beslut (Daniels begäran):** tips-listan (`PredictionsView`) får SAMMA 3-dagars fönster + "Visa alla /
+Visa färre"-expandering som resultatinmatningen (#39/T27). Default visar bara tippbara matcher inom de
+närmaste 3 svenska kalenderdagarna (ankrat på idag, eller premiärdagen om turneringen ej börjat), resten
+fälls ut på begäran via en dubblerad kontroll (uppe + nere).
+
+**Återanvändning (DRY, ingen ny logik):** fönster-urvalet ÄR resultatvyns rena `windowMatches`
+(`features/results/result-window.ts`), oförändrad, anropad med tipsvyns tippbara matcher. Svensk-dag-
+regeln och alla edge-fall (ej börjad, slutet, vilodag, allt inom fönstret) är därmed EN sanning, redan
+uttömmande testad i `result-window.test.ts`. Inget eget urval skrevs.
+
+**ExpandToggle lyft till delad komponent (rule-of-three):** ihopfäll-/expandera-kontrollen bodde inline
+i `ResultEntryView`. Den är nu 3:e konsumenten (resultat-fönster #39, dubblering #42, tips-fönster #68),
+så den lyftes till `src/components/ExpandToggle.tsx` (EN markup-källa, kan aldrig drifta isär).
+Resultatvyn importerar den nu i stället för en lokal kopia, beteende-bevarande. Komponenten tar en
+`name`-prop för data-attribut-namnrymden (`data-${name}-toggle` / `-position`), default `'results'`, så
+resultatvyns redan testade attribut är byte-identiska och tips-listan får sina egna stabila krokar
+(`data-predictions-toggle*`).
+
+**Två "nu" med olika kadens, samma seed:** fönstret mäts i DAGAR via `useTodayKey(now)` (stabil inom
+dygnet, glider över midnatt utan omladdning, PWA-fälla hanterad), medan tips-LÅSET flippar MITT PÅ DAGEN
+vid avspark via `useDeadlineTick(now)` (minut-tick). Båda seedas av vyns injicerade `now` (testbarhet +
+ett konsekvent start-nu), sen tar respektive hook över sin egen tick. Det är medvetet två hooks, de
+löser två olika tidsproblem.
+
+**Bevarat (sekretess/lås/epoch + kontrakt):** korten FILTRERAS inte bort utanför fönstret, de DÖLJS med
+`hidden` (display:none + ur a11y-trädet) och UNMOUNTAS inte, så `PredictionForm`:s lokala osparade
+inmatning och storens låst-/sekretess-/epoch-läge (RLS server-side) överlever expandera/ihopfäll. Samma
+C2-invariant som resultatvyn. Befintliga data-attribut (`data-predictions-list`, `data-prediction-form`)
+och alla tidigare PredictionsView-tester är orörda. Code-vs-id/TeamCode-kontraktet rördes inte (det är
+aggregering, inte tippning).
+
+**Tester:** `PredictionsView.test.tsx` (fönster default = delmängd, expandera/ihopfäll, dubblerad
+kontroll med identisk aria, edge: allt inom fönstret -> ingen knapp, bevarad osparad inmatning över
+toggle) + `components/ExpandToggle.test.tsx` (etikett/böjning, aria-expanded/-controls, name-namnrymd).
+Spårbar via #68 (+ #63 för fönster-delen).
+
+## 2026-06-11 , T39 (#68 F1): kommentar-sanning om install-gaten (Panel-F1)
+
+**Fix:** `App.tsx`-kommentaren vid install-banner-gaten påstod att bannern döljs medan touren är öppen
+för att "touren har ett eget install-steg att installera FRÅN". Tourens install-steg (`onboarding.ts`,
+steget `install`) är REN INFO (titel + brödtext + illustration, ingen install-knapp/-action). Man kan
+alltså inte installera från touren. Kommentaren är rättad till sanningen: tourens install-steg BESKRIVER
+installationen, man installerar via DENNA banner EFTER att touren stängts. (Reviewer-fynd, lessons
+`kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller`.)
+
+## 2026-06-11 , T39 (#68 F2): test vaktar footer-länkens tabnabbing-skydd (Panel-F2)
+
+**Beslut:** footer-signaturens hemsidelänk (`[data-app-signature] a` -> `www.danielaldemir.com`) hade
+korrekta attribut men inget test som vaktade dem. Ett test i `App.test.tsx` asserterar nu
+`href=https://www.danielaldemir.com`, `target=_blank` och `rel` som innehåller BÅDE `noopener`
+(kapar `window.opener`, hindrar tabnabbing) och `noreferrer`. Så kan en framtida refaktor inte tyst
+tappa target/rel (öppna i samma flik eller exponera opener). Ordnings-oberoende koll på rel-tokens.
+
+## 2026-06-11 , T39 (#68): install-knappen, rotorsak + standalone-detektering
+
+**Symptom (Daniel):** "Installera som app"-knappen gör inget vid klick. Bekräftat blockerande inför
+delningen.
+
+**ROTORSAK (källhänvisad, gissas inte):** `beforeinstallprompt`-event:et fångades först i React-
+hookens `useEffect` (`use-install-prompt.ts`), som kör EFTER att appen monterat. Men event:et fyrar
+"usually on page load" UTAN garanterad tidpunkt (MDN: "There's no guaranteed time this event is fired,
+but it usually happens on page load",
+https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeinstallprompt_event). I en riktig
+webbläsare hinner det därför ofta fyra INNAN hooken registrerat sin lyssnare, och event:et är borta
+för alltid (det re-fyrar inte). Då förblir `deferredPrompt` null, knappen dyker aldrig upp / klick gör
+inget. Enhetstesterna missade det för att de dispatchar event:et EFTER mount, ett klassiskt mock-/
+timing-blint-fläck (samma familj som "happy-path bevisar aldrig den gren där de verkliga källorna
+kopplas").
+
+**Fix (MDN + web.dev-mönstret):** Registrera lyssnaren SÅ TIDIGT som möjligt, FÖRE framework-mount.
+Ny modul `install-prompt-capture.ts` registreras från `main.tsx` (före `createRoot`),
+`preventDefault`:ar mini-infobaren och stashar event:et i en modul-variabel + en liten subscribe-API.
+Hooken läser det redan-fångade event:et via `useSyncExternalStore` (synkron läsning vid mount), så ett
+event fångat före mount syns direkt och tappas inte. `prompt()` anropas på det SPARADE event:et och
+nollas direkt (engångs, MDN/web.dev "customize-install":
+https://web.dev/articles/customize-install). Live-verifierat i Chrome mot byggd `dist`: klick på
+"Installera" anropar `prompt()` exakt en gång, sen försvinner knappen (event förbrukat).
+
+**Standalone-detektering (dölj install-ytan HELT i app-läge):** `detectStandalone` kombinerar nu de
+TRE standard-signalerna (web.dev "Detecting PWA standalone mode",
+https://web.dev/learn/pwa/detection): (1) `matchMedia('(display-mode: standalone)')`, (2) iOS
+`navigator.standalone === true` (icke-standard, MDN), (3) `document.referrer.startsWith('android-app://')`
+(TWA / Android-app-wrapper). I standalone returnerar `resolveInstallMode` 'hidden', så VARKEN Chrome-
+knappen, iOS-instruktionen ELLER Play Protect-noten visas. Källhänvisat inline i `install-prompt.ts`
+och `install-prompt-capture.ts`.
+
+**Findings:** Onboarding-touren (T13) renderar en full-skärms overlay (z-50) vid första besök som
+ligger ÖVER install-bannern, så en FÖRSTA-gångs-användare kan inte klicka install-knappen förrän
+touren stängts. Funktionellt korrekt (touren är dismissbar och knappen funkar efteråt), men det är en
+andra, separat orsak till "knappen gör inget" för exakt den vanligaste användaren (en vän som öppnar
+delnings-länken första gången). Lämnas som ett pinnat fynd (F1) för orchestrator, ändring av onboarding-
+beteendet ligger utanför T39:s scope.
+
 ## 2026-06-11 , T38 (#67): rum-persistens, senast valda rummet återställs över sidladdning
 
 **Beslut (persistens-modell):** Det AKTIVA rummets id persistas i localStorage under nyckeln
@@ -73,6 +168,39 @@ dekor). Båda teman verifierade (computed colors matchar token-värdena ovan).
 
 *Städning:* DESIGN-TEST-rummet RADERAT ur produktion efter testet (medlemslöst, exakt id-villkorat
 DELETE), verifierat: 0 DESIGN-TEST-rum kvar, Daniels rum ewrmdt orört. Inget för dirigenten att städa.
+
+## 2026-06-11 , T39 (#68): signatur-namnet länkar till Daniels sajt (www.danielaldemir.com)
+
+**Vad:** namnet "Daniel Aldemir" i footer-signaturen (T38) är nu en länk till
+`https://www.danielaldemir.com`. Diskret men klickbar, i samma arena-estetik.
+
+**Val (varför namnet blir länken, inte en separat rad):** signaturen är EN tät, balanserad enhet
+(sigill + tick + "Made by NAMN"). En extra "danielaldemir.com"-rad under hade brutit den lugna
+kompositionen och dragit blicken. Att göra NAMNET klickbart är det mest naturliga målet (det ÄR
+upphovspersonen) och håller raden oförändrad i vila. Namnet behåller sin stolthets-styling (full
+`--vm-fg` + display-vikt), så footern ser ut precis som efter T38 tills man pekar/fokuserar.
+
+**Affordans (tydligt en länk):** en SOLID accent-underline (`decoration-accent`, `decoration-2`,
+`underline-offset-[3px]`) tänds på `hover` OCH `focus-visible`, samma "tänds-vid-interaktion"-mönster
+som lagnamns-knappen (T10) men med ett SOLIT accent-streck i stället för T10:s prickade fg-muted, så
+formspråket skiljer "länk till annan sajt" från "öppna en panel i appen". Vid tangentbord tar
+dessutom den globala `:focus-visible`-ringen (accent, index.css, WCAG 2.4.7) över som primär signal.
+
+**Säkerhet:** `target="_blank"` + `rel="noopener noreferrer"` (hindrar tabnabbing + läcker ingen
+referrer).
+
+**a11y:** explicit `aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"` ger ett
+tydligt länknamn som även förvarnar om ny flik; `title` på raden uppdaterad med domänen. Monogrammet
++ tick:en förblir `aria-hidden`.
+
+**Kontrast (UPPMÄTT, scripts/contrast-t38.mjs, ny rad 6, canvas-komposit mot sidans FOND, BÅDA teman):**
+- Namnets TEXT är OFÖRÄNDRAD full `--vm-fg`: 17.04:1 mörkt / 16.25:1 ljust (ingen ny brödtext-kontrast).
+- Länk-underline:n (accent, full opacitet) mot fonden = icke-text indikator, WCAG 1.4.11 (>=3:1):
+  **10.83:1 mörkt / 4.90:1 ljust**, klarar med marginal i båda teman.
+
+**Responsivitet (verifierat 280-1440px, båda teman):** länken är inline i samma flex-rad, lägger ingen
+bredd (samma text som förr), så raden får plats på 280px utan horisontell scroll precis som T38, och
+renderar rent upp till 1440px.
 
 ## 2026-06-11 , T17 (#17, Copilot C1+C2): slutspels-matchtips poängsätts + sr-only-interpunktion
 

@@ -805,3 +805,42 @@ fristående testbara och återanvänds av realtid (T18) + mini-ligor (T20). Käl
 klienten men MÅSTE vara server-side i en delad app, och VISNINGEN måste ändå vara sann mot låst-läget.
 Två lager (RLS = skydd, ren tids-gate = sann visning) ger båda. Källa: T17 (`reveal.ts` +
 `LeaderboardProvider.tsx`), bygger på T15 §4 / T16 §4 RLS-sekretessen.
+
+### 3-dagars-fonster-plus-delad-expandera-toggle-pa-en-lang-matchlista (React, VM 2026)
+
+**Recept (en lång VM-lista (104 matcher) blir hanterbar utan att tappa state):**
+
+1. **Urvalet är en REN, delad funktion** (`features/results/result-window.ts`, `windowMatches(matches,
+   now)`): visar matcher inom de närmaste 3 SVENSKA kalenderdagarna (ankrat på idag, eller premiärdagen
+   om turneringen ej börjat), returnerar `{ visible, hiddenCount, anchorKey }`. Svensk-dag-regeln
+   (`localDateKey`, off-by-one-säker) + alla edge-fall (ej börjad, slutet < 3 dagar, vilodag i fönstret,
+   allt inom fönstret) är EN sanning, uttömmande testad fristående. ÅTERANVÄND den rakt av för varje ny
+   lista, skriv inget eget datum-urval.
+2. **DÖLJ, filtrera inte bort** de matcher som ligger utanför fönstret. Rendera ALLA kort alltid och sätt
+   `hidden` på de utanför fönstrets `<li>` (display:none + ur a11y-trädet), så React-instansen lever
+   kvar. VARFÖR: ett kort med osparad lokal `useState` (ett halvskrivet resultat/tips) tappar inmatningen
+   om det unmountas vid ihopfällning. `hidden` bevarar den; dolda kort nås inte av tab/skärmläsare och
+   `getByRole`/`spinbutton` räknar bara de synliga, så hiddenCount i knappen stämmer. (#39 C2-invariant.)
+3. **DAG-MEDVETET "nu" via `useTodayKey(now)`** (stabil inom dygnet, glider över midnatt + vid
+   återaktiverad flik, PWA-fälla hanterad), memoizera fönstret på dess `nowMs`. Räkna ALDRIG fönstret i
+   ett `useMemo` som bara beror på matchlistan + läser `Date.now()` internt, då fryser fönstret på första
+   renderns dag (#39 C1-buggen). Har vyn ett separat avspark-LÅS (tips), seeda BÅDE `useTodayKey(now)`
+   och `useDeadlineTick(now)` med samma injicerade `now`, men låt dem ticka i olika kadens (dygn resp
+   minut), de löser två olika tidsproblem.
+4. **EN delad `ExpandToggle`** (`src/components/ExpandToggle.tsx`), DUBBLERAD (en uppe + en nere) så en
+   toggle alltid nås utan att skrolla igenom en utfälld lista. Båda instanserna delar EN komponent
+   (kan aldrig drifta i aria/etikett). Konsumenten äger fokus-flytten: vid IHOPFÄLLNING flyttas fokus
+   (via `requestAnimationFrame`) till den ÖVRE toggeln så användaren förs upp till listans topp.
+   Komponentens `name`-prop styr data-attribut-namnrymden (`data-${name}-toggle` / `-position`), default
+   `'results'`, så varje vy får stabila, egna test-/styling-krokar utan att kollidera. Knappen visas BARA
+   när `hiddenCount > 0` (allt inom fönstret -> ingen knapp).
+5. **TÄCKNING:** fönster default = äkta delmängd, expandera -> alla synliga, ihopfäll -> tillbaka,
+   dubblerad kontroll med identisk aria, edge (allt inom fönstret -> ingen knapp), och bevarad osparad
+   inmatning i ett out-of-window-kort över expandera/ihopfäll. Plus komponent-testet för ExpandToggle
+   (etikett/böjning, aria, namnrymd).
+
+**Varför:** en 104-rads-lista är ogörlig på mobil; ett dag-fönster med utfällning ger relevant default
+utan att gömma något. Genom att DÖLJA (inte filtrera) bevaras halvskriven inmatning, och en delad,
+parameteriserad toggle + ett delat rent urval gör att resultat- och tips-listan delar EN sanning för
+både fönster-regeln och kontrollen. Källa: T27/#39 (resultatinmatning), generaliserad i T39/#68
+(tips-listan + `ExpandToggle` lyft till `src/components/`).

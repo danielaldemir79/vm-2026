@@ -2,7 +2,7 @@
 // webbläsar-event:en. Den äger sido-effekterna (event-lyssnare, prompt-anrop,
 // persistens av avfärdande); beslutet OM vad som ska visas görs av resolveInstallMode.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { readStoredFlag, writeStoredFlag } from '../../lib/safe-storage';
 import { INSTALL_DISMISSED_KEY } from './storage-keys';
 import {
@@ -11,15 +11,11 @@ import {
   resolveInstallMode,
   type InstallUiMode,
 } from './install-prompt';
-
-/**
- * Det icke-standardiserade beforeinstallprompt-event:et (saknas i lib.dom.d.ts).
- * Vi typar bara de fält vi använder. Källa: MDN "BeforeInstallPromptEvent".
- */
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
+import {
+  consumeDeferredPrompt,
+  getDeferredPrompt,
+  subscribeDeferredPrompt,
+} from './install-prompt-capture';
 
 export interface InstallPromptApi {
   /** Vad install-ytan ska visa just nu (hidden/prompt/ios-instructions). */
@@ -34,43 +30,35 @@ export interface InstallPromptApi {
 }
 
 export function useInstallPrompt(): InstallPromptApi {
-  // Fångat event (eller null). Hålls i state så en omrendering sker när det dyker
-  // upp/försvinner. beforeinstallprompt kan fyras NÄR SOM HELST efter mount.
-  const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  // Det fångade event:et läses ur den TIDIGA capture-modulen (install-prompt-
+  // capture.ts), inte ur en egen sen lyssnare. useSyncExternalStore läser värdet
+  // SYNKRONT vid mount, så ett event som fångats FÖRE React-mount (vanligt, MDN:
+  // "usually happens on page load") syns direkt, och prenumerationen ger en
+  // omrendering när ett senare event dyker upp eller nollas. Detta är rotfixen
+  // för T39: knappen kan inte längre missa ett tidigt event. getSnapshot
+  // returnerar event:et självt (stabil referens medan det inte ändras), så
+  // useSyncExternalStore referens-likhet inte loopar.
+  const promptEvent = useSyncExternalStore(subscribeDeferredPrompt, getDeferredPrompt);
   // Standalone/iOS är stabila per session, läs en gång (lazy init).
   const [isStandalone, setIsStandalone] = useState(() => detectStandalone(window));
   const [dismissed, setDismissed] = useState(() => readStoredFlag(INSTALL_DISMISSED_KEY));
   const isIos = detectIos(window.navigator);
 
+  // När appen installeras ska bannern försvinna direkt även om standalone-
+  // media-frågan inte hunnit slå om. appinstalled nollar event:et i capture-
+  // modulen (-> omrendering); här speglar vi även isStandalone så läget blir
+  // 'hidden' på en gång.
   useEffect(() => {
-    const onBeforeInstallPrompt = (event: Event) => {
-      // Hindra webbläsarens default-mini-infobar; vi visar en EGEN diskret yta.
-      event.preventDefault();
-      setPromptEvent(event as BeforeInstallPromptEvent);
-    };
-    // När appen installeras (eller redan är det) ska bannern försvinna direkt.
-    const onAppInstalled = () => {
-      setPromptEvent(null);
-      setIsStandalone(true);
-    };
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    const onAppInstalled = () => setIsStandalone(true);
     window.addEventListener('appinstalled', onAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
-    };
+    return () => window.removeEventListener('appinstalled', onAppInstalled);
   }, []);
 
   const promptInstall = useCallback(() => {
-    if (promptEvent === null) {
-      return;
-    }
-    // Event:et kan bara användas en gång; nolla det direkt så knappen inte kan
-    // dubbel-trigga. Vi väntar inte in userChoice (appinstalled-event:et städar
-    // upp om installationen lyckas).
-    void promptEvent.prompt();
-    setPromptEvent(null);
-  }, [promptEvent]);
+    // Event:et kan bara användas en gång; capture-modulen nollar det direkt efter
+    // prompt() (-> omrendering -> knappen döljs). No-op om inget event finns.
+    consumeDeferredPrompt();
+  }, []);
 
   const dismiss = useCallback(() => {
     writeStoredFlag(INSTALL_DISMISSED_KEY, true);
