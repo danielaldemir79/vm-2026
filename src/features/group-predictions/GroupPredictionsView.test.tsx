@@ -118,6 +118,20 @@ describe('GroupPredictionsView', () => {
     expect(screen.getByText(/1 grupp öppen att tippa/)).toBeInTheDocument();
   });
 
+  it('AC#3 DEADLINE: öppen grupp visar EXAKT deadline (gruppens första match), låst grupp gör det inte', () => {
+    renderView(store({}), new Date('2026-06-12T10:00:00Z')); // efter g-A-1, före g-B-1
+    const aForm = document.querySelector('[data-group-id="A"]')!; // låst
+    const bForm = document.querySelector('[data-group-id="B"]')!; // öppen
+    // Öppna gruppen B bär en deadline-rad ur SAMMA ISO som låset (g-B-1 = 12 juni 19:00Z
+    // = 21:00 svensk), den låsta gruppen A har INGEN öppen deadline-rad (låst-etikett i stället).
+    const bNotice = bForm.querySelector('[data-deadline-notice]');
+    expect(bNotice).not.toBeNull();
+    expect(bNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-12T19:00:00.000Z');
+    expect(bNotice).toHaveTextContent(/Tippningen låses/);
+    expect(bNotice).toHaveTextContent(/12 juni kl 21:00/);
+    expect(aForm.querySelector('[data-deadline-notice]')).toBeNull();
+  });
+
   it('seedar formuläret från mitt befintliga grupp-tips', () => {
     const mine: GroupPrediction = {
       groupId: 'A',

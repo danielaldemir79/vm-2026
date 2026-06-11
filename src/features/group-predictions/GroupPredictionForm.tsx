@@ -20,6 +20,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { GroupTeamOption } from './group-predictable-data';
 import { TeamFlag } from '../daily/TeamFlag';
+import { DeadlineNotice } from '../predictions/DeadlineNotice';
 
 export interface GroupPredictionFormProps {
   groupId: string;
@@ -29,6 +30,14 @@ export interface GroupPredictionFormProps {
   current: { winnerCode: string; runnerUpCode: string } | null;
   /** Är gruppen LÅST (första matchen sparkat igång)? Då är väljarna disabled. */
   locked: boolean;
+  /**
+   * Gruppens deadline (gruppens första match g-X-1, avspark ISO), SAMMA värde som
+   * driver `locked`. Visas i ÖPPET läge så det är klart NÄR tippningen låses (AC#3).
+   * null om ankar-matchen saknas (oväntat), då visas ingen deadline-rad (fail-safe).
+   */
+  deadlineIso: string | null;
+  /** Injicerbart "nu" (testbarhet) för deadline-radens relativa etikett, default nuet. */
+  now?: Date;
   /**
    * Spara mitt grupp-tips. Kastar vid fel (formuläret visar det inline). Returnerar
    * en Promise så formuläret kan visa "sparar..."/fel-tillstånd.
@@ -199,6 +208,8 @@ export function GroupPredictionForm({
   teams,
   current,
   locked,
+  deadlineIso,
+  now,
   onSubmit,
 }: GroupPredictionFormProps) {
   // Seeda väljarna från mitt nuvarande tips (redigera = se det jag tippat).
@@ -372,6 +383,12 @@ export function GroupPredictionForm({
             läge döljs de visuellt så podiumet ovan är det man ser, men de finns kvar
             i DOM:en för a11y + testkontraktet. */}
         <div className={locked ? 'sr-only' : 'flex flex-col gap-3'}>
+          {/* DEADLINE-RADEN (AC#3): säg KLART när gruppen låses (gruppens första match),
+              ur SAMMA deadlineIso som driver låset (en sanning). Bara i öppet läge, i
+              låst läge säger låst-etiketten ovan redan "låst". */}
+          {!locked ? (
+            <DeadlineNotice deadlineIso={deadlineIso} now={now} lead="Tippningen låses" />
+          ) : null}
           <PodiumSlot
             place={1}
             label="Gruppvinnare (1:a)"

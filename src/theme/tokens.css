@@ -705,35 +705,50 @@ body {
   );
 }
 
-/* LÅST KUPONG: efter avspark dämpas ifyllnads-zonen (den går inte att ändra) och
-   en guld-till-neutral ton signalerar "inlämnad/avgjord". Dämpningen läggs BARA
-   på den dekorativa fonden + topplisten (gulden tonas ner mot border-tonen), så
-   den positiva "låst = rättvist"-känslan finns kvar utan att skrika. Text-lagret
-   rörs inte av dämpningen (låst-etiketten + mitt-tips-talen bär full kontrast).
-   GÄLLER ALLA tips-kupong-typerna: match-tipset (T15, data-prediction-locked),
-   grupp-tipset (T16, data-group-prediction-locked) OCH slutspels-tipsets slot-
-   kuponger (T16b, data-bracket-prediction-locked) , samma dämpnings-recept, en sanning. */
+/* LÅST KUPONG, OMISSKÄNNLIG GRÅMARKERING (T35, #63 AC#1, Daniels feedback 5): efter
+   avspark ska kortet läsas som LÅST direkt, inte bara en aning dämpad guld. Tidigare
+   tonade vi bara ner gulden en aning; Daniel ville ha en TYDLIG gråmarkering. Vi byter
+   därför HELA kupong-fonden till en NEUTRAL grå yta: grått surface-tint i bakgrunden,
+   den varma guld-radialen ersatt av en neutral grå radial, den gyllene inset-topplisten
+   och vilo-kanten neutraliserade till border-tonen, och hela kortet en aning lägre i
+   mättnad/ljus (filter). Resultatet är omisskännligt "låst/inlämnad" utan att skrika.
+   Text-lagret (låst-etikett + mitt-tips-tal) rörs INTE av filtret , det bär full
+   kontrast (vi filtrerar fonden via box-shadow/bakgrund + en svag grayscale, inte en
+   opacity som skulle sänka textens läsbarhet). GÄLLER ALLA tips-kupong-typerna:
+   match-tipset (data-prediction-locked), grupp-tipset (data-group-prediction-locked)
+   OCH slutspels-tipsets slot-kuponger (data-bracket-prediction-locked) , en sanning. */
 .vm-coupon-card[data-prediction-locked],
 .vm-coupon-card[data-group-prediction-locked],
 .vm-coupon-card[data-bracket-prediction-locked] {
+  /* Neutral grå yta i stället för den varma kupong-surface:n. */
+  background-color: color-mix(in srgb, var(--color-fg) 6%, var(--color-surface));
   background-image: radial-gradient(
     120% 90% at 100% 0%,
-    color-mix(in srgb, var(--vm-gold) 5%, transparent),
+    color-mix(in srgb, var(--color-fg) 5%, transparent),
     transparent 60%
   );
+  /* Gyllene vilo-kant -> neutral grå kant (omisskännligt "inte aktiv"). */
+  border-color: var(--color-border);
+  /* Topplisten neutraliseras till border-tonen (ingen guld-signal kvar). */
   box-shadow:
     var(--vm-shadow-card),
-    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 20%, var(--color-border));
+    inset 0 1.5px 0 0 var(--color-border);
+  /* En svag avmättnad gör resten av kortets dekor (flaggor, chip-tinter) gråare,
+     så hela kortet känns inlämnat. Hålls låg (15%) så valda lag-flaggor fortfarande
+     går att känna igen, det är en gråmarkering, inte en utsuddning. */
+  filter: saturate(0.85);
 }
 
 .vm-coupon-card[data-prediction-locked]:hover,
 .vm-coupon-card[data-group-prediction-locked]:hover,
 .vm-coupon-card[data-bracket-prediction-locked]:hover {
-  /* Låst kupong lyfter inte på hover (inget att interagera med), så den känns
-     stilla/inlämnad. Samma vilo-skugga som icke-hover. */
+  /* Låst kupong lyfter inte på hover (inget att interagera med) OCH värms inte upp
+     till guld igen , den förblir grå/stilla/inlämnad. Samma vilo-skugga + neutral
+     kant som icke-hover (annars vinner basens guld-hover-kant via inline-klassen). */
+  border-color: var(--color-border);
   box-shadow:
     var(--vm-shadow-card),
-    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 20%, var(--color-border));
+    inset 0 1.5px 0 0 var(--color-border);
 }
 
 /* HÄNGLÅSETS "klick"-puls när låset just slagit till: en lugn, ENGÅNGS skala-puls

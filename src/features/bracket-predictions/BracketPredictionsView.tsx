@@ -231,6 +231,8 @@ export function BracketPredictionsView({
               teamsKnown
               current={myChampion ? myChampion.advancingTeamId : null}
               locked={champion.locked}
+              deadlineIso={champion.deadlineIso}
+              now={evalNow}
               variant="champion"
               onSubmit={handleSave}
             />
@@ -269,6 +271,8 @@ export function BracketPredictionsView({
                         teamsKnown={slot.teamsKnown}
                         current={mine ? mine.advancingTeamId : null}
                         locked={slot.locked}
+                        deadlineIso={slot.deadlineIso}
+                        now={evalNow}
                         onSubmit={handleSave}
                       />
                     </li>
