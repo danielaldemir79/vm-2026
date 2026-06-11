@@ -42,6 +42,24 @@ describe('ensureSession', () => {
     expect(identity).toEqual({ userId: 'new-1', isAnonymous: true });
   });
 
+  it('samtidiga anrop utan session skapar BARA en anonym användare (in-flight-lås, R2)', async () => {
+    const signIn = vi
+      .fn()
+      .mockResolvedValue({ data: { user: { id: 'new-1', is_anonymous: true } }, error: null });
+    const client = mockClient({
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      signInAnonymously: signIn,
+    });
+
+    // Två SAMTIDIGA anrop (Promise.all, ingen session ännu): utan in-flight-låset
+    // skulle båda trigga signInAnonymously och skapa två anonyma användare.
+    const [a, b] = await Promise.all([ensureSession(client), ensureSession(client)]);
+
+    expect(signIn).toHaveBeenCalledTimes(1);
+    expect(a).toEqual({ userId: 'new-1', isAnonymous: true });
+    expect(b).toEqual(a);
+  });
+
   it('fail loud:ar (kastar) om getSession ger ett fel', async () => {
     const client = mockClient({
       getSession: vi
