@@ -13,14 +13,25 @@
 // tränger sönder layouten; pointer-events styrs så den inte blockerar appen när dold.
 
 import { useAppUpdate, type AppUpdateApi } from './use-app-update';
+import type { RegisterAppSw } from './register-sw';
 
 export interface UpdatePromptProps {
   /**
    * Injicerbar uppdaterings-API (testbarhet): default = den riktiga useAppUpdate.
-   * Test/Storybook kan skicka ett pinnat tillstånd utan att registrera en SW.
+   * Test/Storybook kan skicka ett pinnat tillstånd, och NÄR `api` är satt skickar
+   * komponenten en no-op-registrerare till useAppUpdate så ingen riktig SW
+   * registreras (hookens eget tillstånd ignoreras till förmån för `api`).
    */
   api?: AppUpdateApi;
 }
+
+/**
+ * No-op SW-registrerare som matchar RegisterAppSw men aldrig rör en riktig service
+ * worker. Används när `api` injiceras: rules-of-hooks tvingar oss att alltid anropa
+ * useAppUpdate, men dess registrerings-effekt får då ingen sidoeffekt. updateSW blir
+ * en no-op (returnerar löst Promise) eftersom det injicerade api:t ändå äger handlingen.
+ */
+const noopRegister: RegisterAppSw = () => async () => {};
 
 /**
  * Liten uppdaterings-ikon (cirkulär pil) i en accent-tonad bricka, aria-hidden.
@@ -54,10 +65,11 @@ function UpdateIcon() {
 }
 
 export function UpdatePrompt({ api }: UpdatePromptProps) {
-  // Hooken anropas ovillkorligt (rules-of-hooks). När `api` injiceras använder vi
-  // det i stället , det egna hook-resultatet registrerar då fortfarande en SW,
-  // men i test injiceras alltid `api` så ingen riktig registrering sker.
-  const own = useAppUpdate();
+  // Hooken anropas ovillkorligt (rules-of-hooks). När `api` injiceras skickar vi
+  // en no-op-registrerare så hookens registrerings-effekt INTE rör en riktig SW,
+  // och vi använder då det injicerade api:t (hookens eget tillstånd ignoreras).
+  // Utan `api` (produktionsvägen) körs den riktiga registreraren som vanligt.
+  const own = useAppUpdate(api ? noopRegister : undefined);
   const { needRefresh, offlineReady, updateApp, dismiss } = api ?? own;
 
   // Inget att visa: varken ny version eller offline-redo-beskedet.
