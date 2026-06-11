@@ -74,8 +74,15 @@ export function OfficialResultsProvider({
   // Initiering: ladda facit + admin-status en gång (när aktiva).
   useEffect(() => {
     if (!enabled || !supabase) {
+      // Vilande läge ska vara FAIL-SAFE enligt fil-kontraktet (tomt facit, isAdmin
+      // false, inget fel). Rensa ALLT (Copilot R3): annars kan ett tidigare laddat
+      // facit/fel ligga kvar om live-läget slås av (injicerad liveReady i test eller
+      // en framtida feature-flagga), och UI:t skulle visa ett gammalt facit fast
+      // lagret ska vara vilande.
       setStatus('ready');
       setIsAdmin(false);
+      setResults([]);
+      setError(null);
       return;
     }
     let cancelled = false;
@@ -113,6 +120,14 @@ export function OfficialResultsProvider({
     const [loaded, admin] = await Promise.all([loadResults(), isAppAdmin(supabase)]);
     setResults(loaded);
     setIsAdmin(admin);
+    // En LYCKAD refresh ska återhämta en tidigare felad init-load (Copilot R3):
+    // rensa felet och markera ready, annars fastnar UI:t i 'error' fast data nu är
+    // fräsch. Vi sätter INTE 'loading' i början (ingen flicker vid bakgrunds-refetch
+    // vid fokus/online). Vid FEL kastar Promise.all vidare och anroparen väljer att
+    // svälja (fokus/online-refetchen sväljer och behåller befintligt facit, så ett
+    // flyktigt nätfel inte klottrar över ett giltigt facit).
+    setError(null);
+    setStatus('ready');
   }, [supabase, loadResults]);
 
   // Stabil ref till refresh så fokus/online-lyssnaren inte avregistreras per render.
