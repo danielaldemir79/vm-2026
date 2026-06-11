@@ -5,6 +5,61 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T48 (#81): pre-share-städning, facit-källbyte + admin-gatad inmatning + diskret login
+
+Daniels pre-share-blockerare inför delning med otekniska vänner: (1) resultat-inmatningen syntes
+för ALLA och vem som helst i rummet kunde ändra de delade resultaten, (2) arrangörs-inloggningen
+såg prominent ut (oroade fast RLS skyddar), (3) grupptabellerna drevs av rums-/lokal-inmatning, inte
+av Daniels officiella facit (T42). Tre kärn-ändringar, alla med en TYDLIG fixtures-vs-live-gräns så
+lokal utveckling + simulering + befintliga tester är oförändrade.
+
+**1. FACIT-KÄLLAN FÖR LIVE-TRACKERN BYTER (keystone, tävlingsintegritet):** `ResultsProvider` (T6,
+den delade store som GroupStageView/BracketView/ScenarioView härleder ur) vävde tidigare in RUMMETS
+delade resultat (`room_match_results`, vem som helst i rummet kunde skriva) via `applyRoomResults`.
+Nu väljs facit-källan på `mode` (en sanning, samma `getDataSourceMode` som datakälle-märkningen):
+- **LIVE-läge:** de GLOBALA officiella resultaten (`useOfficialResultsSync().officialResults`,
+  `official_match_results`, BARA admin kan skriva, RLS-bevisat T42), så ALLA ser samma riktiga
+  ställning Daniel matar in.
+- **FIXTURES/lokalt:** rummets delade resultat (OFÖRÄNDRAT), så lokal utveckling + simulering +
+  alla befintliga T14-tester driver tabellerna som förr.
+VÄVNINGEN är OFÖRÄNDRAD: `OfficialMatchResult` är strukturellt identisk med `RoomMatchResult`, så
+bara KÄLLAN (`facitResults = live ? official : room`) byts, inte den rena `applyRoomResults` (DRY,
+samma val topplistan redan gjorde i T42, se `use-leaderboard-data.ts`). Konsekvens: i live-läge
+skriver `submitResult` INTE längre till `room_match_results` (gatad på `!liveRef`); admin matar in
+officiellt facit via AdminResultEntry (`saveOfficialResult`), inte via denna väg. `room_match_results`
+behålls i schemat men är nu helt utfasad för facit (jfr T42-beslutet). **Bevis (det STARKA invariantet,
+lessons `uttommande-test-vaktar-svagare-invariant`):** `official-facit-source.integration.test.tsx`
+matar BÅDA källor samtidigt med OLIKA värden för samma match och bevisar att official (5-0) vinner i
+live och rummets (1-1) i fixtures , ett test som bara matade EN källa skulle inte skilja "läser
+official" från "läser room".
+
+**2. RESULTAT-INMATNINGEN (ResultEntryView) ADMIN-GATAD I LIVE:** ny ren regel `shouldShowResultEntry
+(live, isAdmin, simulating)` + tunn wrapper `ResultEntryGate`. FIXTURES: visa alltid (oförändrat).
+LIVE + admin: visa. LIVE + icke-admin (eller admin-status okänd än, fail-safe mot blink): visa BARA
+när simulering är PÅ. Regeln bor i en EGEN modul (`result-entry-gate-rule.ts`) skild från komponenten
+så ResultEntryView förblir en REN, fristående-testbar vy (renderas i fixtures-paritetstester utan
+facit-lager) och react-refresh-regeln hålls ren. Uttömmande testad över alla 6 fall.
+
+**3. SIMULERING (T12) vs OFFICIELL INMATNING , den rena avgränsningen:** simuleringen ÅTERANVÄNDER
+ResultEntryView som sin "tänk om"-input (samma `submitResult`-seam, men i sim-läge går skrivningen till
+sim-OVERLAYN, ALDRIG till DB, redan så i ResultsProvider). Därför löser gate-regeln #4 rent: en vanlig
+vän i live-läge ser INGEN delad/officiell inmatning, MEN kan starta what-if-leken (SimulationBanner är
+kvar öppen för alla) och då dyker ResultEntryView upp INUTI SimulationFrame (violett ram + sticky
+"Simuleringsläge"-badge), tydligt märkt som hypotetiskt. Utanför sim-läge döljs den helt. Ingen ny
+sim-input byggdes; avgränsningen är "var skrivningen tar vägen" (overlay vs official), som redan fanns.
+
+**4. ARRANGÖRS-INLOGGNINGEN BLIR DISKRET:** den prominenta `<AdminLogin>`-rutan i icke-admin-vyn tuckas
+bakom en inbyggd, tillgänglig `<details>`/`<summary>`-utfällning ("Är du arrangör? Logga in"), STÄNGD
+som standard. Den EXISTERANDE e-post-mekaniken (updateUser/verifyOtp) är OFÖRÄNDRAD, bara gömd , en
+riktig recoverable sign-in är separat (T48b). `<details>` ger tangentbord + skärmläsar-stöd utan extra
+aria-plumbing.
+
+**Bevarat:** T46 poäng-presentation, tippning + deadline-sekretess (RLS + klient-gate), TeamCode-
+kontraktet (T16, orört , samma `applyRoomResults`/`derivePoolFacit`), auto-update-hotfixen (vite.config
++ register-sw, ej rörd). Premium-design på admin/gate-ytan lämnas till design-frontend (samma arbets-
+delning som T42/T16). **Källa:** Daniels task-direktiv T48 (#81) + T42-beslutet i denna logg (official
+results = facit, RLS-bevisat) + patterns.md `global-admin-gatad-facit` / `inmatning-mot-delad-store`.
+
 ## 2026-06-11 , T46 (#79): resultat-presentation (VARFÖR per tips + sammanfattning överst)
 
 Daniels pre-share-blockerare: man måste skrolla hela vägen ner för att se sina poäng, och
