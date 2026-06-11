@@ -21,7 +21,7 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 - `c4bfd97` - fix(tips): legend a11y (Copilot runda 1, #59)
 - `47b9881` - fix(tips): champion-anim + last-dampning (Copilot runda 2, HEAD)
 
-**Verifiering:** 953 tester gröna + 29 env-skippade (+30 nya). Lokal panel: godkänd (1 avvisad nit, code-vs-id-seamen verifierad airtight via negativ kontroll). Copilot 3 rundor (1->2->0). Build/lint/format rent. Datakärnan/RLS oförandrad sedan T16.
+**Verifiering:** 953 tester gröna + 29 env-skippade (+30 nya). Lokal panel: godkänd (1 avvisad nit, code-vs-id-seamen verifierad airtight via negativ kontroll). Copilot 3 rundor (1->2->0). Build/lint/format rent. Datakärnan/RLS oförändrad sedan T16.
 
 **Alla 5/5 acceptanskriterier bockade i issue #59** (journalisten 2026-06-11).
 
