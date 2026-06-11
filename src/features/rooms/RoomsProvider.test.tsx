@@ -1,7 +1,8 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { RoomsProvider } from './RoomsProvider';
 import { useRoomsStore } from './rooms-context';
+import { ACTIVE_ROOM_KEY } from './active-room-storage';
 import type { VmSupabaseClient } from '../../data/supabase-browser';
 
 // Vi mockar rooms-API:t (data/rooms) så provider-testet fokuserar på React-
@@ -67,10 +68,18 @@ function renderProvider(env: ImportMetaEnv, liveReady = true) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Rensa persistens-nyckeln mellan testerna (jsdoms localStorage delas annars),
+  // så rum-persistens-testerna är isolerade.
+  window.localStorage.clear();
   api.ensureSession.mockResolvedValue({ userId: 'me', isAnonymous: true });
   api.listMyRooms.mockResolvedValue([]);
   api.listMembers.mockResolvedValue([]);
   api.listRoomResults.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  // Återställ ev. localStorage-spioner (kastande-storage-testet) så de inte läcker.
+  vi.restoreAllMocks();
 });
 
 describe('RoomsProvider, enabled-gind', () => {
@@ -278,6 +287,124 @@ describe('RoomsProvider, saveResult når rummet (KA-F3 (a))', () => {
 
     expect(api.upsertRoomResult).not.toHaveBeenCalled();
     expect(screen.getByTestId('probe')).toHaveTextContent('results:0');
+  });
+});
+
+describe('RoomsProvider, rum-persistens över sidladdning (T38, #67)', () => {
+  it('PERSISTERAR valet vid create + join (sparar rummets id i localStorage)', async () => {
+    api.createRoom.mockResolvedValue({ id: 'rNew', name: 'Nytt', code: 'bbb22' });
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+
+    await act(async () => {
+      await store.createRoom('Nytt', 'Daniel');
+    });
+    // Auto-vald OCH persistat efter create.
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:Nytt'));
+    expect(window.localStorage.getItem(ACTIVE_ROOM_KEY)).toBe('rNew');
+
+    // Gå sedan med i ett ANNAT rum: persistensen ska följa det senast valda.
+    api.joinRoomByCode.mockResolvedValue({ id: 'rJoin', name: 'Gäng', code: 'ccc33' });
+    await act(async () => {
+      await store.joinRoom('ccc33', 'Daniel');
+    });
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:Gäng'));
+    expect(window.localStorage.getItem(ACTIVE_ROOM_KEY)).toBe('rJoin');
+  });
+
+  it('ÅTERSTÄLLER det sparade rummet vid (re)mount: aktivt + laddar dess data', async () => {
+    // Ett sparat id som motsvarar ett rum man fortfarande är medlem i.
+    window.localStorage.setItem(ACTIVE_ROOM_KEY, 'rB');
+    api.listMyRooms.mockResolvedValue([
+      { id: 'rA', name: 'Rum A', code: 'aaa11' },
+      { id: 'rB', name: 'Rum B', code: 'bbb22' },
+    ]);
+    api.listMembers.mockResolvedValue([{ userId: 'me', displayName: 'Daniel' }]);
+
+    renderProvider(liveEnv());
+
+    // Det sparade rummet (rB) blir aktivt direkt vid mount, utan användar-klick,
+    // och dess medlemmar laddas (man hamnar inte i "inget rum").
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:Rum B'));
+    expect(screen.getByTestId('probe')).toHaveTextContent('members:1');
+    expect(api.listMembers).toHaveBeenCalledWith(fakeClient, 'rB');
+  });
+
+  it('multi-rum: SENAST valda rummet (selectRoom) är det som persisteras', async () => {
+    api.listMyRooms.mockResolvedValue([
+      { id: 'rA', name: 'Rum A', code: 'aaa11' },
+      { id: 'rB', name: 'Rum B', code: 'bbb22' },
+    ]);
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+
+    await act(async () => {
+      await store.selectRoom('rA');
+    });
+    expect(window.localStorage.getItem(ACTIVE_ROOM_KEY)).toBe('rA');
+
+    await act(async () => {
+      await store.selectRoom('rB');
+    });
+    // Senast valda vinner.
+    expect(window.localStorage.getItem(ACTIVE_ROOM_KEY)).toBe('rB');
+  });
+
+  it('STALE id (rummet finns inte / man är inte medlem): faller rent till no-room + rensar id:t', async () => {
+    // Sparat id pekar på ett rum som INTE finns i mina rum längre (borttaget /
+    // lämnat på en annan enhet).
+    window.localStorage.setItem(ACTIVE_ROOM_KEY, 'rGhost');
+    api.listMyRooms.mockResolvedValue([{ id: 'rA', name: 'Rum A', code: 'aaa11' }]);
+
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+
+    // Inget rum aktiveras (ingen gissning), och det döda id:t rensas så vi inte
+    // försöker återställa det igen vid nästa start.
+    expect(screen.getByTestId('probe')).toHaveTextContent('active:none');
+    expect(window.localStorage.getItem(ACTIVE_ROOM_KEY)).toBeNull();
+    // Det stale rummets data hämtas aldrig (vi väljer aldrig ett dött rum).
+    expect(api.listMembers).not.toHaveBeenCalledWith(fakeClient, 'rGhost');
+  });
+
+  it('lämna det aktiva rummet RENSAR det persistade id:t', async () => {
+    window.localStorage.setItem(ACTIVE_ROOM_KEY, 'r1');
+    api.listMyRooms.mockResolvedValue([{ id: 'r1', name: 'Vänner', code: 'aaa11' }]);
+    api.leaveRoom.mockResolvedValue(undefined);
+
+    renderProvider(liveEnv());
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:Vänner'));
+
+    await act(async () => {
+      await store.leaveRoom('r1');
+    });
+
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:none'));
+    expect(window.localStorage.getItem(ACTIVE_ROOM_KEY)).toBeNull();
+  });
+
+  it('KASTANDE storage kraschar inte: appen blir ready, inget rum återställs tyst', async () => {
+    // localStorage-åtkomsten kastar (privat läge / sandbox). Persistens-läsningen
+    // ska falla rent (safe-storage sväljer felet) utan att krascha providern.
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    api.listMyRooms.mockResolvedValue([{ id: 'rA', name: 'Rum A', code: 'aaa11' }]);
+
+    renderProvider(liveEnv());
+
+    // Providern blir ready trots kastande storage (ingen krasch), inget rum
+    // återställs (ingen läsbar persistens), appen fungerar lokalt.
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    expect(screen.getByTestId('probe')).toHaveTextContent('active:none');
   });
 });
 

@@ -5,6 +5,27 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T38 (#67): rum-persistens, senast valda rummet återställs över sidladdning
+
+**Beslut (persistens-modell):** Det AKTIVA rummets id persistas i localStorage under nyckeln
+`vm2026-active-room` (samma `vm2026-`-prefix som tema + app-settings), och återställs vid app-mount.
+Multi-rum: bara ETT id lagras, det SENAST valda (skapa / gå-med / välj skriver alltid över), så det
+är det rummet som återställs nästa gång. Persistens-primitiven bor i `active-room-storage.ts` och
+bygger på `safe-storage` (T13), så blockerad/kastande storage (privat läge, sandbox) aldrig kraschar
+appen, persistensen hoppas bara över.
+
+**Återställnings-regel (verifiera, gissa aldrig):** vid mount läses det sparade id:t och VERIFIERAS
+mot `listMyRooms` (rooms-api). Bara om id:t fortfarande finns bland mina rum (rummet finns OCH jag är
+medlem) väljs det. Finns det inte (rummet borttaget, eller jag har lämnat på en annan enhet) faller vi
+RENT till no-room och RENSAR det inaktuella id:t. Att lämna det aktiva rummet rensar också id:t.
+Återställningen tar samma epoch-token (`loadTokenRef`) som övriga laddningar, så ett manuellt rumsbyte
+under laddningen alltid vinner (stale-vakten från T14 KA-F2 bevaras).
+
+**Varför:** utan persistens tappade appen vilket rum man stod i vid sidladdning, så efter en
+uppdatering stod man i INGET rum och de delade inmatningarna syntes inte (de fanns kvar i molnet, men
+man var inte i rummet). Kritisk UX-bug före delning. Auto-val efter skapa/gå-med fanns redan (T14),
+men valet persisterades inte; nu gör det det.
+
 ## 2026-06-11 , T17 (#17, Copilot C1+C2): slutspels-matchtips poängsätts + sr-only-interpunktion
 
 **C1 (korrekthetsbug, källmedveten fix):** `deriveMatchFacit` (derive-facit.ts) filtrerade på

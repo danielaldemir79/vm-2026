@@ -33,6 +33,7 @@ import {
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
 import { isSupabaseConfigured, LIVE_READY } from '../../data';
 import { RoomsStoreContext, type RoomsStatus, type RoomsStore } from './rooms-context';
+import { clearActiveRoomId, readActiveRoomId, writeActiveRoomId } from './active-room-storage';
 
 export interface RoomsProviderProps {
   children: ReactNode;
@@ -137,6 +138,25 @@ export function RoomsProvider({
       setUserId(identity.userId);
       setMyRooms(rooms);
       setStatus('ready');
+
+      // ÅTERSTÄLL det senast valda rummet över sidladdning (T38, #67). VERIFIERA
+      // mot listMyRooms: bara om det sparade id:t fortfarande finns i mina rum
+      // (rummet finns OCH jag är medlem) väljs det. Annars (rummet borttaget /
+      // jag har lämnat) faller vi rent till no-room och rensar det inaktuella
+      // id:t, så vi inte envist försöker återställa ett dött rum. loadRoomData tar
+      // en epoch-token (loadTokenRef), så ett senare manuellt rumsbyte under
+      // laddningen alltid vinner över denna återställning (bryter inte stale-vakten).
+      const savedId = readActiveRoomId();
+      if (savedId === null) {
+        return;
+      }
+      const saved = rooms.find((r) => r.id === savedId) ?? null;
+      if (saved === null) {
+        clearActiveRoomId();
+        return;
+      }
+      setActiveRoom(saved);
+      await loadRoomData(saved);
     })().catch((err: unknown) => {
       if (cancelled) {
         return;
@@ -147,7 +167,9 @@ export function RoomsProvider({
     return () => {
       cancelled = true;
     };
-  }, [enabled, supabase]);
+    // loadRoomData beror bara på supabase (redan i deps), så återställningen lägger
+    // inte till ett nytt re-körnings-villkor utöver enabled/supabase.
+  }, [enabled, supabase, loadRoomData]);
 
   // OM-HÄMTNING vid fokus/online (ingen polling, T18 gör realtid). Refetchar det
   // aktiva rummets delade data när användaren kommer tillbaka eller får nät igen.
@@ -187,6 +209,9 @@ export function RoomsProvider({
       const room = await apiCreateRoom(supabase, name, displayName);
       setMyRooms((prev) => [...prev, room]);
       setActiveRoom(room);
+      // Man ska ALLTID stå i ett rum efter skapa (T38, #67): gör det aktivt OCH
+      // persistera valet så det överlever sidladdning.
+      writeActiveRoomId(room.id);
       await loadRoomData(room);
     },
     [supabase, loadRoomData]
@@ -203,6 +228,8 @@ export function RoomsProvider({
       }
       setMyRooms((prev) => (prev.some((r) => r.id === room.id) ? prev : [...prev, room]));
       setActiveRoom(room);
+      // Man ska ALLTID stå i ett rum efter gå-med (T38, #67): aktivt + persistat.
+      writeActiveRoomId(room.id);
       await loadRoomData(room);
       return true;
     },
@@ -213,6 +240,13 @@ export function RoomsProvider({
     async (roomId: string) => {
       const room = myRooms.find((r) => r.id === roomId) ?? null;
       setActiveRoom(room);
+      // Multi-rum: persistera SENAST valda rummet så det återställs vid nästa start.
+      // Hittas inte rummet (oväntat) rensar vi hellre än lämnar ett felaktigt id.
+      if (room) {
+        writeActiveRoomId(room.id);
+      } else {
+        clearActiveRoomId();
+      }
       await loadRoomData(room);
     },
     [myRooms, loadRoomData]
@@ -225,11 +259,14 @@ export function RoomsProvider({
       }
       await apiLeaveRoom(supabase, roomId);
       setMyRooms((prev) => prev.filter((r) => r.id !== roomId));
-      // Lämnade man det aktiva rummet: nollställ aktivt + dess data.
+      // Lämnade man det aktiva rummet: nollställ aktivt + dess data + rensa det
+      // persistade id:t (annars skulle nästa start försöka återställa ett rum man
+      // inte längre är medlem i, T38, #67).
       setActiveRoom((prev) => (prev?.id === roomId ? null : prev));
       if (activeRoomRef.current?.id === roomId) {
         setMembers([]);
         setResults([]);
+        clearActiveRoomId();
       }
     },
     [supabase]
