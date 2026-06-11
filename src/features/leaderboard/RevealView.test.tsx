@@ -39,8 +39,20 @@ const revealedMatch: RevealedMatch = {
   kickoff: '2026-06-12T18:00:00Z',
   actual: { homeGoals: 2, awayGoals: 1 },
   picks: [
-    { userId: 'u1', displayName: 'Anna', predicted: { homeGoals: 2, awayGoals: 1 }, points: 3 },
-    { userId: 'u2', displayName: 'Bertil', predicted: { homeGoals: 0, awayGoals: 0 }, points: 0 },
+    {
+      userId: 'u1',
+      displayName: 'Anna',
+      predicted: { homeGoals: 2, awayGoals: 1 },
+      points: 3,
+      pointType: 'exact',
+    },
+    {
+      userId: 'u2',
+      displayName: 'Bertil',
+      predicted: { homeGoals: 0, awayGoals: 0 },
+      points: 0,
+      pointType: 'miss',
+    },
   ],
 };
 
@@ -93,13 +105,31 @@ describe('RevealView, FÄRG-OBEROENDE facit-markörer (premium-finish)', () => {
   const threePicks: RevealedMatch = {
     ...revealedMatch,
     picks: [
-      { userId: 'u1', displayName: 'Anna', predicted: { homeGoals: 2, awayGoals: 1 }, points: 3 },
-      { userId: 'u2', displayName: 'Bo', predicted: { homeGoals: 3, awayGoals: 1 }, points: 1 },
-      { userId: 'u3', displayName: 'Cia', predicted: { homeGoals: 0, awayGoals: 0 }, points: 0 },
+      {
+        userId: 'u1',
+        displayName: 'Anna',
+        predicted: { homeGoals: 2, awayGoals: 1 },
+        points: 3,
+        pointType: 'exact',
+      },
+      {
+        userId: 'u2',
+        displayName: 'Bo',
+        predicted: { homeGoals: 3, awayGoals: 1 },
+        points: 1,
+        pointType: 'outcome',
+      },
+      {
+        userId: 'u3',
+        displayName: 'Cia',
+        predicted: { homeGoals: 0, awayGoals: 0 },
+        points: 0,
+        pointType: 'miss',
+      },
     ],
   };
 
-  it('härleder utfalls-kategori ur poängen (3=exakt, 1=utfall, 0=miss) via data-outcome', () => {
+  it('speglar pick.pointType i data-outcome (exact/outcome/miss), inte en egen tröskel', () => {
     const { container } = renderView(store({ reveal: [threePicks] }));
     const picks = Array.from(container.querySelectorAll('[data-reveal-pick]'));
     expect(picks.map((p) => p.getAttribute('data-outcome'))).toEqual(['exact', 'outcome', 'miss']);
@@ -116,11 +146,13 @@ describe('RevealView, FÄRG-OBEROENDE facit-markörer (premium-finish)', () => {
     expect(new Set(glyphs).size).toBe(3); // tre DISTINKTA glyfer
   });
 
-  it('ger skärmläsaren utfallet i ORD (sr-only), inte bara visuellt', () => {
-    renderView(store({ reveal: [threePicks] }));
-    // De dolda ord-etiketterna finns i DOM:en (färg-oberoende för skärmläsare).
-    expect(screen.getByText(/Exakt rätt/)).toBeInTheDocument();
-    expect(screen.getByText(/Rätt utfall/)).toBeInTheDocument();
-    expect(screen.getByText(/Bom/)).toBeInTheDocument();
+  it('visar VARFÖR i ORD bredvid poängen (T46): orsak + poängtillägg, synligt', () => {
+    const { container } = renderView(store({ reveal: [threePicks] }));
+    const reasons = Array.from(container.querySelectorAll('[data-reveal-reason]')).map((r) =>
+      r.textContent?.replace(/\s+/g, ' ').trim()
+    );
+    // Orsaken står som ren text (läses även av skärmläsare), med poängtillägget: 0 utan
+    // plustecken (ingen vinst), vinster med +.
+    expect(reasons).toEqual(['Exakt resultat +3', 'Rätt vinnare +1', 'Miss 0']);
   });
 });

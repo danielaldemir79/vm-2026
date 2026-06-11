@@ -76,6 +76,24 @@ describe('buildMatchReveal, sekretess-gate (avslöja FÖRST efter avspark)', () 
     ]);
   });
 
+  it('varje pick bär VARFÖR-typen (T46) härledd ur SAMMA facit som poängen (exact/miss)', () => {
+    // Anna prickade exakt (2-1 mot 2-1) -> 'exact'; Bertil bommade utfallet (0-0) -> 'miss'.
+    // pointType ska följa pointTypeOf, inte en egen tröskel mot siffran.
+    const revealed = buildMatchReveal(matches, facit, predictions, NAMES, AFTER);
+    expect(revealed[0].picks.map((p) => [p.displayName, p.points, p.pointType])).toEqual([
+      ['Anna', 3, 'exact'],
+      ['Bertil', 0, 'miss'],
+    ]);
+  });
+
+  it('rätt utfall men fel siffror ger pointType "outcome" (1p), inte exact/miss', () => {
+    // Facit 2-1 (hemmavinst). Tips 3-0 = hemmavinst men ej exakt -> 'outcome'.
+    const outcomePred = [prediction('u1', 'g-A-1', 3, 0)];
+    const revealed = buildMatchReveal(matches, facit, outcomePred, NAMES, AFTER);
+    expect(revealed[0].picks[0].points).toBe(1);
+    expect(revealed[0].picks[0].pointType).toBe('outcome');
+  });
+
   it('exakt PÅ avspark (now === kickoff) räknas som låst (avslöjas), gränsfallet', () => {
     const atKickoff = new Date(KICKOFF);
     const revealed = buildMatchReveal(matches, facit, predictions, NAMES, atKickoff);

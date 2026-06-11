@@ -24,7 +24,13 @@
 
 import type { Match } from '../../domain/types';
 import type { Prediction } from '../../data/predictions';
-import { isMatchLocked, scorePrediction, type Scoreline } from '../../data/predictions';
+import {
+  isMatchLocked,
+  scorePrediction,
+  pointTypeOf,
+  type MatchPointType,
+  type Scoreline,
+} from '../../data/predictions';
 import type { MatchFacit } from './derive-facit';
 
 /** Ett enskilt avslöjat match-tips: vem, vad de gissade, och hur många poäng det gav. */
@@ -35,6 +41,12 @@ export interface RevealedMatchPick {
   predicted: Scoreline;
   /** Poäng tipset gav mot facit (3 exakt / 1 utfall / 0 miss). */
   points: number;
+  /**
+   * VARFÖR tipset gav sin poäng (T46): exakt resultat / rätt utfall / miss. Härledd ur
+   * SAMMA sanning som `points` (pointTypeOf, score.ts), så siffran och orsaken aldrig
+   * kan drifta. UI:t visar etiketten ("Exakt resultat +3") ur denna typ.
+   */
+  pointType: MatchPointType;
 }
 
 /** Avslöjandet för EN avgjord match: facit + alla synliga medlemmars tips + poäng. */
@@ -107,6 +119,8 @@ export function buildMatchReveal(
         displayName: names.get(pred.userId) ?? pred.userId,
         predicted,
         points: scorePrediction(predicted, matchFacit.actual),
+        // Samma facit, samma sanning: typen härleds ur pointTypeOf, inte ur points-siffran.
+        pointType: pointTypeOf(predicted, matchFacit.actual),
       };
     });
     // Sortera picks på poäng fallande, sen namn (stabil, förutsägbar ordning).
