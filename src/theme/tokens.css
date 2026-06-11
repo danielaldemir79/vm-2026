@@ -685,10 +685,12 @@ body {
    på den dekorativa fonden + topplisten (gulden tonas ner mot border-tonen), så
    den positiva "låst = rättvist"-känslan finns kvar utan att skrika. Text-lagret
    rörs inte av dämpningen (låst-etiketten + mitt-tips-talen bär full kontrast).
-   GÄLLER BÅDA kupong-typerna: match-tipset (T15, data-prediction-locked) OCH grupp-
-   tipset (T16, data-group-prediction-locked) , samma dämpnings-recept, en sanning. */
+   GÄLLER ALLA tips-kupong-typerna: match-tipset (T15, data-prediction-locked),
+   grupp-tipset (T16, data-group-prediction-locked) OCH slutspels-tipsets slot-
+   kuponger (T16b, data-bracket-prediction-locked) , samma dämpnings-recept, en sanning. */
 .vm-coupon-card[data-prediction-locked],
-.vm-coupon-card[data-group-prediction-locked] {
+.vm-coupon-card[data-group-prediction-locked],
+.vm-coupon-card[data-bracket-prediction-locked] {
   background-image: radial-gradient(
     120% 90% at 100% 0%,
     color-mix(in srgb, var(--vm-gold) 5%, transparent),
@@ -700,7 +702,8 @@ body {
 }
 
 .vm-coupon-card[data-prediction-locked]:hover,
-.vm-coupon-card[data-group-prediction-locked]:hover {
+.vm-coupon-card[data-group-prediction-locked]:hover,
+.vm-coupon-card[data-bracket-prediction-locked]:hover {
   /* Låst kupong lyfter inte på hover (inget att interagera med), så den känns
      stilla/inlämnad. Samma vilo-skugga som icke-hover. */
   box-shadow:
