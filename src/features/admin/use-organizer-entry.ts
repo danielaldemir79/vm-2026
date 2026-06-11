@@ -47,6 +47,11 @@ export function useOrganizerEntry(): boolean {
   const [present, setPresent] = useState<boolean>(() => readOrganizerEntry());
 
   useEffect(() => {
+    // Samma icke-browser-gard som readOrganizerEntry (Copilot R3): utan window finns
+    // inget att lyssna på, och dokumentationen lovar att hooken inte kraschar då.
+    if (typeof window === 'undefined') {
+      return;
+    }
     // Synka en gång vid mount (hashen kan ha hunnit ändras mellan lazy-init och
     // effekten), sen följ hashchange.
     setPresent(readOrganizerEntry());

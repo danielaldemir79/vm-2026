@@ -183,6 +183,13 @@ describe('T48: facit-källan för live-trackern', () => {
     await waitFor(() => {
       expect(screen.getByTestId('probe')).toHaveAttribute('data-mode', 'live');
     });
+    // Vänta in seedad plan (Copilot R3): data-score är 'none' även när store.matches
+    // ännu är tom, så utan ready-vakten kunde testet passera FÖRE vävningen och vore
+    // en falsk positiv. Med planen seedad bevisar 'none' det riktiga invariantet:
+    // rummets 3-2 vävdes INTE in.
+    await waitFor(() => {
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready');
+    });
     expect(screen.getByTestId('probe')).toHaveAttribute('data-score', 'none');
   });
 });
