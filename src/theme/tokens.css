@@ -1292,3 +1292,71 @@ body {
 .vm-reveal-pick[data-outcome='miss'] {
   border-left: 2px solid transparent;
 }
+
+/* =============================================================================
+   18. UPPHOVS-SIGNATUREN, footerns avsändarrad (T38, issue #67).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET: Daniels signatur på sin egen app, en STOLT men diskret avsändarrad
+   längst ner. Samma "arena i kvällsljus"-familj (SPEC §7): den gröna accent-
+   identiteten bär ett litet "DA"-monogram-SIGILL (som en stämpel/sigill), och en
+   hårfin accent-tick fungerar som diskret separator mot footer-prosan ovanför.
+   Tonen är "stolt liten avsändare", aldrig skrikig: monogrammet är pyttelitet,
+   tick:en hårfin, texten dämpad utom själva NAMNET som bär full förgrund.
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall + token-som-text-med-opacitet-
+   faller-under-AA): footern står på sidans FOND (--vm-bg), inte på en surface-yta,
+   så ALLA värden är mätta mot FONDEN (värsta basytan). UPPMÄTT (scripts/contrast-
+   t38.mjs, canvas-komposit, BÅDA teman, decisions.md T38-visuellt):
+   - "Made by"-prefixet (--vm-fg-muted, FULL opacitet): 8.39:1 mörkt / 5.92:1 ljust.
+     (Den GAMLA stylingen la 80% opacitet PÅ fg-muted -> 3.83:1 ljust = UNDER AA,
+     exakt token-som-text-med-opacitet-fällan. Därför bär raden full opacitet nu.)
+   - Namnet "Daniel Aldemir" (--vm-fg, full): 17.04:1 mörkt / 16.25:1 ljust.
+   - Monogrammet "DA" (accent-fg-ink på SOLID accent-bricka, färg-oberoende solid-
+     bricka-form som DU-brickan/primärknappen): 10.85:1 mörkt / 5.40:1 ljust.
+   Tick:en bär ingen text (ren dekor). Alla text-ytor >= 4.5:1 (normal text).
+   -------------------------------------------------------------------------- */
+
+/* MONOGRAM-SIGILLET "DA": en liten rund accent-bricka med mörk/vit ink (accent-fg),
+   den färg-oberoende solid-bricka-formen (ink på opak accent, aldrig accent-text på
+   tint). En mjuk inre högdager + svag accent-glow ger sigillet relief utan en bild
+   (noll asset), så det känns som en präglad stämpel. Display-typsnittet ger initialerna
+   karaktär. Liten storlek = diskret, men närvarande. */
+.vm-signature-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.5625rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.3),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 1px 6px -1px color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+/* HÅRFIN ACCENT-TICK: en kort lodrät accent-gradient-linje som diskret separator
+   mellan sigillet och texten, ett litet "arena-ljus"-streck. Tonas ut i topp/botten
+   så den känns som en hårfin glimt, inte en hård regel. Ren dekor (aria-hidden i
+   markup), bär ingen text. */
+.vm-signature-tick {
+  flex-shrink: 0;
+  width: 1.5px;
+  height: 0.875rem;
+  border-radius: var(--radius-pill);
+  background-image: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--color-accent) 55%, transparent),
+    transparent
+  );
+}
