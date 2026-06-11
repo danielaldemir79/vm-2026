@@ -84,4 +84,16 @@ describe('App-skalet', () => {
       expect(screen.getAllByRole('table')).toHaveLength(12);
     });
   });
+
+  it('visar upphovs-signaturen "Made by Daniel Aldemir" i footern (T38, #67)', async () => {
+    const { container } = renderApp();
+
+    // Render-test (inte bara en konstant): bevisar att signaturen faktiskt NÅR
+    // DOM:en, så en framtida refaktor inte tappar raden tyst. Data-attributet är
+    // krok för design-frontends finputs.
+    const signature = container.querySelector('[data-app-signature]');
+    expect(signature).not.toBeNull();
+    expect(signature).toHaveTextContent('Made by Daniel Aldemir');
+    await waitForAppSettled();
+  });
 });

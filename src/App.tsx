@@ -267,8 +267,16 @@ function AppShell() {
           <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
         </Slide>
 
-        <footer className="border-t border-border pt-6 text-sm text-fg-muted">
-          VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med en länk.
+        <footer className="flex flex-col gap-2 border-t border-border pt-6 text-sm text-fg-muted">
+          <p>
+            VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med en länk.
+          </p>
+          {/* Diskret upphovs-signatur (T38, #67). Stabil semantik + data-attribut
+              (data-app-signature) som krok för design-frontends finputs efteråt;
+              denna rad är den funktionella basen, inte den slutgiltiga stylingen. */}
+          <p data-app-signature="" className="text-xs text-fg-muted/80">
+            Made by Daniel Aldemir
+          </p>
         </footer>
       </main>
 
