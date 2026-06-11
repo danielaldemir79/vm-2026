@@ -36,6 +36,10 @@ export type {
 } from './validate-result';
 export { applyMatchResult } from './apply-match-result';
 
+// Väv in ett rums delade resultat i matchlistan (T14 KA-F3): ren, testbar funktion.
+// Återanvänds av topplistan (T17) för att bygga samma facit-källa som tracker-vyerna.
+export { applyRoomResults } from './apply-room-results';
+
 // 3-dagars fönster-urval för inmatningslistan (#39): ren, testbar funktion.
 export { windowMatches, WINDOW_DAYS } from './result-window';
 export type { ResultWindow } from './result-window';
