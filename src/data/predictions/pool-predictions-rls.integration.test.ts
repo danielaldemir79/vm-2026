@@ -36,6 +36,9 @@ import {
   listRoomBracketPredictions,
   upsertMyBracketPrediction,
 } from './bracket-predictions-api';
+// Tips-inputens lag-fält är TeamCode (C1+C2): brand literalerna vid testgränsen,
+// precis som UI:t gör via teamCode() (validerad versal FIFA-code).
+import { teamCode } from '../../domain/team-code';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -159,13 +162,13 @@ describe.skipIf(!runnable)('RLS: pool-tips (grupp + bracket), riktiga sessioner'
   it('GRUPP: en medlem (Bob) kan lägga + ändra sitt eget grupp-tips på en öppen grupp', async () => {
     await upsertMyGroupPrediction(bob, roomId, {
       groupId: OPEN_GROUP,
-      winnerTeamId: 'BRA',
-      runnerUpTeamId: 'ARG',
+      winnerTeamId: teamCode('BRA'),
+      runnerUpTeamId: teamCode('ARG'),
     });
     const updated = await upsertMyGroupPrediction(bob, roomId, {
       groupId: OPEN_GROUP,
-      winnerTeamId: 'ESP',
-      runnerUpTeamId: 'POR',
+      winnerTeamId: teamCode('ESP'),
+      runnerUpTeamId: teamCode('POR'),
     });
     expect(updated).toMatchObject({
       groupId: OPEN_GROUP,
@@ -180,8 +183,8 @@ describe.skipIf(!runnable)('RLS: pool-tips (grupp + bracket), riktiga sessioner'
   it('GRUPP-SEKRETESS: Alice ser INTE Bobs grupp-tips på en öppen grupp (bara sitt eget)', async () => {
     await upsertMyGroupPrediction(alice, roomId, {
       groupId: OPEN_GROUP,
-      winnerTeamId: 'FRA',
-      runnerUpTeamId: 'ENG',
+      winnerTeamId: teamCode('FRA'),
+      runnerUpTeamId: teamCode('ENG'),
     });
     const visible = await listRoomGroupPredictions(alice, roomId);
     const onGroup = visible.filter((p) => p.groupId === OPEN_GROUP);
@@ -204,8 +207,8 @@ describe.skipIf(!runnable)('RLS: pool-tips (grupp + bracket), riktiga sessioner'
     await expect(
       upsertMyGroupPrediction(carol, roomId, {
         groupId: OPEN_GROUP,
-        winnerTeamId: 'BRA',
-        runnerUpTeamId: 'ARG',
+        winnerTeamId: teamCode('BRA'),
+        runnerUpTeamId: teamCode('ARG'),
       })
     ).rejects.toThrow(/Spara grupp-tips misslyckades/);
     expect(await listRoomGroupPredictions(carol, roomId)).toEqual([]);
@@ -214,10 +217,13 @@ describe.skipIf(!runnable)('RLS: pool-tips (grupp + bracket), riktiga sessioner'
   // ===== BRACKET-TIPS =====
 
   it('BRACKET: en medlem kan lägga + ändra sitt "går vidare"-tips på en öppen slot', async () => {
-    await upsertMyBracketPrediction(bob, roomId, { slotId: OPEN_SLOT, advancingTeamId: 'BRA' });
+    await upsertMyBracketPrediction(bob, roomId, {
+      slotId: OPEN_SLOT,
+      advancingTeamId: teamCode('BRA'),
+    });
     const updated = await upsertMyBracketPrediction(bob, roomId, {
       slotId: OPEN_SLOT,
-      advancingTeamId: 'ARG',
+      advancingTeamId: teamCode('ARG'),
     });
     expect(updated).toMatchObject({ slotId: OPEN_SLOT, userId: bobUid, advancingTeamId: 'ARG' });
     const mine = await listMyBracketPredictions(bob, roomId);
@@ -225,7 +231,10 @@ describe.skipIf(!runnable)('RLS: pool-tips (grupp + bracket), riktiga sessioner'
   });
 
   it('BRACKET-SEKRETESS: Alice ser INTE Bobs slot-tips på en öppen slot (bara sitt eget)', async () => {
-    await upsertMyBracketPrediction(alice, roomId, { slotId: OPEN_SLOT, advancingTeamId: 'ESP' });
+    await upsertMyBracketPrediction(alice, roomId, {
+      slotId: OPEN_SLOT,
+      advancingTeamId: teamCode('ESP'),
+    });
     const visible = await listRoomBracketPredictions(alice, roomId);
     const onSlot = visible.filter((p) => p.slotId === OPEN_SLOT);
     expect(onSlot.map((p) => p.userId)).toEqual([aliceUid]);
@@ -244,14 +253,17 @@ describe.skipIf(!runnable)('RLS: pool-tips (grupp + bracket), riktiga sessioner'
 
   it('BRACKET: en utomstående (Carol) nekas skriv + ser inga bracket-tips', async () => {
     await expect(
-      upsertMyBracketPrediction(carol, roomId, { slotId: OPEN_SLOT, advancingTeamId: 'BRA' })
+      upsertMyBracketPrediction(carol, roomId, {
+        slotId: OPEN_SLOT,
+        advancingTeamId: teamCode('BRA'),
+      })
     ).rejects.toThrow(/Spara bracket-tips misslyckades/);
     expect(await listRoomBracketPredictions(carol, roomId)).toEqual([]);
   });
 
   it('BRACKET: ett slot_id i fel format (g-* gruppmatch, eller skräp) nekas av constraint', async () => {
     await expect(
-      upsertMyBracketPrediction(bob, roomId, { slotId: 'g-A-1', advancingTeamId: 'BRA' })
+      upsertMyBracketPrediction(bob, roomId, { slotId: 'g-A-1', advancingTeamId: teamCode('BRA') })
     ).rejects.toThrow(/Spara bracket-tips misslyckades/);
     // champion-sloten är dock giltig (om dess deadline g-A-1 ännu inte passerat).
     expect(CHAMPION_SLOT_ID).toBe('champion');

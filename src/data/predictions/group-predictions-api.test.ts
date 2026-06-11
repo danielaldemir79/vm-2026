@@ -5,6 +5,7 @@ import {
   upsertMyGroupPrediction,
 } from './group-predictions-api';
 import type { VmSupabaseClient } from '../supabase-browser';
+import { teamCode } from '../../domain/team-code';
 
 // Samma mock-mönster som predictions-api.test.ts: ensureSession mockas så testerna
 // fokuserar på API-logiken (projektion, fel-vägar, upsert-nyckel), inte auth.
@@ -112,8 +113,8 @@ describe('upsertMyGroupPrediction', () => {
     const from = vi.fn(() => chain);
     const saved = await upsertMyGroupPrediction(mockClient(from), 'r1', {
       groupId: 'E',
-      winnerTeamId: 'FRA',
-      runnerUpTeamId: 'ENG',
+      winnerTeamId: teamCode('FRA'),
+      runnerUpTeamId: teamCode('ENG'),
     });
     expect(saved).toEqual({
       groupId: 'E',
@@ -141,8 +142,8 @@ describe('upsertMyGroupPrediction', () => {
     await expect(
       upsertMyGroupPrediction(mockClient(from), 'r1', {
         groupId: 'A',
-        winnerTeamId: 'BRA',
-        runnerUpTeamId: 'ARG',
+        winnerTeamId: teamCode('BRA'),
+        runnerUpTeamId: teamCode('ARG'),
       })
     ).rejects.toThrow(/Spara grupp-tips misslyckades/);
   });

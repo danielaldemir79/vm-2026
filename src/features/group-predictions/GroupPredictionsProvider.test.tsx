@@ -4,6 +4,7 @@ import { GroupPredictionsProvider } from './GroupPredictionsProvider';
 import { useGroupPredictionsStore } from './group-predictions-context';
 import type { GroupPrediction } from '../../data/predictions';
 import type { VmSupabaseClient } from '../../data/supabase-browser';
+import { teamCode } from '../../domain/team-code';
 
 // Mocka grupp-tips-API:t (vi testar provider-wiringen, inte Supabase-anropen som
 // testas i group-predictions-api.test.ts / RLS-integrationstestet).
@@ -32,8 +33,9 @@ function gp(groupId: string, winner: string, runnerUp: string): GroupPrediction 
   return {
     groupId,
     userId: 'me',
-    winnerTeamId: winner,
-    runnerUpTeamId: runnerUp,
+    // Brandning: GroupPrediction-fälten bär Team.code (C1+C2), brandas vid testgränsen.
+    winnerTeamId: teamCode(winner),
+    runnerUpTeamId: teamCode(runnerUp),
     updatedAt: 't1',
   };
 }
@@ -50,7 +52,11 @@ function Probe() {
         type="button"
         onClick={() => {
           store
-            .saveGroupPrediction({ groupId: 'A', winnerTeamId: 'MEX', runnerUpTeamId: 'RSA' })
+            .saveGroupPrediction({
+              groupId: 'A',
+              winnerTeamId: teamCode('MEX'),
+              runnerUpTeamId: teamCode('RSA'),
+            })
             .catch(() => {});
         }}
       >

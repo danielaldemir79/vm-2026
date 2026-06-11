@@ -7,6 +7,7 @@ import {
 } from './group-predictions-context';
 import type { GroupPrediction } from '../../data/predictions';
 import type { Group, Match, Team } from '../../domain/types';
+import { teamCode } from '../../domain/team-code';
 
 // Mocka data-laddnings-hooken (vi testar vyns LÄGEN, inte I/O:t).
 const dataState = vi.hoisted(() => ({
@@ -121,8 +122,8 @@ describe('GroupPredictionsView', () => {
     const mine: GroupPrediction = {
       groupId: 'A',
       userId: 'me',
-      winnerTeamId: 'MEX',
-      runnerUpTeamId: 'RSA',
+      winnerTeamId: teamCode('MEX'),
+      runnerUpTeamId: teamCode('RSA'),
       updatedAt: 't1',
     };
     renderView(

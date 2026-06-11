@@ -5,6 +5,32 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T16b (#16, C1+C2): tips-API-fälten typade `TeamCode` (branded), namnen slutade ljuga
+
+**Beslut (Copilot C1+C2, samma rot som F1):** API-fälten `winnerTeamId`/`runnerUpTeamId`
+(group-predictions-api) + `advancingTeamId` (bracket-predictions-api), liksom row-projektionernas
+`*_team_id`, BÄR faktiskt Team.**code** (versal "BRA", DB-constraint `^[A-Z]{3}$`), inte Team.id
+(gemen "bra"). Namnen ljög, så en framtida konsument (T16b/T17) kunde skicka ett rått Team.id och få
+TYST fel poäng. **Fix låst vid TYP-nivå (ingen DB-migration, kolumnerna behåller `*_team_id`):** ny
+delad branded typ `TeamCode = string & { __brand: 'TeamCode' }` i `src/domain/team-code.ts` (med
+`teamCode()` = validerad brandning, fail-loud mot `^[A-Z]{3}$`, och `asTeamCode()` = betrodd cast vid
+DB-gränsen). Tips-fälten typas `TeamCode`, så en rå sträng / ett gemen id blir ett KOMPILERINGSFEL
+(bevisat negativt i team-code.test.ts med `@ts-expect-error`). UI:t brandar vid sin gräns
+(GroupPredictionsView: `teamCode(winnerCode)` ur `<option value={t.code}>`).
+
+**Val branded type FRAMFÖR fält-omdöpning (`...Code`):** omdöpningen ripplat genom ~12 filer (UI-vy/
+provider/form + tester) och krockat med DB-kolumnernas `*_team_id`-namn. Branded type är minst churn
+och tydligast: namnen står kvar, men TYPEN bär sanningen. **F1:s normalisering i bonus-score BEHÅLLS
+(defense in depth):** poängfunktionerna tar medvetet kvar `string` + `normalizeTeamRef`/`sameTeam`,
+branded type stoppar felet vid kompilering på write-/API-ytan, normaliseringen är skyddet om en
+otypad sträng ändå slinker in via en seam. De två lagren kompletterar varandra, ersätter inte.
+
+**Källa till regeln (gissas inte):** identitets-rymds-driften + den rekommenderade branded-type-fixen
+är reviewer-lärdomen `tva-identitetsrymder-moter-forst-vid-otestad-poang-seam` (T16 F1) +
+`mock-foljer-konsumenttyp` (memory/lessons/senior-developer.md). `^[A-Z]{3}$` speglar DB-constrainten
+(`..._t16_group_predictions_schema/rls.sql` + bracket-motsvarigheten). Decisions.md T16 F1-raden
+förutsåg detta ("branded type kan läggas ovanpå senare utan att ändra kontraktet"), C1+C2 realiserar det.
+
 ## 2026-06-11 , T16-visuellt (#16): gruppvinnar-tips premium-finish, PODIUM-KUPONG (design-frontend)
 
 Det visuella lagret ovanpå senior-devs funktionella grupp-tips-UI. Mål: "tippa hela gruppspelet"-

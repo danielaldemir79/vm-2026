@@ -23,6 +23,7 @@ import { useGroupPredictableData } from './use-group-predictable-data';
 import { selectPredictableGroups } from './group-predictable-data';
 import { GroupPredictionForm } from './GroupPredictionForm';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
+import { teamCode } from '../../domain/team-code';
 
 export interface GroupPredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -172,10 +173,13 @@ export function GroupPredictionsView({
                   }
                   locked={locked}
                   onSubmit={async (gid, winnerCode, runnerUpCode) => {
+                    // Brandning vid UI-gränsen: formulärets värden kommer från
+                    // <option value={t.code}> (versal FIFA-code). teamCode() validerar
+                    // och låser identiteten, så API:t garanterat får en code (C1+C2).
                     await store.saveGroupPrediction({
                       groupId: gid,
-                      winnerTeamId: winnerCode,
-                      runnerUpTeamId: runnerUpCode,
+                      winnerTeamId: teamCode(winnerCode),
+                      runnerUpTeamId: teamCode(runnerUpCode),
                     });
                   }}
                 />

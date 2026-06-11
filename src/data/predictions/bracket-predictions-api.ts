@@ -13,8 +13,14 @@
 import type { VmSupabaseClient } from '../supabase-browser';
 import type { Database } from '../supabase-types';
 import { ensureSession } from '../rooms/auth';
+import { asTeamCode, type TeamCode } from '../../domain/team-code';
 
 type BracketPredictionRow = Database['public']['Tables']['bracket_predictions']['Row'];
+
+// OBS LAG-IDENTITET (C1+C2): `advancingTeamId` heter så efter DB-kolumnen
+// `advancing_team_id`, men bär Team.CODE (versal "BRA", constraint ^[A-Z]{3}$), INTE
+// Team.id (gemen "bra"). Typas `TeamCode` så ett rått Team.id blir ett kompileringsfel
+// i stället för tyst fel poäng (F1-roten, docs/decisions.md T16). Kolumnnamnet behålls.
 
 /**
  * slot_id för VM-VINNAR-tipset (mästaren). Speglar SQL-constrainten + RLS-helpern
@@ -34,14 +40,16 @@ export const TOURNAMENT_START_MATCH_ID = 'g-A-1';
 export interface BracketPrediction {
   slotId: string;
   userId: string;
-  advancingTeamId: string;
+  /** Tippat lag som går vidare, FIFA-code (Team.code "BRA"), inte Team.id. */
+  advancingTeamId: TeamCode;
   updatedAt: string;
 }
 
 /** Inmatning vid skriv av ett bracket-tips (UI -> API). user_id sätts av API:t (auth). */
 export interface BracketPredictionInput {
   slotId: string;
-  advancingTeamId: string;
+  /** Tippat lag vidare, FIFA-code (Team.code, brandas vid UI-gränsen via teamCode()). */
+  advancingTeamId: TeamCode;
 }
 
 /** Kasta ett begripligt fel ur ett Supabase-fel (fail loud, svensk text). */
@@ -127,12 +135,16 @@ export async function upsertMyBracketPrediction(
   return projectBracketPrediction(data);
 }
 
-/** Projicera en DB-rad till den klient-vänliga BracketPrediction-formen. */
+/**
+ * Projicera en DB-rad till den klient-vänliga BracketPrediction-formen.
+ * `advancing_team_id` är DB-validerad som versal code (constraint ^[A-Z]{3}$ på
+ * write), så den brandas till TeamCode utan re-validering (betrodd DB-gräns).
+ */
 function projectBracketPrediction(row: BracketPredictionRow): BracketPrediction {
   return {
     slotId: row.slot_id,
     userId: row.user_id,
-    advancingTeamId: row.advancing_team_id,
+    advancingTeamId: asTeamCode(row.advancing_team_id),
     updatedAt: row.updated_at,
   };
 }

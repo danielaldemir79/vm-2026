@@ -8,6 +8,7 @@ import {
   upsertMyBracketPrediction,
 } from './bracket-predictions-api';
 import type { VmSupabaseClient } from '../supabase-browser';
+import { teamCode } from '../../domain/team-code';
 
 vi.mock('../rooms/auth', () => ({
   ensureSession: vi.fn().mockResolvedValue({ userId: 'me', isAnonymous: true }),
@@ -122,7 +123,7 @@ describe('upsertMyBracketPrediction', () => {
     const from = vi.fn(() => chain);
     const saved = await upsertMyBracketPrediction(mockClient(from), 'r1', {
       slotId: 'M89',
-      advancingTeamId: 'ESP',
+      advancingTeamId: teamCode('ESP'),
     });
     expect(saved).toEqual({ slotId: 'M89', userId: 'me', advancingTeamId: 'ESP', updatedAt: 't1' });
     expect(chain.upsert).toHaveBeenCalledWith(
@@ -136,7 +137,10 @@ describe('upsertMyBracketPrediction', () => {
       builder({ data: null, error: { message: 'new row violates row-level security policy' } })
     );
     await expect(
-      upsertMyBracketPrediction(mockClient(from), 'r1', { slotId: 'M73', advancingTeamId: 'BRA' })
+      upsertMyBracketPrediction(mockClient(from), 'r1', {
+        slotId: 'M73',
+        advancingTeamId: teamCode('BRA'),
+      })
     ).rejects.toThrow(/Spara bracket-tips misslyckades/);
   });
 });
