@@ -720,11 +720,14 @@ body {
 .vm-coupon-card[data-prediction-locked],
 .vm-coupon-card[data-group-prediction-locked],
 .vm-coupon-card[data-bracket-prediction-locked] {
-  /* Neutral grå yta i stället för den varma kupong-surface:n. */
-  background-color: color-mix(in srgb, var(--color-fg) 6%, var(--color-surface));
+  /* Neutral grå yta i stället för den varma kupong-surface:n. Tinten lyfts till 8%
+     fg (var 6%) så kort-kroppen läses som grå redan på en armlängds avstånd, inte
+     "nästan vit"/"nästan surface". Texten står ändå på den OPAKA ytan med full fg-
+     kontrast, så en något starkare grå sänker ingen läsbarhet (T35-visuellt). */
+  background-color: color-mix(in srgb, var(--color-fg) 8%, var(--color-surface));
   background-image: radial-gradient(
     120% 90% at 100% 0%,
-    color-mix(in srgb, var(--color-fg) 5%, transparent),
+    color-mix(in srgb, var(--color-fg) 6%, transparent),
     transparent 60%
   );
   /* Gyllene vilo-kant -> neutral grå kant (omisskännligt "inte aktiv"). */
@@ -733,10 +736,29 @@ body {
   box-shadow:
     var(--vm-shadow-card),
     inset 0 1.5px 0 0 var(--color-border);
-  /* En svag avmättnad gör resten av kortets dekor (flaggor, chip-tinter) gråare,
-     så hela kortet känns inlämnat. Hålls låg (15%) så valda lag-flaggor fortfarande
-     går att känna igen, det är en gråmarkering, inte en utsuddning. */
+  /* En svag avmättnad (saturate 0.85, 15% mindre mättnad) gör kortets resterande
+     dekor (flaggor, chip-tinter) gråare, så hela kortet känns inlämnat. Hålls lågt
+     så valda lag-flaggor fortfarande går att känna igen, det är en gråmarkering,
+     inte en utsuddning. */
   filter: saturate(0.85);
+}
+
+/* RIVER-PERFORERINGEN var den sista STARKA guld-signalen på ett låst kort: den
+   streckade guld-linjen syntes lika stark som på ett öppet kort och drog ögat,
+   vilket motverkade "låst"-läsningen (en svag saturate räcker inte, gult vid 85%
+   mättnad är fortfarande tydligt gult). Vi neutraliserar perforeringen till en grå
+   streck-linje (border-tonen) i låst läge, så HELA kortet, inklusive avrivnings-
+   linjen, läser som inlämnat. Ren dekor (aria-hidden), bär ingen text. */
+.vm-coupon-card[data-prediction-locked] .vm-coupon-tear,
+.vm-coupon-card[data-group-prediction-locked] .vm-coupon-tear,
+.vm-coupon-card[data-bracket-prediction-locked] .vm-coupon-tear {
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-fg) 22%, transparent) 0,
+    color-mix(in srgb, var(--color-fg) 22%, transparent) 6px,
+    transparent 6px,
+    transparent 12px
+  );
 }
 
 .vm-coupon-card[data-prediction-locked]:hover,

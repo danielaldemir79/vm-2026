@@ -50,11 +50,16 @@ export function DeadlineNotice({
       className="m-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.75rem] leading-snug text-fg-muted"
     >
       {/* Hänglås-glyf (samma signatur som låst-etiketten, men "kommer att låsas"):
-          ren dekoration, aria-hidden, texten bär betydelsen. */}
+          ren dekoration, aria-hidden, texten bär betydelsen. TON (design-frontend,
+          T35): glyfen bär samma dämpade fg-muted-ton som raden, INTE warning-amber.
+          En vänlig UPPLYSNING ("bra att veta när det låses"), inte en VARNING, ska
+          läsas som en lugn rad. Warning-amber drog ögat som ett larm; fg-muted gör
+          hela raden till en stillsam informationsrad där den exakta TIDEN (text-fg,
+          semibold nedan) är det enda som lyfts. */}
       <svg
         aria-hidden="true"
         viewBox="0 0 16 16"
-        className="h-3.5 w-3.5 shrink-0 text-warning"
+        className="h-3.5 w-3.5 shrink-0 text-fg-muted"
         fill="none"
         stroke="currentColor"
         strokeWidth={1.5}
