@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UpdatePrompt } from './UpdatePrompt';
 import type { AppUpdateApi } from './use-app-update';
+import * as registerSwModule from './register-sw';
 
 // Vi injicerar ett pinnat AppUpdateApi via `api`-proppen, så ingen riktig SW
 // registreras och varje renderings-läge kan testas deterministiskt. (Hooken
@@ -17,6 +18,10 @@ function stubApi(overrides: Partial<AppUpdateApi> = {}): AppUpdateApi {
 }
 
 describe('UpdatePrompt', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renderar inget när det varken finns ny version eller offline-redo (dold)', () => {
     const { container } = render(<UpdatePrompt api={stubApi()} />);
     expect(container).toBeEmptyDOMElement();
@@ -66,5 +71,26 @@ describe('UpdatePrompt', () => {
     render(<UpdatePrompt api={stubApi({ needRefresh: true })} />);
     const region = screen.getByRole('status');
     expect(region).toHaveAttribute('aria-live', 'polite');
+  });
+
+  // C1+C2 (#74): prop-doc:en lovar "utan att registrera en SW". Med injicerad api
+  // skickar UpdatePrompt en no-op-registrerare till useAppUpdate, så den riktiga
+  // registerAppSw aldrig anropas (ingen SW-sidoeffekt i test/Storybook).
+  it('registrerar INGEN riktig SW när api injiceras (prop-doc:en hålls)', () => {
+    const registerSpy = vi.spyOn(registerSwModule, 'registerAppSw');
+    render(<UpdatePrompt api={stubApi({ needRefresh: true })} />);
+    expect(registerSpy).not.toHaveBeenCalled();
+  });
+
+  // Produktionsvägen (ingen api): useAppUpdate kör default-registreraren, dvs den
+  // riktiga registerAppSw, så service-workern faktiskt registreras vid mount.
+  it('registrerar SW (anropar registerAppSw) när ingen api injiceras', () => {
+    // Stoppa den riktiga registreringen vid roten: spionen ersätter implementationen
+    // med en no-op så inget virtual:pwa-register-import sker, men anropet räknas.
+    const registerSpy = vi
+      .spyOn(registerSwModule, 'registerAppSw')
+      .mockImplementation(() => async () => {});
+    render(<UpdatePrompt />);
+    expect(registerSpy).toHaveBeenCalledTimes(1);
   });
 });
