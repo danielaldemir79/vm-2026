@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { PredictionsView } from './PredictionsView';
 import { PredictionsStoreContext, type PredictionsStore } from './predictions-context';
@@ -155,5 +155,167 @@ describe('PredictionsView', () => {
   it('LADDNING: visar en laddnings-status', () => {
     renderView(store({ status: 'loading' }), NOW);
     expect(screen.getByRole('status')).toHaveTextContent(/Laddar/);
+  });
+});
+
+// 3-DAGARS FÖNSTER + expandera (Daniels begäran, samma som resultatlistan #39/T27).
+// Den rena fönster-funktionen är uttömmande testad i results/result-window.test.ts;
+// här bevisar vi att TIPS-VYN tillämpar fönstret som default och att expandera-
+// kontrollen är tillgänglig och fungerar end-to-end (samma kontrakt som resultatvyn).
+//
+// Vi ankrar "nu" på premiärdagen (11 juni 2026) och sprider matcherna över flera dagar,
+// så fönstret (11-13 juni) är en ÄKTA delmängd och resten döljs. Ett SYNLIGT kort = ett
+// formulär vars <li> INTE är hidden; ett dolt kort renderas (bevaras) men ligger i ett
+// `hidden`-<li>, så getByRole/spinbutton räknar bara de synliga (a11y-korrekt).
+describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', () => {
+  const PREMIERE = new Date('2026-06-11T08:00:00.000Z');
+
+  /** Alla tippbara formulär i DOM:en (inkl. dolda), ordnade som de renderas. */
+  function allForms(): HTMLElement[] {
+    return Array.from(document.querySelectorAll('[data-prediction-form]')) as HTMLElement[];
+  }
+  /** Bara de SYNLIGA korten (formulär i ett icke-hidden <li>). */
+  function visibleForms(): HTMLElement[] {
+    return allForms().filter((f) => !f.closest('li')?.hasAttribute('hidden'));
+  }
+  function topToggle(): HTMLButtonElement | null {
+    return document.querySelector('button[data-predictions-toggle-position="top"]');
+  }
+  function bottomToggle(): HTMLButtonElement | null {
+    return document.querySelector('button[data-predictions-toggle-position="bottom"]');
+  }
+
+  it('default: visar bara matcher inom fönstret, döljer resten, med en expandera-knapp', () => {
+    // Fönstret 11-13 juni rymmer p0-p2; p3 (14 juni) och p9 (20 juni) ligger utanför.
+    dataState.matches = [
+      match('p0', '2026-06-11T18:00:00.000Z'),
+      match('p1', '2026-06-12T18:00:00.000Z'),
+      match('p2', '2026-06-13T18:00:00.000Z'),
+      match('p3', '2026-06-14T18:00:00.000Z'),
+      match('p9', '2026-06-20T18:00:00.000Z'),
+    ];
+    renderView(store({}), PREMIERE);
+
+    // ALLA fem korten finns i DOM:en (inget filtreras bort, så osparad inmatning bevaras).
+    expect(allForms()).toHaveLength(5);
+    // Men bara fönstrets tre (11-13 juni) är SYNLIGA som default.
+    expect(visibleForms().map((f) => f.getAttribute('data-match-id'))).toEqual(['p0', 'p1', 'p2']);
+
+    // Expandera-knappen finns, säger hur många som är dolda, och är ihopfälld.
+    const toggle = topToggle();
+    expect(toggle).not.toBeNull();
+    expect(toggle).toHaveAccessibleName(/Visa alla matcher \(2 dolda\)/i);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // aria-controls pekar på tips-listan (samma id som <ol data-predictions-list>).
+    const listId = toggle?.getAttribute('aria-controls');
+    expect(listId).toBeTruthy();
+    const list = document.getElementById(listId as string);
+    expect(list?.tagName).toBe('OL');
+    expect(list?.hasAttribute('data-predictions-list')).toBe(true);
+  });
+
+  it('expandera -> alla matcher synliga; ihopfäll -> tillbaka till fönstret', async () => {
+    dataState.matches = [
+      match('p0', '2026-06-11T18:00:00.000Z'),
+      match('p1', '2026-06-12T18:00:00.000Z'),
+      match('p2', '2026-06-13T18:00:00.000Z'),
+      match('p3', '2026-06-14T18:00:00.000Z'),
+      match('p9', '2026-06-20T18:00:00.000Z'),
+    ];
+    renderView(store({}), PREMIERE);
+
+    expect(visibleForms()).toHaveLength(3);
+
+    // Fäll ut -> alla fem synliga, knappen blir "Visa färre" + aria-expanded=true.
+    fireEvent.click(topToggle() as HTMLButtonElement);
+    await waitFor(() => expect(visibleForms()).toHaveLength(5));
+    expect(topToggle()).toHaveAccessibleName(/Visa färre/i);
+    expect(topToggle()).toHaveAttribute('aria-expanded', 'true');
+
+    // Fäll ihop igen -> tillbaka till fönstrets tre.
+    fireEvent.click(topToggle() as HTMLButtonElement);
+    await waitFor(() => expect(visibleForms()).toHaveLength(3));
+    expect(topToggle()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('kontrollen är DUBBLERAD (uppe + nere) med identisk aria-semantik', async () => {
+    dataState.matches = [
+      match('p0', '2026-06-11T18:00:00.000Z'),
+      match('p1', '2026-06-12T18:00:00.000Z'),
+      match('p2', '2026-06-13T18:00:00.000Z'),
+      match('p9', '2026-06-20T18:00:00.000Z'),
+    ];
+    renderView(store({}), PREMIERE);
+
+    const top = topToggle();
+    const bottom = bottomToggle();
+    expect(top).not.toBeNull();
+    expect(bottom).not.toBeNull();
+    // Samma lista styrs (aria-controls) och samma läge (aria-expanded) på BÅDA.
+    const listId = top?.getAttribute('aria-controls');
+    expect(listId).toBeTruthy();
+    expect(bottom).toHaveAttribute('aria-controls', listId);
+
+    // Klick på DEN NEDRE fäller ut -> BÅDA visar aria-expanded=true (delar EN komponent).
+    fireEvent.click(bottom as HTMLButtonElement);
+    await waitFor(() => expect(topToggle()).toHaveAttribute('aria-expanded', 'true'));
+    expect(bottomToggle()).toHaveAttribute('aria-expanded', 'true');
+    expect(topToggle()).toHaveAccessibleName(/Visa färre/i);
+    expect(bottomToggle()).toHaveAccessibleName(/Visa färre/i);
+  });
+
+  it('EDGE: alla matcher inom fönstret -> ingen expandera-knapp', () => {
+    // Bara matcher 11-13 juni (allt inom fönstret) -> hiddenCount 0 -> ingen knapp.
+    dataState.matches = [
+      match('a', '2026-06-11T18:00:00.000Z'),
+      match('b', '2026-06-12T18:00:00.000Z'),
+      match('c', '2026-06-13T18:00:00.000Z'),
+    ];
+    renderView(store({}), PREMIERE);
+
+    expect(visibleForms()).toHaveLength(3);
+    expect(topToggle()).toBeNull();
+    expect(bottomToggle()).toBeNull();
+  });
+
+  it('bevarar osparad inmatning i ett out-of-window-kort över expandera/ihopfäll', async () => {
+    dataState.matches = [
+      match('p0', '2026-06-11T18:00:00.000Z'),
+      match('p9', '2026-06-20T18:00:00.000Z'), // utanför fönstret 11-13 juni
+    ];
+    renderView(store({}), PREMIERE);
+
+    // p9 är dolt som default. Fäll ut så det blir interaktivt.
+    fireEvent.click(topToggle() as HTMLButtonElement);
+    const selector = '[data-prediction-form][data-match-id="p9"]';
+    await waitFor(() => {
+      const form = document.querySelector(selector) as HTMLElement | null;
+      expect(form?.closest('li')?.hasAttribute('hidden')).toBe(false);
+    });
+
+    // Skriv en OSPARAD siffra i out-of-window-kortets hemma-fält.
+    const homeBefore = within(document.querySelector(selector) as HTMLElement).getByLabelText(
+      /\(hemma\)/
+    ) as HTMLInputElement;
+    fireEvent.change(homeBefore, { target: { value: '7' } });
+    expect(homeBefore.value).toBe('7');
+
+    // Fäll ihop (kortet blir hidden men UNMOUNTAS inte) och fäll ut igen.
+    fireEvent.click(topToggle() as HTMLButtonElement);
+    await waitFor(() => {
+      const form = document.querySelector(selector) as HTMLElement;
+      expect(form.closest('li')?.hasAttribute('hidden')).toBe(true);
+    });
+    fireEvent.click(topToggle() as HTMLButtonElement);
+    await waitFor(() => {
+      const form = document.querySelector(selector) as HTMLElement;
+      expect(form.closest('li')?.hasAttribute('hidden')).toBe(false);
+    });
+
+    // Den osparade siffran ska finnas kvar (samma React-instans, ingen unmount).
+    const homeAfter = within(document.querySelector(selector) as HTMLElement).getByLabelText(
+      /\(hemma\)/
+    ) as HTMLInputElement;
+    expect(homeAfter.value).toBe('7');
   });
 });
