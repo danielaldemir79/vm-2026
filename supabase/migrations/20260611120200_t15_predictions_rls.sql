@@ -17,7 +17,7 @@
 --      deadline. (Avslöjandets UI är T17, men sekretessen är T15:s RLS-ansvar.)
 --
 -- En match UTAN rad i match_kickoffs (skulle bara hända vid en trasig seed, som
--- match-kickoffs-seed.test.ts utesluter) ger kickoff = NULL. Vi FAIL-SAFE:ar då
+-- kickoff-seed.test.ts utesluter) ger kickoff = NULL. Vi FAIL-SAFE:ar då
 -- åt det SÄKRA hållet: `now() < kickoff` blir NULL (=> skriv NEKAS, inget tips på
 -- en okänd match) och `now() >= kickoff` blir NULL (=> andras tips förblir DOLDA).
 -- Ett saknat kickoff kan alltså aldrig öppna ett fusk-fönster.
