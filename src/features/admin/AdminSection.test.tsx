@@ -1,6 +1,7 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { AdminSection } from './AdminSection';
+import { ORGANIZER_HASH } from './use-organizer-entry';
 import { RoomsStoreContext, type RoomsStore } from '../rooms/rooms-context';
 import {
   OfficialResultsStoreContext,
@@ -86,12 +87,26 @@ function renderSection(official: OfficialResultsStore) {
   );
 }
 
+// T48 (#81): den dolda arrangörs-ingången styrs av URL-fragmentet `#arrangor`.
+// Helpers för att slå PÅ/AV det i jsdom (location.hash) så test driver synligheten.
+function setOrganizerHash() {
+  window.location.hash = `#${ORGANIZER_HASH}`;
+}
+function clearOrganizerHash() {
+  window.location.hash = '';
+}
+
 beforeEach(() => {
   adminMatchesState.status = 'ready';
   adminMatchesState.matches = [FINISHED_GROUP];
   adminMatchesState.error = null;
   authState.requestError = null;
+  clearOrganizerHash();
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  clearOrganizerHash();
 });
 
 describe('AdminSection, gating', () => {
@@ -107,37 +122,55 @@ describe('AdminSection, gating', () => {
     expect(container.querySelector('[data-admin-readonly]')).toBeNull();
   });
 
-  it('icke-admin ser read-only-noten + arrangörs-inloggning, INTE inmatningen', () => {
+  // T48 (#81): UTAN det hemliga fragmentet ser en vanlig vän BARA read-only-noten,
+  // INGEN inloggnings-affordans alls (Daniels krav: "inloggningen ska de inte se").
+  it('icke-admin UTAN hemligt fragment: bara read-only-noten, INGEN login-affordans', () => {
     renderSection(officialStore({ isAdmin: false }));
-    // Read-only-containern finns, login-flödet finns, men INTE admin-inmatningen.
+    // Read-only-containern + den lugna noten finns.
     expect(document.querySelector('[data-admin-readonly]')).not.toBeNull();
     expect(screen.getByText(/poängen räknas ut åt dig/i)).toBeInTheDocument();
-    expect(document.querySelector('[data-admin-login]')).not.toBeNull();
+    // INGEN login-form, INGEN dold-ingångs-container, och ingen "arrangör? logga in"-text.
+    expect(document.querySelector('[data-admin-login]')).toBeNull();
+    expect(document.querySelector('[data-admin-organizer-entry]')).toBeNull();
+    expect(screen.queryByText(/arrangör\?\s*logga in/i)).toBeNull();
+    expect(screen.queryByText(/logga in/i)).toBeNull();
+    // Och INTE admin-inmatningen.
     expect(document.querySelector('[data-admin-entry]')).toBeNull();
   });
 
-  it('admin ser facit-inmatningen, INTE read-only-noten', () => {
+  // T48 (#81): MED det hemliga fragmentet (`#arrangor`) fälls AdminLogin fram, så
+  // Daniel når inloggningen. Mekaniken är oförändrad, bara synlighets-villkoret är nytt.
+  it('icke-admin MED hemligt fragment (#arrangor): AdminLogin visas', () => {
+    setOrganizerHash();
+    renderSection(officialStore({ isAdmin: false }));
+    expect(document.querySelector('[data-admin-readonly]')).not.toBeNull();
+    expect(document.querySelector('[data-admin-organizer-entry]')).not.toBeNull();
+    expect(document.querySelector('[data-admin-login]')).not.toBeNull();
+    // Fortfarande inte admin-inmatningen (man är inte admin förrän RLS säger det).
+    expect(document.querySelector('[data-admin-entry]')).toBeNull();
+  });
+
+  // T48 (#81): hashchange utan reload fäller fram ingången (Daniel skriver in
+  // `#arrangor` i adressfältet). useOrganizerEntry följer hashchange.
+  it('icke-admin: AdminLogin dyker upp när fragmentet sätts via hashchange (utan reload)', async () => {
+    renderSection(officialStore({ isAdmin: false }));
+    expect(document.querySelector('[data-admin-organizer-entry]')).toBeNull();
+
+    await act(async () => {
+      window.location.hash = `#${ORGANIZER_HASH}`;
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+
+    expect(document.querySelector('[data-admin-organizer-entry]')).not.toBeNull();
+    expect(document.querySelector('[data-admin-login]')).not.toBeNull();
+  });
+
+  it('admin ser facit-inmatningen, INTE read-only-noten (oberoende av fragmentet)', () => {
     renderSection(officialStore({ isAdmin: true }));
     expect(document.querySelector('[data-admin-entry]')).not.toBeNull();
     expect(document.querySelector('[data-admin-readonly]')).toBeNull();
-  });
-
-  // T48 (#81): arrangörs-inloggningen ska vara DISKRET, tuckad bakom en lågmäld
-  // utfällning (<details>), inte en prominent inloggnings-ruta. Vanliga vänner
-  // möts bara av den lugna read-only-noten + en diskret "Är du arrangör?"-ingång.
-  it('icke-admin: inloggningen är diskret (bakom en STÄNGD <details>-utfällning)', () => {
-    renderSection(officialStore({ isAdmin: false }));
-    const disclosure = document.querySelector('[data-admin-organizer-disclosure]');
-    expect(disclosure).not.toBeNull();
-    // STÄNGD som standard (open-attributet saknas) => login-formen är inte framme.
-    expect((disclosure as HTMLDetailsElement).open).toBe(false);
-    // Den lågmälda ingångs-raden (summary) finns med en arrangörs-fråga, inte en
-    // prominent "logga in"-rubrik direkt i flödet.
-    const toggle = document.querySelector('[data-admin-organizer-toggle]');
-    expect(toggle).not.toBeNull();
-    expect(toggle?.textContent).toMatch(/arrangör/i);
-    // Login-flödet bor INUTI utfällningen (gömt tills man fäller ut), inte löst i sektionen.
-    expect(disclosure?.querySelector('[data-admin-login]')).not.toBeNull();
+    // Den dolda ingången är irrelevant för en redan-admin (ingen login-yta visas).
+    expect(document.querySelector('[data-admin-login]')).toBeNull();
   });
 });
 
@@ -209,6 +242,12 @@ describe('AdminResultEntry, save mot global facit', () => {
 });
 
 describe('AdminLogin, e-post-flöde (icke-admin)', () => {
+  // T48 (#81): login-flödet bor bakom det hemliga fragmentet. Slå på det för dessa
+  // tester så AdminLogin renderas (synlighets-villkoret är nytt, mekaniken oförändrad).
+  beforeEach(() => {
+    setOrganizerHash();
+  });
+
   it('steg 1 -> steg 2: skickar koden och visar kod-fältet', async () => {
     renderSection(officialStore({ isAdmin: false }));
     fireEvent.change(screen.getByLabelText('E-postadress'), {
