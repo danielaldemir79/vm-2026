@@ -30,6 +30,16 @@ vi.mock('../../data/rooms', () => ({
   upsertRoomResult: (...a: unknown[]) => api.upsertRoomResult(...a),
 }));
 
+// T52 (#91): kopiera-tips-engine:n mockas så copyMyTips-glimmet kan testas isolerat
+// (att rätt klient, KÄLLrum + MÅLrum (= aktivt) och en fungerande lås-klassificerare
+// skickas in). Vi behåller modulens ÖVRIGA exporter (importActual), så deriveCopyLocks
+// (som importerar isMatchLocked/bracketDeadlineMatchId härifrån) fortfarande funkar.
+const copyApi = { copyMyPredictions: vi.fn() };
+vi.mock('../../data/predictions', async (importActual) => {
+  const actual = await importActual<typeof import('../../data/predictions')>();
+  return { ...actual, copyMyPredictions: (...a: unknown[]) => copyApi.copyMyPredictions(...a) };
+});
+
 // En attrapp-klient räcker (provider:n skickar bara vidare den till API:t, som
 // är mockat). Injiceras via `client`-proppen så ingen riktig Supabase skapas.
 const fakeClient = {} as VmSupabaseClient;
@@ -179,6 +189,52 @@ describe('RoomsProvider, handlingar', () => {
     await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:none'));
     expect(screen.getByTestId('probe')).toHaveTextContent('rooms:0');
     expect(api.leaveRoom).toHaveBeenCalledWith(fakeClient, 'r1');
+  });
+});
+
+describe('RoomsProvider, copyMyTips kopierar IN till det aktiva rummet (T52, #91)', () => {
+  it('skickar klient, KÄLLrum + MÅLrum (= aktivt) och en lås-klassificerare till engine:n', async () => {
+    const report = {
+      items: [],
+      total: { copied: 1, skippedLocked: 0, skippedExisting: 0, failed: 0 },
+      byCategory: {},
+    };
+    copyApi.copyMyPredictions.mockResolvedValue(report);
+    // Gå med i målrummet (gör det aktivt).
+    api.joinRoomByCode.mockResolvedValue({ id: 'rB', name: 'Jobbet', code: 'bbb22' });
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    await act(async () => {
+      await store.joinRoom('bbb22', 'Bob');
+    });
+
+    let got: unknown;
+    await act(async () => {
+      got = await store.copyMyTips('rA');
+    });
+
+    expect(got).toBe(report);
+    // Engine:n fick klienten, KÄLLrummet (rA) och MÅLrummet (= aktivt rum rB), plus en
+    // funktion (lås-klassificeraren). Argumenten bevisar att UI:t inte kan kopiera till
+    // fel rum: målet är alltid det aktiva rummet, inte ett UI-angivet id.
+    expect(copyApi.copyMyPredictions).toHaveBeenCalledWith(
+      fakeClient,
+      'rA',
+      'rB',
+      expect.any(Function)
+    );
+  });
+
+  it('fail loud: kastar utan aktivt rum (inget mål att kopiera till)', async () => {
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    // Inget aktivt rum valt -> copyMyTips ska kasta (inte tyst no-op).
+    await expect(store.copyMyTips('rA')).rejects.toThrow(/inget aktivt rum att kopiera till/);
+    expect(copyApi.copyMyPredictions).not.toHaveBeenCalled();
   });
 });
 

@@ -34,6 +34,7 @@ import {
 import { useRoomsStore } from './rooms-context';
 import { avatarHueFromId, initialsFromName } from './member-avatar';
 import { buildInviteText, copyText, shareInvite } from './share-room';
+import { CopyTipsControl } from './CopyTipsControl';
 import './rooms.css';
 
 // Delade fält-klasser, SAMMA premium-formspråk som resultatinmatningen (#39,
@@ -502,6 +503,11 @@ export function RoomPanel() {
                 Lämna rummet
               </button>
             </div>
+
+            {/* T52 (#91): kopiera mina tips hit från ett annat rum jag är med i.
+                Renderar sig själv bara när det finns ett annat rum att kopiera från
+                (annars null), så ingen tom ruta visas i ett ensamt rum. */}
+            <CopyTipsControl />
           </div>
         </div>
       )}
