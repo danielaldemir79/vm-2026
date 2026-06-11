@@ -35,7 +35,10 @@ export { GROUP_IDS } from './types';
 // Team.code (versal "BRA"), inte Team.id, så de typas TeamCode (en rå sträng/ett
 // gemen id blir då ett kompileringsfel). Se domain/team-code.ts.
 export { teamCode, asTeamCode, TEAM_CODE_PATTERN, type TeamCode } from './team-code';
-export { computeStandings } from './standings/compute-standings';
+// Kort visningsnamn för trånga ytor (grupptabell/matchkort/slutspelsträd): EN
+// sanning för fallback-regeln (shortName ?? name), så ett långt lagnamn löses i
+// lag-datan, inte i varje vy. Se domain/team-name.ts (T50).
+export { teamShortName } from './team-name';
 
 // Slutspels-/treeplats-motorn (T4, SPEC §5). Strukturell seedning av de 8 bästa
 // treorna enligt FIFA:s Annexe C + det fullständiga slutspelsträdet.
