@@ -14,7 +14,8 @@
 //     dold etikett (sr-only) ger skärmläsaren samma besked i ord.
 //
 // SEKRETESS: andras tips dolda före deadline är redan garanterat server-side (RLS,
-// T15) OCH i den rena reveal-gaten (buildMatchReveal kräver låst + avgjort), så vyn
+// T15) OCH i den rena reveal-gaten (buildMatchReveal kräver LÅST match; sedan T55
+// visas även låsta PÅGÅENDE matcher, som 'live'-varianten utan poäng), så vyn
 // renderar bara det som FÅR visas. Vyn LÄSER store.reveal + slår upp lagnamn ur den
 // delade lag-listan (results-storen).
 //
