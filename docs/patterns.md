@@ -9,6 +9,50 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### global-admin-gatad-facit-med-allowlist-rls-bevisad-med-riktiga-roller (Supabase, VM 2026)
+
+**Recept (en GLOBAL, offentlig-läsbar tabell som BARA en admin får skriva, bevisat inte påstått):**
+
+1. **Skilj GLOBAL fakta från per-rum-data.** En global sanning (här de officiella matchresultaten,
+   facit) har INGEN `room_id` , den är EN, delad av alla. Lägg den i en egen tabell
+   (`official_match_results`, PK = den naturliga nyckeln, här `match_id`). Återanvänd EXAKT samma
+   format-/integritets-constraints som den per-rum-tabell den ersätter (samma `match_id`-regex, samma
+   strikta straffar-paired-CHECK, samma goals >= 0), så de två tabellerna aldrig kan referera olika
+   id-rymder eller acceptera olika data.
+2. **Admin-allowlist + SECURITY DEFINER-helper.** En liten `app_admins`-tabell (`user_id` PK) +
+   `is_app_admin()` (SECURITY DEFINER, `search_path=''`, EXECUTE för anon/authenticated), EXAKT samma
+   härdning som `is_room_member` (RLS-uttryck evalueras i anroparens roll, så EXECUTE krävs; definer-läge
+   så policyn kan fråga `app_admins` utan att fastna i RLS). Helpern läcker bara "är JAG admin?" (boolean),
+   ingen lista.
+3. **RLS: SELECT öppen, skriv bara admin.** SELECT `using (true)` (offentlig fakta, ingen medlemskap
+   krävs, även anon ser). INSERT/UPDATE/DELETE `is_app_admin()`, och INSERT/UPDATE `with check` binder
+   `updated_by = auth.uid()` (en admin kan inte signera i en annans namn). `app_admins`: SELECT bara sin
+   egen rad (`user_id = auth.uid()`, klienten kan visa admin-läget utan att rad-skanna listan), INGEN
+   skriv-policy => RLS default-deny => ingen kan befordra sig själv (hela tävlingsintegriteten hänger där).
+4. **BEVISA med riktiga roller FÖRE klient-koden** (samma anda som rums-/deadline-recepten): kör EN
+   transaktion (DO-block + `set local role authenticated` + `request.jwt.claims` med `sub`/`role`) mot
+   det levande projektet, med en admin-test-user TILLFÄLLIGT i `app_admins`, sedan ROLLBACK (noll proof-
+   data kvar, verifiera med en count efteråt). Bevisa BÅDE tillåtet (admin INSERT/UPDATE OK) OCH nekat
+   (admin kan inte förfalska `updated_by`; icke-admin INSERT nekad; icke-admin UPDATE rör 0 rader; anon +
+   icke-admin SER ändå; icke-admin kan inte befordra sig själv; icke-admin ser inte admin-listan).
+5. **Admin-IDENTITET via anonym uppgradering (behåller user_id + data).** Logga inte in admin på en NY
+   e-post-användare (det vore ett nytt user_id och tappade FK-rader). UPPGRADERA den BEFINTLIGA anonyma
+   sessionen med `supabase.auth.updateUser({ email })` (länkar e-posten till SAMMA auth.users-rad) +
+   `verifyOtp({ type: 'email_change' })` för 6-siffrig kod (in-page, ingen redirect). user_id är
+   oförändrat => admin-rollen (seedad på id:t) + tidigare data följer med. Källa: Supabase "Convert an
+   anonymous user to a permanent user". Seeda admin-id:t i en idempotent migration.
+6. **Klient-status = serverns helper.** UI:t avgör "visa admin-läget?" via SAMMA `is_app_admin()`-RPC
+   som RLS använder (en sanning, kan aldrig drifta). Klient-gaten är BARA visning; RLS är det riktiga
+   skyddet (en kringgången klient nekas ändå).
+
+**Varför:** en regel som "bara arrangören får mata in officiella resultat, men alla ser dem" är exakt den
+klass som ser ut att kunna lösas i klienten men MÅSTE vara server-side i en delad anon-auth-app, och måste
+BEVISAS mot databasen. Allowlist + SECURITY DEFINER-helper gör skriv-skyddet till en deklarativ, reviewbar
+RLS-invariant. Skiljer sig från rums-receptet (per-rum medlemskap) genom att facit är GLOBALT och skriv-
+gatat på en ROLL (admin), inte på medlemskap. Källa: T42 (`supabase/migrations/*t42*`, `src/data/official/`,
+`src/data/rooms/admin-auth.ts`, `src/features/official-results/`, `src/features/admin/`,
+`official-results-rls.integration.test.ts` + DO-block-beviset i decisions.md T42).
+
 ### delad-rums-data-med-rls-pa-auth-uid-bevisad-med-riktiga-sessioner (Supabase, VM 2026)
 
 **Recept (delad, muterbar state bakom anonym auth + RLS, säkerhet BEVISAD inte påstådd):**
