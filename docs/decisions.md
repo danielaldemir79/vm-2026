@@ -5,6 +5,39 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T48 (#81, skärpning + Copilot R2): DOLD arrangörs-ingång + rums-byte väver inte om i live
+
+Två efterföljande ändringar ovanpå T48-blocket nedan (samma branch/PR), drivna av Daniels skärpta
+krav och ett Copilot-fynd.
+
+**1. ARRANGÖRS-INLOGGNINGEN ÄR NU HELT DOLD (ERSÄTTER den DISKRETA `<details>`-ingången i punkt 4
+nedan):** Daniels skärpta krav inför delning var "inloggningen ska de inte se", inte bara dämpa den.
+Den synliga `<details>`/`<summary>`-ingången ("Är du arrangör? Logga in") togs därför BORT ur icke-
+admin-vyn; en vanlig vän möts nu BARA av den lugna read-only-noten. AdminLogin renderas i stället bara
+när URL:en bär ett hemligt fragment (`#arrangor`), läst via en liten hook `useOrganizerEntry`
+(`src/features/admin/use-organizer-entry.ts`) som följer `hashchange` så Daniel kan skriva in fragmentet
+UTAN reload (samma window-event-mönster som `use-online-status`). **VARFÖR detta är OK säkerhetsmässigt:**
+det är REN UX-diskretion, INGEN säkerhetsgräns , skyddet ligger i RLS/app_admins (T42, RLS-bevisat): den
+som hittar/gissar fragmentet kan ändå inte bli admin utan att finnas i app_admins. Fragmentet behöver
+alltså inte vara hemligt för säkerheten, bara för att hålla ytan undan för otekniska vänner. AdminLogin-
+MEKANIKEN (updateUser/verifyOtp, onUpgraded->refresh) är OFÖRÄNDRAD, bara dess synlighets-villkor är nytt.
+En riktig recoverable sign-in är fortfarande T48b. Test: icke-admin UTAN fragment ser INGEN login-
+affordans (negativ kontroll på texten), MED fragment (eller efter en `hashchange`) ser AdminLogin, admin
+ser AdminResultEntry som förr. **Källa:** Daniels skärpta task-direktiv T48 ("inloggningen ska de inte se").
+
+**2. RUMS-BYTE I LIVE VÄVER INTE OM I ONÖDAN (Copilot R2):** facit-källan är
+`live ? officialResults : sharedResults` (se punkt 1 i T48-blocket nedan), så det aktiva rummet driver
+facit BARA i fixtures-läge. Reweave-effekten i `ResultsProvider` gatade tidigare på `roomChanged` oavsett
+läge, så ett rent rums-byte i LIVE körde en omvävning trots att facit-källan (de globala officiella
+resultaten) är OBEROENDE av rummet. Fix: `roomChanged` gatas nu på `!live` (rum-bytet är facit-relevant
+bara i fixtures), så ett rums-byte i live aldrig kan trigga en omväving. Beteendet i fixtures är
+oförändrat (byter man rum byter facit och vi väver om). Test (`reweave-on-room-change.test.tsx`) låser det
+FAKTISKA invariantet via referens-identitet på `store.matches` (ingen reweave = samma referens; reweave =
+ny referens), och håller käll-referenserna stabila så bara rum-bytes-grenen kan trigga, verifierat rött
+mot den ogatade koden. **Källa:** Copilot-review R2 på PR #83.
+
+---
+
 ## 2026-06-11 , T48 (#81): pre-share-städning, facit-källbyte + admin-gatad inmatning + diskret login
 
 Daniels pre-share-blockerare inför delning med otekniska vänner: (1) resultat-inmatningen syntes
