@@ -18,9 +18,11 @@ tids-ticken (`use-deadline-tick`, ett öppet kort blir låst när avspark passer
 T15) fanns. Det SAKNADE var att kortet inte LÄSTES som låst, den gamla låst-stilen tonade bara ner
 gulden en aning. Beslut: `.vm-coupon-card[data-*-locked]` (tokens.css §10) byter nu HELA fonden till
 en NEUTRAL grå yta (grått surface-tint på 8% fg, neutral radial i stället för guld, neutral kant +
-topplist, en svag `saturate(0.85)`), så låst != aktiv är omisskännligt. Text-lagret (etikett +
-mitt-tips-tal) behåller full kontrast (vi filtrerar fonden, inte texten, ingen opacity som sänker
-läsbarheten). Gäller alla tre kupong-typerna (match/grupp/bracket-slot) via samma data-attribut, en
+topplist, en svag `saturate(0.85)`), så låst != aktiv är omisskännligt. Filtret verkar på HELA
+kortet inklusive texten (copilot R1/R2-sanning): det är enbart en mättnadssänkning, ingen
+opacity/ljushets-ändring, så textens luminans-kontrast påverkas försumbart och AA är uppmätt
+kompositerat med filtret aktivt i båda teman.
+Gäller alla tre kupong-typerna (match/grupp/bracket-slot) via samma data-attribut, en
 sanning. Champion-hero:n (egen `.vm-champion-hero[data-bracket-prediction-locked]`) har kvar sin egen
 hjälte-låst-stil (den är inte en `.vm-coupon-card`).
 
