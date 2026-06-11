@@ -5,6 +5,58 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T16b-visuellt (#59): bracket-tips-lagrets premium-finish ("vägen till bucklan")
+
+**Kontext:** ovanpå senior-devs funktionella lager (data-attribut-seam + semantik + tester) la
+design-frontend den visuella finishen för slutspels-tipset. Det är det episka momentet, "vem tror
+du tar sig hela vägen till final och vinner VM". Identitet: "VÄGEN TILL BUCKLAN". Två lager, EN
+`BracketPredictionForm` (en ny `variant`-prop styr presentationen, semantiken är oförändrad):
+
+**1. CHAMPION = HJÄLTE-momentet (pokal/guld):** en egen, större panel (`.vm-champion-hero`) med
+en pokal-glyf i en solid guld-bricka, en varm guld arena-glow (samma "arena i kvällsljus"-recept
+som hero/profil/onboarding), och ett STOLT guld mästar-band (`.vm-champion-band`, "Mitt tips: X" +
+TeamFlag) när min mästare är vald. Det är trädets krona, översatt till tips.
+
+**2. SLOT-TIPSEN = TIPSKUPONG-formspråk (DRY):** återbrukar HELA tips-kupong-familjen
+(`.vm-coupon-card`, river-tear, coupon-eyebrow, lock-ikon, `.vm-coupon-mine`) som grupp-tipset
+(T16) + match-tipset (T15) redan etablerat, så slutspels-tipset hör till SAMMA kupong-värld. De
+TVÅ möjliga lagen blir ett tydligt binärt val (TeamFlag + "vs"). Rund-grupperat med en rund-marker
+vars intensitet BYGGER mot finalen (`.vm-tips-round-marker`, semifinal tar accent, brons/final tar
+guld, ekar `bracket.css`). TBD-läget är en elegant streckad väntan-kupong (`.vm-tips-tbd`, "Lagen
+avgörs av tidigare resultat", inte tomt), låst-läget är hänglås + mitt tips kvar stolt. "Gå med i
+ett rum"-läget är en INBJUDANDE guld-tonad port med pokal-ikon.
+
+**KONTRAST (taskens punkt 4, canvas-komposit VÄRSTA fall, BÅDA teman, UPPMÄTT, inte gissat):** all
+läsbar text står på OPAK surface/surface-raised, aldrig på guld-glow:en. Guld-TEXT använder den
+AA-mätta `--color-warning` (aldrig rå `--vm-gold`, guld-på-ljus-fällan). Mästar-/sparat-/pokal-
+brickorna är SOLID guld-yta med mörk ink (`--vm-coupon-ink`, färg-oberoende solid-bricka-form
+T9/T11/T15/T16). Champion-hero:ns två guld-radialer sitter i MOTSATTA hörn (100% 0% + 0% 100%) så
+de möts ALDRIG på full peak, värsta enskilda punkt är EN radial (13%). Uppmätta MIN-kontraster
+(canvas-komposit, alfa-blend över base-ytan, svept, inte typfall):
+
+| Yta (värsta fall) | Mörkt | Ljust | Tröskel |
+|---|---|---|---|
+| Champion brödtext (fg-muted) på hero-glow-peak (13%) | 4.66:1 | 4.98:1 | 4.5 (normal) |
+| Champion eyebrow "VM-FINALEN" (warning) på hero-glow | 4.90:1 | 4.53:1 | 4.5 (normal) |
+| Champion rubrik (fg, stor) på hero-glow | 7.40:1 | 13.69:1 | 3.0 (large) |
+| Mästar-band "Mitt tips" (coupon-ink) på SOLID guld | 10.90:1 | 5.03:1 | 4.5 |
+| Slot eyebrow/rubrik (warning/fg) på kupong-glow | 8.45 / 12.76 | 5.36 / 16.19 | 4.5 |
+| Binär val-rad lagnamn (fg) / "vs" (fg-muted) | 14.20 / 6.99 | 16.86 / 6.14 | 4.5 |
+| Låst-etikett (fg) / undertext (fg-muted) på guld-7%-tint | 15.19 / 7.48 | 15.14 / 5.51 | 4.5 |
+| TBD eyebrow/rubrik/text på TBD-yta | 8.94 / 13.5 / 6.65 | 5.44 / 16.44 / 5.99 | 4.5 |
+| Fel-text (danger) på danger-9%-tint (sämsta yta) | 4.66:1 | 4.80:1 | 4.5 (normal) |
+| Rund-marker final (warning, stor) på guld-10%-yta | 8.21:1 | 5.31:1 | 3.0 (large) |
+
+**MIN över ALLA nya text-ytor: 4.66:1 (mörkt) / 4.53:1 (ljust), alla >= AA.** En FÄLLA fångad i
+mätningen: champion-brödtext (fg-muted) föll till 3.64:1 i mörkt tema vid den första glow-alfan
+(16%/9%, konservativt stackad), glow:en sänktes till 13%/7% (samma kontrast-lås-disciplin som
+profil-hero:n §7), då håller den 4.66:1 enkel-radial-peak. **Verifierat:** Playwright mot dev-preview
+(faktisk rendering, båda teman) per skärmklass 280/768/1440px (noll horisontell overflow, formen
+krymper rent via `min-w-0`), reduced-motion-grindar (champion-lift + TBD-breathe gatade på
+no-preference + explicit reset under reduce), a11y (legend/label-koppling, TeamFlag aria-hidden,
+binär "vs"-rad aria-hidden, väljare fokuserbar). Inga tester rörda (data-attribut-seam intakt,
+953 gröna).
+
 ## 2026-06-11 , T16b (#59): bracket-/slutspels-tips-VYN (tippbarhet, deadline, champion-urval)
 
 **Kontext:** T16 byggde HELA datakärnan (bracket_predictions schema/RLS/API + bonus-score +
