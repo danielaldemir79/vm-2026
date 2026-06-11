@@ -5,6 +5,44 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T39 (#68): tips-listan får 3-dagars fönster + expandera (delad ExpandToggle)
+
+**Beslut (Daniels begäran):** tips-listan (`PredictionsView`) får SAMMA 3-dagars fönster + "Visa alla /
+Visa färre"-expandering som resultatinmatningen (#39/T27). Default visar bara tippbara matcher inom de
+närmaste 3 svenska kalenderdagarna (ankrat på idag, eller premiärdagen om turneringen ej börjat), resten
+fälls ut på begäran via en dubblerad kontroll (uppe + nere).
+
+**Återanvändning (DRY, ingen ny logik):** fönster-urvalet ÄR resultatvyns rena `windowMatches`
+(`features/results/result-window.ts`), oförändrad, anropad med tipsvyns tippbara matcher. Svensk-dag-
+regeln och alla edge-fall (ej börjad, slutet, vilodag, allt inom fönstret) är därmed EN sanning, redan
+uttömmande testad i `result-window.test.ts`. Inget eget urval skrevs.
+
+**ExpandToggle lyft till delad komponent (rule-of-three):** ihopfäll-/expandera-kontrollen bodde inline
+i `ResultEntryView`. Den är nu 3:e konsumenten (resultat-fönster #39, dubblering #42, tips-fönster #68),
+så den lyftes till `src/components/ExpandToggle.tsx` (EN markup-källa, kan aldrig drifta isär).
+Resultatvyn importerar den nu i stället för en lokal kopia, beteende-bevarande. Komponenten tar en
+`name`-prop för data-attribut-namnrymden (`data-${name}-toggle` / `-position`), default `'results'`, så
+resultatvyns redan testade attribut är byte-identiska och tips-listan får sina egna stabila krokar
+(`data-predictions-toggle*`).
+
+**Två "nu" med olika kadens, samma seed:** fönstret mäts i DAGAR via `useTodayKey(now)` (stabil inom
+dygnet, glider över midnatt utan omladdning, PWA-fälla hanterad), medan tips-LÅSET flippar MITT PÅ DAGEN
+vid avspark via `useDeadlineTick(now)` (minut-tick). Båda seedas av vyns injicerade `now` (testbarhet +
+ett konsekvent start-nu), sen tar respektive hook över sin egen tick. Det är medvetet två hooks, de
+löser två olika tidsproblem.
+
+**Bevarat (sekretess/lås/epoch + kontrakt):** korten FILTRERAS inte bort utanför fönstret, de DÖLJS med
+`hidden` (display:none + ur a11y-trädet) och UNMOUNTAS inte, så `PredictionForm`:s lokala osparade
+inmatning och storens låst-/sekretess-/epoch-läge (RLS server-side) överlever expandera/ihopfäll. Samma
+C2-invariant som resultatvyn. Befintliga data-attribut (`data-predictions-list`, `data-prediction-form`)
+och alla tidigare PredictionsView-tester är orörda. Code-vs-id/TeamCode-kontraktet rördes inte (det är
+aggregering, inte tippning).
+
+**Tester:** `PredictionsView.test.tsx` (fönster default = delmängd, expandera/ihopfäll, dubblerad
+kontroll med identisk aria, edge: allt inom fönstret -> ingen knapp, bevarad osparad inmatning över
+toggle) + `components/ExpandToggle.test.tsx` (etikett/böjning, aria-expanded/-controls, name-namnrymd).
+Spårbar via #68 (+ #63 för fönster-delen).
+
 ## 2026-06-11 , T39 (#68): install-knappen, rotorsak + standalone-detektering
 
 **Symptom (Daniel):** "Installera som app"-knappen gör inget vid klick. Bekräftat blockerande inför

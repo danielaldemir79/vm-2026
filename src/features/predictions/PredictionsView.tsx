@@ -14,7 +14,10 @@
 // SÄKERHET: deadline-låset + sekretessen upprätthålls SERVER-SIDE (RLS). Vyn visar
 // bara läget; ett save som nekas (matchen hann låsas) blir ett fail-loud-fel i formuläret.
 
-import { useMemo } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
+import { ExpandToggle } from '../../components/ExpandToggle';
+import { useTodayKey } from '../daily';
+import { windowMatches } from '../results/result-window';
 import { usePredictionsStore } from './predictions-context';
 import { usePredictableData } from './use-predictable-matches';
 import { selectPredictableMatches } from './predictable-matches';
@@ -55,6 +58,64 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
   // att tippa" i singular, både substantiv och adjektiv böjs), så det känns
   // levande och kul. Låsta matcher räknas inte (de går inte att tippa längre).
   const openCount = useMemo(() => predictable.filter((p) => !p.locked).length, [predictable]);
+
+  // 3-DAGARS FÖNSTER + expandera (Daniels begäran, samma som resultatlistan #39/T27):
+  // hela VM:t är 104 matcher = en orimligt lång tips-lista att skrolla. Default visar
+  // bara matcherna inom de närmaste 3 svenska dagarna (från idag, eller premiärdagen
+  // om turneringen inte börjat), resten fälls ut på begäran. Vi ÅTERANVÄNDER samma rena
+  // urvalsfunktion som resultatvyn (windowMatches i results/result-window.ts) + den
+  // delade ExpandToggle:n, så fönster-regeln (svensk-dag, edge-fall) är EN sanning.
+  const [expanded, setExpanded] = useState(false);
+
+  // DAG-MEDVETET "nu" för fönstret (samma PWA-fälla som resultatvyn, #39 C1): appen
+  // lämnas öppen hela VM:t, så fliken kan stå öppen över midnatt. useTodayKey ger ett
+  // `nowMs` som är referens-STABILT inom en dag och bara byts vid en faktisk dygns-
+  // växling (eller när fliken blir synlig igen). Fönstret memoizeras på det, så det
+  // glider över midnatt utan omladdning men räknas inte om i onödan varje minut-tick.
+  // OBS: detta är ett SEPARAT "nu" från evalNow (use-deadline-tick): fönstret mäts i
+  // DAGAR (useTodayKey, stabil inom dygnet), låset flippar MITT PÅ DAGEN vid avspark
+  // (deadline-tick). De är två olika kadenser med två olika syften, men SEEDAS av
+  // samma injicerade `now` (testbarhet + ett konsekvent start-"nu" för båda), sen tar
+  // respektive hook över sin egen tick (dygn resp minut) i appen.
+  const { nowMs } = useTodayKey(now);
+  // Fönstret räknas över matcherna i den ordning de visas (predictable = tidigast
+  // först). windowMatches bevarar indata-ordningen i `visible`, så fönster-delmängden
+  // ligger korrekt överst utan en egen omsortering.
+  const windowed = useMemo(
+    () =>
+      windowMatches(
+        predictable.map((p) => p.match),
+        nowMs
+      ),
+    [predictable, nowMs]
+  );
+  // Vilka match-id som ligger i fönstret (snabb koll). ALLA tippbara matcher renderas
+  // alltid; detta avgör bara vilka som DÖLJS när listan inte är utfälld (se nedan).
+  const visibleIds = useMemo(() => new Set(windowed.visible.map((m) => m.id)), [windowed]);
+  const isInWindow = (matchId: string): boolean => expanded || visibleIds.has(matchId);
+
+  // Knappen behövs bara när det FINNS något dolt (alla inom fönstret -> ingen knapp).
+  const hasHidden = windowed.hiddenCount > 0;
+  // Stabil id-koppling för aria-controls/aria-expanded mellan knapparna och listan.
+  const listId = useId();
+
+  // FOKUS-FLYTT vid ihopfällning (samma a11y-grepp som resultatvyn, #42): den NEDRE
+  // toggeln kan ligga långt ner i en utfälld lista. Fäller användaren ihop därifrån
+  // ska fokus (och därmed vyporten) flyttas till den ÖVRE toggeln, så hen landar vid
+  // listans topp i stället för kvar långt ner vid en kontroll som just försvann. Bara
+  // vid IHOPFÄLLNING (vid utfällning är det rätt att fokus stannar där användaren var).
+  const topToggleRef = useRef<HTMLButtonElement>(null);
+  function toggleExpanded() {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (!next) {
+        // Ihopfällning: flytta fokus till den övre kontrollen (listans topp).
+        // requestAnimationFrame så fokus sätts EFTER att React renderat om.
+        requestAnimationFrame(() => topToggleRef.current?.focus());
+      }
+      return next;
+    });
+  }
 
   const ready = store.enabled && status === 'ready' && store.status === 'ready';
 
@@ -155,14 +216,43 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
         </p>
       ) : null}
 
-      {/* Tips-listan: en kupong per tippbar match, kommande överst, låsta nedtill. */}
+      {/* ÖVRE ihopfäll-/expandera-kontroll (Daniels begäran, dubblerad som #42): en
+          toggle ALLTID nåbar utan att skrolla igenom en utfälld lista. Den övre är
+          dessutom fokus-MÅLET vid ihopfällning (toggleExpanded), så användaren förs upp
+          till listans topp. Syns bara när fönstret döljer något. Båda kontrollerna delar
+          EN komponent (ExpandToggle), så deras semantik aldrig kan drifta isär. */}
+      {ready && predictable.length > 0 && hasHidden ? (
+        <div className="mt-5">
+          <ExpandToggle
+            expanded={expanded}
+            hiddenCount={windowed.hiddenCount}
+            controls={listId}
+            onToggle={toggleExpanded}
+            buttonRef={topToggleRef}
+            position="top"
+            name="predictions"
+          />
+        </div>
+      ) : null}
+
+      {/* Tips-listan: en kupong per tippbar match, kommande överst, låsta nedtill.
+          ALLA tippbara matcher renderas alltid; out-of-window-korten DÖLJS med `hidden`
+          (display:none + borttaget ur a11y-trädet), de UNMOUNTAS inte. VARFÖR `hidden`
+          och inte filtrering: PredictionForm håller osparad inmatning i lokal useState
+          (samma som resultatformuläret), filtrerar vi bort ett kort vid ihopfällning
+          tappas den inmatningen. `hidden` bevarar React-instansen, så ett pågående tips
+          (och låst-/sekretess-/epoch-läget i storen) överlever expandera/ihopfäll. */}
       {ready ? (
         predictable.length > 0 ? (
-          <ol data-predictions-list="" className="mt-5 flex list-none flex-col gap-3 p-0">
+          <ol
+            id={listId}
+            data-predictions-list=""
+            className="mt-5 flex list-none flex-col gap-3 p-0"
+          >
             {predictable.map(({ match, locked }) => {
               const mine = store.myPredictions.get(match.id) ?? null;
               return (
-                <li key={match.id}>
+                <li key={match.id} hidden={!isInWindow(match.id)}>
                   <PredictionForm
                     match={match}
                     teamsById={teamsById}
@@ -184,6 +274,25 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
             upp här.
           </p>
         )
+      ) : null}
+
+      {/* NEDRE ihopfäll-/expandera-kontroll (dubblerad): i UTFÄLLT läge ligger den efter
+          hela listan, så användaren kan fälla ihop utan att skrolla tillbaka upp.
+          Identisk semantik som den övre (samma ExpandToggle), och vid ihopfällning
+          härifrån flyttas fokus upp till den ÖVRE toggeln (listans topp, toggleExpanded).
+          I ihopfällt läge ligger de två direkt ovanpå varandra, ofarligt och billigare
+          än att villkora bort den ena per läge (KISS), aria-haken hålls på BÅDA. */}
+      {ready && predictable.length > 0 && hasHidden ? (
+        <div className="mt-4 flex">
+          <ExpandToggle
+            expanded={expanded}
+            hiddenCount={windowed.hiddenCount}
+            controls={listId}
+            onToggle={toggleExpanded}
+            position="bottom"
+            name="predictions"
+          />
+        </div>
       ) : null}
     </section>
   );
