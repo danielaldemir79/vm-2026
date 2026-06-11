@@ -188,4 +188,43 @@ describe('AdminLogin, e-post-flöde (icke-admin)', () => {
     // Stannar på e-post-steget (ingen kod-input).
     expect(screen.queryByLabelText('Inloggningskod')).toBeNull();
   });
+
+  // Reviewer F1: onUpgraded får signaleras EXAKT en gång per uppgradering, även när
+  // sessionen INTE blir admin (då unmountar AdminLogin aldrig och låg tidigare och
+  // loopade refresh() vid varje förälder-render eftersom onUpgraded är en ny closure).
+  it('signalerar uppgradering exakt en gång, ingen refresh-loop när isAdmin förblir false', async () => {
+    const refresh = vi.fn(async () => {});
+    const store = officialStore({ isAdmin: false, refresh });
+    const { rerender } = renderSection(store);
+
+    // Driv flödet hela vägen till 'done'.
+    fireEvent.change(screen.getByLabelText('E-postadress'), {
+      target: { value: 'daniel@example.com' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Skicka inloggningskod'));
+    });
+    fireEvent.change(await screen.findByLabelText('Inloggningskod'), {
+      target: { value: '123456' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Logga in'));
+    });
+
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+
+    // Tvinga om-renderingar av föräldern: AdminSection skapar en NY onUpgraded-closure
+    // varje render. Utan vakten skulle effekten re-fyra och loopa refresh().
+    const tree = (
+      <RoomsStoreContext.Provider value={roomsStore()}>
+        <OfficialResultsStoreContext.Provider value={store}>
+          <AdminSection surface={(children) => <div>{children}</div>} />
+        </OfficialResultsStoreContext.Provider>
+      </RoomsStoreContext.Provider>
+    );
+    rerender(tree);
+    rerender(tree);
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
 });

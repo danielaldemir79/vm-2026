@@ -8,7 +8,7 @@
 // FLÖDE: ange e-post -> få en 6-siffrig kod i mejlet -> ange koden -> sessionen
 // uppgraderas till Daniels permanenta identitet (SAMMA user_id, tips behålls).
 
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useAdminAuthFlow } from './use-admin-auth-flow';
 import type { VmSupabaseClient } from '../../data/supabase-browser';
 
@@ -37,10 +37,26 @@ export function AdminLogin({ client, onUpgraded }: AdminLoginProps) {
   };
 
   // När flödet nått 'done' (lyckad uppgradering, inget fel kastades) signalerar vi
-  // uppåt EN gång så sektionen laddar om admin-status (i en effekt, inte under
-  // render, så vi inte triggar setState-i-render). step blir 'done' bara vid framgång.
+  // uppåt EXAKT EN gång per uppgradering så sektionen laddar om admin-status (i en
+  // effekt, inte under render, så vi inte triggar setState-i-render). step blir
+  // 'done' bara vid framgång.
+  //
+  // VAKT med useRef (reviewer F1): `onUpgraded` kan vara en NY closure per render
+  // hos anroparen (AdminSection skickar `() => void official.refresh()`), så att ha
+  // den i deps räcker inte, effekten skulle re-fyra vid VARJE render medan step är
+  // 'done'. I happy-path räddas det av att admin-status flippar och AdminLogin
+  // unmountar, MEN i edge-fallet "uppgraderad session som inte är admin" (fristående
+  // e-postanvändare / nytt user_id) stannar vyn i 'done' och refresh() skulle loopa
+  // obegränsat mot Supabase. Vakten signalerar en gång när vi NÅR 'done' och nollas
+  // när vi lämnar det, så kommentaren "en gång" är sann oavsett admin-utfall.
+  const signaledRef = useRef(false);
   useEffect(() => {
-    if (flow.step === 'done') {
+    if (flow.step !== 'done') {
+      signaledRef.current = false;
+      return;
+    }
+    if (!signaledRef.current) {
+      signaledRef.current = true;
       onUpgraded();
     }
   }, [flow.step, onUpgraded]);
