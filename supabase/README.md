@@ -14,6 +14,8 @@ Bara **delad, muterbar** state ligger i Supabase:
 | `room_match_results` | Delade matchresultat per rum (vännerna fyller i ihop). |
 | `predictions` (T15) | Tips: en gissad målställning per (rum, match, användare). |
 | `match_kickoffs` (T15) | Referensdata: matchernas avsparkstider, deadline-låsets klocka. |
+| `group_predictions` (T16) | Pool-tips: gissad 1:a + 2:a per grupp (A till L). |
+| `bracket_predictions` (T16) | Slutspels-tips: vem går vidare per slot + VM-vinnaren. |
 
 **Statisk turneringsdata (lag, grupper, spelschema) stannar i klient-bundlen.**
 Den är källåkrad och verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare,
