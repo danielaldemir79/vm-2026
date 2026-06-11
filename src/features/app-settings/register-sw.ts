@@ -30,6 +30,29 @@ export interface AppSwCallbacks {
 export type RegisterAppSw = (callbacks: AppSwCallbacks) => (reloadPage?: boolean) => Promise<void>;
 
 /**
+ * Form på vite-plugin-pwa:s virtuella modul (bara den del vi använder). Importeras
+ * som en INJICERBAR funktion (se nedan) så att fel-vägen kan testas utan att den
+ * virtuella `virtual:pwa-register`-modulen behöver lösas i Vitest.
+ */
+type PwaRegisterModule = {
+  registerSW: (options: {
+    immediate?: boolean;
+    onNeedRefresh?: () => void;
+    onOfflineReady?: () => void;
+  }) => (reloadPage?: boolean) => Promise<void>;
+};
+
+/**
+ * Lat import av den virtuella modulen. Default = det riktiga dynamiska importet
+ * (löses bara i ett Vite-bygge). Den ligger som ett injicerbart argument enbart
+ * för att göra fel-vägen (catch) testbar , produktionskoden anropar registerAppSw
+ * utan andra argumentet och får då det riktiga importet.
+ */
+type ImportPwaRegister = () => Promise<PwaRegisterModule>;
+const importPwaRegister: ImportPwaRegister = () =>
+  import('virtual:pwa-register') as Promise<PwaRegisterModule>;
+
+/**
  * Riktig implementation: importerar den virtuella modulen lat (dynamiskt) så att
  * en miljö utan service worker-stöd / utan Vite-bygge (t.ex. en SSR-/testkörning
  * som råkar importera denna fil) inte tvingas lösa importet vid modul-laddning.
@@ -37,12 +60,18 @@ export type RegisterAppSw = (callbacks: AppSwCallbacks) => (reloadPage?: boolean
  * Lat import via en funktion gör också att produktionskoden kan skicka in detta
  * som default medan tester skickar en fake , ingen statisk `virtual:`-referens
  * tvingas in i testgrafen.
+ *
+ * @param importModule Injicerbar modul-importör (default = riktiga virtual:pwa-register).
+ *                     Testet skickar en kastande importör för att verifiera fel-vägen.
  */
-export const registerAppSw: RegisterAppSw = (callbacks) => {
+export const registerAppSw = (
+  callbacks: AppSwCallbacks,
+  importModule: ImportPwaRegister = importPwaRegister
+): ((reloadPage?: boolean) => Promise<void>) => {
   let updateSW: (reloadPage?: boolean) => Promise<void> = async () => {};
   // Dynamiskt import: modulen finns bara i ett Vite-bygge. I en miljö där den
   // saknas blir updateSW en no-op (appen fungerar, bara utan SW-uppdatering).
-  void import('virtual:pwa-register')
+  void importModule()
     .then(({ registerSW }) => {
       updateSW = registerSW({
         immediate: true,
@@ -50,9 +79,18 @@ export const registerAppSw: RegisterAppSw = (callbacks) => {
         onOfflineReady: callbacks.onOfflineReady,
       });
     })
-    .catch(() => {
-      // Inget SW-stöd / ingen virtuell modul: lämna no-op. Fail-soft, appen
-      // körs vidare utan auto-uppdatering (ingen krasch, ingen tyst lögn om SW).
+    .catch((error: unknown) => {
+      // FAIL-LOUD-MEN-INTE-FATALT (samma kontrakt som safe-storage.ts): en
+      // misslyckad SW-registrering (saknad virtuell modul, inget SW-stöd, eller
+      // en felkonfig där SW FÖRVÄNTAS funka) får aldrig ta ner appen , den
+      // renderas vidare utan offline/uppdaterings-prompt. Men vi sväljer INTE
+      // felet tyst: då blir cache-/uppdaterings-problemet osynligt igen. Vi
+      // loggar det med [VM2026]-kontext så en felkonfig syns i konsolen.
+      console.warn(
+        '[VM2026] Service worker-registreringen misslyckades , appen körs vidare ' +
+          'utan offline-stöd och utan ny-version-prompt:',
+        error
+      );
     });
   // Returnera en wrapper som delegerar till det (asynkront satta) updateSW, så
   // anroparen får en stabil funktion direkt vid registreringen.
