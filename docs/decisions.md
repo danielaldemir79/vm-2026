@@ -5,6 +5,25 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T41 (#70): EOL-normalisering till LF (.gitattributes + Prettier)
+
+**Beslut:** Repot normaliseras till **LF** för alla textfiler via `.gitattributes`
+(`* text=auto eol=lf` + binär-undantag för png/woff2/ico/jpg m.fl.), och Prettier sätts till
+`endOfLine: "lf"` (var `"auto"`). `git add --renormalize .` konverterade de 14 filer som var
+CRLF i index (inklusive tidigare-medvetet-CRLF: tokens.css, decisions.md, patterns.md, HANDOFF.md,
+supabase/README.md) till LF. Efter denna task är ALLT LF.
+**Varför:** Utan `.gitattributes` (`core.autocrlf=false`, mixade radslut) avgjorde varje utvecklares
+lokala editor radslutet. Windows-editorn skrev om en tidigare-LF-fil med CRLF vid minsta ändring, så
+git såg HELA filen som ändrad: en 12-raders ändring blev en 186-raders hel-fil-rewrite i diffen (T38),
+vilket gjorde review svårare och dolde den äkta ändringen. Mönstret återkom och krävde en manuell
+numstat-vakt varje gång i **T38, T50, T51, T55, T59+**. `endOfLine: "auto"` gjorde dessutom
+`format:check` blind för CRLF/LF (auto accepterar filens befintliga radslut), så lint-grinden gav
+ingen signal. `eol=lf` löser roten en gång, `endOfLine: "lf"` gör att grinden nu FÅNGAR en framtida
+flip. **LF (inte CRLF)** valdes för att toolchainen (Node, Vite, Prettier, git) och Cloudflare/Linux-
+hostingen är LF-native; CRLF skulle kräva undantag på fler ställen. Normaliserings-diffen hölls i en
+EGEN commit skild från konfig-committen och bevisades ren EOL per fil (`--numstat --ignore-all-space`
+TOM => noll äkta innehållsrad ändrad).
+
 ## 2026-06-12 , T55 (#96): tips-avslöjandet visas vid AVSPARK, inte först vid slutsignal
 
 **Symptom (Daniels rapport 2026-06-11, live under öppningsmatchen):** "Mexico-matchen startade men man
