@@ -30,8 +30,10 @@ import {
   OnboardingDialog,
   OnlineStatusIndicator,
   SettingsControl,
+  UpdatePrompt,
   useOnboarding,
 } from './features/app-settings';
+import { VersionStamp } from './components/VersionStamp';
 
 /** Ett innehållskort på en yt-token, delad yt-form för app-vyns sektioner. */
 function Panel({ children }: { children: ReactNode }) {
@@ -349,6 +351,10 @@ function AppShell() {
               </a>
             </span>
           </p>
+          {/* Version-stämpel (T43, #74): diskret bygg-identifierare (kort commit-SHA
+              + byggtid) så live-versionen kan verifieras mot develop-HEAD. Löser
+              framtida "är det live?"-förvirring (debug-agentens förbättring). */}
+          <VersionStamp className="mt-1" />
         </footer>
       </main>
 
@@ -357,6 +363,13 @@ function AppShell() {
           så modalen täcker hela skärmen. Får den DELADE onboarding-instansen så
           install-gaten ovan och touren stänger i takt (EN sanning, T39/#68 F1). */}
       <OnboardingDialog onboarding={onboarding} />
+
+      {/* "Ny version finns"-prompten (T43, #74): registrerar SW:n (registerType
+          'prompt') och visar en diskret banner när en ny app-version väntar, så en
+          användare aldrig fastnar på en gammal cachad version, ETT klick uppdaterar.
+          Ligger på rot-nivå (utanför main, fixed längst ner) så den aldrig tränger
+          layouten och syns över allt innehåll. */}
+      <UpdatePrompt />
     </div>
   );
 }

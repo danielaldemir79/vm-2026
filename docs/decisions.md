@@ -99,6 +99,66 @@ inte rör DB:n alls. Den FASAS UT för facit-syftet (resultatinmatningen blir ad
 enda befintliga raden i produktion var en `scheduled` 0-0-platshållare (g-A-1) i ewrmdt, inget facit
 att migrera. **Behöver Daniel (dashboard):** se "Behöver Daniel"-raden nedan om e-post-SMTP-sändning.
 
+---
+
+## 2026-06-11 , T43 (#74): PWA-uppdatering via prompt + bygg-version-stämpel
+
+**Beslut (uppdaterings-modell):** registerType bytt från `'autoUpdate'` till **`'prompt'`** i
+`vite.config.ts`, och `injectRegister: 'auto'` -> **`null`** (vi registrerar SJÄLVA via
+`virtual:pwa-register` i `register-sw.ts`). En ny service worker INSTALLERAS men VÄNTAR; appen visar
+en diskret "Ny version finns, ladda om"-prompt (`UpdatePrompt`) och användaren tar den i bruk med ETT
+klick (`updateSW(true)` -> SW:n får `SKIP_WAITING`-meddelandet, aktiverar och laddar om).
+**Varför:** roten till tasken var att användares enheter fastnar på en GAMMAL cachad version (PWA SW)
+och det ser ut som buggar. `autoUpdate` ensamt kan dessutom rycka undan vyn med en tyst omladdning mitt
+i något. `prompt` ger användaren ETT klick att uppdatera utan att fastna, och utan oväntad omladdning.
+
+**Källhänvisat (regel som lätt gissas fel):** med `registerType: 'prompt'` sätts INTE workbox
+`skipWaiting: true` / `clientsClaim: true`. skipWaiting skulle aktivera den nya SW:n DIREKT och kringgå
+prompten (då blir det de facto auto-update, och `onNeedRefresh` slutar fyra pålitligt). I prompt-läget
+är det användarens klick som posterar `SKIP_WAITING` och laddar om, dvs takeovern sker direkt VID
+klicket, inte först när alla flikar stängts. Verifierat i det genererade `dist/sw.js`: en
+`message`-lyssnare som anropar `self.skipWaiting()` BARA på `SKIP_WAITING`, inget ovillkorligt
+skipWaiting/clientsClaim. **Källa:** vite-plugin-pwa-dokumentationen (guide "Prompt for new content
+refreshing" + frameworks/index: registerType 'prompt' kräver manuell `registerSW`-import med
+`onNeedRefresh`/`onOfflineReady`; klicket anropar `updateSW()`).
+
+**Testbarhet (T43-krav):** `virtual:pwa-register` löses bara i ett Vite-bygge (otestbart i Vitest). All
+uppdaterings-LOGIK ligger i `use-app-update.ts` med en INJICERBAR registrerare (`RegisterAppSw`);
+`register-sw.ts` är en tunn seam som bara importerar den virtuella modulen. Hela hooken testas mot en
+fake-register som fyrar callbacks. App-mount-testerna mockar `virtual:pwa-register` globalt (setup.ts).
+
+**Beslut (version-stämpel):** commit-SHA (kort, 7) + byggtid (ISO/UTC) injiceras som Vite-`define`
+(`__APP_SHA__`, `__APP_BUILT_AT__`) och visas på en diskret rad i footern (`VersionStamp`,
+`data-app-version`). SHA:n löses i en prioritetsordning: **`CF_PAGES_COMMIT_SHA`** (Cloudflare-bygget,
+auktoritativ i produktion) -> `git rev-parse HEAD` (lokalt) -> `"unknown"` (gissar aldrig).
+**Källa för Cloudflare-variabeln:** Cloudflare Pages "System environment variables"
+(`CF_PAGES_COMMIT_SHA` sätts av plattformen i varje Pages-bygge). Detta löser framtida "är det live?"-
+förvirring: live-versionen kan jämföras mot develop-HEAD. Regeln + fallbacken bor i den rena, testbara
+`build-info.ts`; Node-läsningarna (git, `process.env`) i `vite.config.ts`.
+
+**Beslut (ingen @types/node):** bygg-tids-koden i `vite.config.ts` behöver `process.env` +
+`node:child_process`, men hela `@types/node` LÄCKER Node-globaler (t.ex. `NodeJS.Timeout`) in i
+APP-projektet via vitest-typerna och bryter browser-typningen av `window.setTimeout` (number vs Timeout)
+på orelaterad kod (RoomPanel). I stället en SMAL ambient-deklaration `build-env.d.ts` som bara
+deklarerar de Node-ytor bygget faktiskt rör, inkluderad ENBART i `tsconfig.node.json`.
+
+**Cloudflare-deploy-pipeline (verifierad, ingen flagga):** produktionen auto-deployar från `develop`
+via Cloudflare Pages git-integration (`docs/deploy.md`), så den nya SW:n + version-stämpeln rullar ut
+automatiskt när PR:en mergas till `develop`. Inga tecken på fördröjd/utebliven trigger i repots
+konfiguration (CI gör bara kvalitetsgrinden, deployen ägs av Cloudflare-dashboarden). Cloudflare-
+konfig orörd (utanför repots kontroll, PRINCIPLES §7).
+
+**Fail-loud vid misslyckad SW-registrering (#74, Copilot C3):** `registerAppSw`-catchen sväljde
+tidigare felet TYST, så en felkonfig (saknad/oladdbar `virtual:pwa-register`, inget SW-stöd där det
+förväntas) skulle göra cache-/uppdaterings-problemet osynligt igen , precis det tasken löser. Nu loggas
+felet med `console.warn('[VM2026] ...')` (samma fail-loud-men-inte-fatalt-kontrakt som
+`src/lib/safe-storage.ts`): en misslyckad registrering kraschar ALDRIG appen (den renderas vidare utan
+offline/uppdaterings-prompt) men blir SYNLIG i konsolen. Modul-importören är nu ett injicerbart andra
+argument till `registerAppSw` (default = riktiga importet) enbart för att göra catch-grenen testbar
+(`register-sw.test.ts`) utan att den virtuella modulen behöver lösas i Vitest.
+
+---
+
 ## 2026-06-11 , T39 (#68): tips-listan får 3-dagars fönster + expandera (delad ExpandToggle)
 
 **Beslut (Daniels begäran):** tips-listan (`PredictionsView`) får SAMMA 3-dagars fönster + "Visa alla /

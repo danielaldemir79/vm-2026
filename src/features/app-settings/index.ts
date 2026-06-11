@@ -42,6 +42,14 @@ export { OnboardingDialog } from './OnboardingDialog';
 export { useOnlineStatus } from './use-online-status';
 export { OnlineStatusIndicator } from './OnlineStatusIndicator';
 
+// PWA-uppdatering (T43/#74): "ny version finns"-prompt. Logiken (use-app-update)
+// tar en injicerbar SW-registrerare så den är testbar utan virtual:pwa-register.
+export { useAppUpdate } from './use-app-update';
+export type { AppUpdateApi } from './use-app-update';
+export { UpdatePrompt } from './UpdatePrompt';
+export { registerAppSw } from './register-sw';
+export type { RegisterAppSw, AppSwCallbacks } from './register-sw';
+
 // Persistens-nycklar (exporteras så App-/integrationstester kan sätta dem för
 // att försätta appen i ett känt läge, t.ex. onboarding redan sedd).
 export { INSTALL_DISMISSED_KEY, ONBOARDING_DONE_KEY, HAPTICS_KEY, SOUND_KEY } from './storage-keys';
