@@ -17,6 +17,81 @@ export type Database = {
   };
   public: {
     Tables: {
+      // T16 (#16): bracket-/slutspels-tips (vem går vidare per slot + VM-vinnaren).
+      bracket_predictions: {
+        Row: {
+          advancing_team_id: string;
+          created_at: string;
+          room_id: string;
+          slot_id: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          advancing_team_id: string;
+          created_at?: string;
+          room_id: string;
+          slot_id: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          advancing_team_id?: string;
+          created_at?: string;
+          room_id?: string;
+          slot_id?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bracket_predictions_room_id_fkey';
+            columns: ['room_id'];
+            isOneToOne: false;
+            referencedRelation: 'rooms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      // T16 (#16): gruppvinnar-tips (gissad 1:a + 2:a per grupp/rum/användare).
+      group_predictions: {
+        Row: {
+          created_at: string;
+          group_id: string;
+          room_id: string;
+          runner_up_team_id: string;
+          updated_at: string;
+          user_id: string;
+          winner_team_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          group_id: string;
+          room_id: string;
+          runner_up_team_id: string;
+          updated_at?: string;
+          user_id: string;
+          winner_team_id: string;
+        };
+        Update: {
+          created_at?: string;
+          group_id?: string;
+          room_id?: string;
+          runner_up_team_id?: string;
+          updated_at?: string;
+          user_id?: string;
+          winner_team_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'group_predictions_room_id_fkey';
+            columns: ['room_id'];
+            isOneToOne: false;
+            referencedRelation: 'rooms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       // T15 (#15): referenstabell för avsparkstider (deadline-låsets klocka).
       match_kickoffs: {
         Row: {
@@ -174,6 +249,12 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      // T16 (#16): deadline-ankare för ett bracket-tips. Per-slot (M73..M104) =
+      // slottens egen avspark; 'champion' = turneringsstart (g-A-1). Bygger på
+      // match_kickoff, så samma NULL-fail-safe gäller (okänd slot => NULL =>
+      // skriv nekas, andras tips dolda). Returns string | null, INTE string, av
+      // exakt samma säkerhets-skäl som match_kickoff nedan.
+      bracket_deadline_kickoff: { Args: { p_slot_id: string }; Returns: string | null };
       create_room: {
         Args: { p_code: string; p_display_name: string; p_name: string };
         Returns: {
@@ -182,6 +263,10 @@ export type Database = {
           room_name: string;
         }[];
       };
+      // T16 (#16): deadline-ankare för ett grupp-tips = gruppens första match
+      // (g-X-1). Returns string | null (okänd grupp => NULL => skriv nekas, andras
+      // tips dolda), samma fail-safe-kontrakt som match_kickoff.
+      group_deadline_kickoff: { Args: { p_group_id: string }; Returns: string | null };
       is_room_member: { Args: { p_room_id: string }; Returns: boolean };
       join_room_by_code: {
         Args: { p_code: string; p_display_name: string };

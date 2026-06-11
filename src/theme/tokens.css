@@ -104,6 +104,20 @@
      UPPMÄTT: near-black (#1c1403) på #f3c14e = 11.0:1 (decisions.md T15-visuellt). */
   --vm-coupon-ink: #1c1403;
 
+  /* SILVER-TONER (T16, gruppvinnar-tipsets PODIUM: 1:a = guld, 2:a = SILVER). Guld
+     bär redan appen (--vm-gold/--vm-warning); silver är 2:ans-medaljen. Samma
+     guld-på-ljus-disciplin gäller silver: rå --vm-silver är DEKOR (medalj-fyllning,
+     ring, tint), all silver-TEXT som måste läsas använder den AA-mätta --vm-silver-
+     text-tonen (inte rå --vm-silver, som är för ljus för text på ljus yta).
+     - --vm-silver: medaljens fyllnad (en kall, ljus platina-ton i mörkt tema).
+     - --vm-silver-ink: near-black ink PÅ en fylld silver-medalj (UPPMÄTT 12.9:1 på
+       #c5cdd6 i mörkt tema). Egen token (mätning bunden till silver-hue:n).
+     - --vm-silver-text: silver som TEXT/ikon på mörka ytor (samma roll som warning
+       för guld). I mörkt tema = den ljusa platinan själv (UPPMÄTT 9.8:1 mot surface). */
+  --vm-silver: #c5cdd6;
+  --vm-silver-ink: #15191e;
+  --vm-silver-text: #c5cdd6;
+
   /* SIMULERINGS-TON (T12, what-if-läget). En dämpad indigo/violett som signalerar
      "labbet/hypotetiskt" och som med FLIT ligger utanför appens rollfärger (grön
      accent, guld/warning, mint/teal success, korall danger), så ingen kan förväxla
@@ -165,6 +179,19 @@
      bricka-form som "Klar"-chippen (T11). Egen token, mätning bunden till guld-hue:n.
      UPPMÄTT: near-black (#1c1403) på #b07d10 = 5.03:1 (decisions.md T15-visuellt). */
   --vm-coupon-ink: #1c1403;
+
+  /* SILVER-TONER i ljust tema (T16, podiumets 2:a-medalj). Samma uppdelning som i
+     mörkt tema: rå --vm-silver är DEKOR (medalj-fyllning, ring, tint), och en EGEN,
+     mörkare --vm-silver-text bär all silver-TEXT (den ljusa platinan faller under AA
+     som text på vit yta, exakt guld-på-ljus-fällan, så silver-text blir en djup slate).
+     - --vm-silver: medaljens fyllnad (en mjuk, sval silver-grå mot vit yta).
+     - --vm-silver-ink: ink PÅ en fylld silver-medalj. NEAR-BLACK (UPPMÄTT 9.5:1 på
+       #aab4bf). Egen token, mätning bunden till silver-hue:n.
+     - --vm-silver-text: silver som TEXT/ikon på ljusa ytor = en djup slate-grå
+       (#52606e, UPPMÄTT 5.6:1 mot vit surface), inte den ljusa platinan. */
+  --vm-silver: #aab4bf;
+  --vm-silver-ink: #15191e;
+  --vm-silver-text: #52606e;
 
   /* SIMULERINGS-TON i ljust tema (T12). Djup indigo/violett, samma "labbet"-roll
      och samma utanför-rollfärgerna-motiv som i mörkt tema. UPPMÄTT WCAG AA:
@@ -657,8 +684,11 @@ body {
    en guld-till-neutral ton signalerar "inlämnad/avgjord". Dämpningen läggs BARA
    på den dekorativa fonden + topplisten (gulden tonas ner mot border-tonen), så
    den positiva "låst = rättvist"-känslan finns kvar utan att skrika. Text-lagret
-   rörs inte av dämpningen (låst-etiketten + mitt-tips-talen bär full kontrast). */
-.vm-coupon-card[data-prediction-locked] {
+   rörs inte av dämpningen (låst-etiketten + mitt-tips-talen bär full kontrast).
+   GÄLLER BÅDA kupong-typerna: match-tipset (T15, data-prediction-locked) OCH grupp-
+   tipset (T16, data-group-prediction-locked) , samma dämpnings-recept, en sanning. */
+.vm-coupon-card[data-prediction-locked],
+.vm-coupon-card[data-group-prediction-locked] {
   background-image: radial-gradient(
     120% 90% at 100% 0%,
     color-mix(in srgb, var(--vm-gold) 5%, transparent),
@@ -669,7 +699,8 @@ body {
     inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 20%, var(--color-border));
 }
 
-.vm-coupon-card[data-prediction-locked]:hover {
+.vm-coupon-card[data-prediction-locked]:hover,
+.vm-coupon-card[data-group-prediction-locked]:hover {
   /* Låst kupong lyfter inte på hover (inget att interagera med), så den känns
      stilla/inlämnad. Samma vilo-skugga som icke-hover. */
   box-shadow:
@@ -707,4 +738,110 @@ body {
 .vm-coupon-mine {
   background-color: var(--vm-gold);
   color: var(--vm-coupon-ink);
+}
+
+/* -----------------------------------------------------------------------------
+   11. GRUPPVINNAR-TIPSET, PODIUM-KUPONGEN (T16, issue #16). [VÄRDE, ej @theme-kontrakt]
+
+   IDENTITET (taskens punkt 1, "tippa hela gruppspelet"): det här är VM-kupongen
+   man fyller i med kompisarna , per grupp A..L gissar man vem som VINNER gruppen
+   (1:a) och vem som blir TVÅA (2:a). Samma "TIPS-KUPONG"-familj som T15 (samma
+   guld-signatur, samma `.vm-coupon-card`-fond ärvd nedan), men med en egen
+   PODIUM-metafor: 1:a = GULD-medalj, 2:a = SILVER-medalj. Guld + silver = en
+   pallplats, det universella språket för "vem stod överst". Allt podium-dekor är
+   RENA lager (medalj-brickor, ring, tint) , ingen bär läsbarhet utan att bära
+   den AA-mätta text-tonen (--color-warning för guld, --vm-silver-text för silver).
+
+   KONTRAST-VAKT (taskens punkt 4, canvas-komposit, VÄRSTA fall, BÅDA teman,
+   lessons aa-kontrast-...-varsta-fall + guld/silver-på-ljus-fällan): ALL läsbar
+   text (grupp-rubrik, medalj-etiketter, lagnamn, sparat-podium, låst-etikett, fel)
+   står på den OPAKA surface-fonden, INTE på guld/silver-glow:en. Medalj-SIFFRORNA
+   (1/2) står som mörk ink på en SOLID medalj-yta (färg-oberoende solid-bricka-form,
+   T9/T11), aldrig som ljus medalj-färg-text på tint. De uppmätta MIN-värdena står
+   i decisions.md (T16-visuellt).
+   -------------------------------------------------------------------------- */
+
+/* GRUPP-KUPONGEN ärver hela tips-kupong-fonden (guld-hörn-glow + topplist + hover-
+   lyft + låst-dämpning) från `.vm-coupon-card` (§10). Vi lägger bara podium-haken
+   ovanpå, så grupp-tipset och match-tipset hör tydligt till SAMMA kupong-familj
+   (DRY: ingen andra-kort-fond, en sanning för "det här är en tips-kupong"). */
+
+/* MEDALJ-BRICKAN (1:a guld / 2:a silver): en liten rund medalj som bär sin plats-
+   SIFFRA i mörk ink på en SOLID medalj-yta. Färg-oberoende solid-bricka-formen
+   (T9/T11): siffran läses oavsett tema eftersom den står på en opak medalj, inte
+   på en tint. Guld-medaljen och silver-medaljen delar form, bara fyllning + ink
+   skiljer (sätts av modifierarna nedan). */
+.vm-pool-medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+  /* Mjuk inre högdager + yttre ring ger medaljen relief utan en bild (noll asset). */
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.35),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 1px 2px rgb(0 0 0 / 0.2);
+}
+
+.vm-pool-medal--gold {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+}
+
+.vm-pool-medal--silver {
+  background-color: var(--vm-silver);
+  color: var(--vm-silver-ink);
+}
+
+/* PODIUM-RADEN (1:a-väljaren / 2:a-väljaren): en rad med medalj + etikett + väljare.
+   En hårfin medalj-tonad vänsterkant (guld respektive silver) knyter raden till sin
+   medalj utan att färga någon text. Ren dekor (border), bär ingen läsbarhet. */
+.vm-pool-slot {
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-md);
+  transition: border-color 0.2s ease;
+}
+
+.vm-pool-slot--gold {
+  border-left-color: color-mix(in srgb, var(--vm-gold) 55%, transparent);
+}
+
+.vm-pool-slot--silver {
+  border-left-color: color-mix(in srgb, var(--vm-silver) 60%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-pool-slot {
+    transition: none;
+  }
+}
+
+/* SPARAT PODIUM, "stolt"-sammanfattning: när ett grupp-tips är sparat/seedat visas
+   mitt podium som en kompakt rad , guld-medalj + 1:ans lag, silver-medalj + 2:ans
+   lag. Den fyllda medalj-formen (solid + mörk ink) är AA-säker i båda teman, och
+   lagnamnen står som fg-text på opak surface. Samma "stolt, inte diskret"-anda som
+   T15:s sparat-bricka, men nu en hel pallplats. */
+.vm-pool-podium {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(
+    130% 100% at 0% 0%,
+    color-mix(in srgb, var(--vm-gold) 7%, transparent),
+    transparent 62%
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vm-gold) 22%, var(--color-border));
+}
+
+/* En tunn medalj-tonad lodrät avdelare mellan 1:a och 2:a i sparat-podiumet
+   (dekor, ingen text). */
+.vm-pool-podium-divider {
+  width: 1px;
+  align-self: stretch;
+  background-image: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--vm-silver) 45%, transparent),
+    transparent
+  );
 }
