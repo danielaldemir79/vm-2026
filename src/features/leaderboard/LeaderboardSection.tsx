@@ -7,12 +7,17 @@
 // I fixtures-läge är hela det sociala lagret vilande och sektionen renderar inget.
 // `surface` är kort-stilen App ger (samma som de andra tips-sektionerna).
 //
-// EN provider, TVÅ vyer: topplistan (alltid) + avslöjandet (renderar sig självt
-// tyst tills första matchen avgjorts). Båda läser samma store.
+// EN provider, FLERA vyer: sammanfattningen ÖVERST (egen poäng + placering + "Så funkar
+// poängen", T46) + topplistan (alltid) + avslöjandet (renderar sig självt tyst tills första
+// matchen avgjorts). Alla läser samma store.
+//
+// ORDNING (T46, #79, Daniels begäran): sammanfattningen ÖVERST så man ser sina egna poäng
+// utan att skrolla, topplistan (full lista) KVAR längst ned, avslöjandet sist.
 
 import type { ReactNode } from 'react';
 import { useRoomsStore } from '../rooms';
 import { LeaderboardProvider } from './LeaderboardProvider';
+import { LeaderboardSummary } from './LeaderboardSummary';
 import { LeaderboardView } from './LeaderboardView';
 import { RevealView } from './RevealView';
 
@@ -25,6 +30,7 @@ export function LeaderboardSection({ surface }: { surface: (children: ReactNode)
     <LeaderboardProvider>
       {surface(
         <>
+          <LeaderboardSummary />
           <LeaderboardView />
           <RevealView />
         </>
