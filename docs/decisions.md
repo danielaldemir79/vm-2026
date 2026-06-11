@@ -12,8 +12,9 @@ kolumner. Lösningen är GENERELL, inte en hårdkodad specialregel i komponenten
 `shortName`-fält på `Team` (`src/domain/types.ts`), satt i lag-datan (`src/data/wc2026/team-refs.ts`).
 Default är `name`, så bara lag vars fulla namn är för långt sätter en kortform.
 
-**Regel + en sanning:** fallback-regeln (`shortName ?? name`) bor i `teamShortName` (`src/domain/
-team-name.ts`), så de trånga ytorna importerar samma regel i stället för att upprepa `?? name`.
+**Regel + en sanning:** fallback-regeln (`shortName ?? name`) bor i `teamShortName`
+(`src/domain/team-name.ts`), så de trånga ytorna importerar samma regel i stället för att
+upprepa `?? name`.
 Trånga ytor som visar kortformen: grupptabellen (`GroupTable`), matchkortet + slutspelsträdet (båda
 via `teamDisplayName` i `src/features/daily/match-display.ts`). Det FULLA namnet står kvar i
 lagprofilen (`TeamProfilePanel`, hero-rubriken) där utrymmet finns, SPEC-andan "fullt där det ryms".
