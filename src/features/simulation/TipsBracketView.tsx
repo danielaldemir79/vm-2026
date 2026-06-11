@@ -82,7 +82,7 @@ function TipsSlotRow({
       {slot.resolution === 'open-third' ? (
         <span
           data-tips-open-third=""
-          className="shrink-0 rounded-pill border border-border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
+          className="vm-tips-open-badge shrink-0 rounded-pill border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
         >
           Öppen
         </span>
@@ -123,6 +123,43 @@ function matchCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'match' : 'matcher'}`;
 }
 
+/**
+ * Runda-markörens innehåll: ett ordningstal (sextondel = 1 ... semifinal = 4) som
+ * låter ögat följa progressionen mot finalen, en "3" för bronsmatchen, och en pokal-
+ * glyf för finalen (slutet). Samma redaktionella språk som det riktiga trädet
+ * (BracketView) och slutspels-tipset (BracketPredictionsView), så sim-trädet hör
+ * tydligt till samma slutspels-värld. Ren dekoration (markören är aria-hidden).
+ */
+const ROUND_STEP: Readonly<Record<string, string>> = {
+  'round-of-32': '1',
+  'round-of-16': '2',
+  'quarter-final': '3',
+  'semi-final': '4',
+  'third-place': '3',
+};
+
+function RoundMarkerGlyph({ stage }: { stage: string }) {
+  if (stage === 'final') {
+    // Pokal-glyf (finalen är trädets krona), samma form som slutspels-tipsets markör.
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M7 4h10v4a5 5 0 0 1-10 0z" />
+        <path d="M7 5H4.5a1.5 1.5 0 0 0 0 5H7M17 5h2.5a1.5 1.5 0 0 1 0 5H17" />
+        <path d="M12 13v3M9 20h6M9.5 20a2.5 2.5 0 0 1 5 0" />
+      </svg>
+    );
+  }
+  return <span className="leading-none">{ROUND_STEP[stage] ?? ''}</span>;
+}
+
 /** En runda som en KOLUMN av match-kort, med rubrik (samma layout som BracketView). */
 function RoundColumn({
   label,
@@ -135,14 +172,20 @@ function RoundColumn({
   stage: string;
   children: ReactNode;
 }) {
+  const isCrown = stage === 'final';
   return (
     <section
       data-bracket-round={stage}
       aria-label={`${label} (${matchCountLabel(matchCount)})`}
       className="vm-bracket-round flex w-60 shrink-0 flex-col gap-3"
     >
+      {/* Rubrik-rad: en numrerad/ikon-markör (progression mot finalen) + runda-namnet.
+          Finalen lyfts till full fg (krona), övriga rundor är dämpade. */}
       <h3 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide">
-        <span className="text-fg-muted">{label}</span>
+        <span aria-hidden="true" data-round={stage} className="vm-tips-bracket-marker">
+          <RoundMarkerGlyph stage={stage} />
+        </span>
+        <span className={isCrown ? 'text-fg' : 'text-fg-muted'}>{label}</span>
       </h3>
       <div className="flex flex-col gap-3">{children}</div>
     </section>
@@ -283,16 +326,30 @@ function Header({ tippedGroupCount }: { tippedGroupCount: number }) {
         <h3 id="tips-bracket-heading" className="font-display text-lg font-semibold sm:text-xl">
           Slutspelet ur dina tips
         </h3>
-        {/* Tydligt simulerings-märke: detta är INTE facit. */}
+        {/* Tydligt simulerings-märke: detta är INTE facit. SOLID guld-bricka med mörk
+            ink (.vm-tips-sim-badge), den färg-OBEROENDE AA-säkra formen, samma
+            hejarklacks-guld som kupong-/slutspels-tips-världen men lugn, inte
+            alarmistisk (guld-som-text-på-tint föll under AA, uppmätt 2.51:1 ljust). */}
         <span
           data-tips-bracket-badge=""
-          className="rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--vm-gold) 45%, transparent)',
-            backgroundColor: 'color-mix(in srgb, var(--vm-gold) 12%, transparent)',
-            color: 'var(--vm-gold)',
-          }}
+          className="vm-tips-sim-badge inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
         >
+          <span aria-hidden="true" className="inline-flex">
+            {/* En liten "labb/utkast"-kolv-glyf, samma hypotetisk-signal som what-if-
+                läget, men i kupong-guld. Ren dekor; texten bär betydelsen. */}
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 3h6M10 3v6.5L5.5 18a1.5 1.5 0 0 0 1.3 2.3h10.4a1.5 1.5 0 0 0 1.3-2.3L14 9.5V3" />
+              <path d="M7.5 14h9" />
+            </svg>
+          </span>
           Simulering
         </span>
         {tippedGroupCount < 12 ? (
