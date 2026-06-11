@@ -58,7 +58,7 @@ accent-pill med en PULSANDE prick (`.vm-reveal-pending` + `.vm-pending-dot`, sam
 (index.css, `.vm-pending-dot` tillagd i reduce-blocket) och då bär ordet "Pågår" + formen budskapet, ingen
 rörelse krävs (WCAG 2.3.3). Pågående tips får en svag accent-vänsterkant (`.vm-reveal-pick--live`). KONTRAST
 (uppmätt i renderad DOM, per tema, korrekt attribuerat): "Pågår"-pillens accent-text på 9%-accent-tint =
-8.07:1 MÖRKT (ljus accent `#1fe082` mot mörk surface) / 4.77:1 LJUST (mörk accent `#0e7a44` mot vit surface),
+8.10:1 MÖRKT (ljus accent `#1fe082` mot mörk surface) / 4.77:1 LJUST (mörk accent `#0e7a44` mot vit surface),
 båda >= 4.5:1 (normal text). Det LJUSA temat ger den lägre ratiot (mörk accent på nästan-vit yta), korrekt
 ordning. Kort-glow:en sitter i NEDRE VÄNSTRA hörnet, pillen uppe till HÖGER (motsatta-hörn-disciplinen, §17),
 så glow:en aldrig lyfter pill-ytan och sänker text-kontrasten under AA.
