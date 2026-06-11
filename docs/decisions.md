@@ -5,6 +5,45 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T53 (#95): FÖRLÄNGD deadline till söndag 14 juni (gruppvinnare + champion)
+
+**Daniels beslut 2026-06-11 (källa, gissas inte):** de som inte hann tippa före premiären ska få
+till och med SÖNDAG 2026-06-14 23:59 svensk tid på sig att tippa GRUPPVINNARE/TVÅA och VM-VINNARE
+(champion). Spelade matcher ger inga match-poäng i efterhand , match-tipsen + bracket-SLOT-tipsen
+(M73..M104) behåller sina EGNA avsparks-lås (rörs INTE). Daniels ord: "så de som inte hann med
+premiären får en chans. men de matcher som spelats missar de givetvis poäng på." Issue #95.
+
+**FAST TIDPUNKT:** 2026-06-14 23:59 svensk tid = `2026-06-14T21:59:00Z`. Sverige är på sommartid
+(CEST, UTC+2) i juni, så 23:59 lokal = 21:59 UTC. Verifierad mot kalendern (sommartid gäller mars-okt).
+
+**KRITISK DESIGN-REGEL , FÖRLÄNG, FÖRKORTA ALDRIG (GREATEST):** nya deadlinen =
+`GREATEST(ursprungligt kickoff-ankare, fasta tiden)`. Grupperna G..L spelar sin FÖRSTA match EFTER
+14 juni (g-G-1..g-L-1 ligger 15-17 juni, verifierat mot t15-seeden / spelschemat: G=15/6 19:00Z,
+H=15/6 16:00Z, I=16/6, J=17/6 01:00Z, K=17/6 17:00Z, L=17/6 20:00Z). Att tvinga dem till fasta
+tiden skulle FÖRKORTA deras fönster och låsa ute folk. GREATEST ger A..F den förlängda söndagstiden
+(deras ankare ligger FÖRE 14/6) OCH låter G..L behålla sitt SENARE egna ankare. Champion-ankaret
+g-A-1 (11/6) ligger FÖRE fasta tiden => `GREATEST(g-A-1, fast)` = fasta tiden (champion förlängs).
+
+**EN SANNING (T35-principen), klient + DB:** regeln bor på EN plats per sida och speglar varandra
+EXAKT. DB: ny migration `20260611150000_t53_extended_deadline_group_and_champion.sql` inför
+`pool_extended_deadline()` + GREATEST i `group_deadline_kickoff` och champion-grenen av
+`bracket_deadline_kickoff` (slot-grenen orörd). Klient: `src/data/predictions/prediction-deadline.ts`
+(`POOL_EXTENDED_DEADLINE_ISO` + `applyExtendedDeadline`), inkopplad i `group-predictable-data.ts`,
+champion-delen av `bracket-predictable-slots.ts` och `derive-copy-locks.ts` (grupp + champion). Text
+(`formatDeadline`/`DeadlineNotice`) och lås härleds ur SAMMA `deadlineIso`, ingen dubblerad tid.
+
+**FAIL-SAFE bevarad:** ett saknat ankare (okänd grupp/slot) ger fortfarande NULL-deadline (skriv
+nekas / andras tips dolda), aldrig fasta tiden , `applyExtendedDeadline(null) = null`, och migrationen
+har en explicit `when ... is null then null`-gren (SQL:s `greatest` ignorerar annars NULL och hade
+gett ett öppet fönster). Verifierat live mot produktion (kmzhyblzxangpxydufve) med read-only-frågor
++ ett hårt skriv-prov genom riktig anonym session i ett isolerat test-rum (städat efteråt): grupp A
++ champion (tidigare LÅSTA) skriver nu igenom RLS, grupp G (sen) + slot M73 opåverkade.
+
+**Källa:** Daniels task-direktiv T53 (#95) + t15-seeden (spelschemat) + t16-RLS-migrationerna (de två
+deadline-helpers förändringen bygger på).
+
+---
+
 ## 2026-06-11 , T52 (#91): kopiera mina tips mellan rum
 
 Daniels live-feedback: "man ska kunna kopiera in sina resultat från ett rum till ett annat rum,

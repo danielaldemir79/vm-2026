@@ -20,6 +20,10 @@ export {
   type MatchPointType,
 } from './score';
 
+// T53 (#95): pool-tipsens FÖRLÄNGDA deadline (grupp + champion) , delad sanning för
+// fasta söndagstiden + GREATEST-regeln, speglar RLS-helpers (klient + DB en sanning).
+export { POOL_EXTENDED_DEADLINE_ISO, applyExtendedDeadline } from './prediction-deadline';
+
 // T16 (#16): pool-bonus-poängsättning (grupp- + bracket-tips).
 export {
   scoreGroupPrediction,
