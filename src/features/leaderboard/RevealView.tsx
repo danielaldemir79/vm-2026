@@ -27,8 +27,16 @@
 // allas tips MEN inget facit och INGA poäng (ärligt "Pågår", vi gissar aldrig poäng på
 // en oavgjord match, HARD T55). En FÄRDIG match (status 'finished') visar facit + poäng
 // + varför som förut. Diskriminanten gör att poäng-fälten strukturellt bara finns på den
-// färdiga grenen. design-frontend polerar pågår-läget ovanpå data-attribut-hakarna
-// (data-reveal-status, data-reveal-live-pick) efter denna funktionella nivå.
+// färdiga grenen.
+//
+// PÅGÅR-FINISHEN (design-frontend, ovanpå data-attribut-hakarna): pågår-kortet bär
+// appens PITCH-GRÖNA accent-identitet (.vm-reveal-card--live) i stället för facit-
+// kortets kvällsljus-guld, så de två kort-typerna skiljs på en blink. "Pågår"-markören
+// är en levande accent-pill med en pulsande prick (.vm-reveal-pending + .vm-pending-dot,
+// samma vm-pulse som dagshero:ns live-prick), pulsen stannar vid reducerad rörelse och
+// budskapet bärs då av form + ord, aldrig av enbart färg eller rörelse. Pågående tips
+// får en svag accent-vänsterkant (.vm-reveal-pick--live), "ligger på bordet, ännu inte
+// dömda". AA-mätt per tema, se tokens.css .vm-reveal-card--live-blocket.
 
 import { useMemo } from 'react';
 import { useLeaderboardStore } from './leaderboard-context';
@@ -207,17 +215,22 @@ function PendingMatchCard({
       data-reveal-match=""
       data-match-id={match.matchId}
       data-reveal-status="live"
-      className="vm-reveal-card rounded-card p-4"
+      className="vm-reveal-card vm-reveal-card--live rounded-card p-4"
     >
-      {/* Match-rubrik + PÅGÅR-markör (inget facit-tal än, matchen är inte avgjord). */}
+      {/* Match-rubrik + PÅGÅR-pill (inget facit-tal än, matchen är inte avgjord). Pillen
+          bär en pulsande accent-prick + ordet "Pågår": en LEVANDE markör (matchen rullar)
+          som ändå är tydligt skild från facit-kortets solida guld-bricka. Den pulsande
+          pricken är dekor (aria-hidden); ORDET "Pågår" är den lästa/upplästa etiketten,
+          så budskapet bärs av text + form, aldrig av enbart färg eller enbart rörelse. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="m-0 font-display text-sm font-semibold">
           {nameOf(match.homeTeamId)} mot {nameOf(match.awayTeamId)}
         </p>
         <span
           data-reveal-pending=""
-          className="inline-flex items-center rounded-pill px-2.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-fg-muted"
+          className="vm-reveal-pending inline-flex items-center gap-1.5 rounded-pill px-2.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.12em]"
         >
+          <span className="vm-pending-dot" aria-hidden="true" />
           Pågår
         </span>
       </div>
@@ -231,7 +244,7 @@ function PendingMatchCard({
               data-reveal-pick=""
               data-reveal-live-pick=""
               data-user-id={pick.userId}
-              className="vm-reveal-pick flex flex-wrap items-center gap-x-3 gap-y-1 py-1 pl-2 text-sm"
+              className="vm-reveal-pick vm-reveal-pick--live flex flex-wrap items-center gap-x-3 gap-y-1 py-1 pl-2 text-sm"
             >
               <span data-reveal-name="" className="min-w-0 flex-1 truncate">
                 {pick.displayName}
