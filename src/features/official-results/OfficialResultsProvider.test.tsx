@@ -80,6 +80,7 @@ function Probe() {
       >
         spara
       </button>
+      <button onClick={() => store.refresh().catch(() => {})}>refresh</button>
     </div>
   );
 }
@@ -161,6 +162,65 @@ describe('OfficialResultsProvider', () => {
       screen.getByText('spara').click();
     });
     await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('0'));
+  });
+
+  // Copilot R3: en lyckad refresh ska återhämta en tidigare felad init-load, annars
+  // fastnar UI:t i 'error' fast data nu är fräsch.
+  it('en lyckad refresh återhämtar ett tidigare ladd-fel (error -> ready, fel rensat)', async () => {
+    apiState.listError = new Error('RLS nej');
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('error'));
+
+    // Nästa hämtning lyckas: felet borta, facit finns.
+    apiState.listError = null;
+    apiState.results = [
+      {
+        matchId: 'g-A-1',
+        homeGoals: 1,
+        awayGoals: 0,
+        penalties: null,
+        status: 'finished',
+        updatedBy: 'admin',
+        updatedAt: 't',
+      },
+    ];
+    await act(async () => {
+      screen.getByText('refresh').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(screen.getByTestId('error').textContent).toBe('');
+    expect(screen.getByTestId('count').textContent).toBe('1');
+  });
+
+  // Copilot R3: när live-läget slås av (enabled false) ska facit + fel rensas, så ett
+  // gammalt facit inte ligger kvar i ett läge som ska vara vilande (fail-safe).
+  it('när live-läget slås av rensas facit + fel (vilande = fail-safe)', async () => {
+    apiState.results = [
+      {
+        matchId: 'g-A-1',
+        homeGoals: 2,
+        awayGoals: 1,
+        penalties: null,
+        status: 'finished',
+        updatedBy: 'admin',
+        updatedAt: 't',
+      },
+    ];
+    const { rerender } = render(
+      <OfficialResultsProvider env={liveEnv} liveReady={true} client={fakeClient}>
+        <Probe />
+      </OfficialResultsProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('1'));
+
+    rerender(
+      <OfficialResultsProvider env={liveEnv} liveReady={false} client={fakeClient}>
+        <Probe />
+      </OfficialResultsProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('0'));
+    expect(screen.getByTestId('error').textContent).toBe('');
+    expect(screen.getByTestId('status').textContent).toBe('ready');
   });
 
   it('inaktivt utan Supabase-env: enabled false, status ready, isAdmin false', async () => {
