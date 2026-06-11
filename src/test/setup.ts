@@ -5,6 +5,17 @@ import '@testing-library/jest-dom/vitest';
 import { MotionGlobalConfig } from 'motion/react';
 import { vi } from 'vitest';
 
+// virtual:pwa-register finns BARA i ett riktigt Vite-bygge, inte i Vitest. Tester
+// som monterar hela appen (App.test) går via den riktiga useAppUpdate ->
+// registerAppSw som dynamiskt importerar modulen. Vi mockar den globalt till en
+// no-op registerSW så app-monteringen inte försöker lösa ett obefintligt modul-id.
+// useAppUpdate-LOGIKEN testas separat mot en INJICERAD fake-register
+// (use-app-update.test.tsx), så denna mock döljer inget beteende, den gör bara
+// monterings-seam:et inert (T43/#74).
+vi.mock('virtual:pwa-register', () => ({
+  registerSW: () => async () => {},
+}));
+
 // Gör ALL motion-animation momentan i testmiljön (deterministisk svit).
 //
 // VARFÖR: motion-komponenter (motion.div m.fl.) kör annars sina in-animationer
