@@ -34,14 +34,15 @@
 // eller felande match får ALDRIG stoppa resten, vi fortsätter och summerar utfallet.
 
 import type { VmSupabaseClient } from '../supabase-browser';
-import {
-  listMyPredictions,
-  upsertMyPrediction,
-  listMyGroupPredictions,
-  upsertMyGroupPrediction,
-  listMyBracketPredictions,
-  upsertMyBracketPrediction,
-} from './index';
+// Importera de återanvända API-funktionerna DIREKT ur sina käll-moduler, INTE via
+// barrel:n `./index` (T52 Copilot-runda-1, F1). `index.ts` re-exporterar denna fil,
+// så en import härifrån tillbaka till `./index` blir en cirkulär modul-referens
+// (ESM/bundler-risk: oinitierad re-export kan ge undefined vid load, och cirkeln gör
+// modulen svårmockad i test). Direkt-importen bryter cykeln och håller beroende-grafen
+// riktad: index -> copy-predictions -> {predictions,group,bracket}-api.
+import { listMyPredictions, upsertMyPrediction } from './predictions-api';
+import { listMyGroupPredictions, upsertMyGroupPrediction } from './group-predictions-api';
+import { listMyBracketPredictions, upsertMyBracketPrediction } from './bracket-predictions-api';
 
 /** Vilken tips-kategori ett resultat gäller (för rapportens uppdelning). */
 export type CopyCategory = 'match' | 'group' | 'bracket';

@@ -8,12 +8,15 @@ import {
 import type { VmSupabaseClient } from '../supabase-browser';
 import type { TeamCode } from '../../domain/team-code';
 
-// Vi mockar HELA API-ytan (data/predictions/index) som copy-predictions återanvänder,
-// så testet fokuserar på orkestreringen (regel-flödet + rapporten), inte Supabase.
+// Vi mockar de KÄLL-moduler copy-predictions importerar DIREKT ur (predictions-api,
+// group-predictions-api, bracket-predictions-api), inte barrel:n ./index (F1: barrel-
+// importen var cirkulär eftersom index re-exporterar copy-predictions). Att mocka käll-
+// modulerna träffar exakt de funktioner produktionskoden nu binder, och håller testet
+// fritt från Supabase, så fokus blir orkestreringen (regel-flödet + rapporten).
 // Det BEVISAR också regel 1 (bara egna tips): kopieringen läser BARA via listMy* och
 // skriver BARA via upsertMy*, aldrig en bredare läsning som listRoom* (skulle dra in
-// andras tips). Vi assertar nedan att listRoom* aldrig rörs och att skriv går till
-// MÅL-rummet.
+// andras tips). listRoom* mockas kvar (de bor i samma käll-moduler) så vi kan asserta
+// att de ALDRIG rörs , nu trivialt sant eftersom copy-predictions inte ens importerar dem.
 const api = {
   listMyPredictions: vi.fn(),
   upsertMyPrediction: vi.fn(),
@@ -26,15 +29,19 @@ const api = {
   listRoomBracketPredictions: vi.fn(),
 };
 
-vi.mock('./index', () => ({
+vi.mock('./predictions-api', () => ({
   listMyPredictions: (...a: unknown[]) => api.listMyPredictions(...a),
   upsertMyPrediction: (...a: unknown[]) => api.upsertMyPrediction(...a),
+  listRoomPredictions: (...a: unknown[]) => api.listRoomPredictions(...a),
+}));
+vi.mock('./group-predictions-api', () => ({
   listMyGroupPredictions: (...a: unknown[]) => api.listMyGroupPredictions(...a),
   upsertMyGroupPrediction: (...a: unknown[]) => api.upsertMyGroupPrediction(...a),
+  listRoomGroupPredictions: (...a: unknown[]) => api.listRoomGroupPredictions(...a),
+}));
+vi.mock('./bracket-predictions-api', () => ({
   listMyBracketPredictions: (...a: unknown[]) => api.listMyBracketPredictions(...a),
   upsertMyBracketPrediction: (...a: unknown[]) => api.upsertMyBracketPrediction(...a),
-  listRoomPredictions: (...a: unknown[]) => api.listRoomPredictions(...a),
-  listRoomGroupPredictions: (...a: unknown[]) => api.listRoomGroupPredictions(...a),
   listRoomBracketPredictions: (...a: unknown[]) => api.listRoomBracketPredictions(...a),
 }));
 

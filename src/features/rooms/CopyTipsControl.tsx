@@ -25,7 +25,7 @@
 // betydelsen (färg-oberoende a11y). Tonerna är AA-mätta mot tokens per tema
 // (rooms.css §7, decisions.md T52).
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRoomsStore } from './rooms-context';
 import type { CopyReport } from '../../data/predictions';
 import { summarizeCopyReport } from './copy-report-summary';
@@ -95,6 +95,24 @@ function resultGlyph(status: CopyState['status'], tone: ResultTone): string {
 }
 
 /**
+ * Live-region-roll för besked-rutan, VILLKORLIG per utfall (T52 Copilot-runda-1, F5),
+ * i linje med resten av RoomPanel (hårt fel = role="alert"/assertive, status/notiser =
+ * role="status"/polite). Ett FEL-utfall (tone 'negative') ska annonseras assertivt: det
+ * gäller både en kastad LÄSmiss (status 'error') OCH ett svalt SKRIVfel som engine:n
+ * inte kastar för (status 'done', failed > 0) , just den fel-klass T52:s ton-logik
+ * lyfte fram. Lyckat/neutralt/pågående annonseras artigt (polite), så de inte avbryter
+ * skärmläsaren i onödan. Returnerar role + matchande aria-live så de aldrig glider isär.
+ */
+function liveRegion(tone: ResultTone): {
+  role: 'alert' | 'status';
+  ariaLive: 'assertive' | 'polite';
+} {
+  return tone === 'negative'
+    ? { role: 'alert', ariaLive: 'assertive' }
+    : { role: 'status', ariaLive: 'polite' };
+}
+
+/**
  * Kontrollen som låter användaren kopiera sina tips från ett annat rum in i det aktiva.
  * Returnerar null (inget UI) när det inte finns något att kopiera, så panelen inte
  * visar en tom ruta (samma princip som RoomSection i fixtures-läge).
@@ -102,10 +120,29 @@ function resultGlyph(status: CopyState['status'], tone: ResultTone): string {
 export function CopyTipsControl() {
   const store = useRoomsStore();
   // Spårar utfallet PER käll-rum (roomId -> CopyState), så varje rad har sitt eget
-  // besked och sin egen "kopierar ..."-spinner utan att störa de andra.
+  // besked och sin egen "kopierar ..."-spinner utan att störa de andra. Nyckeln är
+  // KÄLL-rummets id; tillståndet beskriver en kopiering IN i det AKTIVA (mål-)rummet.
   const [stateByRoom, setStateByRoom] = useState<Record<string, CopyState>>({});
 
   const active = store.activeRoom;
+  const activeId = active?.id ?? null;
+
+  // VARFÖR denna ref + effekt (T52 Copilot-runda-1, F2-F4): RoomPanel REMOUNTAR inte
+  // CopyTipsControl när det aktiva rummet byts, så `stateByRoom` (knutet till det FÖRRA
+  // mål-rummet) lever kvar. Utan städning kan ett klart/pågående kopierings-resultat
+  // som gällde mål-rum B visas kvar och MISSTOLKAS som ett resultat in i nya mål-rummet
+  // C. `activeRoomRef` håller alltid det rum som är aktivt NU, så en asynkron kopiering
+  // som startades mot ett rum kan jämföra före varje setState och vägra skriva tillbaka
+  // status i FEL mål-rum (race-skydd, fix (b)+(c)).
+  const activeRoomRef = useRef<string | null>(activeId);
+  useEffect(() => {
+    activeRoomRef.current = activeId;
+    // Fix (a): nollställ besked-tillståndet när MÅL-rummet byts. Allt i stateByRoom
+    // beskrev en kopiering in i det förra rummet och får inte hänga med till det nya.
+    // (Körs även vid första mount: stateByRoom är då redan tomt, så det är en no-op.)
+    setStateByRoom({});
+  }, [activeId]);
+
   if (!active) {
     return null; // inget aktivt mål-rum -> inget att kopiera till
   }
@@ -116,6 +153,11 @@ export function CopyTipsControl() {
   }
 
   const handleCopy = async (sourceRoomId: string, sourceName: string) => {
+    // Lås fast vilket MÅL-rum denna kopiering gäller. Servern skriver alltid in i det
+    // rum som var aktivt NÄR vi startade (store.copyMyTips läser store.activeRoom i
+    // samma ögonblick); byter användaren rum medan anropet är i luften får utfallet
+    // INTE skrivas in i det nya rummets vy. Vi jämför mot activeRoomRef före varje set.
+    const targetWhenStarted = activeId;
     setStateByRoom((prev) => ({
       ...prev,
       [sourceRoomId]: {
@@ -126,6 +168,12 @@ export function CopyTipsControl() {
     }));
     try {
       const report: CopyReport = await store.copyMyTips(sourceRoomId);
+      // Race-guard (fix (b)/(c)): har mål-rummet bytts under tiden, släpp resultatet
+      // tyst. Det gällde det FÖRRA rummet, och effekten ovan har redan tömt vyn för
+      // det nya. Att skriva här skulle återinföra ett gammalt resultat i fel rum.
+      if (activeRoomRef.current !== targetWhenStarted) {
+        return;
+      }
       setStateByRoom((prev) => ({
         ...prev,
         [sourceRoomId]: {
@@ -135,6 +183,11 @@ export function CopyTipsControl() {
         },
       }));
     } catch (err) {
+      // Samma race-guard i fel-grenen: ett fel som gällde det förra mål-rummet får inte
+      // heller dyka upp i det nya (annars läcker en gammal kopierings-status över).
+      if (activeRoomRef.current !== targetWhenStarted) {
+        return;
+      }
       // En LÄSmiss (kan inte kopiera blint) fail-loud:ar hit. Vi visar felets text,
       // ingen tyst "det gick bra"-lögn (PRINCIPLES §8).
       setStateByRoom((prev) => ({
@@ -175,6 +228,8 @@ export function CopyTipsControl() {
         {otherRooms.map((room) => {
           const cs = stateByRoom[room.id] ?? IDLE;
           const isBusy = cs.status === 'busy';
+          // Villkorlig live-region per utfall (F5): fel = alert/assertive, annars status/polite.
+          const live = liveRegion(cs.tone);
           return (
             <li key={room.id} data-rooms-copy-source data-source-id={room.id}>
               <button
@@ -205,8 +260,8 @@ export function CopyTipsControl() {
               </button>
               {cs.message && (
                 <p
-                  role="status"
-                  aria-live="polite"
+                  role={live.role}
+                  aria-live={live.ariaLive}
                   data-rooms-copy-result
                   data-result-status={cs.status}
                   data-result-tone={cs.tone}
