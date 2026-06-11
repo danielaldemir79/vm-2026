@@ -19,6 +19,7 @@ function renderForm(overrides: Partial<ComponentProps<typeof GroupPredictionForm
       teams={TEAMS}
       current={null}
       locked={false}
+      deadlineIso="2026-06-20T18:00:00.000Z"
       onSubmit={onSubmit}
       {...overrides}
     />
