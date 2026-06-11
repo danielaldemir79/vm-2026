@@ -20,6 +20,7 @@ import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
 import { PredictionSection } from './features/predictions';
+import { GroupPredictionSection } from './features/group-predictions';
 import {
   InstallBanner,
   OnboardingDialog,
@@ -230,6 +231,17 @@ function AppShell() {
             frontend ger premium-finish ovanpå. */}
         <Slide direction="up">
           <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
+        </Slide>
+
+        {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
+            grupp FÖRE gruppspelet. Per rum, deadline per grupp (gruppens första
+            match), server-side RLS-lås + sekretess (bevisat med riktiga sessioner).
+            Funktionellt + tillgängligt UI byggs här; design-frontend ger finishen.
+            Bracket-/slutspels-tipsen (vem går vidare per slot + VM-vinnaren) har
+            full datakärna (schema/RLS/poäng/API) men dess UI är en pinnad
+            fortsättning, se T16 HANDOFF + docs/decisions.md. */}
+        <Slide direction="up">
+          <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
         </Slide>
 
         <footer className="border-t border-border pt-6 text-sm text-fg-muted">
