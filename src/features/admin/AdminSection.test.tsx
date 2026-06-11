@@ -121,6 +121,24 @@ describe('AdminSection, gating', () => {
     expect(document.querySelector('[data-admin-entry]')).not.toBeNull();
     expect(document.querySelector('[data-admin-readonly]')).toBeNull();
   });
+
+  // T48 (#81): arrangörs-inloggningen ska vara DISKRET, tuckad bakom en lågmäld
+  // utfällning (<details>), inte en prominent inloggnings-ruta. Vanliga vänner
+  // möts bara av den lugna read-only-noten + en diskret "Är du arrangör?"-ingång.
+  it('icke-admin: inloggningen är diskret (bakom en STÄNGD <details>-utfällning)', () => {
+    renderSection(officialStore({ isAdmin: false }));
+    const disclosure = document.querySelector('[data-admin-organizer-disclosure]');
+    expect(disclosure).not.toBeNull();
+    // STÄNGD som standard (open-attributet saknas) => login-formen är inte framme.
+    expect((disclosure as HTMLDetailsElement).open).toBe(false);
+    // Den lågmälda ingångs-raden (summary) finns med en arrangörs-fråga, inte en
+    // prominent "logga in"-rubrik direkt i flödet.
+    const toggle = document.querySelector('[data-admin-organizer-toggle]');
+    expect(toggle).not.toBeNull();
+    expect(toggle?.textContent).toMatch(/arrangör/i);
+    // Login-flödet bor INUTI utfällningen (gömt tills man fäller ut), inte löst i sektionen.
+    expect(disclosure?.querySelector('[data-admin-login]')).not.toBeNull();
+  });
 });
 
 describe('AdminResultEntry, save mot global facit', () => {
