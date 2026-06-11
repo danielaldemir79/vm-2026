@@ -100,6 +100,24 @@ describe('App-skalet', () => {
     expect(signature).toHaveTextContent('Made by Daniel Aldemir');
     await waitForAppSettled();
   });
+
+  it('signatur-namnet länkar till danielaldemir.com med tabnabbing-skydd (T39, #68)', async () => {
+    const { container } = renderApp();
+
+    // Länk-kontraktet vaktas (F2): rätt href + ny flik + rel mot tabnabbing. Utan
+    // detta test kan en framtida refaktor tyst tappa target/rel (öppnar i samma
+    // flik, eller exponerar window.opener) utan att något fångar det.
+    const link = container.querySelector('[data-app-signature] a') as HTMLAnchorElement | null;
+    expect(link).not.toBeNull();
+    expect(link).toHaveAttribute('href', 'https://www.danielaldemir.com');
+    expect(link).toHaveAttribute('target', '_blank');
+    // rel måste ha BÅDE noopener (kapar window.opener, hindrar tabnabbing) och
+    // noreferrer (läcker ingen referrer). Ordnings-oberoende koll på tokens.
+    const rel = (link?.getAttribute('rel') ?? '').split(/\s+/);
+    expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
+    await waitForAppSettled();
+  });
 });
 
 // Install-bannern gatas bakom onboarding-touren (T39/#68, F1): touren är en z-50
