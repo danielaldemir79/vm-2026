@@ -5,6 +5,92 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T16-visuellt (#16): gruppvinnar-tips premium-finish, PODIUM-KUPONG (design-frontend)
+
+Det visuella lagret ovanpå senior-devs funktionella grupp-tips-UI. Mål: "tippa hela gruppspelet"-
+momentet , VM-kupongen man fyller i med kompisarna , ska kännas KUL och tydligt, utan att lämna
+"arena i kvällsljus"-familjen eller bryta senior-devs data-attribut/test-kontrakt.
+
+**1. IDENTITET, "PODIUM-KUPONG" (taskens punkt 1, DRY mot T15):** grupp-tipset ärver HELA T15:s
+tips-kupong-fond (`.vm-coupon-card` i tokens.css §10: guld-hörn-glow, inset guld-topplist, hover-lyft,
+låst-dämpning), så grupp-tipset och match-tipset hör tydligt till SAMMA kupong-familj , en sanning för
+"det här är en tips-kupong", ingen andra-kort-fond. Ovanpå läggs en egen PODIUM-metafor (tokens.css §11
+`.vm-pool-*`): 1:a = GULD-medalj, 2:a = SILVER-medalj. Guld + silver = en pallplats, det universella
+"vem stod överst". Varje plats-rad får sin medalj + en medalj-tonad vänsterkant + en TeamFlag-
+förhandsvisning (T7-discen, återbrukad) av det valda laget, så valet syns visuellt direkt , inte två
+grå dropdowns. "POOL"-eyebrow + biljett-ikon + guld kupong-prick i legenden ärver T15:s signatur.
+
+**2. SELECT BEHÅLLS (a11y + testkontrakt, INTE chip-knappar):** taskens "chips/rader" tolkas som det
+VISUELLA lagret (medalj + flagga + ton) ovanpå senior-devs semantiska `<select>`, inte en ersättning.
+Att byta `<select>` mot chip-knappar skulle bryta 6 tester (`getByLabelText` -> select, `.value`-
+assertions) OCH tappa den inbyggda tangentbords-/skärmläsar-semantiken ett native `<select>` ger gratis.
+Native select = bäst a11y + testkontraktet hålls; medalj/flagga/podium-lagret bär "kul"-känslan.
+
+**3. MITT TIPS, ett STOLT podium (taskens punkt 1):** ett sparat/seedat grupp-tips visas som en kompakt
+pallplats-rad , guld-medalj + 1:ans lag, silver-medalj + 2:ans lag (`.vm-pool-podium`). Medalj-siffrorna
+(1/2) står som mörk ink på en SOLID medalj-yta (färg-OBEROENDE solid-bricka-formen, T9/T11/T15), AA-säker
+i båda teman , aldrig guld/silver-som-text-på-tint (den kända fällan, lessons aa-kontrast). Sparat-
+brickan ("Sparat" + bock) återbrukar T15:s `.vm-coupon-mine` (solid guld + near-black ink).
+
+**4. LÅST-LÄGET, elegant + POSITIVT (taskens punkt 2):** efter gruppens första match dämpas kupongen
+(guld-till-neutral, ingen hover-lyft, "inlämnad/avgjord"-känsla) och en låst-etikett med HÄNGLÅS
+(`.vm-coupon-lock-icon`, lugn engångs-puls, nollad vid reducerad rörelse) visas: "Låst vid gruppens
+första match, så alla tippar blint." POSITIV inramning (spelets rättvisa), inte frustration. Mitt podium
+står KVAR synligt under etiketten. Dämpnings-receptet är T15:s `.vm-coupon-card`-låst-regel, UTÖKAD att
+matcha BÅDA nycklarna (`data-prediction-locked` OCH `data-group-prediction-locked`) , en sanning, samma
+recept för båda kupong-typerna. Väljarna renderas fortfarande (disabled via fieldset, men `sr-only` när
+låst) så låst-kontraktet håller (väljare finns + disabled) och en skärmläsare ser vad jag tippat , samma
+kontrakt-anda som T15.
+
+**5. "GÅ MED I ETT RUM"-läget, INBJUDANDE (taskens punkt 3):** porten är en guld-tonad ruta med en rund
+kupong-ikon-bricka + tydlig rubrik + en väg framåt ("Skapa eller gå med i ett rum ovanför, så öppnar
+kupongerna här"), inte en grå rad. En inbjudan, inte ett fel. `data-group-predictions-no-room` bevarat.
+
+**6. NYA SILVER-TONER (för podiumets 2:a-medalj, samma guld/silver-på-ljus-disciplin):** guld bärs redan
+av appen (`--vm-gold`/`--color-warning`). Silver är NYTT: `--vm-silver` (medalj-fyllnad, DEKOR),
+`--vm-silver-ink` (near-black ink PÅ en fylld silver-medalj), `--vm-silver-text` (silver som TEXT/ikon,
+en SEPARAT ton , i ljust tema en djup slate #52606e, eftersom den ljusa platinan faller under AA som
+text på vit yta, exakt guld-på-ljus-fällan). Egna tokens per tema, mätning bunden till silver-hue:n.
+
+**7. RESPONSIV GRID:** grupp-korten är `grid-cols-1 sm:grid-cols-2 xl:grid-cols-3` , 1 kolumn på smal
+mobil/vikbar cover, 2 på surfplatta, 3 på bred skärm (12 grupper läses bättre i 3 kolumner). KRITISK
+overflow-fix: ett `<select>` krymper inte under sin längsta `<option>` (intrinsisk min-content) i en
+flex-rad , utan `min-w-0` på fieldset + flex-raden + select:en spränger ett långt lagnamn ("Bosnien och
+Hercegovina") kolumnen på 280px. `min-w-0` låter select:en följa `w-full` och options-texten trunceras.
+
+**KONTRAST UPPMÄTT (canvas-komposit, VÄRSTA fall, alfa-blend över base-yta, BÅDA teman, ej typfall):**
+varje text-/ikon-yta mätt mot den FAKTISKT komponerade fonden (guld-glow/tint inräknad), inte mot
+token-hex:en. ALLA klarar WCAG AA som NORMAL text (>= 4.5:1), inkl. de vars formella krav bara är 3:1
+(ikoner). MIN-värden: **mörkt tema 5.61:1, ljust tema 4.78:1** (4.78 är no-room-ikonen, krav 3:1; lägsta
+4.5-krav-element är fel-texten 4.81 ljust). Per yta (mörkt / ljust):
+- Eyebrow "POOL" + 1:a-etikett (warning) på kupong-fond: 8.40 / 5.37
+- 2:a-etikett (--vm-silver-text) på kupong-fond: 8.75 / 5.84
+- Grupp-rubrik + podium-lagnamn (fg) på kupong-/podium-fond: 12.68-13.26 / 16.22-16.59
+- Guld-medalj-siffra (coupon-ink) på SOLID guld: 10.90 / 5.03
+- Silver-medalj-siffra (silver-ink) på SOLID silver: 10.99 / 8.40
+- Låst-rubrik (fg) / låst-förklaring (fg-muted) på låst-yta (guld 7% / bg): 15.16, 7.46 / 15.12, 5.51
+- Hänglås-ikon (warning) på låst-yta [krav 3:1]: 10.03 / 5.00
+- Sparat-bricka ink (coupon-ink) på SOLID guld: 10.90 / 5.03
+- Spar-knapp (accent-fg) på accent: 10.85 / 5.40
+- Öppen-räknare (fg-muted) på guld-8%-chip: 6.39 / 5.97
+- "Gå med i rum"-rubrik (fg) / brödtext (fg-muted) på guld-6%-yta: 13.56, 6.67 / 16.77, 6.11
+- "Gå med i rum"-kupong-ikon (warning) på guld-14%-bricka [krav 3:1]: 6.53 / 4.78
+- Fel-text (danger) på danger-9%/OPAK-surface: 5.61 / 4.81
+Metod: WCAG relativ luminans + ratio, color-mix som gamma-sRGB-interpolation (per CSS-spec), alfa-
+komposit source-over i gamma-rummet (som webbläsaren). Engångsprob, raderad efter (samma mönster som
+T15-mätningen; delade element matchar T15:s siffror exakt, t.ex. guld-medalj 10.90/5.03, accent-knapp
+10.85/5.40).
+
+**RESPONSIVT + A11Y VERIFIERAT LIVE (Playwright mot dev-render, isolerad harness, raderad efter):**
+ingen horisontell overflow på 280 (vikbar cover) / 375 / 768 / 1440 px i BÅDA teman (scrollW == clientW
+överallt , bekräftat EFTER `min-w-0`-fixen; FÖRE fixen sprängde select:ens min-content kolumnen till
+454px). Fokus-ring bevisad LIVE: select ger `:focus-visible == true` + `outline: solid 2px` (accent-ring,
+index.css). Reduced-motion: hänglås-pulsen + slot-border-transition gatade under `@media (prefers-
+reduced-motion: no-preference)` / nollade vid `reduce`. Tester: alla 912 gröna, senior-devs data-attribut
++ strängar + select-semantik bevarade.
+
+---
+
 ## 2026-06-11 , T16 (#16): pool-tipsen, gruppvinnar-tips + bracket-/slutspels-tips (modell + poäng + RLS)
 
 VM-poolens kärna (SPEC §6: GroupPrediction + BracketPrediction). Bygger PÅ T15:s mönster
