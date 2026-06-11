@@ -224,15 +224,15 @@ function AppShell() {
                 <SimulationBanner />
               </Slide>
 
-              {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): bara
-                  arrangören (admin) ser den delade/officiella inmatningen. En vanlig
-                  vän ser den BARA när what-if-läget är PÅ (då är inmatningen den
-                  lokala "tänk om"-leken, skriver aldrig delat/officiellt facit, se
-                  ResultEntryGate). I fixtures-läge är den oförändrat alltid synlig.
-                  ResultEntryGate renderar inget (inkl. Panelen via `surface`) när vyn
-                  ska döljas, så ingen tom ruta blir kvar. Design-frontends premium-
-                  firande kopplas in via render-proppen (kroken styr trigger/timing/
-                  reduced-motion, overlayn ritar bara explosionen). */}
+              {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): i live
+                  visas inmatningen BARA när what-if-läget är PÅ, för ALLA inkl.
+                  arrangören (då är den den lokala "tänk om"-leken, skriver aldrig
+                  delat/officiellt facit, se ResultEntryGate). Officiella resultat
+                  matas in via AdminResultEntry (AdminSection). I fixtures-läge är den
+                  oförändrat alltid synlig. ResultEntryGate renderar inget (inkl. Panelen
+                  via `surface`) när vyn ska döljas, så ingen tom ruta blir kvar. Design-
+                  frontends premium-firande kopplas in via render-proppen (kroken styr
+                  trigger/timing/reduced-motion, overlayn ritar bara explosionen). */}
               <Slide direction="up">
                 <ResultEntryGate
                   surface={(children) => <Panel>{children}</Panel>}

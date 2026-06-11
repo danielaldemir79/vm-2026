@@ -287,15 +287,15 @@ export function ResultsProvider({
   // körts (t.ex. en realtids-push eller ett test som setMatches:ar en färdig
   // matchlista). Genom att bara reagera på en ÄKTA ändring av facit/rum rör vi aldrig
   // den lokala/setMatches-drivna vägen, bara när facit-källan faktiskt ger ny data.
-  const prevRoomRef = useRef<{ roomId: string | null; results: RoomMatchResult[] }>({
+  const prevFacitRef = useRef<{ roomId: string | null; results: RoomMatchResult[] }>({
     roomId: activeRoomId,
     results: facitResults,
   });
   useEffect(() => {
-    const prev = prevRoomRef.current;
+    const prev = prevFacitRef.current;
     const roomChanged = prev.roomId !== activeRoomId;
     const resultsChanged = prev.results !== facitResults;
-    prevRoomRef.current = { roomId: activeRoomId, results: facitResults };
+    prevFacitRef.current = { roomId: activeRoomId, results: facitResults };
     if (!roomChanged && !resultsChanged) {
       return; // inget facit-/rums-relaterat ändrades: rör inte den lokala/setMatches-vägen
     }
