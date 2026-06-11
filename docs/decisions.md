@@ -5,6 +5,27 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T49 (#84): VM-vinnar-poängen höjd 8p -> 20p
+
+`CHAMPION_PREDICTION_POINTS` (`src/data/predictions/bonus-score.ts`) ändrad från 8 till **20**.
+
+**Beslut + källa (gissas inte, det är ett VAL inte en härledd regel):** Daniels poäng-beslut inför
+delning (pre-share). Mästar-tipset ska väga tydligt tyngst, det är turneringens svåraste enskilda
+gissning (1 lag av 48, blint före första matchen). 20 valdes för att matcha match-skalan rent:
+exakt match = 3p, så 20 motsvarar dryga 6 exakta matcher, en kännbar men inte absurd tyngd. Daniel
+SÄNKTE från sitt ursprungliga 50 just för att hålla skalan rimlig mot 3p-matcherna. Invarianten
+"mästaren väger tyngst" (> djupaste bracket-rundan, 5p) gäller fortfarande och är test-vaktad.
+
+**Påverkan (allt uppdaterat så inget driftar):** konstanten + dess VARFÖR-kommentar (bonus-score.ts),
+poängregel-headern i samma fil, testerna i `bonus-score.test.ts` (konstant-assertion 8 -> 20) och
+`aggregate-scores.test.ts` (summa-testet OMRÄKNAT 17 -> 29: 3+5+1+20), poäng-raden ovan (punkt 3 i
+T16-blocket), `supabase/README.md` (poängregel-noten) och kommentaren i T16-bracket-schema-migrationen
+(ren beskrivande kommentar i en redan applicerad migration, ändras bara för att doc:en ska vara sann,
+DB-tillståndet rörs inte). Special-tips-UI:t (T16b) visar ingen poäng-siffra för mästaren, så ingen
+UI-copy behövde ändras.
+
+---
+
 ## 2026-06-11 , T48 (#81, skärpning + Copilot R2): DOLD arrangörs-ingång + rums-byte väver inte om i live
 
 Två efterföljande ändringar ovanpå T48-blocket nedan (samma branch/PR), drivna av Daniels skärpta
@@ -912,7 +933,8 @@ resultat" på rubriknivå, inga exakta bonustal. Vi följer den VEDERTAGNA pool-
     (R32=1, R16=2, kvart=3, semi=4, brons/final=5). Standard i bracket-pooler (t.ex. ESPN
     Tournament Challenge-familjen: poängen ökar/dubblas per runda); vi väljer en enkel linjär
     1..5, INTE en härmning av en specifik produkts exakta tal.
-  - **Mästaren:** rätt VM-vinnare = **8p** (störst, ett svårt enskilt tips).
+  - **Mästaren:** rätt VM-vinnare = **20p** (störst, ett svårt enskilt tips). Höjt från 8p i T49
+    (#84, se decision-rad nedan).
   **Källa:** vedertagen VM-pool-/bracket-standard (1:a > 2:a; djupare runda väger tyngre; mästaren
   ger störst bonus). Rena funktioner `scoreGroupPrediction` / `scoreBracketAdvance` /
   `scoreChampionPrediction` (`src/data/predictions/bonus-score.ts`), uttömmande testade.
