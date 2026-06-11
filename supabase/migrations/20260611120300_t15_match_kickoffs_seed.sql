@@ -4,7 +4,7 @@
 -- (src/data/wc2026/matches.ts, värde-låst mot den svenska TV-tablån). Tiderna är
 -- EXAKT samma instant som klient-bundlens kickoff, så deadline-låset (RLS på
 -- predictions) och klient-UI:t aldrig kan drifta isär om när en match stänger.
--- Värde-låst mot matches.ts i CI av match-kickoffs-seed.test.ts (regenerera-och-
+-- Värde-låst mot matches.ts i CI av kickoff-seed.test.ts (regenerera-och-
 -- diffa). Idempotent (on conflict do update), så en körning om/efter en tid-
 -- uppdatering är säker.
 

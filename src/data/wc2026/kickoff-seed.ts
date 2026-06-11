@@ -6,7 +6,7 @@
 // men "stängd" i klienten, eller tvärtom). I stället för att handknappa 104 rader
 // genererar vi seed-SQL:en ur matches.ts (EN sanning för tiderna) och VÄRDE-LÅSER
 // den genererade migrationen mot den committade ur denna modul i CI
-// (match-kickoffs-seed.test.ts: regenerera-och-diffa). Samma källåkrings-mönster
+// (kickoff-seed.test.ts: regenerera-och-diffa). Samma källåkrings-mönster
 // som matchplanen själv (docs/patterns.md, gissningskanslig-data-genereras...).
 //
 // REN: in = matchlistan, ut = en SQL-sträng. Ingen IO, fristående testbar. Skriptet
@@ -69,7 +69,7 @@ const HEADER = `-- GENERERAD FIL, redigera inte för hand. Se scripts/generate-k
 -- (src/data/wc2026/matches.ts, värde-låst mot den svenska TV-tablån). Tiderna är
 -- EXAKT samma instant som klient-bundlens kickoff, så deadline-låset (RLS på
 -- predictions) och klient-UI:t aldrig kan drifta isär om när en match stänger.
--- Värde-låst mot matches.ts i CI av match-kickoffs-seed.test.ts (regenerera-och-
+-- Värde-låst mot matches.ts i CI av kickoff-seed.test.ts (regenerera-och-
 -- diffa). Idempotent (on conflict do update), så en körning om/efter en tid-
 -- uppdatering är säker.
 
