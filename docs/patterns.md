@@ -748,3 +748,60 @@ text + ikon (inte bara ton), välja en ton utanför rollfärgerna och mäta tint
 canvas-komposit i värsta fallet, blir markeringen både premium och tillgänglig per konstruktion.
 Generaliserar till vilket "utkast/förhandsgransknings/sandlåde"-läge som helst. Källa: T12-visuellt
 (`SimulationFrame.tsx` + `SimulationBanner.tsx`, tokens i `tokens.css` § SIM-TON + §8, `App.tsx`).
+
+### poang-aggregering-mot-harlett-facit-med-identitets-mappning-vid-kallan (VM 2026)
+
+**Recept (aggregera poäng från flera tips-typer mot ett härlett facit, utan tyst identitets-drift):**
+
+1. **EN ren facit-modul (`derive-*-facit.ts`)** härleder det FAKTISKA utfallet ur den ENDA sanningen
+   (här rummets delade, vävda matchlista). Den RÄKNAR INTE om någon domänlogik, den DELEGERAR till
+   de redan testade härledningarna (`computeStandings`/`deriveBracket`) och plockar ut utfallen
+   (avgjorda matcher, klara grupper, avgjorda slots, mästaren). Bara AVGJORDA utfall kommer med
+   (ett tips ger poäng FÖRST när dess match/grupp/slot är avgjord), så poängen är meningsfull löpande.
+2. **MAPPA IDENTITETS-RYMDEN VID FACIT-KÄLLAN, inte i poängfunktionen** (kärnan i T16 F1-lärdomen):
+   när tipsen lagras i EN rymd (versal code) men facit härleds i en ANNAN (gemen id), mappa
+   id -> code (branded `TeamCode`) via lag-listan INNAN facit lämnar modulen. Då bär BÅDA sidor av
+   poäng-jämförelsen samma rymd, en gemen id kan strukturellt inte nå poängfunktionen, och kontraktet
+   bor i TYPEN. FAIL LOUD om ett härlett facit-id saknar en code (brutet referens-kontrakt), aldrig
+   tyst. (Behåll poängfunktionens egen normalisering som defense-in-depth.)
+3. **EN ren aggregerings-modul (`aggregate-scores.ts`)** indexerar facit (O(1)-uppslag per nyckel) och
+   summerar varje medlems poäng över ALLA tips-typer mot facit via de RENA poängfunktionerna (DRY).
+   Ett tips bidrar bara om dess utfall finns i facit (annars 0, inget facit än). En medlem UTAN tips
+   är med i listan (0p), visas inte bort.
+4. **RANGORDNING: delad placering vid lika poäng** (samma rank, nästa distinkta hoppar fram, "1,1,3").
+   TIEBREAKET avgör bara VISNINGS-ordningen inom en delad grupp (här fler exakta träffar, sen namn
+   alfabetiskt sv-locale), det BRYTER ALDRIG den delade placeringen. Härled "exakt"-tröskeln ur
+   poängregelns konstant (`PREDICTION_POINTS.exact`), ingen magisk siffra.
+5. **BEVISA SEAMEN MED RIKTIGT FACIT (inte handskrivna strängar i samma rymd):** ett seam-test kör de
+   RIKTIGA härledningarna på en produktions-fixture, plockar härlett `teamId`/`winnerTeamId` (gemen
+   id) och kräver full poäng mot ett code-lagrat tips. MUTATIONSTESTA att grenen NÅS: bryt id->code-
+   mappningen (id->id) och bevisa att seam-testet RÖDNAR (`expected +0 to be 5`), återställ. Utan den
+   kontrollen vet du inte att testet vaktar just den tysta-noll-fällan.
+
+**Varför:** poäng-aggregering över flera tips-typer mot ett härlett facit är exakt den klass där två
+identitets-rymder (code vs id) möts i en otestad seam och ger TYST 0 poäng (T16 F1). Genom att mappa
+rymden VID FACIT-KÄLLAN (en sanning, i typen) och bevisa seamen med riktigt härlett facit + ett
+mutationstest, blir driften strukturellt omöjlig och bevisad, inte påstådd. De rena modulerna är
+fristående testbara och återanvänds av realtid (T18) + mini-ligor (T20). Källa: T17
+(`src/features/leaderboard/`: `derive-facit.ts` + `aggregate-scores.ts` + `reveal.ts`).
+
+### sekretess-avslojande-gate-tva-lager-rls-plus-ren-tids-gate (VM 2026)
+
+**Recept (avslöja delad data FÖRST efter en deadline, server-säkert + sann visning):**
+
+1. **SERVER-SIDE är det RIKTIGA skyddet (RLS):** andras rader finns inte ens i svaret förrän
+   deadline passerat (bevisat i T15/T16). `listRoom*`-API:erna returnerar BARA RLS-synliga rader
+   (egna + redan-avslöjade), så en aggregering/avslöjande-vy kan STRUKTURELLT bara se det som FÅR ses,
+   även om klient-gaten vore fel. Förlita dig ALDRIG på en klient-gate för sekretessen.
+2. **KLIENT-GATEN gör bara VISNINGEN sann (ren funktion):** avslöjande-vyn renderar bara det som BÅDE
+   är låst (`now >= kickoff`, sekretess-gaten) OCH avgjort (facit finns, för att kunna visa poäng).
+   Gaten jämför mot en INJICERBAR `now` (default nuet) + en minut-tick (`useDeadlineTick`), så ett lås
+   flippar utan omladdning och tester kan styra "nu". Den är en VISNINGS-sanning, inte säkerhetsspärren.
+3. **TESTA BÅDA SIDOR av gränsfallet:** före avspark -> inget avslöjat (även om facit/tips råkar finnas
+   i datan), exakt PÅ avspark (`now === kickoff`) -> låst (avslöjas), efter -> avslöjat. Plus "låst men
+   ej avgjord" (pågår) -> inte avslöjad, och "avgjord men ej låst" -> inte avslöjad.
+
+**Varför:** ett tidsbaserat avslöjande (andras tips dolda före deadline) ser ut att kunna lösas i
+klienten men MÅSTE vara server-side i en delad app, och VISNINGEN måste ändå vara sann mot låst-läget.
+Två lager (RLS = skydd, ren tids-gate = sann visning) ger båda. Källa: T17 (`reveal.ts` +
+`LeaderboardProvider.tsx`), bygger på T15 §4 / T16 §4 RLS-sekretessen.

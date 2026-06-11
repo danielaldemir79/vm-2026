@@ -5,6 +5,164 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T17 (#17, Copilot C1+C2): slutspels-matchtips poängsätts + sr-only-interpunktion
+
+**C1 (korrekthetsbug, källmedveten fix):** `deriveMatchFacit` (derive-facit.ts) filtrerade på
+`stage === 'group'` och tappade ALLA slutspelsmatcher ur matchfacit, så topplistan + reveal missade
+matchpoäng för färdigspelade slutspelsmatcher. **Regel + källa (gissas inte):** matchtipset
+poängsätts på den ORDINARIE målställningen i ALLA tippbara matcher, grupp SOM slutspel, mot exakt
+samma `scorePrediction`. **Källa:** T15 §2 i denna logg ("UTFALL (1X2) PÅ ORDINARIE MÅL, inkl.
+slutspel ... alla tips bedöms på samma plan, grupp som slutspel") + `score.ts` modul-doc. En
+slutspelsmatch är tippbar så snart båda lag är kända (`predictable-matches` `bothTeamsKnown`), så ett
+färdigspelat slutspel ska ge matchpoäng. **Fix:** matchfacit inkluderar nu varje `status==='finished'`
+match (grupp + slutspel). **Ingen dubbelräkning mot bracket-facit:** matchfacit jämför ordinarie mål
+(`scorePrediction`), bracket-facit jämför vem som avancerade inkl. straffar (`scoreBracketAdvance`,
+FIFA Art. 14), skilda tips-typer mot skilda facit-kartor (matchByMatchId vs bracketBySlotId). Ett
+straff-avgjort slutspel räknas i matchfacit som ordinarie ställning (1-1 = 'draw'), exakt T15 §2.
+Regression-test: avgjort slutspel ger matchfacit + matchpoäng i aggregeringen, additivt med bracket-tips.
+
+**C2 (a11y):** sr-only-etiketten i RevealView hade ledande blanksteg före komma (" ,") -> skärmläsare
+läser "namn kommatecken". Det är interpunktion i en uppläst mening, inte husstilens " , "-titel-
+separator, så kommatecknet skrivs nu ihop med namnet (inget ledande blanksteg). Övriga aria-strängar
+i leaderboard/ skannades, inga fler träffar (LeaderboardView:s `aria-label` är ren).
+
+## 2026-06-11 , T17 (#17): topplista + tips-avslöjande (poäng-aggregering + sekretess-gate)
+
+VM-poolens kröning: vem tippar bäst (topplista med rörelse-animation) + vad alla gissade
+(tips-avslöjande efter avspark). Bygger PÅ T15:s scorePrediction + T16:s bonus-score + de tre
+list-API:erna, bygger INTE om poänglogiken. Fyra modell-beslut, alla källmedvetna.
+
+**1. FACIT-KÄLLAN (vilken sanning poängen jämför mot, dokumenterat val):** rummets DELADE,
+inmatade resultat (`room_match_results`, vävda ovanpå den källåkrade planen via `applyRoomResults`,
+T14 KA-F3) är facit. Rummet lovar "ni fyller i matchresultaten TILLSAMMANS", så den delade
+matchlistan är den ENDA sanningen alla medlemmar delar. Grupptabeller + slutspelsträd härleds i
+sin tur ur EXAKT samma matchlista (`computeStandings`/`deriveBracket`, SPEC §6 "härledd state"),
+ingen ny sanning införs. **Källa:** T14 KA-F3 (apply-room-results.ts) + SPEC §6.
+
+**2. POÄNG-/AVSLÖJANDE-MODELLEN (KISS, löser sekretess-paradoxen):** taskens fråga var "hur
+beräknas andras totalpoäng innan deras tips avslöjats?". Svar: poäng räknas BARA på AVGJORDA/låsta
+utfall, ett tips ger poäng FÖRST när dess match/grupp/slot är avgjord (facit innehåller bara
+avgjorda utfall). Det gör topplistans POÄNG meningsfull LÖPANDE (tickar in när matcher avgörs)
+utan att läsa andras OAVGJORDA tips-innehåll. RLS döljer andras tips-RADER tills deadline, så
+`listRoom*`-API:erna returnerar bara egna + redan-avslöjade rader, aggregeringen kan strukturellt
+bara se det som FÅR ses. Tips-INNEHÅLLET avslöjas SEPARAT (avslöjande-vyn), per avgjord+låst match.
+**Avslöjande-gaten kräver BÅDE låst (`now >= kickoff`, sekretess) OCH avgjord (facit finns, för
+att kunna visa poäng).** Server-RLS är det RIKTIGA skyddet (bevisat T15/T16); klient-gaten gör bara
+VISNINGEN sann. **Källa:** T15 §4 (tips-sekretess RLS) + T16 §4 + isMatchLocked (T15).
+
+**3. LAG-IDENTITET (HARD, T16 F1-seamen, code-vs-id tyst-noll):** pool-tipsen LAGRAS som versal
+Team.CODE ("BRA", DB-constraint `^[A-Z]{3}$`), men det härledda facit (`computeStandings.teamId`,
+`deriveBracket.winnerTeamId`) bär gemen Team.ID ("bra", `teamId(code)=toLowerCase`). Möts de två
+rymderna otransformerat ger det TYST 0 poäng för ALLA tips. **Fix: facit-modulen (derive-facit.ts)
+mappar id -> CODE (branded `TeamCode`) VID KÄLLAN, via lag-listan, INNAN facit lämnar modulen.** Då
+bär BÅDA sidor versal code; en gemen id kan strukturellt inte nå poängfunktionen, och kontraktet är
+i TYPEN (TeamCode), inte bara en docstring. bonus-score:s egen normalisering blir defense-in-depth.
+**BEVIS (att seamen NÅS):** ett seam-test kör de RIKTIGA `computeStandings`/`deriveBracket` på en
+produktions-grupp-fixture, plockar härlett `teamId`/`winnerTeamId` (gemen id), och kräver full poäng
+mot ett code-lagrat tips. Mutationstestat: med id->id-mappning (omappat) failar seam-testet RÖTT
+(`expected +0 to be 5`), med id->code är det grönt. En FAIL-LOUD-vakt kastar om ett härlett facit-id
+saknar code i lag-listan (brutet referens-kontrakt), aldrig tyst. **Källa:** reviewer-lärdom T16 F1
+(`tva-identitetsrymder-moter-forst-vid-otestad-poang-seam`) + docs/decisions.md T16 + team-code.ts.
+
+**4. RANGORDNING + TIEBREAK (källmedvetet, edge-testat):** sortera på total poäng FALLANDE, LIKA
+poäng = DELAD placering (samma rank, nästa distinkta hoppar fram, "1,1,3"-stilen, standard för
+delade placeringar). **Tiebreak (visnings-ordning INOM en delad grupp, inte en rank-skiljare):**
+(1) fler EXAKTA match-resultat (3-poängare) först, en KVALITETS-skillnad som speglar skickligare
+tippande (samma anda som poängregelns "exakt > utfall"), (2) därefter visningsnamn ALFABETISKT
+(svensk locale), en stabil förutsägbar ordning så listan aldrig "flaxar". Tiebreaket bryter ALDRIG
+den delade placeringen, lika poäng = samma rank oavsett tiebreak. **Källa:** vedertagen poolspel-
+standard (delad placering vid lika; mer specifikt rätt väger tyngre); SPEC anger ingen avvikande
+regel, så standarden är förvalet, inte en gissning.
+
+**RÖRELSE-ANIMATION (taskens punkt 1):** topplistans rader är `motion.li` med `layout='position'`,
+så de GLIDER till sin nya plats när poäng/ordning ändras. Reduced-motion: `MotionConfig
+reducedMotion="user"` (MotionProvider) stänger AUTOMATISKT av layout-/transform-animationer, OCH
+`layout` gatas explicit på `useReducedMotion` (dubbelt skydd, WCAG 2.3.3). Funktionellt lager:
+stabil semantik (`<ol>`, aria-label "Placering N") + data-attribut (`data-leaderboard-row/-rank/
+-points`, `data-user-id` som stabil animations-key); premium-finish (medaljer, glow) -> design-frontend.
+
+**ARKITEKTUR (DRY, lägsta koppling):** tre RENA moduler (derive-facit / aggregate-scores / reveal,
+React-fritt, fristående testbara) + en LÄS-ONLY provider (T17 skriver inga tips, aggregerar de
+befintliga). Provider:n läser facit-källan via `useLeaderboardData` (laddar statisk data + väver in
+`useRoomsSync.sharedResults` med SAMMA `applyRoomResults` som ResultsProvider, så facit är IDENTISKT
+och sektionen kan ligga UTANFÖR ResultsProvider, alongside tips-sektionerna). Epoch-vakt mot rumsbyte
+(samma mönster som T15 C14 / T16). Sektionen gatas på `rooms.enabled` (samma som T15/T16-sektionerna).
+
+**DISPOSITION:** topplistan + tips-avslöjandet byggda FULLT (taskens kärna). Realtids-synk (T18) +
+mini-ligor (T20) out of scope. Premium-finish (medaljer, rörelse-polish) lämnas till design-frontend
+ovanpå data-attribut-seamen (samma arbetsdelning som T15/T16).
+
+## 2026-06-11 , T17-visuellt (#17): topplistans + tips-avslöjandets premium-finish (KRÖNINGEN)
+
+Det visuella lagret ovanpå senior-devs funktionella topplista + tips-avslöjande. Mål: VM-poolens
+KRÖNING , topplistan är vad kompisarna kollar VARJE dag, den ska kännas LEVANDE och TÄVLINGSINRIKTAD,
+och avslöjandet ska bli ett FACIT-ÖGONBLICK. Allt inom "arena i kvällsljus"-familjen (SPEC §7) och
+utan att röra senior-devs data-attribut/test-kontrakt (rank-ordning, poäng-strängar, reveal-gate).
+
+**1. TOPPLISTAN = PODIUM + RACE (taskens punkt 1):** topp-3 bär riktiga PALLPLATS-medaljer , 1:a guld,
+2:a silver, 3:a BRONS , via samma färg-OBEROENDE solid-bricka-medalj som grupp-tipsets podium (T16,
+`.vm-pool-medal`, DRY) + en NY `.vm-pool-medal--bronze`-modifierare. Brons krävde tre nya tokens
+(`--vm-bronze`/`-ink`/`-text`) i BÅDA teman, samma guld/silver-disciplin: rå brons = DEKOR (medalj-
+fyllning), all brons-TEXT använder den AA-mätta `--vm-bronze-text`. Ledar-raden (rank 1) får en varm
+guld-glow (`[data-leader]`) + gulda poäng-tal (`--color-warning`) så ögat dras dit. Plats 4+ får en
+neutral rank-bricka (`.vm-board-rank`). RÖRELSE: senior-devs `motion.li layout='position'`-glid
+behölls och fick en premium spring (`stiffness 520, damping 38`) + en kort ENGÅNGS highlight-puls
+(`.vm-board-row[data-rank-changed]`, CSS) på en rad som JUST bytt placering, så ögat hänger med i
+racet. Puls-spårningen jämför rank mot förra renderingen (useRef), pulsar bara vid en ÄNDRING (inte
+första laddningen = brus), och sätts ALDRIG vid reducerad rörelse.
+
+**2. "DU" = FÄRG-OBEROENDE framhävd egen rad (taskens punkt 1):** den egna raden markeras med accent-
+ring + svag accent-tint + en läsbar "DU"-bricka (`.vm-board-self-badge`, solid accent + accent-fg-ink),
+INTE bara en färg , så den syns för en färgblind användare och i båda teman (form + text + färg, tre
+redundanta signaler). NY SEAM: `currentUserId` trådd genom storen (rummets `rooms.userId`); null =
+ingen rad markeras (auth-sessionen ej klar). Vyn jämför rad-userId mot den. Sekretess hänger INTE på
+den (bara en visnings-hak).
+
+**3. TIPS-AVSLÖJANDET = FACIT-ÖGONBLICK (taskens punkt 2):** facit-talet (det faktiska resultatet) är
+HJÄLTEN , en solid guld-bricka med mörk ink (`.vm-reveal-actual`, samma solid-bricka-form som
+medaljerna). Varje pick får en FÄRG-OBEROENDE utfalls-markör (IKON + FORM, inte bara färg): EXAKT (3p)
+= bock i solid grön medalj, RÄTT UTFALL (1p) = halv-cirkel i solid guld-medalj, MISS (0p) = kryss i en
+neutral ring + en grön/guld vänsterkant per rad. Kategorin HÄRLEDS ur `pick.points` mot den testade
+poängregeln (`PREDICTION_POINTS = {exact:3,outcome:1,miss:0}`), ingen ny tröskel. En dold `sr-only`-
+etikett ("Exakt rätt"/"Rätt utfall"/"Bom") ger skärmläsaren samma besked i ord. Så man ser på en blink
+vem som prickade rätt och vem som bommade, oavsett färgseende.
+
+**KONTRAST (taskens punkt 3, canvas-komposit VÄRSTA fall, BÅDA teman, UPPMÄTT + KORSVERIFIERAT live):**
+all läsbar text står på OPAK surface/surface-raised eller på en LÅG-alfa tint mätt som canvas-komposit.
+Medalj-/markör-/facit-SIFFRORNA är mörk ink på SOLID bricka (färg-oberoende solid-bricka-form T9/T11/
+T16), aldrig ljus medalj-färg-text på tint. Guld-TEXT = `--color-warning`, brons-TEXT = `--vm-bronze-
+text`. Värden beräknade i `scripts/contrast-t17.mjs` (alfa-komposit) OCH korsverifierade i browsern
+(Playwright `getComputedStyle`, faktisk render) , de två metoderna gav IDENTISKA siffror:
+
+| Yta (värsta fall) | Mörkt | Ljust | Tröskel |
+|---|---|---|---|
+| Guld-medalj siffra (coupon-ink på solid gold) | 10.90:1 | 5.03:1 | 4.5 |
+| Silver-medalj siffra (silver-ink på solid silver) | 10.99:1 | 8.40:1 | 4.5 |
+| Brons-medalj siffra (bronze-ink på solid bronze) | 6.60:1 | 4.87:1 | 4.5 |
+| "DU"-bricka (accent-fg på solid accent) | 10.85:1 | 5.40:1 | 4.5 |
+| Ledar-rad namn (fg) på guld-7%-glow-rad | 15.24:1 | 16.19:1 | 4.5 |
+| Ledar-rad poäng (warning) på guld-glow-rad | 10.09:1 | 5.36:1 | 4.5 |
+| Egen rad namn (fg) på accent-8/10%-tint | 15.24:1 | 15.61:1 | 4.5 |
+| Eyebrow/facit-tal (warning) på surface | 10.09:1 | 5.92:1 | 4.5 |
+| Facit-tal (coupon-ink på solid gold) | 10.90:1 | 5.03:1 | 4.5 |
+| Exakt-markör ink (on-success på solid success) | 9.97:1 | 5.47:1 | 4.5 |
+| Utfall-markör ink (coupon-ink på solid gold) | 10.90:1 | 5.03:1 | 4.5 |
+| Miss-markör glyf (fg-muted på surface-raised) | 6.23:1 | 6.52:1 | 3.0 |
+| Reveal pick namn (fg) / tippning (fg-muted) | 15.24 / 7.50 | 17.91 / 6.52 | 4.5 |
+
+**MIN över ALLA nya normal-text-ytor: 6.60:1 (mörkt) / 4.87:1 (ljust), alla >= AA.** Den nya brons-
+tokenen valdes så även dess medalj-ink klarar AA i ljust tema (4.87:1, samma guld/silver-på-ljus-
+disciplin). **RESPONSIVT + ÖVRIG VERIFIERING:** Playwright mot Vite-render (faktisk rendering, båda
+teman) på 280 (foldable cover) / 760 / 1440px , noll horisontell overflow. En FÄLLA fångad i 280px-
+verifieringen: "DU"-brickan låg nästlad i namn-gruppen och ÖVERLAPPADE poängen 26px när namnet
+truncats till 0 bredd; fixat genom att flatta brickan + poängen till `shrink-0`-SYSKON av namnet
+(flex reserverar deras plats först, kan aldrig kollidera, mätt gap 12px efter fix). Animation
+verifierad i KOMPILERAD CSS (`dist/assets/*.css`, lessons `verifiera-animation-mot-kompilerad-css`):
+`vm-board-rank-pulse`-keyframe finns OCH ligger inuti `@media (prefers-reduced-motion: no-preference)`
+(reduced-motion-användare får ingen puls; dubbelt skydd med JS-gaten). Inga tester rörda i kontrakt;
+7 NYA tester låser premium-seamen (podium-medaljer, ledar-/du-markering, currentUserId-null-fallet,
+färg-oberoende reveal-markörer + sr-only-orden). 1006 gröna (var 999).
+
 ## 2026-06-11 , T16b-visuellt (#59): bracket-tips-lagrets premium-finish ("vägen till bucklan")
 
 **Kontext:** ovanpå senior-devs funktionella lager (data-attribut-seam + semantik + tester) la
