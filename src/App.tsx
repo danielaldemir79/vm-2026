@@ -22,6 +22,7 @@ import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
 import { PredictionSection } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
+import { LeaderboardSection } from './features/leaderboard';
 import {
   InstallBanner,
   OnboardingDialog,
@@ -253,6 +254,17 @@ function AppShell() {
             design-frontend ger finishen ovanpå (datakärnan finns från T16). */}
         <Slide direction="up">
           <BracketPredictionSection surface={(children) => <Panel>{children}</Panel>} />
+        </Slide>
+
+        {/* Topplistan + tips-avslöjandet (T17, #17): vem tippar bäst (poäng från
+            ALLA tre tips-typer mot facit, delad placering vid lika, rörelse-animation
+            vid placeringsändring) + vad alla tippade per avgjord match (avslöjas
+            FÖRST efter avspark, sekretessen är server-side i RLS, T15/T16). Per rum,
+            "gå med i ett rum" tills ett rum är aktivt. Det FUNKTIONELLA + tillgängliga
+            UI:t byggs här (stabil semantik + data-attribut); design-frontend ger
+            premium-finish (medaljer, glow, finputsad rörelse) ovanpå. */}
+        <Slide direction="up">
+          <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
         </Slide>
 
         <footer className="border-t border-border pt-6 text-sm text-fg-muted">

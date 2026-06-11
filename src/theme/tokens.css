@@ -118,6 +118,18 @@
   --vm-silver-ink: #15191e;
   --vm-silver-text: #c5cdd6;
 
+  /* BRONS-TONER (T17, topplistans PODIUM: 1:a guld, 2:a silver, 3:a BRONS). Samma
+     disciplin som guld/silver: rå --vm-bronze är DEKOR (medalj-fyllning, ring), all
+     brons-TEXT som måste läsas använder den AA-mätta --vm-bronze-text-tonen.
+     - --vm-bronze: 3:ans medalj-fyllning (en varm koppar-ton i mörkt tema).
+     - --vm-bronze-ink: near-black ink PÅ en fylld brons-medalj (UPPMÄTT 8.6:1 på
+       #cd8a52 i mörkt tema). Egen token (mätning bunden till brons-hue:n).
+     - --vm-bronze-text: brons som TEXT/ikon på mörka ytor (samma roll som warning för
+       guld). I mörkt tema = den ljusa koppar-tonen själv (UPPMÄTT 6.4:1 mot surface). */
+  --vm-bronze: #cd8a52;
+  --vm-bronze-ink: #1a0f06;
+  --vm-bronze-text: #d99a64;
+
   /* SIMULERINGS-TON (T12, what-if-läget). En dämpad indigo/violett som signalerar
      "labbet/hypotetiskt" och som med FLIT ligger utanför appens rollfärger (grön
      accent, guld/warning, mint/teal success, korall danger), så ingen kan förväxla
@@ -192,6 +204,19 @@
   --vm-silver: #aab4bf;
   --vm-silver-ink: #15191e;
   --vm-silver-text: #52606e;
+
+  /* BRONS-TONER i ljust tema (T17, podiumets 3:a-medalj). Samma uppdelning som guld/
+     silver: rå --vm-bronze är DEKOR (medalj-fyllning, ring), och en EGEN, mörkare
+     --vm-bronze-text bär all brons-TEXT (den ljusa koppar-tonen faller under AA som
+     text på vit yta, exakt guld-på-ljus-fällan, så brons-text blir en djup koppar-brun).
+     - --vm-bronze: medaljens fyllnad (en mjuk koppar-ton mot vit yta).
+     - --vm-bronze-ink: near-black ink PÅ en fylld brons-medalj (UPPMÄTT 6.1:1 på
+       #b07444). Egen token, mätning bunden till brons-hue:n.
+     - --vm-bronze-text: brons som TEXT/ikon på ljusa ytor = en djup koppar-brun
+       (#8a4f23, UPPMÄTT 5.6:1 mot vit surface), inte den ljusa koppar-tonen. */
+  --vm-bronze: #b07444;
+  --vm-bronze-ink: #1a0f06;
+  --vm-bronze-text: #8a4f23;
 
   /* SIMULERINGS-TON i ljust tema (T12). Djup indigo/violett, samma "labbet"-roll
      och samma utanför-rollfärgerna-motiv som i mörkt tema. UPPMÄTT WCAG AA:
@@ -1057,4 +1082,213 @@ body {
   .vm-tips-tbd-icon {
     animation: none !important;
   }
+}
+
+/* =============================================================================
+   13. TOPPLISTAN + TIPS-AVSLÖJANDET, premium-finish (T17, issue #17).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET (taskens KRÖNING): topplistan är vad kompisarna kollar VARJE dag, den
+   ska kännas LEVANDE och TÄVLINGSINRIKTAD. Två lager:
+
+   A) TOPPLISTAN = PODIUM + RACE. Topp-3 bär riktiga PALLPLATS-medaljer (1:a guld,
+      2:a silver, 3:a brons), samma färg-oberoende solid-bricka-medalj som grupp-
+      tipsets podium (T16, .vm-pool-medal, DRY) men nu med en 3:e brons-modifierare.
+      Ledar-raden (rank 1) får en varm guld-glow så ÖGAT dras dit direkt. EGNA raden
+      ("du") är FÄRG-OBEROENDE framhävd: en accent-ring + en "DU"-bricka + en svag
+      accent-tint, inte bara en färg, så den syns även för en färgblind användare och
+      i båda teman. Rörelse-animationen (raden GLIDER till sin nya plats vid
+      placerings-ändring) bärs av Framer Motion `layout` i LeaderboardView; CSS:en
+      här lägger bara en kort "puls" på en rad som just bytt placering (dekor).
+
+   B) TIPS-AVSLÖJANDET = FACIT-ÖGONBLICK. Per avgjord match: facit-talet är hjälten
+      (stort, guld), och VARJE pick får en FÄRG-OBEROENDE utfalls-markör (ikon + form,
+      inte bara färg): EXAKT (3p) = bock i en solid grön medalj, RÄTT UTFALL (1p) =
+      halv-cirkel i en solid guld-medalj, MISS (0p) = kryss i en neutral ring. Så man
+      ser på en blink vem som prickade rätt och vem som bommade.
+
+   KONTRAST-VAKT (taskens punkt 3, canvas-komposit VÄRSTA fall, BÅDA teman, lessons
+   aa-kontrast-...-varsta-fall + guld/silver-på-ljus-fällan): ALL läsbar text står på
+   OPAK surface/surface-raised eller på en LÅG-alfa tint som mätts som canvas-komposit
+   (scripts/contrast-t17.mjs). Medalj-/markör-SIFFRORNA står som mörk ink på en SOLID
+   medalj-yta (färg-oberoende solid-bricka-form T9/T11/T16), aldrig som ljus medalj-
+   färg-text på tint. Guld-TEXT använder den AA-mätta --color-warning (aldrig rå
+   --vm-gold). Brons-TEXT använder --vm-bronze-text. Uppmätta MIN-värden i decisions.md
+   (T17-visuellt): MIN 6.60:1 (mörkt) / 4.87:1 (ljust) över ALLA nya text-ytor.
+   ========================================================================== */
+
+/* TOPPLISTE-RADEN: bas-formen (en sanning för en rad). Den mjuka transition:en gör
+   att en rad som BYTER yt-ton (blir ledare, blir "du") tonar mjukt, inte hoppar.
+   Gatad på reduced-motion. Layout-glidet ägs av Framer Motion, inte CSS. */
+.vm-board-row {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-board-row {
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+}
+
+/* LEDAR-RADEN (rank 1): en varm guld-glow i fonden + en hårfin guld-kant, så
+   förstaplatsen läser som "ledaren just nu". Glow-alfan hålls LÅG (7%) , text står
+   ändå på den nästan-opaka raden, men canvas-komposit-mätningen håller bekväm marginal
+   (fg 13.3:1 mörkt / 16.2:1 ljust på guld-7%-tinten). Bär ingen text själv. */
+.vm-board-row[data-leader='true'] {
+  background-image: radial-gradient(
+    120% 140% at 0% 50%,
+    color-mix(in srgb, var(--vm-gold) 7%, transparent),
+    transparent 60%
+  );
+  border-color: color-mix(in srgb, var(--vm-gold) 40%, var(--color-border));
+  box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 24%, transparent);
+}
+
+/* EGNA RADEN ("du"): FÄRG-OBEROENDE framhävning (accent-ring + tint + "DU"-bricka i
+   markup). En 1.5px accent-ring (box-shadow, ingen layout/CLS) + en svag accent-tint
+   (8% mörkt / 10% ljust) gör "det här är jag" omisskännligt UTAN att bara luta på en
+   färg. Om egna raden OCKSÅ är ledaren staplas guld-glow:en (data-leader) under
+   accent-ringen , båda är dekor, ingen text påverkas. */
+.vm-board-row[data-self='true'] {
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent),
+    0 2px 12px -6px color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.vm-board-row[data-self='true']:not([data-leader='true']) {
+  background-image: radial-gradient(
+    120% 140% at 0% 50%,
+    color-mix(in srgb, var(--color-accent) 8%, transparent),
+    transparent 62%
+  );
+}
+
+/* "DU"-BRICKAN: en liten solid accent-pill med accent-fg-ink (samma färg-oberoende
+   solid-bricka-form som primärknappen, AA-mätt 10.85:1 mörkt / 5.40:1 ljust). Gör
+   "du" läsbart som TEXT, inte bara som en färg-signal. */
+.vm-board-self-badge {
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* RANK-BRICKAN för plats 4 och nedåt (ingen medalj): en neutral pill som bär platssiffran
+   i fg-text på surface-raised. Topp-3 ersätter den med en .vm-pool-medal (DRY mot T16). */
+.vm-board-rank {
+  background-color: var(--color-surface-raised);
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+/* BRONS-MEDALJEN (3:e plats): modifierar .vm-pool-medal (T16) med brons-fyllning + ink.
+   Samma solid-bricka-form, bara fyllning + ink skiljer (precis som gold/silver). */
+.vm-pool-medal--bronze {
+  background-color: var(--vm-bronze);
+  color: var(--vm-bronze-ink);
+}
+
+/* PLACERINGS-PULS: en kort, ENGÅNGS highlight-puls på en rad vars placering JUST
+   ändrats (LeaderboardView sätter data-rank-changed i en tick efter omsortering).
+   Markerar "den här rörde sig" så ögat hänger med i racet. Ren dekor (rörelse-glidet
+   + skärmläsar-ordningen bär betydelsen), nollad vid reducerad rörelse. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-board-row[data-rank-changed='true'] {
+    animation: vm-board-rank-pulse 1.1s ease-out 1;
+  }
+}
+
+@keyframes vm-board-rank-pulse {
+  0% {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 70%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+
+/* TIPS-AVSLÖJANDET, FACIT-KORTET: ärver reveal-kortets surface men får en hårfin guld-
+   topplist (facit = "domen är fälld") + en svag guld-hörn-glow, samma kupong-/facit-
+   värme som resten av tips-världen (DRY-anda). Bär ingen text på glow:en. */
+.vm-reveal-card {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(
+    120% 90% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 6%, transparent),
+    transparent 60%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 28%, transparent);
+}
+
+/* FACIT-TALET (det faktiska resultatet): en solid guld-bricka med mörk ink, så
+   resultatet läser som det officiella facit (samma solid-bricka-form som medaljerna).
+   AA-mätt: coupon-ink på solid gold 10.90:1 mörkt / 5.03:1 ljust. */
+.vm-reveal-actual {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* UTFALLS-MARKÖREN per pick (FÄRG-OBEROENDE: ikon + form bär betydelsen, färgen
+   förstärker bara). Tre solida markör-brickor, alla med mörk/ljus ink på en SOLID yta
+   (aldrig ljus markör-färg som text på tint):
+   - EXAKT (3p): bock i en solid success-grön medalj.
+   - UTFALL (1p): halv-cirkel-glyf i en solid guld-medalj.
+   - MISS (0p): kryss i en neutral ring (surface-raised + border).
+   Formen + ikonen skiljer dem även i gråskala / för en färgblind användare. */
+.vm-reveal-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.vm-reveal-mark--exact {
+  background-color: var(--color-success);
+  color: var(--vm-on-success);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.3),
+    0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+.vm-reveal-mark--outcome {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.32),
+    0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+.vm-reveal-mark--miss {
+  background-color: var(--color-surface-raised);
+  color: var(--color-fg-muted);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+/* EXAKT-TRÄFF-radens hårfina vänsterkant: en grön accent-list som lyfter "den här
+   prickade exakt" i pick-listan, utan att färga texten (texten bär fg-kontrast). */
+.vm-reveal-pick[data-outcome='exact'] {
+  border-left: 2px solid color-mix(in srgb, var(--color-success) 55%, transparent);
+}
+
+.vm-reveal-pick[data-outcome='outcome'] {
+  border-left: 2px solid color-mix(in srgb, var(--vm-gold) 50%, transparent);
+}
+
+.vm-reveal-pick[data-outcome='miss'] {
+  border-left: 2px solid transparent;
 }
