@@ -114,16 +114,33 @@ export function LeaderboardProvider({
   // EPOCH-vakt: ett snabbt rumsbyte får aldrig låta ett föråldrat svar visa fel rum.
   const loadTokenRef = useRef(0);
 
+  // Vilket rum den NU laddade datan tillhör (null = ingen data laddad än). Skiljer en
+  // SYNLIG laddning (initial / rumsbyte: datan saknas eller hör till fel rum -> visa
+  // 'loading') från en TYST re-fetch (avspark: samma rum, datan finns redan -> behåll
+  // 'ready' + datan under hämtningen, byt bara ut den när svaret kommer). Vi läser inte
+  // av predictionsStatus/predictions i effekten (det skulle kräva dem i deps och kunna
+  // loopa); den här ref:en uttrycker invarianten "datan tillhör rätt rum" direkt.
+  const loadedRoomIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const token = ++loadTokenRef.current;
     if (!supabase || activeRoomId === null) {
       setPredictions(EMPTY_PREDICTIONS);
       setPredictionsStatus('idle');
       setPredictionsError(null);
+      loadedRoomIdRef.current = null;
       return;
     }
-    setPredictionsStatus('loading');
-    setPredictionsError(null);
+    // TYST RE-FETCH (T55 #96, rotorsak): en avspark-triggad omhämtning (lockedMatchCount
+    // ändrades) i SAMMA rum vi redan har data för ska INTE flimra 'loading' och tömma
+    // topplistan/avslöjandet, den ska bara KOMPLETTERA med de RLS-nyligen-släppta raderna.
+    // 'loading' visas bara vid INITIAL hämtning (ingen data än) och vid RUMSBYTE (datan
+    // hör till fel rum); då är det rätt att blanka och visa laddning.
+    const isSilentRefetch = loadedRoomIdRef.current === activeRoomId;
+    if (!isSilentRefetch) {
+      setPredictionsStatus('loading');
+      setPredictionsError(null);
+    }
     // Ladda rummets RLS-synliga tips för ALLA tre typer parallellt. RLS gör att vi
     // bara får egna + redan-avslöjade rader (sekretessen är server-side).
     Promise.all([
@@ -137,9 +154,24 @@ export function LeaderboardProvider({
         }
         setPredictions({ match, group, bracket });
         setPredictionsStatus('ready');
+        loadedRoomIdRef.current = activeRoomId;
       })
       .catch((err: unknown) => {
         if (token !== loadTokenRef.current) {
+          return;
+        }
+        // FELVÄG, TYST RE-FETCH: en avspark-triggad omhämtning som failar får ALDRIG
+        // kasta bort den befintliga (giltiga, om än något inaktuella) topplistan. Vi
+        // behåller datan + 'ready' och loggar felet (fail-loud i konsolen, samma
+        // [VM2026]-warn-konvention som övriga icke-fatala fel), i stället för att sätta
+        // 'error' som hade blankat hela vyn för en transient avspark-poll. Nästa avspark
+        // (eller rumsbyte/reload) försöker igen. En INITIAL/rumsbyte-fetch som failar har
+        // däremot ingen data att skydda, då är 'error' rätt (fail loud, PRINCIPLES §8).
+        if (isSilentRefetch) {
+          console.warn(
+            '[VM2026] Tyst omhämtning av topplistan (avspark) misslyckades, behåller befintlig data:',
+            err
+          );
           return;
         }
         setPredictionsError(err instanceof Error ? err.message : 'Kunde inte ladda topplistan.');

@@ -286,3 +286,214 @@ describe('LeaderboardProvider, T55 (#96): re-fetch när en match passerar avspar
     expect(screen.getByTestId('reveal')).toHaveTextContent('1');
   });
 });
+
+describe('LeaderboardProvider, T55 (#96): avspark-triggad re-fetch är TYST', () => {
+  // ROTORSAK 2-fyndet (copilot R2): fetch-effekten satte ALLTID 'loading' vid start, så
+  // en avspark-triggad re-fetch (lockedMatchCount ändras) flimrade "Laddar..." och tömde
+  // topplistan/avslöjandet trots att giltig data redan fanns. Fixen: 'loading' visas BARA
+  // vid INITIAL hämtning (ingen data) och RUMSBYTE (datan hör till fel rum); en avspark-
+  // re-fetch i SAMMA rum behåller data + 'ready' och byter bara ut datat när svaret kommer.
+
+  /** En styrbar promise (resolve/reject utifrån), för att hålla en hämtning "i flykten". */
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  /** Probe som SPÅRAR varje status-värde över tid (för flimmer-bevis), inte bara nuet. */
+  const statusLog: string[] = [];
+  function TrackingProbe() {
+    const store = useLeaderboardStore();
+    statusLog.push(store.status);
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="reveal">{store.reveal.length}</span>
+        <span data-testid="board">
+          {store.leaderboard.map((e) => `${e.displayName}:${e.points}`).join('|')}
+        </span>
+      </div>
+    );
+  }
+
+  it('avspark-trigger flimrar INTE loading: status förblir ready, gamla picks kvar tills nya satts', async () => {
+    vi.useFakeTimers();
+    statusLog.length = 0;
+    try {
+      const start = new Date('2026-06-12T17:45:00Z');
+      vi.setSystemTime(start);
+      // Två avgjorda+låsta matcher. g-A-1 låst vid start (initial), g-A-2 låses 18:00Z.
+      // Båda finished så reveal får data att visa (gamla picks ska synas under re-fetch).
+      dataState.matches = [
+        matchAt('g-A-1', '2026-06-12T17:30:00Z', 'finished'),
+        matchAt('g-A-2', '2026-06-12T18:00:00Z', 'finished'),
+      ];
+      roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+
+      // Initial-svaret: en match-pick (ger 3p exakt + reveal-rad). Avspark-svaret hålls
+      // i flykten via en deferred, så vi kan observera status MEDAN re-fetchen pågår.
+      const initial = [
+        { matchId: 'g-A-1', userId: 'u1', homeGoals: 1, awayGoals: 0, updatedAt: '' },
+      ];
+      const second = deferred<typeof initial>();
+      api.listRoomPredictions.mockReturnValueOnce(Promise.resolve(initial));
+      api.listRoomPredictions.mockReturnValueOnce(second.promise);
+
+      render(
+        <LeaderboardProvider env={env} client={fakeClient} activeRoomId="r1" now={start}>
+          <TrackingProbe />
+        </LeaderboardProvider>
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      // Initial hämtning klar: ready, 3p, en avslöjad match.
+      expect(screen.getByTestId('status')).toHaveTextContent('ready');
+      expect(screen.getByTestId('board')).toHaveTextContent('Anna:3');
+      expect(screen.getByTestId('reveal')).toHaveTextContent('1');
+      expect(api.listRoomPredictions).toHaveBeenCalledTimes(1);
+
+      const seenReadyAt = statusLog.length;
+
+      // Passera g-A-2:s avspark (18:00Z): lockedMatchCount går 1 -> 2, re-fetch triggas.
+      // Andra-svaret HÄNGER (deferred ej löst), så vi ser läget MITT i re-fetchen.
+      await act(async () => {
+        vi.setSystemTime(new Date('2026-06-12T18:01:00Z'));
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(api.listRoomPredictions).toHaveBeenCalledTimes(2);
+      // FLIMMER-BEVIS: status är fortfarande 'ready' (aldrig 'loading'), och de GAMLA
+      // tips-DATAT (board-poängen, härledd ur predictions) står kvar på 3p medan re-
+      // fetchen pågår, det töms inte. (reveal räknas separat ur data.matches+evalNow och
+      // går 1 -> 2 när g-A-2 låses; det är just det T55:s avslöjande SKA göra oberoende
+      // av tips-laddningen, så reveal är inte flimmer-måttet här, board-datat är det.)
+      expect(screen.getByTestId('status')).toHaveTextContent('ready');
+      expect(screen.getByTestId('board')).toHaveTextContent('Anna:3');
+      expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
+
+      // Lös re-fetchen med UTÖKAD data (en till pick, +3p): nu byts tips-datat ut.
+      await act(async () => {
+        second.resolve([
+          { matchId: 'g-A-1', userId: 'u1', homeGoals: 1, awayGoals: 0, updatedAt: '' },
+          { matchId: 'g-A-2', userId: 'u1', homeGoals: 1, awayGoals: 0, updatedAt: '' },
+        ]);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId('status')).toHaveTextContent('ready');
+      expect(screen.getByTestId('board')).toHaveTextContent('Anna:6'); // 3 + 3
+      // Hela förloppet efter första ready: aldrig en 'loading' (ingen flimmer).
+      expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('en misslyckad TYST re-fetch kastar inte bort befintlig data (behåller ready + gamla picks)', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const start = new Date('2026-06-12T17:45:00Z');
+      vi.setSystemTime(start);
+      dataState.matches = [
+        matchAt('g-A-1', '2026-06-12T17:30:00Z', 'finished'),
+        matchAt('g-A-2', '2026-06-12T18:00:00Z', 'finished'),
+      ];
+      roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+
+      api.listRoomPredictions.mockReturnValueOnce(
+        Promise.resolve([
+          { matchId: 'g-A-1', userId: 'u1', homeGoals: 1, awayGoals: 0, updatedAt: '' },
+        ])
+      );
+      // Avspark-re-fetchen FAILAR. Deferred + reject INNE i act, så rejectionen alltid
+      // har en konsument (effektens .catch) och aldrig blir en "unhandled rejection".
+      // Den TOMMA .catch:en nedan tystar bara node:s unhandled-rejection-vakt för den
+      // RÅA second-promisen (mocken delar ut den innan effektens Promise.all hinner
+      // koppla sin handler); den fångar inget testet bryr sig om.
+      const second = deferred<never>();
+      second.promise.catch(() => {});
+      api.listRoomPredictions.mockReturnValueOnce(second.promise);
+
+      renderProvider(start);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId('status')).toHaveTextContent('ready');
+      expect(screen.getByTestId('board')).toHaveTextContent('Anna:3:1');
+
+      // Passera andra avsparken -> tyst re-fetch som failar.
+      await act(async () => {
+        vi.setSystemTime(new Date('2026-06-12T18:01:00Z'));
+        await vi.advanceTimersByTimeAsync(60_000);
+        second.reject(new Error('RLS nekade'));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(api.listRoomPredictions).toHaveBeenCalledTimes(2);
+      // BEFINTLIG DATA KVAR: inte 'error', inte tom, gamla picksen står kvar.
+      expect(screen.getByTestId('status')).toHaveTextContent('ready');
+      expect(screen.getByTestId('error')).toHaveTextContent('');
+      expect(screen.getByTestId('board')).toHaveTextContent('Anna:3:1');
+      // Felet loggas (fail-loud i konsolen), inte sväljs helt tyst.
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('RUMSBYTE visar loading som idag (datan hör till fel rum, ska blankas)', async () => {
+    statusLog.length = 0;
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+    api.listRoomPredictions.mockResolvedValue([
+      { matchId: 'g-A-1', userId: 'u1', homeGoals: 1, awayGoals: 0, updatedAt: '' },
+    ]);
+
+    const view = render(
+      <LeaderboardProvider env={env} client={fakeClient} activeRoomId="r1" now={new Date()}>
+        <TrackingProbe />
+      </LeaderboardProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    const beforeSwitch = statusLog.length;
+
+    // Byt rum: datan tillhör r1, så det NYA rummet ska visa loading (blanka), inte
+    // tyst behålla r1:s data.
+    view.rerender(
+      <LeaderboardProvider env={env} client={fakeClient} activeRoomId="r2" now={new Date()}>
+        <TrackingProbe />
+      </LeaderboardProvider>
+    );
+    // Rumsbytet passerade 'loading' (till skillnad från en avspark-re-fetch).
+    expect(statusLog.slice(beforeSwitch)).toContain('loading');
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+  });
+
+  it('INITIAL hämtning visar loading som idag (ingen data än)', async () => {
+    statusLog.length = 0;
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+    const gate = deferred<[]>();
+    api.listRoomPredictions.mockReturnValueOnce(gate.promise as unknown as Promise<[]>);
+    api.listRoomGroupPredictions.mockResolvedValue([]);
+    api.listRoomBracketPredictions.mockResolvedValue([]);
+
+    render(
+      <LeaderboardProvider env={env} client={fakeClient} activeRoomId="r1" now={new Date()}>
+        <TrackingProbe />
+      </LeaderboardProvider>
+    );
+    // Före svaret: status är 'loading' (initial, ingen data än).
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('loading'));
+    expect(statusLog).toContain('loading');
+
+    await act(async () => {
+      gate.resolve([]);
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+  });
+});
