@@ -1,6 +1,7 @@
 // Ärlig svensk sammanfattning av en kopierings-rapport (T52, #91): gör CopyReport:ens
-// siffror till EN begriplig mening , "X tips kopierade, Y hoppades över (låsta), Z
-// hoppades över (redan tippade), W kunde inte kopieras". Ren funktion, ingen React,
+// siffror till en begriplig sammanfattning (en inlednings-mening, plus en extra mening
+// när hoppade/felade kategorier förekom): "X tips kopierade, Y hoppades över (låsta),
+// Z hoppades över (redan tippade), W kunde inte kopieras". Ren funktion, ingen React,
 // fristående testbar, så UI:t (CopyTipsControl) blir en tunn konsument.
 //
 // SANNINGS-KRAV (T52-direktivet): beskedet MÅSTE spegla det faktiska utfallet , vi
