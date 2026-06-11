@@ -121,5 +121,49 @@ describe('CopyTipsControl, fel-väg (LÄSmiss fail-loud:ar)', () => {
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent(/Hämta mina tips misslyckades: nät/);
     expect(status).toHaveAttribute('data-result-status', 'error');
+    // En kastad läsmiss går via catch-grenen och får danger-tonen direkt.
+    expect(status).toHaveAttribute('data-result-tone', 'negative');
+  });
+});
+
+// data-result-tone styr den VISUELLA signalen (danger/success/neutral-tint + glyf-färg).
+// Den måste vara SANN mot HELA utfallet, inte bara mot "kopierades något". Engine:n
+// (copyMyPredictions) sväljer per-item-SKRIVfel medvetet och kastar INTE, så ett
+// failat utfall (copied:0, failed>0) når success-grenen i handleCopy, inte catch, och
+// fick tidigare den lugna neutral-tonen trots ett äkta fel. Dessa tester binder fast
+// att fel ALLTID ger danger, även vid delframgång, och att de lugna tonerna bara når
+// fel-fria utfall.
+describe('CopyTipsControl, resultat-TON speglar HELA utfallet (failed vinner)', () => {
+  async function clickAndGetStatus(report: CopyReport) {
+    const copyMyTips = vi.fn(async () => report);
+    renderWith(stubStore({ myRooms: [ROOM_A, ROOM_B], activeRoom: ROOM_B, copyMyTips }));
+    fireEvent.click(screen.getByRole('button', { name: /Kopiera mina tips från Familjen/i }));
+    return screen.findByRole('status');
+  }
+
+  it('copied:0, failed>0 (svalt skrivfel, kastar ej) -> tone "negative", inte neutral', async () => {
+    // Det failande fallet som engine:n producerar UTAN att kasta: inget kopierades men
+    // skrivningar gick fel. Tonen MÅSTE vara danger, inte den lugna info-tonen.
+    const status = await clickAndGetStatus(reportWith({ copied: 0, failed: 2 }));
+    expect(status).toHaveAttribute('data-result-tone', 'negative');
+    expect(status).toHaveAttribute('data-result-status', 'done');
+    expect(status).toHaveTextContent('2 kunde inte kopieras');
+  });
+
+  it('copied>0 OCH failed>0 (delframgång) -> tone "negative" (fel maskeras aldrig av delframgång)', async () => {
+    const status = await clickAndGetStatus(reportWith({ copied: 3, failed: 1 }));
+    expect(status).toHaveAttribute('data-result-tone', 'negative');
+    expect(status).toHaveTextContent('3 tips kopierade från Familjen.');
+    expect(status).toHaveTextContent('1 kunde inte kopieras');
+  });
+
+  it('copied>0, failed:0 -> tone "positive" (lugn bekräftelse)', async () => {
+    const status = await clickAndGetStatus(reportWith({ copied: 2, skippedLocked: 1 }));
+    expect(status).toHaveAttribute('data-result-tone', 'positive');
+  });
+
+  it('copied:0, failed:0 (allt låst/redan tippat) -> tone "neutral" (inget fel)', async () => {
+    const status = await clickAndGetStatus(reportWith({ copied: 0, skippedExisting: 4 }));
+    expect(status).toHaveAttribute('data-result-tone', 'neutral');
   });
 });
