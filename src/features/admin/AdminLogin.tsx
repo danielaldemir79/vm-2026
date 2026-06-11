@@ -140,6 +140,32 @@ export function AdminLogin({ client, onUpgraded }: AdminLoginProps) {
           </div>
         </form>
       ) : null}
+
+      {/* 'done': ge ALLTID återkoppling (Copilot R2). I normalfallet (Daniel = admin)
+          flippar admin-status och hela sektionen byts till resultat-inmatningen, så
+          detta syns då aldrig. Men i edge-fallet "uppgraderad men inte arrangör"
+          stannar vyn här, och utan ett 'done'-block vore komponenten tom (dött läge).
+          Vi bekräftar uppgraderingen och erbjuder att börja om med en annan e-post. */}
+      {flow.step === 'done' ? (
+        <div data-admin-login-done="" className="flex flex-col gap-2">
+          <p className="text-sm text-fg-muted">
+            Inloggningen lyckades. Resultat-inmatningen visas bara för arrangören. Är du arrangör
+            men ser inte inmatningen, prova att ladda om sidan eller logga in med den e-post som är
+            kopplad till arrangörs-rollen.
+          </p>
+          <button
+            type="button"
+            data-admin-login-restart=""
+            onClick={() => {
+              setCode('');
+              flow.reset();
+            }}
+            className="self-start rounded-pill border border-border px-5 py-2.5 font-display text-sm font-semibold"
+          >
+            Logga in med en annan e-post
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

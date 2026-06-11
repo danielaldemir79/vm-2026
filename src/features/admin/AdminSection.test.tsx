@@ -254,4 +254,27 @@ describe('AdminLogin, e-post-flöde (icke-admin)', () => {
 
     expect(refresh).toHaveBeenCalledTimes(1);
   });
+
+  // Copilot R2: vid 'done' (uppgraderad men inte admin) ska vyn ge återkoppling, inte
+  // vara tom. Bekräftelse + "logga in med en annan e-post" i stället för ett dött läge.
+  it('vid done utan admin-behörighet visas bekräftelse + börja-om, inte ett tomt läge', async () => {
+    renderSection(officialStore({ isAdmin: false }));
+
+    fireEvent.change(screen.getByLabelText('E-postadress'), {
+      target: { value: 'daniel@example.com' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Skicka inloggningskod'));
+    });
+    fireEvent.change(await screen.findByLabelText('Inloggningskod'), {
+      target: { value: '123456' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Logga in'));
+    });
+
+    expect(document.querySelector('[data-admin-login-done]')).not.toBeNull();
+    expect(screen.getByText(/Inloggningen lyckades/i)).toBeInTheDocument();
+    expect(document.querySelector('[data-admin-login-restart]')).not.toBeNull();
+  });
 });
