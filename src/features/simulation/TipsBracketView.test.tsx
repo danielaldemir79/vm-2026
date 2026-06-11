@@ -39,6 +39,26 @@ describe('TipsBracketView, tomt läge', () => {
   });
 });
 
+describe('TipsBracketView, under laddning (ej ready)', () => {
+  it('visar INTE tomläges-uppmaningen medan datan laddar (bracket null, ready false)', () => {
+    // Under laddning vet vi ännu inte om något är tippat (bracket är null både
+    // "laddar" och "tomt tips"). Tomtexten får ALDRIG blinka fram då (T51-fynd):
+    // ej ready -> ingen tomläges-text, ingen tomläges-sektion, inget träd.
+    const loadingData: TipsBracketData = { bracket: null, teams: TEAMS, ready: false };
+    render(<TipsBracketView data={loadingData} />);
+    expect(screen.queryByText(/tippa minst en grupp/i)).toBeNull();
+    expect(document.querySelector('[data-tips-bracket-empty]')).toBeNull();
+    expect(document.querySelector('[data-bracket-round]')).toBeNull();
+  });
+
+  it('visar tomläges-uppmaningen så snart datan är klar men inget är tippat', () => {
+    // Kontroll-fall: när datan ÄR ready och tipset är tomt SKA uppmaningen synas
+    // (gaten gäller bara laddning, inte det äkta tomma läget).
+    render(<TipsBracketView data={dataFrom(new Map())} />);
+    expect(screen.getByText(/tippa minst en grupp/i)).toBeInTheDocument();
+  });
+});
+
 describe('TipsBracketView, märkning som simulering', () => {
   it('bär ett tydligt "Simulering"-märke och förklarar att det inte är facit', () => {
     const picks = new Map<string, GroupTipPick>([

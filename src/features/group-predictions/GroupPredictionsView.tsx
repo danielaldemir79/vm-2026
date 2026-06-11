@@ -41,7 +41,11 @@ export function GroupPredictionsView({
   now = new Date(),
 }: GroupPredictionsViewProps) {
   const store = useGroupPredictionsStore();
-  const { status, groups, teams, matches, error } = useGroupPredictableData(env);
+  // En laddning: vi behåller hela datan (predictableData) och skickar ned den till
+  // den simulerade slutspels-vyn, så den INTE laddar samma turneringsdata igen
+  // (T51 Copilot-fynd, ingen dubbel fetch).
+  const predictableData = useGroupPredictableData(env);
+  const { status, groups, teams, matches, error } = predictableData;
 
   // Deadline-medveten re-render (samma minut-tick som T15:s tipsvy): låst-statusen
   // (now >= gruppens första match) räknas om utan manuell omladdning.
@@ -204,7 +208,7 @@ export function GroupPredictionsView({
           resultat). Visar en uppmaning tills minst en grupp är tippad. */}
       {ready ? (
         <div data-tips-bracket-section="" className="mt-8">
-          <TipsBracketView env={env} />
+          <TipsBracketView predictableData={predictableData} />
         </div>
       ) : null}
     </section>

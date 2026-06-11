@@ -39,6 +39,19 @@ T16/F1, vaktad av test som assertar i id-rymden).
 bad om den. Visar en uppmaning tills minst en grupp är tippad. Design-frontend polerar ovanpå de
 återanvända bracket.css-hakarna (tipped/open-third/tbd via `data-tips-slot-resolution`).
 
+**Copilot runda 1-fixar (samma task, #88):**
+- `tippedGroupCount` räknas nu BARA över kanoniska grupp-id (A..L), via ett `Set` byggt ur
+  `GROUP_IDS` (`domain/types`, EN sanning, ej hårdkodat i sim-modulen). En korrupt/legacy-nyckel i
+  `picksByGroup` (t.ex. ett gammalt rum) får annars räknas som tippad grupp och ge "13 av 12".
+- **EN laddning, ingen dubbel fetch:** den simulerade vyn laddar inte längre samma turneringsdata
+  igen via egen `useGroupPredictableData`. `GroupPredictionsView` skickar ned sin redan-laddade
+  `GroupPredictableData` som `predictableData`-prop, så `useTipsBracketData(predictableData)` härleder
+  ur den injicerade datan. Fail-loud bevarat: utan injicerad data (och utan test-`data`) kastar
+  `TipsBracketView` (det är ett programmeringsfel, inte ett tyst körningsläge).
+- Tomläges-uppmaningen ("Tippa minst en grupp ...") blinkar inte längre fram under laddning:
+  `TipsBracketPresentation` renderar inget tills `data.ready` (bracket är null både vid "laddar" och
+  "tomt tips", så vi får inte gissa "tomt" under laddning).
+
 ---
 
 ## 2026-06-11 , T35 (#63): lås-tydlighet, gråmarkerat låst-läge + deadline-budskap (verifierad modell)

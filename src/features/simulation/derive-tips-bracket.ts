@@ -4,8 +4,9 @@
 // hur 16del kommer se ut osv. Tänkte att den kunde räkna ut det så man kan se
 // potentiella finallag, alltså vilka som möter varandra." Detta är motorn bakom
 // den vyn: ta användarens tippade gruppvinnare + tvåor och placera dem i
-// slutspelsträdets slots, så man SER mötena ("1A mot 2B = Sverige mot Frankrike
-// om mina tips slår in").
+// slutspelsträdets slots, så man SER mötena ("2A mot 2B = Sverige mot Frankrike
+// om mina tips slår in"). M73 = Runner-up A v Runner-up B (bracket-structure.ts,
+// FIFA Article 12.6), alltså tvåan i grupp A mot tvåan i grupp B.
 //
 // SYSTERFUNKTION till deriveBracket (bracket/derive-bracket.ts), men driven av
 // TIPS i stället för riktiga resultat. Vi ÅTERANVÄNDER hela den källhänvisade,
@@ -36,7 +37,15 @@
 // ============================================================================
 
 import type { GroupId, Team } from '../../domain/types';
+import { GROUP_IDS } from '../../domain/types';
 import { buildBracket, type BracketNode } from '../../domain/bracket/build-bracket';
+
+// De kanoniska grupp-id:na (A..L) som ett Set för O(1)-validering av nycklar i
+// picksByGroup. EN sanning (domain/types GROUP_IDS), aldrig hårdkodad här: en
+// korrupt/legacy-nyckel i mapen (t.ex. ett gammalt rum eller en felskriven grupp)
+// får ALDRIG räknas som en tippad grupp, annars kan tippedGroupCount överstiga 12
+// ("13 av 12").
+const VALID_GROUP_IDS: ReadonlySet<string> = new Set(GROUP_IDS);
 
 /**
  * Hur en slot är bestämd i den TIPS-härledda bilden. Medvetet ett ANNAT
@@ -185,11 +194,16 @@ export function deriveTipsBracket(
   const nodes = buildBracket();
   const idByCode = teamIdByCode(teams);
 
-  // Räkna FULLSTÄNDIGA grupp-tips (både 1:a och 2:a satta). Ett tips med tom
-  // sträng på någon sida räknas inte som fullständigt (defensivt; storen levererar
-  // normalt båda, men en framtida källa kan ge delvis ifyllt).
+  // Räkna FULLSTÄNDIGA grupp-tips (både 1:a och 2:a satta) över BARA giltiga
+  // grupp-id (A..L). Ett tips med tom sträng på någon sida räknas inte som
+  // fullständigt (defensivt; storen levererar normalt båda, men en framtida källa
+  // kan ge delvis ifyllt), och en nyckel som inte är ett kanoniskt grupp-id räknas
+  // inte alls (annars kan en korrupt/legacy-nyckel ge "13 av 12").
   let tippedGroupCount = 0;
-  for (const pick of picksByGroup.values()) {
+  for (const [groupId, pick] of picksByGroup) {
+    if (!VALID_GROUP_IDS.has(groupId)) {
+      continue;
+    }
     if (pick.winnerCode !== '' && pick.runnerUpCode !== '') {
       tippedGroupCount += 1;
     }

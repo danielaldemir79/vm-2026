@@ -24,6 +24,7 @@ import { useMemo, type ReactNode } from 'react';
 import type { Team } from '../../domain/types';
 import { teamDisplayName } from '../daily/match-display';
 import { ROUND_LABELS, ROUND_ORDER } from '../bracket/derive-bracket';
+import type { GroupPredictableData } from '../group-predictions/use-group-predictable-data';
 // Återanvänder det riktiga slutspelsträdets premium-CSS-hakar (bracket.css):
 // samma kolumn-/kort-/slot-klasser, så simuleringen ser ut som "appens slutspel".
 import '../bracket/bracket.css';
@@ -225,8 +226,13 @@ function groupTipsByRound(matches: readonly TipsMatchState[]): TipsRound[] {
 }
 
 export interface TipsBracketViewProps {
-  /** Injicerbar env (testbarhet), default = import.meta.env. */
-  env?: ImportMetaEnv;
+  /**
+   * Den redan-laddade turneringsdatan (grupper/lag/matcher + status) från
+   * värd-vyn (GroupPredictionsView). Injiceras så EN laddning sker, ingen dubbel
+   * fetch (T51 Copilot-fynd). Utelämnas bara i test/Storybook, då `data` ges i
+   * stället.
+   */
+  predictableData?: GroupPredictableData;
   /** Injicerbar data (testbarhet/Storybook), default = den riktiga hooken. */
   data?: TipsBracketData;
 }
@@ -236,20 +242,29 @@ export interface TipsBracketViewProps {
  *
  * Är `data` injicerat (test/Storybook) renderar vi DIREKT den rena presentationen
  * UTAN att anropa hooken, så testet inte behöver hela provider-/Supabase-kedjan
- * (hooken fail-loud:ar utan provider). Annars kopplar vi upp hooken. Uppdelningen
- * undviker villkorliga hook-anrop (Rules of Hooks): varje gren har en stabil
- * hook-uppsättning, eftersom de är SKILDA komponenter.
+ * (hooken fail-loud:ar utan provider). Annars kopplar vi upp hooken med den
+ * INJICERADE turneringsdatan (predictableData, från värd-vyn) så ingen extra
+ * laddning sker. Uppdelningen undviker villkorliga hook-anrop (Rules of Hooks):
+ * varje gren har en stabil hook-uppsättning, eftersom de är SKILDA komponenter.
  */
-export function TipsBracketView({ env, data }: TipsBracketViewProps) {
+export function TipsBracketView({ predictableData, data }: TipsBracketViewProps) {
   if (data) {
     return <TipsBracketPresentation data={data} />;
   }
-  return <ConnectedTipsBracketView env={env} />;
+  if (!predictableData) {
+    // Fail-loud: utan injicerad data OCH utan turneringsdata kan vyn inte härleda
+    // något. Det är ett programmeringsfel (värd-vyn ska alltid skicka ned sin
+    // redan-laddade data), inte ett körningsläge att tyst svälja.
+    throw new Error(
+      'TipsBracketView: antingen `data` (test) eller `predictableData` (produktion) måste ges.'
+    );
+  }
+  return <ConnectedTipsBracketView predictableData={predictableData} />;
 }
 
-/** Kopplar hooken (live-data) och delegerar till presentationen. */
-function ConnectedTipsBracketView({ env = import.meta.env }: { env?: ImportMetaEnv }) {
-  const data = useTipsBracketData(env);
+/** Kopplar hooken (mina tips + injicerad turneringsdata) och delegerar till presentationen. */
+function ConnectedTipsBracketView({ predictableData }: { predictableData: GroupPredictableData }) {
+  const data = useTipsBracketData(predictableData);
   return <TipsBracketPresentation data={data} />;
 }
 
@@ -261,6 +276,15 @@ function TipsBracketPresentation({ data }: { data: TipsBracketData }) {
   const rounds = useMemo(() => (bracket ? groupTipsByRound(bracket.matches) : []), [bracket]);
 
   const tippedGroupCount = bracket?.tippedGroupCount ?? 0;
+
+  // Under laddning (data.ready false, bracket fortfarande null) får tomläges-
+  // uppmaningen ALDRIG blinka fram: vi VET ännu inte om något är tippat (bracket
+  // är null både "laddar" och "tomt tips"). Rendera inget tills datan är klar, så
+  // användaren inte ser "Tippa minst en grupp ..." för att en mikrosekund senare
+  // se sitt redan tippade träd dyka upp. (Värd-vyn visar sin egen laddnings-status.)
+  if (!data.ready) {
+    return null;
+  }
 
   // Inget tippat än: visa en lugn uppmaning i stället för ett tomt skelett-träd.
   if (tippedGroupCount === 0) {
