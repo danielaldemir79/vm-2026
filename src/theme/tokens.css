@@ -705,35 +705,74 @@ body {
   );
 }
 
-/* LÅST KUPONG: efter avspark dämpas ifyllnads-zonen (den går inte att ändra) och
-   en guld-till-neutral ton signalerar "inlämnad/avgjord". Dämpningen läggs BARA
-   på den dekorativa fonden + topplisten (gulden tonas ner mot border-tonen), så
-   den positiva "låst = rättvist"-känslan finns kvar utan att skrika. Text-lagret
-   rörs inte av dämpningen (låst-etiketten + mitt-tips-talen bär full kontrast).
-   GÄLLER ALLA tips-kupong-typerna: match-tipset (T15, data-prediction-locked),
-   grupp-tipset (T16, data-group-prediction-locked) OCH slutspels-tipsets slot-
-   kuponger (T16b, data-bracket-prediction-locked) , samma dämpnings-recept, en sanning. */
+/* LÅST KUPONG, OMISSKÄNNLIG GRÅMARKERING (T35, #63 AC#1, Daniels feedback 5): efter
+   avspark ska kortet läsas som LÅST direkt, inte bara en aning dämpad guld. Tidigare
+   tonade vi bara ner gulden en aning; Daniel ville ha en TYDLIG gråmarkering. Vi byter
+   därför HELA kupong-fonden till en NEUTRAL grå yta: grått surface-tint i bakgrunden,
+   den varma guld-radialen ersatt av en neutral grå radial, den gyllene inset-topplisten
+   och vilo-kanten neutraliserade till border-tonen, och hela kortet en aning lägre i
+   mättnad/ljus (filter). Resultatet är omisskännligt "låst/inlämnad" utan att skrika.
+   OBS sanning om filtret (copilot R1): `filter: saturate(0.85)` verkar på HELA
+   elementet, alltså även text-lagret. Det är OK just för att det är en mättnads-
+   sänkning, inte en opacity/ljushets-ändring: texten är nära-neutral (fg på opak yta)
+   så dess luminans-kontrast påverkas försumbart, och AA är uppmätt KOMPOSITERAT med
+   filtret aktivt i båda teman (se decisions.md T35). GÄLLER ALLA tips-kupong-typerna:
+   match-tipset (data-prediction-locked), grupp-tipset (data-group-prediction-locked)
+   OCH slutspels-tipsets slot-kuponger (data-bracket-prediction-locked) , en sanning. */
 .vm-coupon-card[data-prediction-locked],
 .vm-coupon-card[data-group-prediction-locked],
 .vm-coupon-card[data-bracket-prediction-locked] {
+  /* Neutral grå yta i stället för den varma kupong-surface:n. Tinten lyfts till 8%
+     fg (var 6%) så kort-kroppen läses som grå redan på en armlängds avstånd, inte
+     "nästan vit"/"nästan surface". Texten står ändå på den OPAKA ytan med full fg-
+     kontrast, så en något starkare grå sänker ingen läsbarhet (T35-visuellt). */
+  background-color: color-mix(in srgb, var(--color-fg) 8%, var(--color-surface));
   background-image: radial-gradient(
     120% 90% at 100% 0%,
-    color-mix(in srgb, var(--vm-gold) 5%, transparent),
+    color-mix(in srgb, var(--color-fg) 6%, transparent),
     transparent 60%
   );
+  /* Gyllene vilo-kant -> neutral grå kant (omisskännligt "inte aktiv"). */
+  border-color: var(--color-border);
+  /* Topplisten neutraliseras till border-tonen (ingen guld-signal kvar). */
   box-shadow:
     var(--vm-shadow-card),
-    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 20%, var(--color-border));
+    inset 0 1.5px 0 0 var(--color-border);
+  /* En svag avmättnad (saturate 0.85, 15% mindre mättnad) över HELA kortet (inkl.
+     text, se blockkommentaren ovan) gör dekor (flaggor, chip-tinter) gråare, så
+     kortet känns inlämnat. Hålls lågt så valda lag-flaggor fortfarande går att
+     känna igen, det är en gråmarkering, inte en utsuddning. */
+  filter: saturate(0.85);
+}
+
+/* RIVER-PERFORERINGEN var den sista STARKA guld-signalen på ett låst kort: den
+   streckade guld-linjen syntes lika stark som på ett öppet kort och drog ögat,
+   vilket motverkade "låst"-läsningen (en svag saturate räcker inte, gult vid 85%
+   mättnad är fortfarande tydligt gult). Vi neutraliserar perforeringen till en grå
+   streck-linje (border-tonen) i låst läge, så HELA kortet, inklusive avrivnings-
+   linjen, läser som inlämnat. Ren dekor (aria-hidden), bär ingen text. */
+.vm-coupon-card[data-prediction-locked] .vm-coupon-tear,
+.vm-coupon-card[data-group-prediction-locked] .vm-coupon-tear,
+.vm-coupon-card[data-bracket-prediction-locked] .vm-coupon-tear {
+  background-image: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-fg) 22%, transparent) 0,
+    color-mix(in srgb, var(--color-fg) 22%, transparent) 6px,
+    transparent 6px,
+    transparent 12px
+  );
 }
 
 .vm-coupon-card[data-prediction-locked]:hover,
 .vm-coupon-card[data-group-prediction-locked]:hover,
 .vm-coupon-card[data-bracket-prediction-locked]:hover {
-  /* Låst kupong lyfter inte på hover (inget att interagera med), så den känns
-     stilla/inlämnad. Samma vilo-skugga som icke-hover. */
+  /* Låst kupong lyfter inte på hover (inget att interagera med) OCH värms inte upp
+     till guld igen , den förblir grå/stilla/inlämnad. Samma vilo-skugga + neutral
+     kant som icke-hover (annars vinner basens guld-hover-kant via inline-klassen). */
+  border-color: var(--color-border);
   box-shadow:
     var(--vm-shadow-card),
-    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 20%, var(--color-border));
+    inset 0 1.5px 0 0 var(--color-border);
 }
 
 /* HÄNGLÅSETS "klick"-puls när låset just slagit till: en lugn, ENGÅNGS skala-puls

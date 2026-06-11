@@ -179,6 +179,32 @@ describe('BracketPredictionsView', () => {
     expect(champion.querySelector('[data-bracket-prediction-lock]')).not.toBeNull();
   });
 
+  it('AC#3 DEADLINE: öppen slot visar slottens egen avspark, champion visar turneringsstart (g-A-1)', () => {
+    renderView(store({}), new Date('2026-06-01T00:00:00Z')); // allt öppet
+    // M73:s deadline = slottens egen avspark (1 juli 16:00Z = 18:00 svensk).
+    const m73Notice = document
+      .querySelector('[data-slot-id="M73"]')!
+      .querySelector('[data-deadline-notice]');
+    expect(m73Notice).not.toBeNull();
+    expect(m73Notice!.getAttribute('data-deadline-iso')).toBe('2026-07-01T16:00:00.000Z');
+    expect(m73Notice).toHaveTextContent(/Låses/);
+    expect(m73Notice).toHaveTextContent(/1 juli kl 18:00/);
+    // Champion: turneringsstart g-A-1 (11 juni 16:00Z = 18:00 svensk).
+    const champNotice = document
+      .querySelector('[data-slot-id="champion"]')!
+      .querySelector('[data-deadline-notice]');
+    expect(champNotice).not.toBeNull();
+    expect(champNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-11T16:00:00.000Z');
+    expect(champNotice).toHaveTextContent(/Tippningen låses/);
+  });
+
+  it('AC#3: en LÅST slot visar ingen öppen deadline-rad (låst-etikett tar över)', () => {
+    renderView(store({}), new Date('2026-07-01T18:00:00.000Z')); // efter M73-avspark
+    const m73 = document.querySelector('[data-slot-id="M73"]')!;
+    expect(m73.querySelector('[data-bracket-prediction-lock]')).not.toBeNull();
+    expect(m73.querySelector('[data-deadline-notice]')).toBeNull();
+  });
+
   it('seedar champion-väljaren från mitt befintliga tips', () => {
     const mine: BracketPrediction = {
       slotId: 'champion',
