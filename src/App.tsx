@@ -271,11 +271,27 @@ function AppShell() {
           <p>
             VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med en länk.
           </p>
-          {/* Diskret upphovs-signatur (T38, #67). Stabil semantik + data-attribut
-              (data-app-signature) som krok för design-frontends finputs efteråt;
-              denna rad är den funktionella basen, inte den slutgiltiga stylingen. */}
-          <p data-app-signature="" className="text-xs text-fg-muted/80">
-            Made by Daniel Aldemir
+          {/* Upphovs-signatur (T38, #67): Daniels stolta lilla avsändarrad i "arena i
+              kvällsljus"-estetiken. Ett "DA"-monogram-sigill (solid accent-bricka, mörk/
+              vit ink = den färg-oberoende solid-bricka-formen, AA i båda teman) + en hårfin
+              accent-tick som diskret separator, sen "Made by" dämpat (fg-muted, FULL
+              opacitet = AA-säkert mot fonden) och NAMNET i full fg/display-vikt så det
+              läses stolt, inte som en eftertanke. data-app-signature = stabil krok + testad
+              semantik. Monogrammet är aria-hidden (ren dekor), så skärmläsaren läser den rena
+              meningen "Made by Daniel Aldemir". Kontrast mätt i scripts/contrast-t38.mjs
+              (canvas-komposit mot FONDEN, värsta basytan), värden i docs/decisions.md. */}
+          <p
+            data-app-signature=""
+            className="mt-1 flex items-center gap-2.5 text-xs"
+            title="Made by Daniel Aldemir"
+          >
+            <span aria-hidden="true" className="vm-signature-seal">
+              DA
+            </span>
+            <span aria-hidden="true" className="vm-signature-tick" />
+            <span className="text-fg-muted">
+              Made by <span className="font-display font-semibold text-fg">Daniel Aldemir</span>
+            </span>
           </p>
         </footer>
       </main>
