@@ -289,3 +289,164 @@
     scroll-behavior: auto;
   }
 }
+
+/* =============================================================================
+   6. SIMULERINGS-TRÄDET UR TIPSEN (T51, #88). [design-frontend, ovanpå senior-devs
+   seam: data-tips-slot-resolution, data-tips-bracket-*]
+   =============================================================================
+
+   IDENTITET: detta är INTE det levande trädet (BracketView ovan), det är en
+   SIMULERING ur Daniels grupp-tips, "så här blir sextondelen om mina ettor/tvåor
+   stämmer". Den ärver hela premium-trädets layout (kolumner, kort, scroll-edges,
+   per-runda-intensitet mot finalen) men lägger ETT extra läsbarhets-lager: de tre
+   slot-tillstånden ska gå att skilja på en blink, FÄRG-OBEROENDE (form + vikt +
+   yta, aldrig bara en färg), så de läses även i gråskala / för färgblinda / i
+   båda teman:
+
+     - TIPPAD (resolution='tipped'): laget kommer UR mina tips. Mest visuell vikt,
+       en accent-vänsterbar (form) + en svag accent-yt-ton, fet text. "Det här
+       valde JAG."
+     - ÖPPEN TREA (resolution='open-third'): en av de 8 bästa treorna, som avgörs
+       av de RIKTIGA resultaten (FIFA-seedning), gissas aldrig. En ärlig, inbjudande
+       platshållare: en streckad vänsterkant (väntar på att fyllas) + en lugn ton,
+       plus "Öppen"-brickan i markup. Neutral, inte ett fel.
+     - TBD / STRUKTUR (resolution='tbd'): "Vinnare M73" osv, vägen vidare som tipsen
+       inte uttalar sig om. Dämpad (lägst vikt), så den läser som struktur, inte
+       som ett påstått lag.
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall): all slot-TEXT står på den
+   OPAKA kort-ytan (surface), tinterna nedan är LÅG-alfa color-mix mot transparent
+   bakom texten och bär aldrig läsbarhet själva. De FÄRG-OBEROENDE signalerna (kant-
+   bar, streckad kant, text-vikt) bär tillståndet, tonen förstärker bara. Mätt
+   kompositerat i båda teman (handoff Verification).
+   -------------------------------------------------------------------------- */
+
+/* TIPPAD slot: laget ur mina tips, slot-radens HJÄLTE. En accent-vänsterbar (form,
+   samma vinst-markör-språk som data-winner ovan men dämpad till "vald") + en svag
+   accent-yt-ton lyfter raden ur kortet. Texten bär redan font-semibold + text-fg
+   (seamen), tonen är bara förstärkning. */
+.vm-bracket-slot[data-tips-slot-resolution='tipped'] {
+  background-color: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--color-accent) 70%, transparent);
+}
+
+/* En liten accent-prick FÖRE det tippade lagnamnet (form-signal, inte färg-beroende):
+   en ifylld punkt som säger "det här kommer ur ditt tips", syns i gråskala. Ritad
+   via pseudo så TSX-semantiken inte rörs. */
+.vm-bracket-slot[data-tips-slot-resolution='tipped'] .vm-bracket-slot-name::before {
+  content: '';
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-right: 0.4375rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+  vertical-align: middle;
+}
+
+/* ÖPPEN TREA: en ärlig, inbjudande platshållare. En STRECKAD vänsterkant (väntar
+   på att fyllas, samma "kommer snart"-språk som tips-kupongens .vm-tips-tbd) + en
+   nästan omärklig neutral ton, så raden läser "den här avgörs av riktiga resultat",
+   varken som ett tippat lag eller som ett fel. Bär ingen accent (det är inte mitt
+   val), bara en lugn, öppen känsla. */
+.vm-bracket-slot[data-tips-slot-resolution='open-third'] {
+  border-left: 2px dashed color-mix(in srgb, var(--color-fg-muted) 45%, transparent);
+  background-color: color-mix(in srgb, var(--color-fg) 2%, transparent);
+}
+
+/* "Öppen"-brickan (markup): en lugn, neutral pill. Texten är fg-muted (AA som normal
+   text i båda teman) på en svag neutral tint, ingen alarmistisk färg. */
+.vm-tips-open-badge {
+  border-color: color-mix(in srgb, var(--color-fg-muted) 35%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-fg) 4%, transparent);
+}
+
+/* TBD / STRUKTUR ("Vinnare M73"): dämpad, så den läser som vägen-vidare-struktur,
+   inte ett påstått lag. Texten är redan fg-muted (seamen); en aning lägre opacitet
+   trycker tillbaka den ett steg till utan att falla under läsbarhet (fg-muted har
+   gott om AA-marginal i båda teman, en lätt dämpning sänker den inte under tröskeln,
+   mätt kompositerat). Ingen kant-bar, ingen ton, lugnast av de tre. */
+.vm-bracket-slot[data-tips-slot-resolution='tbd'] .vm-bracket-slot-name {
+  opacity: 0.82;
+}
+
+/* RUNDA-MARKÖREN i sim-trädet: samma redaktionella, numrerade rubrik-känsla som det
+   riktiga trädet (§2) och slutspels-tipset (tokens.css §12), så de tre slutspels-
+   ytorna hör ihop. Default = dämpad kant; intensiteten byggs mot finalen (per-stage
+   nedan). ENBART dekor (aria-hidden), aldrig text-bärare. */
+.vm-tips-bracket-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-fg-muted);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.6875rem;
+  line-height: 1;
+}
+
+/* Semifinalen börjar ta accent (vi närmar oss toppen), brons + final får guld-
+   markören (trädets krona), samma per-stage-språk som bracket.css §3 + tokens.css
+   §12. Guld-TEXT på markören använder --color-warning (AA-mätt), aldrig rå --vm-gold. */
+.vm-tips-bracket-marker[data-round='semi-final'] {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  color: var(--color-fg);
+}
+.vm-tips-bracket-marker[data-round='third-place'] {
+  border-color: color-mix(in srgb, var(--vm-gold) 35%, var(--color-border));
+  color: var(--color-warning);
+}
+.vm-tips-bracket-marker[data-round='final'] {
+  border-color: color-mix(in srgb, var(--vm-gold) 60%, var(--color-border));
+  background-color: color-mix(in srgb, var(--vm-gold) 10%, var(--color-surface));
+  color: var(--color-warning);
+}
+
+/* PER-RUNDA-INTENSITET på sim-trädets kort (samma anda som bracket.css §3): tidiga
+   rundor lugna, mot finalen lyfts korten. Finalen får guld-signatur (trädets krona,
+   skärmen man visar kompisarna), bronsmatchen en lugnare brons-ton. Detta är samma
+   data-bracket-round-haken som det riktiga trädet, men sim-trädet sätter dem också,
+   så vi tonsätter dem här lika. Dekor (kant/yta/skugga), bär ingen text. */
+.vm-bracket-round[data-bracket-round='semi-final'] .vm-bracket-match {
+  border-color: color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
+}
+.vm-bracket-round[data-bracket-round='final'] .vm-bracket-match {
+  border-color: color-mix(in srgb, var(--vm-gold) 50%, var(--color-border));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vm-gold) 10%, var(--color-surface)),
+    var(--color-surface)
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    0 0 0 1px color-mix(in srgb, var(--vm-gold) 26%, transparent),
+    0 8px 28px -10px color-mix(in srgb, var(--vm-gold) 28%, transparent);
+}
+.vm-bracket-round[data-bracket-round='third-place'] .vm-bracket-match {
+  border-color: color-mix(in srgb, var(--vm-gold) 24%, var(--color-border));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vm-gold) 5%, var(--color-surface)),
+    var(--color-surface)
+  );
+}
+
+/* SIMULERINGS-BRICKAN: en SOLID guld-yta med mörk ink (--vm-coupon-ink), den färg-
+   OBEROENDE solid-bricka-formen (T9/T11/T15: guld-som-text-på-tint faller under AA,
+   uppmätt 2.51:1 i ljust tema, en SOLID guld-bricka med near-black ink gör inte det).
+   Tonalt samma "hejarklacks-guld" som hela kupong-/slutspels-tips-världen, men nu
+   AA-säkert i båda teman. Inte alarmistisk: lugn och varm, signalerar "tips, inte
+   facit", precis som what-if-läget signalerar "hypotetiskt". */
+.vm-tips-sim-badge {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.3),
+    0 2px 8px -3px color-mix(in srgb, var(--vm-gold) 60%, transparent);
+}
