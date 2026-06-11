@@ -159,7 +159,7 @@ export function GroupPredictionsView({
           data-group-predictions-list=""
           className="mt-5 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3"
         >
-          {predictableGroups.map(({ groupId, teams: groupTeams, locked }) => {
+          {predictableGroups.map(({ groupId, teams: groupTeams, locked, deadlineIso }) => {
             const mine = store.myGroupPredictions.get(groupId) ?? null;
             return (
               <li key={groupId}>
@@ -172,6 +172,8 @@ export function GroupPredictionsView({
                       : null
                   }
                   locked={locked}
+                  deadlineIso={deadlineIso}
+                  now={evalNow}
                   onSubmit={async (gid, winnerCode, runnerUpCode) => {
                     // Brandning vid UI-gränsen: formulärets värden kommer från
                     // <option value={t.code}> (versal FIFA-code). teamCode() validerar

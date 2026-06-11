@@ -36,6 +36,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { SlotTeamOption } from './bracket-predictable-slots';
 import { TeamFlag } from '../daily/TeamFlag';
+import { DeadlineNotice } from '../predictions/DeadlineNotice';
 
 export interface BracketPredictionFormProps {
   /** slot_id (M73..M104 eller 'champion'), tips-nyckel + data-hake. */
@@ -50,6 +51,14 @@ export interface BracketPredictionFormProps {
   current: string | null;
   /** Är slotten LÅST (avspark/turneringsstart passerad)? Då är väljaren disabled. */
   locked: boolean;
+  /**
+   * Slottens deadline (slottens egen avspark, eller g-A-1 för champion, avspark ISO),
+   * SAMMA värde som driver `locked`. Visas i ÖPPET läge så det är klart NÄR tippningen
+   * låses (AC#3). null om ankar-matchen saknas (oväntat) -> ingen deadline-rad.
+   */
+  deadlineIso?: string | null;
+  /** Injicerbart "nu" (testbarhet) för deadline-radens relativa etikett, default nuet. */
+  now?: Date;
   /**
    * Visuell variant: 'champion' = hjälte-hero (pokal/guld), 'slot' = tips-kupong.
    * Default 'slot' (de flesta slotsen). Påverkar BARA presentationen, inte semantiken.
@@ -193,6 +202,8 @@ export function BracketPredictionForm({
   teamsKnown,
   current,
   locked,
+  deadlineIso = null,
+  now,
   variant = 'slot',
   onSubmit,
 }: BracketPredictionFormProps) {
@@ -374,6 +385,11 @@ export function BracketPredictionForm({
               (mästar-bandet ovan är det man ser) men finns kvar i DOM:en (disabled via
               fieldset) för a11y + testkontraktet. */}
           <div className={locked ? 'sr-only' : 'flex flex-col gap-4'}>
+            {/* DEADLINE-RADEN (AC#3): VM-vinnaren låses vid turneringsstart (g-A-1),
+                ur SAMMA deadlineIso som driver låset (en sanning). Bara i öppet läge. */}
+            {!locked ? (
+              <DeadlineNotice deadlineIso={deadlineIso} now={now} lead="Tippningen låses" />
+            ) : null}
             <div className="flex min-w-0 flex-col gap-2">
               <label htmlFor={pickId} className="font-display text-sm font-semibold text-fg">
                 Min VM-vinnare
@@ -526,6 +542,9 @@ export function BracketPredictionForm({
             låst-kontraktet håller. I låst läge döljs den visuellt (sammanfattningen
             ovan är det man ser) men finns kvar i DOM:en för a11y + testkontraktet. */}
         <div className={locked ? 'sr-only' : 'flex flex-col gap-2.5'}>
+          {/* DEADLINE-RADEN (AC#3): slotten låses vid sin egen avspark, ur SAMMA
+              deadlineIso som driver låset (en sanning). Bara i öppet läge. */}
+          {!locked ? <DeadlineNotice deadlineIso={deadlineIso} now={now} lead="Låses" /> : null}
           {/* De TVÅ möjliga lagen som ett tydligt val: flaggor + namn + "vs", så valet
               känns konkret innan väljaren. Ren dekoration (aria-hidden), väljaren bär
               det riktiga valet. Visas bara när det är en binär match-slot (2 lag). */}

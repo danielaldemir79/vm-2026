@@ -5,6 +5,70 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T35 (#63): lås-tydlighet, gråmarkerat låst-läge + deadline-budskap (verifierad modell)
+
+Daniels feedback 5: tippnings-upplevelsen ska vara TYDLIG om lås och deadlines. Tre AC. AC#2 (3-dagars
+fönster + expandera på matchtips-listan) levererades REDAN i T39 (`PredictionsView`, `ExpandToggle`,
+paritetsguard `predictions-results-window-parity.test.tsx`), verifierat orört på develop, byggdes inte
+om. Kvar: AC#1 (visuellt lås) + AC#3 (deadline-tydlighet grupp + bracket).
+
+**AC#1, omisskännlig GRÅMARKERING av låst kupong (visuellt):** den funktionella låsningen (fält
+disabled via `fieldset disabled={locked}`, ingen spara-knapp, låst-etikett "Tipset är låst") +
+tids-ticken (`use-deadline-tick`, ett öppet kort blir låst när avspark passerar, redan testat
+T15) fanns. Det SAKNADE var att kortet inte LÄSTES som låst, den gamla låst-stilen tonade bara ner
+gulden en aning. Beslut: `.vm-coupon-card[data-*-locked]` (tokens.css §10) byter nu HELA fonden till
+en NEUTRAL grå yta (grått surface-tint på 8% fg, neutral radial i stället för guld, neutral kant +
+topplist, en svag `saturate(0.85)`), så låst != aktiv är omisskännligt. Filtret verkar på HELA
+kortet inklusive texten (copilot R1/R2-sanning): det är enbart en mättnadssänkning, ingen
+opacity/ljushets-ändring, så textens luminans-kontrast påverkas försumbart och AA är uppmätt
+kompositerat med filtret aktivt i båda teman.
+Gäller alla tre kupong-typerna (match/grupp/bracket-slot) via samma data-attribut, en
+sanning. Champion-hero:n (egen `.vm-champion-hero[data-bracket-prediction-locked]`) har kvar sin egen
+hjälte-låst-stil (den är inte en `.vm-coupon-card`).
+
+**AC#1, visuell finish (design-frontend):** två justeringar lyfte "låst"-läsningen från "en aning
+dämpad" till omisskännlig på en armlängds avstånd, verifierat live i båda teman + på vikbar-cover-bredd
+(265px, ingen overflow): (1) tinten höjd 6% -> 8% fg så kort-KROPPEN läser grå, inte "nästan surface";
+(2) den streckade RIVER-perforeringen, den sista starka guld-signalen, neutraliseras till en grå
+streck-linje i låst läge (`.vm-coupon-card[data-*-locked] .vm-coupon-tear`), för en `saturate(0.85)`
+ensam lämnar gult tydligt gult och den gyllene linjen drog ögat lika starkt som på ett öppet kort.
+HELHETEN är medvetet TVÅDELAD: de grå låsta kupongerna (formulär-ifyllningar, "inlämnat") står mot
+den VARMT guldhållna champion-hero:n (firande, "trädets krona avgjord"), en hierarki, inte en
+inkonsekvens, eftersom de bär samma hänglås + lås-notis-signatur men hero:n förtjänar sin värme.
+
+**AC#3, deadline-radens TON (design-frontend):** hänglås-glyfen i `DeadlineNotice` bär nu radens
+dämpade `text-fg-muted`-ton (var warning-amber), så raden läser som en vänlig UPPLYSNING ("bra att
+veta NÄR det låses"), inte en VARNING, warning-amber drog ögat som ett larm. Den exakta TIDEN
+(`<time>`, `text-fg` semibold) är det enda som lyfts. Medveten kontrast mot det POST-lås amber-
+hänglåset i lås-notisen (det ÄR låst nu): pre-lås heads-up = lugn muted, present locked = etablerad
+varm lås-signatur. AA-uppmätt (canvas-komposit på kupong-ytan, båda teman): muted glyf/relativ-text
+6.52:1 (ljust) / 7.5:1 (mörkt), tid-texten 17.9:1 / 15.2:1, alla >= 4.5:1 (normal text).
+
+**AC#3, deadline-budskap ur den VERIFIERADE modellen (HARD, gissa aldrig, källhänvisad):** Daniel sa
+"deadline till söndag", men deadline-modellen får INTE gissas. Verifierad 1:1 mot RLS-migrationerna
+(det FAKTISKA låset, inte en klient-gissning):
+  - **Grupp-tips:** `group_deadline_kickoff(group_id)` = kickoff för gruppens FÖRSTA match `g-X-1`
+    (`20260611130100_t16_group_predictions_rls.sql:29-39`). Per-grupp, inte globalt.
+  - **Bracket-slot:** `bracket_deadline_kickoff(slot_id)` = slottens EGEN avspark (M73..M104).
+  - **Champion:** `bracket_deadline_kickoff('champion')` = `g-A-1` (turneringens första match =
+    turneringsstart) (`20260611130300_t16_bracket_predictions_rls.sql:28-37`).
+  I ALLA tre fallen är deadlinen en MATCH-AVSPARK, alltså en exakt tidpunkt, inte en veckodag. Vi
+  kommunicerar den exakta tiden ("Tippningen låses torsdag 11 juni kl 21:00 · om 3 dagar"), inte en
+  gissad söndag. **Källa:** ovan nämnda RLS-migrationer + decisions.md T16 §4 (deadline-lås).
+
+**EN SANNING (HARD, ingen hårdkodad text-dubblett av en tid):** budskapet härleds ur SAMMA
+`deadlineIso` som driver `locked` i selektorerna (`group-predictable-data.ts` / `bracket-predictable-
+slots.ts` räknar redan ut `deadlineIso` ur ankar-matchen och `locked = now >= deadlineIso`). Ny REN
+`formatDeadline(deadlineIso, now)` (`src/features/predictions/format-deadline.ts`) + presentations-
+komponent `DeadlineNotice` formaterar exakt det ankaret i svensk tid (återanvänder daily-lagrets
+`formatKickoffTime`/`formatDayHeadingNoYear`/`localDateKey`, off-by-one-säkert). Låset och texten kan
+därför aldrig drifta isär, är de olika är det samma ISO som är fel på båda. Visas bara i ÖPPET läge
+(i låst läge säger låst-etiketten redan "låst"). Fail-safe: null-deadline (saknad ankar-match) -> ingen
+rad (samma fail-safe som låset). Tester vaktar gränsen (now exakt på deadline -> "idag") + midnatt-
+randfallet (svensk kalenderdag, inte rå < 24h) + att en låst slot inte visar den öppna deadline-raden.
+
+---
+
 ## 2026-06-11 , T34 (#62): "Så funkar poängen", en delad förklaring vid tippningen + topplistan
 
 Daniels huvudkrav: TYDLIGHET, en synlig, inbjudande förklaring av poängen där man tippar OCH vid
