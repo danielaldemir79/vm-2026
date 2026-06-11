@@ -43,8 +43,18 @@ export const GROUP_IDS = [
 export interface Team {
   /** Stabil intern nyckel som matcher/tabeller refererar (gissas aldrig om). */
   id: string;
-  /** Visningsnamn, t.ex. "Brasilien". */
+  /** Visningsnamn, t.ex. "Brasilien". Det FULLA namnet, används där det finns plats (lagprofilen). */
   name: string;
+  /**
+   * Kort visningsnamn för TRÅNGA sammanhang (grupptabellen, matchkortet,
+   * slutspelsträdets celler) där det fulla `name` trycker ihop övriga kolumner,
+   * t.ex. "Bosnien" för "Bosnien och Hercegovina". VALFRITT: default är `name`,
+   * så bara lag vars fulla namn är för långt sätter det explicit. Hämta det
+   * effektiva korta namnet via `teamShortName(team)` (en sanning för fallback-
+   * regeln, domain/team-name.ts), aldrig `team.shortName` direkt (då tappas
+   * default:en). Det FULLA `name` står kvar i lagprofilen där utrymmet finns.
+   */
+  shortName?: string;
   /** FIFA:s trebokstavs-landskod, t.ex. "BRA". Driver flagg-rendering. */
   code: string;
   /** Vilken grupp laget tillhör. */

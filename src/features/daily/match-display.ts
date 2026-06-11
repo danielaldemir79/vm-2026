@@ -7,6 +7,7 @@
 // gissa ett lag (gissa aldrig, PRINCIPLES).
 
 import type { Match, MatchStage, Team } from '../../domain/types';
+import { teamShortName } from '../../domain';
 
 /** Svensk etikett per slutspels-/gruppsteg (för matchkortets steg-märke). */
 const STAGE_LABELS: Record<MatchStage, string> = {
@@ -31,9 +32,12 @@ export function stageLabel(match: Pick<Match, 'stage' | 'groupId'>): string {
 export const UNKNOWN_TEAM_LABEL = 'Ej klart';
 
 /**
- * Visningsnamnet för ett lag i en match-sida. Slår upp Team.name ur uppslaget;
- * är laget okänt (slutspel innan seedningen, teamId null) eller saknas i
- * uppslaget returneras en tydlig platshållare i stället för ett gissat namn.
+ * Visningsnamnet för ett lag på en matchsida (matchkortet, slutspelsträdets celler).
+ * Båda är TRÅNGA ytor (två lag som speglar varandra runt "mot" / smala bracket-celler),
+ * så vi visar det KORTA namnet (teamShortName: shortName om satt, annars name), t.ex.
+ * "Bosnien" i stället för "Bosnien och Hercegovina" (T50). Det fulla namnet står kvar
+ * i lagprofilen där det finns plats. Är laget okänt (slutspel innan seedningen, teamId
+ * null) eller saknas i uppslaget returneras en tydlig platshållare, inte ett gissat namn.
  */
 export function teamDisplayName(
   teamId: string | null,
@@ -42,7 +46,8 @@ export function teamDisplayName(
   if (teamId === null) {
     return UNKNOWN_TEAM_LABEL;
   }
-  return teamsById.get(teamId)?.name ?? UNKNOWN_TEAM_LABEL;
+  const team = teamsById.get(teamId);
+  return team ? teamShortName(team) : UNKNOWN_TEAM_LABEL;
 }
 
 /**
