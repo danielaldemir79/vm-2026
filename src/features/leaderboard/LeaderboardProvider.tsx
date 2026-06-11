@@ -20,6 +20,7 @@ import {
   listRoomPredictions,
   listRoomGroupPredictions,
   listRoomBracketPredictions,
+  isMatchLocked,
   type Prediction,
   type GroupPrediction,
   type BracketPrediction,
@@ -98,6 +99,18 @@ export function LeaderboardProvider({
   // match som låses (avspark passeras) dyker upp i avslöjandet utan omladdning.
   const evalNow = useDeadlineTick(now ?? new Date());
 
+  // T55 (#96), rotorsak 2: re-fetcha andras tips NÄR en match passerar avspark. RLS
+  // släpper andras tips-RADER först efter kickoff, så en app som stått öppen sedan FÖRE
+  // avspark har ett svar UTAN dem; utan en ny hämtning ser man inget förrän en reload.
+  // Vi pollar INTE och öppnar ingen realtime (det är T18/#18): vi härleder bara ANTALET
+  // LÅSTA matcher ur den BEFINTLIGA minut-ticken (evalNow). Talet ökar när en match
+  // passerar avspark, och eftersom det ligger i fetch-effektens deps triggar just den
+  // övergången en (1) ny hämtning, så de nyligen avslöjade raderna kommer in.
+  const lockedMatchCount = useMemo(
+    () => data.matches.filter((m) => isMatchLocked(m.kickoff, evalNow)).length,
+    [data.matches, evalNow]
+  );
+
   // EPOCH-vakt: ett snabbt rumsbyte får aldrig låta ett föråldrat svar visa fel rum.
   const loadTokenRef = useRef(0);
 
@@ -132,7 +145,10 @@ export function LeaderboardProvider({
         setPredictionsError(err instanceof Error ? err.message : 'Kunde inte ladda topplistan.');
         setPredictionsStatus('error');
       });
-  }, [supabase, activeRoomId]);
+    // lockedMatchCount (T55 #96): re-fetcha när en match passerar avspark, så RLS-
+    // nyligen-släppta tips kommer in utan reload. ENDAST när talet ÄNDRAS (en ny match
+    // låstes) körs effekten om, inte varje minut-tick (talet är stabilt mellan avspark).
+  }, [supabase, activeRoomId, lockedMatchCount]);
 
   // VÄVD status: topplistan är 'ready' först när BÅDE facit-datan OCH tipsen laddat.
   // Felet från endera lagret fail-loud:ar. Idle/loading speglas så vyn visar laddning.

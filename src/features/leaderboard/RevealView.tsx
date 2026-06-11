@@ -21,10 +21,19 @@
 // UTFALLS-KATEGORI härleds ur pick.pointType (T46), den TESTADE poäng-TYPEN ur score.ts
 // (pointTypeOf, samma sanning som poäng-siffran). Inte en egen tröskel mot points-talet,
 // en sanning för "vad är en exakt träff" OCH "varför fick tipset sin poäng".
+//
+// T55 (#96): PÅGÅR-LÄGET. Avslöjandet visas nu redan vid AVSPARK, inte först vid
+// slutsignal. En LÅST men PÅGÅENDE match (store.reveal-rad med status 'live') visar
+// allas tips MEN inget facit och INGA poäng (ärligt "Pågår", vi gissar aldrig poäng på
+// en oavgjord match, HARD T55). En FÄRDIG match (status 'finished') visar facit + poäng
+// + varför som förut. Diskriminanten gör att poäng-fälten strukturellt bara finns på den
+// färdiga grenen. design-frontend polerar pågår-läget ovanpå data-attribut-hakarna
+// (data-reveal-status, data-reveal-live-pick) efter denna funktionella nivå.
 
 import { useMemo } from 'react';
 import { useLeaderboardStore } from './leaderboard-context';
 import { type MatchPointType, type Scoreline } from '../../data/predictions';
+import type { RevealedMatch, FinishedRevealedMatch, PendingRevealedMatch } from './reveal';
 
 /** Formatera en målställning som "2-1". */
 function formatScore(score: Scoreline): string {
@@ -84,6 +93,173 @@ function outcomeFor(pointType: MatchPointType): Outcome {
   return { key: pointType, ...OUTCOME_BY_TYPE[pointType] };
 }
 
+/** Lagnamn-uppslag (Team.id -> namn). Returnerar en stabil fallback, ingen krasch. */
+type TeamNameLookup = (teamId: string | null) => string;
+
+/**
+ * En FÄRDIG match: facit-talet (hjälten) + allas tips + poäng + VARFÖR-etikett. Oförändrat
+ * beteende mot T17/T46, bara utbrutet ur en gemensam dispatch så pågår-läget kan ligga jämte.
+ */
+function FinishedMatchCard({
+  match,
+  nameOf,
+}: {
+  match: FinishedRevealedMatch;
+  nameOf: TeamNameLookup;
+}) {
+  return (
+    <li
+      data-reveal-match=""
+      data-match-id={match.matchId}
+      data-reveal-status="finished"
+      className="vm-reveal-card rounded-card p-4"
+    >
+      {/* Match-rubrik + FACIT-talet (det faktiska resultatet, hjälten). */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="m-0 font-display text-sm font-semibold">
+          {nameOf(match.homeTeamId)} mot {nameOf(match.awayTeamId)}
+        </p>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-fg-muted">
+            Facit
+          </span>
+          <span
+            data-reveal-actual=""
+            className="vm-reveal-actual inline-flex items-center rounded-pill px-2.5 py-0.5 text-sm tabular-nums"
+          >
+            {formatScore(match.actual)}
+          </span>
+        </span>
+      </div>
+
+      {/* Allas tips + poäng (sorterade på poäng fallande av reveal-modulen). Varje
+          rad bär en FÄRG-OBEROENDE utfalls-markör + en SYNLIG VARFÖR-etikett (T46)
+          + en grön/guld vänsterkant. */}
+      {match.picks.length > 0 ? (
+        <ul data-reveal-picks="" className="mt-3 flex list-none flex-col gap-1.5 p-0">
+          {match.picks.map((pick) => {
+            const outcome = outcomeFor(pick.pointType);
+            return (
+              <li
+                key={pick.userId}
+                data-reveal-pick=""
+                data-user-id={pick.userId}
+                data-points={pick.points}
+                data-outcome={outcome.key}
+                className="vm-reveal-pick flex flex-wrap items-center gap-x-3 gap-y-1 py-1 pl-2 text-sm"
+              >
+                {/* FÄRG-OBEROENDE utfalls-markör: ikon + form. Etiketten står synlig
+                    bredvid poängen, så ingen sr-only-dublett behövs här längre. */}
+                <span
+                  className={`vm-reveal-mark ${outcome.markClass} h-6 w-6 text-xs`}
+                  aria-hidden="true"
+                >
+                  {outcome.glyph}
+                </span>
+                <span data-reveal-name="" className="min-w-0 flex-1 truncate">
+                  {pick.displayName}
+                </span>
+                <span className="shrink-0 tabular-nums text-fg-muted">
+                  {formatScore(pick.predicted)}
+                </span>
+                {/* VARFÖR + poäng (T46): orsaken bredvid poängen, "Exakt resultat +3".
+                    data-reveal-reason = stabil krok för design-frontend + test. */}
+                <span
+                  data-reveal-reason=""
+                  className={`shrink-0 text-right font-medium tabular-nums ${
+                    outcome.key === 'exact'
+                      ? 'text-warning'
+                      : outcome.key === 'miss'
+                        ? 'text-fg-muted'
+                        : ''
+                  }`}
+                >
+                  {outcome.reason} {formatPointDelta(pick.points)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p data-reveal-no-picks="" className="mt-3 text-sm text-fg-muted">
+          Ingen i rummet tippade den här matchen.
+        </p>
+      )}
+    </li>
+  );
+}
+
+/**
+ * En LÅST men PÅGÅENDE match (T55, #96): allas tips synliga, men INGET facit och INGA
+ * poäng (ärligt "Pågår"). Ingen utfalls-markör/VARFÖR-etikett, det finns inget facit att
+ * döma mot än. Vi visar bara vem som gissade vad. design-frontend polerar finishen ovanpå
+ * data-reveal-status="live" + data-reveal-live-pick.
+ */
+function PendingMatchCard({
+  match,
+  nameOf,
+}: {
+  match: PendingRevealedMatch;
+  nameOf: TeamNameLookup;
+}) {
+  return (
+    <li
+      data-reveal-match=""
+      data-match-id={match.matchId}
+      data-reveal-status="live"
+      className="vm-reveal-card rounded-card p-4"
+    >
+      {/* Match-rubrik + PÅGÅR-markör (inget facit-tal än, matchen är inte avgjord). */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="m-0 font-display text-sm font-semibold">
+          {nameOf(match.homeTeamId)} mot {nameOf(match.awayTeamId)}
+        </p>
+        <span
+          data-reveal-pending=""
+          className="inline-flex items-center rounded-pill px-2.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-fg-muted"
+        >
+          Pågår
+        </span>
+      </div>
+
+      {/* Allas tips (sorterade på namn). INGA poäng, matchen är inte avgjord (HARD T55). */}
+      {match.picks.length > 0 ? (
+        <ul data-reveal-picks="" className="mt-3 flex list-none flex-col gap-1.5 p-0">
+          {match.picks.map((pick) => (
+            <li
+              key={pick.userId}
+              data-reveal-pick=""
+              data-reveal-live-pick=""
+              data-user-id={pick.userId}
+              className="vm-reveal-pick flex flex-wrap items-center gap-x-3 gap-y-1 py-1 pl-2 text-sm"
+            >
+              <span data-reveal-name="" className="min-w-0 flex-1 truncate">
+                {pick.displayName}
+              </span>
+              <span className="shrink-0 tabular-nums text-fg-muted">
+                {formatScore(pick.predicted)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p data-reveal-no-picks="" className="mt-3 text-sm text-fg-muted">
+          Ingen i rummet tippade den här matchen.
+        </p>
+      )}
+    </li>
+  );
+}
+
+/** Rendera ett avslöjande, dispatchat på status (pågår vs färdig). Uttömmande union. */
+function RevealMatchCard({ match, nameOf }: { match: RevealedMatch; nameOf: TeamNameLookup }) {
+  return match.status === 'finished' ? (
+    <FinishedMatchCard match={match} nameOf={nameOf} />
+  ) : (
+    <PendingMatchCard match={match} nameOf={nameOf} />
+  );
+}
+
 export function RevealView() {
   const store = useLeaderboardStore();
 
@@ -92,13 +268,13 @@ export function RevealView() {
     () => new Map(store.teams.map((t) => [t.id, t.name])),
     [store.teams]
   );
-  const nameOf = (teamId: string | null): string =>
+  const nameOf: TeamNameLookup = (teamId) =>
     teamId === null ? 'Okänt lag' : (teamNameById.get(teamId) ?? teamId);
 
   const ready = store.enabled && store.status === 'ready';
 
-  // Inget att avslöja än (inga avgjorda+låsta matcher): rendera inget (vyn är tyst
-  // tills första matchen avgjorts, ingen tom-rubrik som distraherar).
+  // Inget att avslöja än (ingen låst match): rendera inget (vyn är tyst tills första
+  // matchen sparkat igång, ingen tom-rubrik som distraherar).
   if (!ready || store.reveal.length === 0) {
     return null;
   }
@@ -113,90 +289,14 @@ export function RevealView() {
           Vad alla tippade
         </h2>
         <p className="max-w-2xl text-sm text-fg-muted">
-          Efter avspark avslöjas allas tips. Här ser du vad var och en gissade, och hur det gick.
+          Efter avspark avslöjas allas tips. Här ser du vad var och en gissade, och, när matchen är
+          klar, hur det gick.
         </p>
       </header>
 
       <ol data-reveal-list="" className="mt-5 flex list-none flex-col gap-4 p-0">
         {store.reveal.map((match) => (
-          <li
-            key={match.matchId}
-            data-reveal-match=""
-            data-match-id={match.matchId}
-            className="vm-reveal-card rounded-card p-4"
-          >
-            {/* Match-rubrik + FACIT-talet (det faktiska resultatet, hjälten). */}
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-              <p className="m-0 font-display text-sm font-semibold">
-                {nameOf(match.homeTeamId)} mot {nameOf(match.awayTeamId)}
-              </p>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-fg-muted">
-                  Facit
-                </span>
-                <span
-                  data-reveal-actual=""
-                  className="vm-reveal-actual inline-flex items-center rounded-pill px-2.5 py-0.5 text-sm tabular-nums"
-                >
-                  {formatScore(match.actual)}
-                </span>
-              </span>
-            </div>
-
-            {/* Allas tips + poäng (sorterade på poäng fallande av reveal-modulen). Varje
-                rad bär en FÄRG-OBEROENDE utfalls-markör + en SYNLIG VARFÖR-etikett (T46)
-                + en grön/guld vänsterkant. */}
-            {match.picks.length > 0 ? (
-              <ul data-reveal-picks="" className="mt-3 flex list-none flex-col gap-1.5 p-0">
-                {match.picks.map((pick) => {
-                  const outcome = outcomeFor(pick.pointType);
-                  return (
-                    <li
-                      key={pick.userId}
-                      data-reveal-pick=""
-                      data-user-id={pick.userId}
-                      data-points={pick.points}
-                      data-outcome={outcome.key}
-                      className="vm-reveal-pick flex flex-wrap items-center gap-x-3 gap-y-1 py-1 pl-2 text-sm"
-                    >
-                      {/* FÄRG-OBEROENDE utfalls-markör: ikon + form. Etiketten står synlig
-                          bredvid poängen, så ingen sr-only-dublett behövs här längre. */}
-                      <span
-                        className={`vm-reveal-mark ${outcome.markClass} h-6 w-6 text-xs`}
-                        aria-hidden="true"
-                      >
-                        {outcome.glyph}
-                      </span>
-                      <span data-reveal-name="" className="min-w-0 flex-1 truncate">
-                        {pick.displayName}
-                      </span>
-                      <span className="shrink-0 tabular-nums text-fg-muted">
-                        {formatScore(pick.predicted)}
-                      </span>
-                      {/* VARFÖR + poäng (T46): orsaken bredvid poängen, "Exakt resultat +3".
-                          data-reveal-reason = stabil krok för design-frontend + test. */}
-                      <span
-                        data-reveal-reason=""
-                        className={`shrink-0 text-right font-medium tabular-nums ${
-                          outcome.key === 'exact'
-                            ? 'text-warning'
-                            : outcome.key === 'miss'
-                              ? 'text-fg-muted'
-                              : ''
-                        }`}
-                      >
-                        {outcome.reason} {formatPointDelta(pick.points)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p data-reveal-no-picks="" className="mt-3 text-sm text-fg-muted">
-                Ingen i rummet tippade den här matchen.
-              </p>
-            )}
-          </li>
+          <RevealMatchCard key={match.matchId} match={match} nameOf={nameOf} />
         ))}
       </ol>
     </section>

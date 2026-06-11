@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { LeaderboardProvider } from './LeaderboardProvider';
 import { useLeaderboardStore } from './leaderboard-context';
 import type { VmSupabaseClient } from '../../data/supabase-browser';
@@ -75,6 +75,22 @@ function groupMatch(g: string, home: string, away: string, hg: number, ag: numbe
     status: 'finished',
     result: { homeGoals: hg, awayGoals: ag },
   };
+}
+
+/** En match med valbar avspark + status (för lås-/re-fetch-testet, T55). */
+function matchAt(id: string, kickoff: string, status: Match['status'] = 'live'): Match {
+  const base = {
+    id,
+    stage: 'group' as const,
+    groupId: 'A' as Group['id'],
+    homeTeamId: 'mex',
+    awayTeamId: 'kor',
+    kickoff,
+    venue: 'Arena',
+  };
+  return status === 'finished'
+    ? { ...base, status: 'finished', result: { homeGoals: 1, awayGoals: 0 } }
+    : { ...base, status, result: null };
 }
 
 function Probe() {
@@ -206,5 +222,67 @@ describe('LeaderboardProvider, wiring + aggregering', () => {
     renderProvider(new Date('2026-06-12T20:00:00Z'));
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
     expect(screen.getByTestId('board')).toHaveTextContent('Anna:0:1');
+  });
+});
+
+describe('LeaderboardProvider, T55 (#96): re-fetch när en match passerar avspark', () => {
+  // ROTORSAK 2: tipsen hämtades bara vid mount/rumsbyte, så en app som stått öppen
+  // sedan FÖRE avspark fick aldrig in andras (RLS-)nyligen-släppta tips utan reload.
+  // Härled "antal låsta matcher" ur minut-ticken (evalNow), lägg i fetch-deps -> en ny
+  // hämtning körs PRECIS när en match låses, men INTE varje minut-tick (talet är stabilt).
+
+  it('hämtar om tipsen NÄR en match passerar avspark (mock-klocka), inte bara vid mount', async () => {
+    // Fake timers driver BÅDE Date.now() (lås-jämförelsen) OCH minut-tickens setInterval.
+    // Vi undviker testing-librarys waitFor (den pollar och hänger sig under fake timers);
+    // i stället flushar vi React-effekternas mikrotasks via advanceTimersByTimeAsync.
+    vi.useFakeTimers();
+    try {
+      // Två matcher: en redan låst (17:30Z) och en som låses strax (18:00Z). Start 17:45Z.
+      const start = new Date('2026-06-12T17:45:00Z');
+      vi.setSystemTime(start);
+      dataState.matches = [
+        matchAt('g-A-1', '2026-06-12T17:30:00Z'), // redan låst vid start
+        matchAt('g-A-2', '2026-06-12T18:00:00Z'), // låses 15 min in
+      ];
+      roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+
+      renderProvider(start);
+      // Flusha mount-effektens promise-kedja (Promise.all -> setState).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      // Initial hämtning (1 låst match vid mount).
+      expect(api.listRoomPredictions).toHaveBeenCalledTimes(1);
+
+      // Innan andra avsparken: en minut-tick ska INTE ge en ny hämtning (lås-talet oförändrat).
+      await act(async () => {
+        vi.setSystemTime(new Date('2026-06-12T17:50:00Z'));
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(api.listRoomPredictions).toHaveBeenCalledTimes(1);
+
+      // Passera andra avsparken (18:00Z): nu blir 2 matcher låsta -> EN ny hämtning.
+      await act(async () => {
+        vi.setSystemTime(new Date('2026-06-12T18:01:00Z'));
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(api.listRoomPredictions).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('en LÅST men PÅGÅENDE match avslöjas (status live), inte först vid slutsignal', async () => {
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+    // Matchen pågår (live, inget facit), avspark 18:00Z passerad.
+    dataState.matches = [matchAt('g-A-1', '2026-06-12T18:00:00Z', 'live')];
+    api.listRoomPredictions.mockResolvedValue([
+      { matchId: 'g-A-1', userId: 'u1', homeGoals: 2, awayGoals: 1, updatedAt: '' },
+    ]);
+
+    renderProvider(new Date('2026-06-12T19:00:00Z')); // efter avspark, matchen pågår
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    // Avslöjandet visar den pågående matchen (T55), trots att den inte är avgjord.
+    expect(screen.getByTestId('reveal')).toHaveTextContent('1');
   });
 });

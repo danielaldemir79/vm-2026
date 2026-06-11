@@ -27,5 +27,12 @@ export {
   type GroupFacit,
   type BracketFacit,
 } from './derive-facit';
-export { buildMatchReveal, type RevealedMatch, type RevealedMatchPick } from './reveal';
+export {
+  buildMatchReveal,
+  type RevealedMatch,
+  type FinishedRevealedMatch,
+  type PendingRevealedMatch,
+  type RevealedMatchPick,
+  type PendingMatchPick,
+} from './reveal';
 export { deriveSelfSummary, type SelfSummary } from './self-summary';
