@@ -70,25 +70,35 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
   // DAG-MEDVETET "nu" för fönstret (samma PWA-fälla som resultatvyn, #39 C1): appen
   // lämnas öppen hela VM:t, så fliken kan stå öppen över midnatt. useTodayKey ger ett
   // `nowMs` som är referens-STABILT inom en dag och bara byts vid en faktisk dygns-
-  // växling (eller när fliken blir synlig igen). Fönstret memoizeras på det, så det
-  // glider över midnatt utan omladdning men räknas inte om i onödan varje minut-tick.
+  // växling (eller när fliken blir synlig igen). DET är dag-granulariteten: ett useMemo
+  // som har `nowMs` i deps räknas bara om vid dagsbyte, inte varje render/minut.
   // OBS: detta är ett SEPARAT "nu" från evalNow (use-deadline-tick): fönstret mäts i
   // DAGAR (useTodayKey, stabil inom dygnet), låset flippar MITT PÅ DAGEN vid avspark
   // (deadline-tick). De är två olika kadenser med två olika syften, men SEEDAS av
   // samma injicerade `now` (testbarhet + ett konsekvent start-"nu" för båda), sen tar
   // respektive hook över sin egen tick (dygn resp minut) i appen.
   const { nowMs } = useTodayKey(now);
-  // Fönstret räknas över matcherna i den ordning de visas (predictable = tidigast
-  // först). windowMatches bevarar indata-ordningen i `visible`, så fönster-delmängden
-  // ligger korrekt överst utan en egen omsortering.
-  const windowed = useMemo(
-    () =>
-      windowMatches(
-        predictable.map((p) => p.match),
-        nowMs
-      ),
-    [predictable, nowMs]
+
+  // Fönster-indata: matcherna i visnings-ordning (tidigast först), MEN frikopplat från
+  // lås-statusen. `predictable` (ovan) får en NY referens varje minut-tick (evalNow
+  // räknar om `locked`), så att memoizera fönstret på `predictable` skulle räkna om det
+  // varje minut , fel granularitet, fönstret beror på DAGEN, inte minuten. Vi memoizerar
+  // därför match-listan (samma sort, tidigast först, från selectPredictableMatches) på
+  // `matches` ENSAMT: vilka matcher som är tippbara och deras ordning ändras inte av en
+  // minut-tick, bara av ny data. Lås-statusen lever kvar i `predictable` (per minut).
+  // Detta är T15:s tick-granularitet-knep: memoizera på exakt det som faktiskt ska
+  // räknas om. (`selectPredictableMatches` tar ett `now` bara för `locked`, som vi kastar
+  // bort här; default-nuet räcker, listans innehåll/ordning beror enbart på `matches`.)
+  const windowMatchList = useMemo(
+    () => selectPredictableMatches(matches).map((p) => p.match),
+    [matches]
   );
+  // Fönstret räknas över match-listan i visnings-ordning (tidigast först). windowMatches
+  // bevarar indata-ordningen i `visible`, så fönster-delmängden ligger korrekt överst utan
+  // en egen omsortering. DAG-granularitet via `nowMs` (stabilt inom en dag): en minut-tick
+  // som inte korsar en dygnsgräns ger samma `nowMs` + samma listreferens -> ingen omräkning;
+  // fönstret räknas bara om vid ny data eller ett faktiskt dagsbyte (glider över midnatt).
+  const windowed = useMemo(() => windowMatches(windowMatchList, nowMs), [windowMatchList, nowMs]);
   // Vilka match-id som ligger i fönstret (snabb koll). ALLA tippbara matcher renderas
   // alltid; detta avgör bara vilka som DÖLJS när listan inte är utfälld (se nedan).
   const visibleIds = useMemo(() => new Set(windowed.visible.map((m) => m.id)), [windowed]);

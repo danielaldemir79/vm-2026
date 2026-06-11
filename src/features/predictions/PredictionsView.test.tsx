@@ -18,6 +18,17 @@ vi.mock('./use-predictable-matches', () => ({
   usePredictableData: () => dataState,
 }));
 
+// Spionera på den rena fönster-funktionen (men kör den ÄKTA implementationen) så
+// tick-granularitet-testerna kan assertera HUR OFTA fönstret räknas om, inte bara att
+// utdatat ser likadant ut (utdatat är värde-identiskt även under buggen, så bara ett
+// call-count-spion fångar fel-granulariteten: fönstret räknades om varje minut-tick).
+const windowMatchesSpy = vi.hoisted(() => vi.fn());
+vi.mock('../results/result-window', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../results/result-window')>();
+  windowMatchesSpy.mockImplementation(actual.windowMatches);
+  return { ...actual, windowMatches: windowMatchesSpy };
+});
+
 const TEAMS: Team[] = [
   { id: 'mex', name: 'Mexiko', code: 'MEX', group: 'A' },
   { id: 'rsa', name: 'Sydafrika', code: 'RSA', group: 'A' },
@@ -65,6 +76,7 @@ beforeEach(() => {
   dataState.matches = [];
   dataState.teams = TEAMS;
   dataState.error = null;
+  windowMatchesSpy.mockClear();
 });
 
 describe('PredictionsView', () => {
@@ -276,6 +288,101 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     expect(visibleForms()).toHaveLength(3);
     expect(topToggle()).toBeNull();
     expect(bottomToggle()).toBeNull();
+  });
+
+  // TICK-GRANULARITET (Copilot C, T15:s knep): fönstret (vilka matcher inom 3 dagar)
+  // ska bero på DAGEN (useTodayKey), låset (är matchen låst) på MINUT-ticken
+  // (useDeadlineTick). Tidigare memoizerades fönstret på `predictable`, som får ny
+  // referens varje minut (locked räknas om), så fönstret räknades om varje minut, fel
+  // granularitet. Dessa två tester pinnar isär kadenserna: en minut-tick UTAN dagsbyte
+  // flippar låset men rör INTE fönstret; ett dagsbyte räknar om fönstret.
+  it('minut-tick utan dagsbyte: låset flippar men fönstret står still', () => {
+    vi.useFakeTimers();
+    try {
+      // Svensk tid i juni = UTC+2. Ankra "nu" 16:59 svensk tid 15 juni (14:59Z), strax
+      // före en avspark 17:00 svensk tid (15:00Z) SAMMA dag. Fönstret ankrar på 15 juni
+      // (svensk), spänner 15-17 juni. p-far (20 juni) ligger utanför -> ett ÄKTA fönster.
+      const before = new Date('2026-06-15T14:59:00.000Z');
+      dataState.matches = [
+        match('p-soon', '2026-06-15T15:00:00.000Z'), // i fönstret, öppen (avspark strax)
+        match('p-far', '2026-06-20T18:00:00.000Z'), // utanför fönstret (20 juni)
+      ];
+      vi.setSystemTime(before);
+      renderView(store({}), before);
+
+      // Fönstret före ticken: bara p-soon synlig (p-far dolt), p-soon ännu ÖPPEN.
+      const visibleBefore = () =>
+        Array.from(document.querySelectorAll('[data-prediction-form]'))
+          .filter((f) => !(f as HTMLElement).closest('li')?.hasAttribute('hidden'))
+          .map((f) => (f as HTMLElement).getAttribute('data-match-id'));
+      expect(visibleBefore()).toEqual(['p-soon']);
+      const soonBefore = document.querySelector(
+        '[data-prediction-form][data-match-id="p-soon"]'
+      ) as HTMLElement;
+      expect(soonBefore.getAttribute('data-prediction-locked')).toBeNull();
+      // Hur många gånger fönstret räknats om vid startrenderingen (baslinje).
+      const callsAtStart = windowMatchesSpy.mock.calls.length;
+
+      // En minut-tick som passerar avsparken men INTE en dygnsgräns (15 juni hela tiden).
+      act(() => {
+        vi.setSystemTime(new Date('2026-06-15T15:01:00.000Z'));
+        vi.advanceTimersByTime(60_000);
+      });
+
+      // LÅSET flippade (minut-tickens jobb): p-soon är nu låst.
+      const soonAfter = document.querySelector(
+        '[data-prediction-form][data-match-id="p-soon"]'
+      ) as HTMLElement;
+      expect(soonAfter.getAttribute('data-prediction-locked')).toBe('true');
+      // FÖNSTRET står still (ingen dygnsväxling): exakt samma synliga uppsättning.
+      expect(visibleBefore()).toEqual(['p-soon']);
+      // KÄRNAN i fyndet (C): fönstret räknades INTE om på minut-ticken (samma dag, samma
+      // todayKey -> memoizerat). Under buggen (memoiserat på `predictable`, som får ny
+      // referens varje minut) hade detta ökat. Värde-identiskt utdata döljer buggen, så
+      // vi vaktar call-count, inte bara den synliga uppsättningen.
+      expect(windowMatchesSpy.mock.calls.length).toBe(callsAtStart);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('dagsbyte: fönstret räknas om (ankaret glider till nästa dag)', () => {
+    vi.useFakeTimers();
+    try {
+      // Ankra "nu" 15 juni (svensk). Fönstret 15-17 juni rymmer p-d0 (15 juni); p-d3
+      // (18 juni) ligger utanför. Efter att klockan gått till 18 juni ska fönstret
+      // (18-20 juni) i stället rymma p-d3, och p-d0 (då passerad) faller utanför det
+      // framåtblickande fönstret. Det BEVISAR att fönstret räknas om vid dagsbyte.
+      const day0 = new Date('2026-06-15T10:00:00.000Z'); // 12:00 svensk tid 15 juni
+      dataState.matches = [
+        match('p-d0', '2026-06-15T18:00:00.000Z'), // 15 juni, i startfönstret
+        match('p-d3', '2026-06-18T18:00:00.000Z'), // 18 juni, utanför startfönstret
+      ];
+      vi.setSystemTime(day0);
+      renderView(store({}), day0);
+
+      const visibleIds = () =>
+        Array.from(document.querySelectorAll('[data-prediction-form]'))
+          .filter((f) => !(f as HTMLElement).closest('li')?.hasAttribute('hidden'))
+          .map((f) => (f as HTMLElement).getAttribute('data-match-id'));
+      // Startfönstret (15-17 juni): p-d0 synlig, p-d3 dold.
+      expect(visibleIds()).toEqual(['p-d0']);
+      const callsAtStart = windowMatchesSpy.mock.calls.length;
+
+      // Klockan går till 18 juni 12:00 svensk tid (10:00Z) och en minut-tick fyrar.
+      // useTodayKey ser dagsbytet -> nytt nowMs/todayKey -> fönstret räknas om.
+      act(() => {
+        vi.setSystemTime(new Date('2026-06-18T10:00:00.000Z'));
+        vi.advanceTimersByTime(60_000);
+      });
+
+      // Nya fönstret (18-20 juni): p-d3 synlig, p-d0 (passerad, före fönstret) dold.
+      expect(visibleIds()).toEqual(['p-d3']);
+      // Vid dagsbyte SKA fönstret räknas om (todayKey bytte): call-count ökade.
+      expect(windowMatchesSpy.mock.calls.length).toBeGreaterThan(callsAtStart);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('bevarar osparad inmatning i ett out-of-window-kort över expandera/ihopfäll', async () => {
