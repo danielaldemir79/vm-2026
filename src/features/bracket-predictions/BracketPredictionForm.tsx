@@ -282,7 +282,6 @@ export function BracketPredictionForm({
     isChampion ? (
       <div
         data-bracket-prediction-pick-summary=""
-        data-champion-celebrate={saved || undefined}
         className="vm-champion-band flex items-center gap-3 rounded-pill px-4 py-2.5"
       >
         <TeamFlag code={pick} size="md" />
@@ -324,7 +323,11 @@ export function BracketPredictionForm({
               som div:en bar förut: pokal-emblem + textkolumn (eyebrow + label). */}
           <legend className="m-0 flex w-full items-center gap-3 p-0">
             {/* Pokal-emblemet: solid guld-bricka med mörk ink (AA-säker, T9/T11-form). */}
-            <span aria-hidden="true" className="vm-champion-trophy h-12 w-12 shrink-0 rounded-pill">
+            <span
+              aria-hidden="true"
+              data-champion-celebrate={saved || undefined}
+              className="vm-champion-trophy h-12 w-12 shrink-0 rounded-pill"
+            >
               <TrophyIcon />
             </span>
             <span className="flex min-w-0 flex-col">
