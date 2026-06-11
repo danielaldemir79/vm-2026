@@ -21,11 +21,22 @@ export interface AuthIdentity {
   isAnonymous: boolean;
 }
 
+// IN-FLIGHT-LÅS per klient (Copilot R2, DATAINTEGRITET): ensureSession kan anropas
+// SAMTIDIGT (t.ex. providers som laddar parallellt vid mount, Promise.all). Utan lås
+// ser två samtidiga anrop båda "ingen session" via getSession() och triggar VAR SITT
+// signInAnonymously(), vilket skapar TVÅ anonyma användare, en väns tips kan då
+// splittras över två user-id:n (precis den persistens vi lovar). WeakMap:en gör att
+// samtidiga anropare delar SAMMA pågående skapande-promise i stället. Keyad på klient-
+// instansen (singleton i prod; egen per test) och GC-vänlig. Posten nollas när skapandet
+// settlar (även vid fel, så ett misslyckat försök inte cachas och nästa anrop får retry).
+const inFlightSession = new WeakMap<VmSupabaseClient, Promise<AuthIdentity>>();
+
 /**
  * Säkerställ att det finns en (anonym) session och returnera identiteten.
  * Idempotent: återanvänder en befintlig session, skapar bara en ny anonym om
- * ingen finns. Fail loud (PRINCIPLES §8): ett auth-fel kastar med Supabase-
- * meddelandet, det maskeras inte som "ingen användare".
+ * ingen finns. Samtidighetssäker: ett pågående skapande delas av samtidiga anropare
+ * (ett enda signInAnonymously). Fail loud (PRINCIPLES §8): ett auth-fel kastar med
+ * Supabase-meddelandet, det maskeras inte som "ingen användare".
  *
  * @param client  den typade Supabase-klienten (injiceras för testbarhet).
  */
@@ -39,6 +50,21 @@ export async function ensureSession(client: VmSupabaseClient): Promise<AuthIdent
     return { userId: user.id, isAnonymous: user.is_anonymous ?? true };
   }
 
+  // Ingen session: skapa en anonym, men bara EN gång även vid samtidiga anrop.
+  // Pågår redan ett skapande för denna klient, vänta in samma promise.
+  const pending = inFlightSession.get(client);
+  if (pending) {
+    return pending;
+  }
+  const creation = createAnonymousSession(client).finally(() => {
+    inFlightSession.delete(client);
+  });
+  inFlightSession.set(client, creation);
+  return creation;
+}
+
+/** Skapa en ny anonym session (den enda vägen som faktiskt anropar signInAnonymously). */
+async function createAnonymousSession(client: VmSupabaseClient): Promise<AuthIdentity> {
   const { data, error } = await client.auth.signInAnonymously();
   if (error) {
     throw new Error(`[VM2026] Anonym inloggning misslyckades: ${error.message}`);

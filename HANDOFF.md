@@ -5,6 +5,139 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T42/#72 (Global facit + admin-login) KLAR - PR #78 väntar på merge
+
+**Branch:** `feature/T42-global-facit` @ HEAD `144a063`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/78 mot `develop` (Closes #72, state: OPEN)
+**Board:** issue #72 i "In Review" (korrekt). Dirigenten stänger issue #72 MANUELLT och flyttar kort #72 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**Varför T42 spelar roll:** Bara Daniel (admin) matar in officiella matchresultat EN gång - gäller alla rum och alla användare (tävlingsintegritet). Tidigare per-rum facit som vem som helst kunde skriva.
+
+**KLART med bevis (SHA-lista, äldst sist):**
+- `144a063` - T42: copilot R5 trivial fixes (clear code on reset, comment typo) - HEAD
+- `fdfda01` - T42: swallow refresh-rejection at onUpgraded call-site (copilot R4)
+- `c5af408` - T42: copilot R3 fixes (refresh recovers error, inactive fail-safe)
+- `42c1063` - T42: copilot R2 fixes (ensureSession race + AdminLogin done-state)
+- `961418f` - T42: copilot R1 fixes (penalty-parse, reset busy, error wording)
+- `bc92944` - T42: guard onUpgraded-signalen mot refresh-loop (reviewer F1)
+- `b1debff` - Merge remote-tracking branch 'origin/develop' into feature/T42-global-facit
+- `cb24cbb` - feat(admin): admin-läge + facit-inmatning + read-only för deltagare (#72)
+- `08b6859` - style(data): normalisera src/data/index.ts till LF (EOL-churn, #72)
+- `d5bd6e6` - feat(auth): admin-inloggning via e-post (anonym -> permanent, behåller user_id) (#72)
+- `1ef339d` - feat(leaderboard): poängsätt mot GLOBAL facit i stället för per-rum (#72)
+- `6e2096d` - feat(data): global facit-API + admin-status-API (#72)
+- `a3a4a1a` - feat(db): global facit + admin-allowlist + RLS, bevisad med riktiga sessioner (#72)
+
+**Vad som byggdes:**
+- DB: `official_match_results` (global, ingen room_id) + `app_admins` (allowlist) + `is_app_admin()` SECURITY DEFINER. RLS: facit SELECT öppen, skriv bara admin, `updated_by=auth.uid()` bunden, app_admins ingen skriv-policy (ingen självbefordran). Bevisad 9/9 mot riktiga roller, rollback. Migrationer: 20260611140000/140100/140200.
+- Auth: admin loggar in via e-post-OTP, uppgraderar SAMMA anonyma session (updateUser+verifyOtp), user_id + tips behålls. `src/data/rooms/admin-auth.ts`.
+- Data: `src/data/official/` (official-results-api, app-admin-api).
+- Poäng: topplista/avslöjande poängsätter nu mot GLOBALA facit. TeamCode-kontraktet (T16) orört. `src/features/leaderboard/use-leaderboard-data.ts`.
+- Provider + UI: `src/features/official-results/OfficialResultsProvider.tsx`, `src/features/admin/` (AdminSection/AdminLogin/AdminResultEntry/use-admin-auth-flow/use-admin-matches).
+- App.tsx: OfficialResultsProvider omsluter AppShell inuti RoomsProvider.
+
+**Verifiering:** build ok, lint ok, format:check ok. 1162 tester gröna. Reviewer: PASS (säkerhetsmodellen verifierad mot live-DB). Copilot 5 rundor (R5 = 2 triviala nitar, inga strukturella/säkerhets-/dataintegritets-fynd).
+
+**Reviewer-dispositioner (no-deferral):**
+- F1 (refresh-loop): ÅTGÄRDAD (bc92944 + regressionstest)
+- F2 (migration-versionsnamn skiljer från live): UTTRYCKLIGEN ACCEPTERAD - slut-state bevisat byte-identiskt mot live
+- F3 (DB accepterar straff på gruppmatch, klient-validering avvisar): UTTRYCKLIGEN ACCEPTERAD - teoretisk, fail-safe, admin-only
+
+**Alla 6/6 acceptanskriterier bockade i issue #72 (journalisten 2026-06-11).**
+OBS: bockning i själva issue-kroppen nekades av auto-mode-classifier (docs-only, får inte redigera andras issues). Dirigenten bockar i GitHub-dashboarden efter att ha läst detta block.
+
+**BEHÖVER DANIEL (dashboard, blockerar INTE merge men krävs för att han ska kunna logga in som admin och mata in kvällens resultat):**
+1. E-postmall "Change email address" - lägg `{{ .Token }}` (Auth -> Email Templates). Krävs för att OTP-koden ska skickas korrekt.
+2. Valfritt: konfigurera egen SMTP-avsändare.
+3. Redirect-URL `https://vm-2026.pages.dev` (bara om magic-länk-vägen används).
+Daniels admin-roll är redan seedat på hans user_id.
+
+**PERSISTENS (verifierat, inga kodändringar behövdes):** tips/resultat överlever full stäng+återbesök. `persistSession:true` + `autoRefreshToken:true` (anon-identitet kvar) + T38 active-room-storage (rum kvar). Enda känd gräns: iOS ITP kan vräka localStorage efter ~7 dagars inaktivitet - ärligt flaggat, blockerar inte.
+
+**NÄSTA PRE-SHARE-ARBETE (Daniels beslut, väntar med att dela tills detta är fixat):**
+
+Daniel vill ha POÄNG-PRESENTATIONEN klar innan han delar appen. Det är mest wiring + UI, inte bygge från noll - kärnan finns redan.
+
+1. **Match-poäng:** 3p exakt / 1p rätt vinnare / 0 miss (koden har detta, oförändrat).
+2. **Special-tips (VIKTIG UPPTÄCKT - arbetet är wiring, inte nybygge):**
+   - Poänglogiken finns redan i `src/data/predictions/bonus-score.ts` (T16): gruppvinnare 3p + grupptvåa 2p (=5p perfekt grupp), bracket-advance 1-5p stigande per runda, VM-vinnare 8p.
+   - APIs finns: group-predictions-api.ts, bracket-predictions-api.ts.
+   - Daniel vill SÄNKA VM-vinnaren till **20p** (koden har 8, ändra `CHAMPION_PREDICTION_POINTS` till 20).
+   - Verifiera om pool-tips-UI (mata in grupp/bracket/champion-tips) finns eller behöver byggas.
+   - Arbetet är wiring + UI + värde-justering.
+3. **Resultat-presentation (Daniels exakta begäran):** varje match-tips ska visa poäng + VARFÖR ("Exakt resultat +3", "Rätt vinnare +1", "Miss 0"). En sammanfattning överst med användarens totala poäng + placering. Topplistan kvar längst ned.
+   - Idag visar avslöjandet (reveal.ts/RevealView) bara en poängsiffra utan VARFÖR.
+
+**Daniels citat:** "väntar med att dela detta tills det ovan är fixat" + "varje spel borde presentera resultat... sammanfattning överst av totala poäng och placering."
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **#70 (T41 .gitattributes EOL):** EOL-housekeeping - editor flippar LF->CRLF (träffat T38+T39). Kort i Ready. HÖG-prioritet att avbryta mönstret.
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bär framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort #56 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (uppdaterad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **BEFORDRAN 3 (senior-developer-mönstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Förekomst 3. Typ: agent-beteende -> senior-developers fil. Väntar Daniels godkännande. (Flaggas nu för första gången - se nedan.)
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T42 dashboard-steg:** se "Behöver Daniel" ovan (e-postmall + redirect-URL).
+
+**IMPROVEMENTS-kandidater (dirigenten skriver i IMPROVEMENTS.md):**
+1. "När en task medvetet pinnar konsument-seamen till en senare task, kräv att data-/identitets-KONTRAKTET skrivs där funktionen DEFINIERAS, inte bara i decisions.md." (F1-fällan: code-vs-id tyst noll hade hindrats av ett kontrakt vid definitions-stället.)
+2. "Supabase deadline-lås + sekretess-RLS-mönstret (rls-tidslås-sekretess-mot-kallankrad-referenstabell) verifierat 3 gånger (T14/T15/T16) med 3 rena RLS-pass. Playbook-post nu på Förekomst 2 - nästa förekomst triggar Förekomst >= 3 och befordransregeln. Kandidat för senior-developer-rekommendation i README."
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #78 (T42/#72, feature/T42-global-facit) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 78 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #72 manuellt (`gh issue close 72`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #72 till Done på boarden. Bocka av alla 6 acceptanskriterier i issue #72 (journalisten nekades av auto-mode-classifier).
+> Verifiera att vm-2026.pages.dev visar admin-sektionen bakom en diskret inloggning och att vanliga deltagare ser facit read-only.
+>
+> Om PR #78 REDAN mergad:
+> T42 är klar och mergad. Global facit + admin-login levererade. Tävlingsintegriteten säkrad.
+> **Nästa arbete: POÄNG-PRESENTATION (Daniels begäran, väntar med att dela tills detta är klart).**
+> Special-tips-poänglogiken finns REDAN i `src/data/predictions/bonus-score.ts` (T16): gruppvinnare 3p + grupptvåa 2p, bracket-advance 1-5p, VM-vinnare 8p (ändra till 20p). APIs finns (group/bracket-predictions-api.ts). Arbetet är wiring + UI + värde-justering. Verifiera om pool-tips-UI (mata in grupp/bracket/champion-tips) finns eller behöver byggas.
+> Resultat-presentation: varje match-tips ska visa poäng + VARFÖR ("Exakt resultat +3" / "Rätt vinnare +1" / "Miss 0"). Sammanfattning överst med total poäng + placering. Idag visar avslöjandet (reveal.ts/RevealView) bara en poängsiffra.
+>
+> **Prioritetsordning (pre-share-polish):**
+> - Poäng-presentation (BLOCKERAR DELNING - Daniel väntar med att dela)
+> - #76 (T45 admin-statistik + read-only-vy för vanliga)
+> - #69 (T40 resultat-rätt-feedback på kortet + topplista synlig för alla)
+> - #62 (T34 poängskala + "Så funkar poängen"-UI)
+> - #63 (T35 tippnings-lås gråmarkerat + deadline-tydlighet)
+> - #64 (T36 Play Protect TWA)
+> - #70 (T41 .gitattributes EOL-housekeeping)
+> - #48/#56 (plockas när de passar)
+> - T18-T25 därefter
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **#56 (delad modal-primitiv):** kort i Ready, plockas när rule-of-three nås.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T42-dashboard-steg.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T43/#74 (PWA smidig auto-uppdatering + bygg-versionsstämpel) KLAR - PR #77 väntar på merge
 
 **Branch:** `feature/T43-pwa-autoupdate` @ HEAD `a222ce0`

@@ -1,18 +1,23 @@
-// React-hook som laddar facit-källan för topplistan (T17, #17): lag + grupper +
-// den DELADE matchlistan (rummets resultat vävda ovanpå den statiska planen).
+// React-hook som laddar facit-källan för topplistan (T17, #17; facit-källa bytt i
+// T42, #72): lag + grupper + matchlistan med det GLOBALA officiella facit invävt.
 //
 // VARFÖR en egen hook (inte useResultsStore): topplista-sektionen renderas
 // ALONGSIDE tips-sektionerna (T15/T16), som ligger UTANFÖR ResultsProvider i
-// App-trädet. Att kräva ResultsProvider här skulle tvinga en omplacering. I stället
-// väver vi rummets delade resultat (useRoomsSync.sharedResults, tillgängligt var
-// som helst i RoomsProvider) ovanpå den statiska planen med EXAKT samma rena
-// funktion ResultsProvider använder (applyRoomResults), så facit blir IDENTISKT,
-// EN sanning för hur ett delat resultat blir en match, ingen ny vävning uppfunnen.
+// App-trädet. Att kräva ResultsProvider här skulle tvinga en omplacering.
+//
+// FACIT-KÄLLAN BYTTE I T42 (#72, TÄVLINGSINTEGRITET): tidigare vävdes RUMMETS
+// delade resultat (useRoomsSync.sharedResults, per-rum room_match_results) in som
+// facit, vilket lät vem som helst i rummet styra poängen. Nu väver vi de GLOBALA
+// officiella resultaten (useOfficialResultsSync.officialResults, official_match_
+// results, BARA admin kan skriva, RLS-bevisat) , EN sanning för facit, delad av
+// alla rum/användare. Själva VÄVNINGEN är OFÖRÄNDRAD (samma rena applyRoomResults,
+// official-resultaten är strukturellt samma form som rummets var), bara KÄLLAN
+// bytte. derivePoolFacit + TeamCode-kontraktet (id->code, T16 F1) är helt orörda.
 
 import { useEffect, useMemo, useState } from 'react';
 import { getDataSource } from '../../data';
 import type { Group, Match, Team } from '../../domain/types';
-import { useRoomsSync } from '../rooms';
+import { useOfficialResultsSync } from '../official-results';
 import { applyRoomResults } from '../results';
 
 /** Laddningstillstånd för den statiska turneringsdatan. */
@@ -34,7 +39,7 @@ export interface LeaderboardData {
  * import.meta.env), samma seam som datalagrets övriga. Fel FAIL-LOUD:ar.
  */
 export function useLeaderboardData(env: ImportMetaEnv = import.meta.env): LeaderboardData {
-  const { sharedResults } = useRoomsSync();
+  const { officialResults } = useOfficialResultsSync();
 
   const [status, setStatus] = useState<LeaderboardDataStatus>('loading');
   const [teams, setTeams] = useState<Team[]>([]);
@@ -69,12 +74,13 @@ export function useLeaderboardData(env: ImportMetaEnv = import.meta.env): Leader
     };
   }, [env]);
 
-  // Väv in rummets delade resultat ovanpå den statiska planen (samma rena funktion
-  // som ResultsProvider). En ändring i sharedResults ger en ny facit-källa -> nya
-  // poäng, utan en andra kopia av matchlistan.
+  // Väv in det GLOBALA officiella facit ovanpå den statiska planen (samma rena
+  // funktion ResultsProvider använder). En ändring i officialResults (admin matade
+  // in ett resultat) ger en ny facit-källa -> nya poäng, utan en andra kopia av
+  // matchlistan. Facit är nu GLOBALT (T42), inte per-rum.
   const matches = useMemo(
-    () => applyRoomResults(baseMatches, sharedResults),
-    [baseMatches, sharedResults]
+    () => applyRoomResults(baseMatches, officialResults),
+    [baseMatches, officialResults]
   );
 
   return { status, teams, groups, matches, error };
