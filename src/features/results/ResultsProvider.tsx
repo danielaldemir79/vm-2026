@@ -16,7 +16,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { getDataSource, getDataSourceMode, LIVE_READY, type DataSource } from '../../data';
 import type { Group, Match, Team } from '../../domain/types';
 import { useRoomsSync } from '../rooms';
-import type { RoomResultInput } from '../../data/rooms';
+import type { RoomMatchResult, RoomResultInput } from '../../data/rooms';
+import { useOfficialResultsSync } from '../official-results';
 import { applySimulationOverlay, type SimulationOverlay } from '../simulation/apply-simulation';
 import { applyMatchResult } from './apply-match-result';
 import { applyRoomResults } from './apply-room-results';
@@ -91,12 +92,35 @@ export function ResultsProvider({
   const [realMatches, setRealMatchesState] = useState<Match[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Läget (fixtures/live) beror på env OCH live-flaggan, härled tidigt: BÅDE
+  // facit-källans val (rum vs globalt facit) nedan OCH store-märkningen längre ner
+  // läser detta. EN sanning, så de aldrig kan säga emot varandra.
+  const mode = useMemo(() => getDataSourceMode(env, liveReady), [env, liveReady]);
+  const live = mode === 'live';
+
   // DELAT RUMS-LAGER (T14, KA-F3): det aktiva rummet + dess delade resultat +
   // spar-funktionen, läst TOLERANT (inert utan RoomsProvider, se useRoomsSync).
   // Wiringen gör att (a) en inmatning i rum-läge även sparas till rummet, och
   // (b) rummets delade resultat vävs in i matchlistan så ALLA medlemmar ser
   // samma tabell/träd. Utan aktivt rum är detta inert -> lokalt läge precis som förr.
   const { activeRoomId, sharedResults, saveResult: saveRoomResult } = useRoomsSync();
+
+  // GLOBALT FACIT (T42/T48, #81): de officiella matchresultaten admin matar in,
+  // lästa TOLERANT (inert utan OfficialResultsProvider). I LIVE-läge är DETTA
+  // facit-källan för hela live-trackern (tabell/träd/"Vad krävs"), inte längre
+  // rummets delade resultat.
+  const { officialResults } = useOfficialResultsSync();
+
+  // FACIT-KÄLLAN FÖR TRACKERN (T48, #81, TÄVLINGSINTEGRITET):
+  //   - LIVE-läge: de GLOBALA officiella resultaten (official_match_results, BARA
+  //     admin kan skriva, RLS-bevisat T42), så ALLA ser samma riktiga ställning
+  //     som arrangören matar in. Tidigare vävdes RUMMETS delade resultat in, vilket
+  //     lät vem som helst i rummet styra tabellerna (pre-share-blockeraren).
+  //   - FIXTURES/lokalt läge: rummets delade resultat (oförändrat), så lokal
+  //     utveckling + simulering + befintliga tester driver tabellerna som förr.
+  // VÄVNINGEN är OFÖRÄNDRAD (samma rena applyRoomResults): OfficialMatchResult är
+  // strukturellt identisk med RoomMatchResult, så bara KÄLLAN byts, inte logiken (DRY).
+  const facitResults: RoomMatchResult[] = live ? officialResults : sharedResults;
 
   // Den SEEDADE BASEN (den statiska, källåkrade matchplanen från senaste seed),
   // bevarad SEPARAT från realMatches. VARFÖR: rummets delade resultat vävs in OVANPÅ
@@ -106,11 +130,12 @@ export function ResultsProvider({
   // och speglar EXAKT rummets nuvarande delade tillstånd (sista-skrivet-vinner från servern).
   const seededBaseRef = useRef<Match[]>([]);
 
-  // Ref till de delade resultaten så SEED-effekten kan väva in dem UTAN att lista
-  // sharedResults i sin dep-array (en ändring i delade resultat ska inte seeda om
-  // hela datakällan, bara väva om; det gör den separata effekten nedan). Synkas varje render.
-  const sharedResultsRef = useRef(sharedResults);
-  sharedResultsRef.current = sharedResults;
+  // Ref till FACIT-källan så SEED-effekten kan väva in den UTAN att lista den i
+  // sin dep-array (en ändring i facit ska inte seeda om hela datakällan, bara väva
+  // om; det gör den separata effekten nedan). Synkas varje render. Källan är
+  // officiella resultat i live-läge, rummets i fixtures (se facitResults ovan).
+  const facitResultsRef = useRef(facitResults);
+  facitResultsRef.current = facitResults;
 
   // Reffar till rum-id + spar-funktionen så den STABILA submitResult-callbacken
   // (tom dep-array nedan) alltid läser det NUVARANDE aktiva rummet och senaste
@@ -121,15 +146,20 @@ export function ResultsProvider({
   const saveRoomResultRef = useRef(saveRoomResult);
   saveRoomResultRef.current = saveRoomResult;
 
+  // Ref till live-läget så den STABILA submitResult-callbacken (tom dep-array) kan
+  // gata rums-skrivningen utan att binda mot en stale closure. T48 (#81): i LIVE-läge
+  // drivs trackern av det GLOBALA facit (admin-only), så en lokal inmatning ska INTE
+  // längre skrivas till rummets resultat (room_match_results fasas ut för facit, T42).
+  // Rums-skrivningen sker därför bara i fixtures-läge, där rummet fortfarande driver.
+  const liveRef = useRef(live);
+  liveRef.current = live;
+
   // SIMULERINGS-STATE (T12): är what-if-läget på, och det hypotetiska overlayt
   // (Map<matchId, Match>). När simulating=false ELLER overlayn är tom är de
   // effektiva matcherna identiska med de riktiga. Overlayn är referens-stabil i
   // state så React ser en ändring bara när vi faktiskt byter ut den.
   const [simulating, setSimulating] = useState(false);
   const [overlay, setOverlay] = useState<SimulationOverlay>(() => new Map());
-
-  // Läget (fixtures/live) beror på env OCH live-flaggan, härled en gång.
-  const mode = useMemo(() => getDataSourceMode(env, liveReady), [env, liveReady]);
 
   // EFFEKTIVA matcher = riktiga + overlay (T12). När overlayn är tom är detta de
   // riktiga matcherna (ny array-referens, samma element). När den har poster är
@@ -203,11 +233,12 @@ export function ResultsProvider({
         // Vi går därför INTE via den läges-ruttande setMatches här. Reffen synkas
         // direkt (samma invariant som alla andra riktiga skrivvägar).
         //
-        // T14 (KA-F3): bevara den rena seedade BASEN och väv in rummets delade
-        // resultat ovanpå (idempotent, från basen). I lokalt läge är sharedResults
-        // tom -> woven === basen, så beteendet är oförändrat mot förr.
+        // T14 (KA-F3) / T48 (#81): bevara den rena seedade BASEN och väv in
+        // FACIT-källan ovanpå (idempotent, från basen). Facit = officiella resultat
+        // i live-läge, rummets i fixtures (se facitResults). I lokalt läge utan
+        // resultat är facit tomt -> woven === basen, beteendet oförändrat mot förr.
         seededBaseRef.current = loadedMatches;
-        const woven = applyRoomResults(loadedMatches, sharedResultsRef.current);
+        const woven = applyRoomResults(loadedMatches, facitResultsRef.current);
         matchesRef.current = woven;
         setRealMatchesState(woven);
         // En (om)laddning byter ut datan sandlådan byggdes på, så ett kvarvarande
@@ -239,40 +270,42 @@ export function ResultsProvider({
     // ingår: ändras gaten eller den injicerade källan ska seedningen köras om.
   }, [env, liveReady, injectedDataSource, setMatches]);
 
-  // VÄV OM vid ändrade DELADE RESULTAT (T14, KA-F3): när rummets delade resultat
-  // ändras (man väljer/byter rum, eller en refetch på fokus/online hämtar färska
-  // resultat en annan medlem skrivit), väv om från den rena seedade BASEN så ALLA
-  // medlemmar ser samma tabell/träd. Vi väver från basen (inte den nuvarande listan)
-  // så vävningen är idempotent och ett ändrat/borttaget delat resultat backar korrekt.
+  // VÄV OM vid ändrad FACIT (T14, KA-F3 / T48, #81): när facit-källan ändras (i
+  // live-läge: admin matade in ett officiellt resultat, eller en fokus/online-
+  // refetch hämtade ett en annan enhet skrev; i fixtures: man väljer/byter rum,
+  // eller en rums-refetch gav nya delade resultat), väv om från den rena seedade
+  // BASEN så ALLA ser samma tabell/träd. Vi väver från basen (inte den nuvarande
+  // listan) så vävningen är idempotent och ett ändrat/borttaget facit-resultat
+  // backar korrekt.
   //
-  // KÖR BARA VID EN FAKTISK RUMS-ÄNDRING: vi jämför mot förra rendrets rum-id +
-  // delade-resultat-referens och hoppar om inget rums-relaterat ändrats. VARFÖR
-  // (kritiskt): seed-effekten gör redan den FÖRSTA vävningen, och setMatches-seamen
-  // (T18 realtid + test-harness) skriver den riktiga datan direkt. Skulle denna
-  // effekt köra på BLOTTA seed/mount (utan en verklig rums-ändring) skulle den väva
-  // om från den rena basen och STOMPA en setMatches som just körts (t.ex. en
-  // realtids-push eller ett test som setMatches:ar en färdig matchlista). Genom att
-  // bara reagera på en ÄKTA ändring av rums-tillståndet rör vi aldrig den lokala/
-  // setMatches-drivna vägen, bara när rummet faktiskt ger ny delad data (eller töms).
-  const prevRoomRef = useRef<{ roomId: string | null; results: typeof sharedResults }>({
+  // KÖR BARA VID EN FAKTISK FACIT-/RUMS-ÄNDRING: vi jämför mot förra rendrets
+  // facit-referens (+ rum-id, för att fånga ett rums-byte i fixtures-läge) och
+  // hoppar om inget ändrats. VARFÖR (kritiskt): seed-effekten gör redan den FÖRSTA
+  // vävningen, och setMatches-seamen (T18 realtid + test-harness) skriver den
+  // riktiga datan direkt. Skulle denna effekt köra på BLOTTA seed/mount (utan en
+  // verklig ändring) skulle den väva om från basen och STOMPA en setMatches som just
+  // körts (t.ex. en realtids-push eller ett test som setMatches:ar en färdig
+  // matchlista). Genom att bara reagera på en ÄKTA ändring av facit/rum rör vi aldrig
+  // den lokala/setMatches-drivna vägen, bara när facit-källan faktiskt ger ny data.
+  const prevRoomRef = useRef<{ roomId: string | null; results: RoomMatchResult[] }>({
     roomId: activeRoomId,
-    results: sharedResults,
+    results: facitResults,
   });
   useEffect(() => {
     const prev = prevRoomRef.current;
     const roomChanged = prev.roomId !== activeRoomId;
-    const resultsChanged = prev.results !== sharedResults;
-    prevRoomRef.current = { roomId: activeRoomId, results: sharedResults };
+    const resultsChanged = prev.results !== facitResults;
+    prevRoomRef.current = { roomId: activeRoomId, results: facitResults };
     if (!roomChanged && !resultsChanged) {
-      return; // inget rums-relaterat ändrades: rör inte den lokala/setMatches-vägen
+      return; // inget facit-/rums-relaterat ändrades: rör inte den lokala/setMatches-vägen
     }
     if (status !== 'ready') {
-      return; // basen är inte seedad än; seed-effekten väver med sharedResultsRef
+      return; // basen är inte seedad än; seed-effekten väver med facitResultsRef
     }
-    const woven = applyRoomResults(seededBaseRef.current, sharedResults);
+    const woven = applyRoomResults(seededBaseRef.current, facitResults);
     matchesRef.current = woven;
     setRealMatchesState(woven);
-  }, [status, sharedResults, activeRoomId]);
+  }, [status, facitResults, activeRoomId]);
 
   // Mata in/redigera ETT resultat: validera, och vid ok uppdatera matchlistan
   // optimistiskt (direkt i minnet, vyerna räknar om reaktivt). Vid fel ändras
@@ -331,13 +364,16 @@ export function ResultsProvider({
       // matchesRef SYNKRONT + state), så snabba submit i följd ser senaste listan.
       setMatches(next);
 
-      // DELA TILL RUMMET (T14, KA-F3 (a)): finns ett aktivt rum persistas resultatet
-      // även dit, så alla medlemmar ser samma tabell/träd. Optimistiskt: den lokala
-      // matchlistan är redan uppdaterad ovan (UI reagerar direkt), spar-anropet sker
-      // i bakgrunden. RoomsProvider.saveResult uppdaterar dessutom rummets egna
-      // delade resultat optimistiskt, så vävnings-effekten ovan håller listorna i synk.
-      // UTAN aktivt rum (activeRoomIdRef null, lokalt läge) hoppas detta helt -> som förr.
-      if (activeRoomIdRef.current) {
+      // DELA TILL RUMMET (T14, KA-F3 (a)) , BARA i FIXTURES-läge (T48, #81): finns
+      // ett aktivt rum persistas resultatet även dit, så alla medlemmar ser samma
+      // tabell/träd. Optimistiskt: den lokala matchlistan är redan uppdaterad ovan
+      // (UI reagerar direkt), spar-anropet sker i bakgrunden.
+      // I LIVE-läge drivs trackern numera av det GLOBALA officiella facit (admin-only),
+      // så en lokal inmatning ska INTE skrivas till rummets resultat (room_match_results
+      // fasas ut för facit, decisions.md T42). Admin matar in det officiella facit via
+      // AdminResultEntry (saveOfficialResult), inte via denna väg. Gaten på !liveRef
+      // gör att den enda kvarvarande rums-skrivningen är fixtures-/utvecklings-vägen.
+      if (!liveRef.current && activeRoomIdRef.current) {
         const persisted = next.find((m) => m.id === matchId);
         if (persisted) {
           // Spara FAIL-LOUD men ICKE-BLOCKERANDE: ett spar-fel (nätfel/RLS) får inte
