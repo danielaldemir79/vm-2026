@@ -37,8 +37,8 @@ export interface ResultEntryGateProps extends ResultEntryViewProps {
 
 /**
  * Wrappar ResultEntryView med live-grinden. Renderar inget (inkl. `surface`) när
- * vyn ska döljas (live + icke-admin + ej simulering). Vidarebefordrar render-
- * propparna till vyn oförändrat.
+ * vyn ska döljas (i live utanför simuleringsläge, för ALLA inkl. admin). Vidare-
+ * befordrar render-propparna till vyn oförändrat.
  */
 export function ResultEntryGate({ surface, ...viewProps }: ResultEntryGateProps) {
   const { mode, simulating } = useResultsStore();

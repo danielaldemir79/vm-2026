@@ -12,8 +12,9 @@ export type { ResultsStore, ResultsLoadStatus } from './results-context';
 export { ResultEntryView } from './ResultEntryView';
 export type { ResultEntryViewProps } from './ResultEntryView';
 
-// Live-grind runt inmatnings-vyn (T48, #81): bara admin ser den delade/officiella
-// inmatningen i live-läge; en vanlig vän ser den bara i "tänk om"-simulering.
+// Live-grind runt inmatnings-vyn (T48, #81): i live visas inmatnings-vyn BARA i
+// "tänk om"-simulering, för ALLA (även admin). Officiella resultat matas in via
+// AdminResultEntry; i fixtures/lokalt läge visas vyn alltid (oförändrat).
 export { ResultEntryGate } from './ResultEntryGate';
 export type { ResultEntryGateProps } from './ResultEntryGate';
 export { shouldShowResultEntry } from './result-entry-gate-rule';

@@ -57,6 +57,11 @@ som standard. Den EXISTERANDE e-post-mekaniken (updateUser/verifyOtp) är OFÖR�
 riktig recoverable sign-in är separat (T48b). `<details>` ger tangentbord + skärmläsar-stöd utan extra
 aria-plumbing.
 
+**OMFATTNING vs issue #81 (Copilot R1):** T48 levererar AC #1 (resultat-inmatning gatad) + #2 (officiella
+resultat driver tabellerna) + den DISKRETA inloggningen. Issue #81:s AC #3 efterfrågar en RECOVERABLE
+OTP/magic-link-inloggning (`signInWithOtp`) , den är medvetet UTBRUTEN till **T48b** (separat PR), så
+T48-PR:en "Closes" INTE #81. Issue #81 hålls öppen tills T48b mergats; då stängs den.
+
 **Bevarat:** T46 poäng-presentation, tippning + deadline-sekretess (RLS + klient-gate), TeamCode-
 kontraktet (T16, orört , samma `applyRoomResults`/`derivePoolFacit`), auto-update-hotfixen (vite.config
 + register-sw, ej rörd). Premium-design på admin/gate-ytan lämnas till design-frontend (samma arbets-
