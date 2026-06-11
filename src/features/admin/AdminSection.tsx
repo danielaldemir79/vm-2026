@@ -42,7 +42,16 @@ export function AdminSection({ surface }: { surface: (children: ReactNode) => Re
           inte fylla i något, poängen räknas ut åt dig när matcherna spelats.
         </p>
       </div>
-      <AdminLogin client={official.client} onUpgraded={() => void official.refresh()} />
+      <AdminLogin
+        client={official.client}
+        onUpgraded={() => {
+          // refresh() kastar vid fel (R3-kontraktet); en login-triggad refresh som
+          // missar (flyktigt nät-/RPC-fel) ska inte ge en o-hanterad Promise-rejection
+          // (console-brus/krasch i test). Svälj här, AdminLogin:s 'done'-läge ger ändå
+          // feedback och nästa fokus/online-refetch försöker igen. (Copilot R4)
+          void official.refresh().catch(() => {});
+        }}
+      />
     </div>
   );
 }
