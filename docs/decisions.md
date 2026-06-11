@@ -91,6 +91,27 @@ reduced-motion: no-preference)` / nollade vid `reduce`. Tester: alla 912 gröna,
 
 ---
 
+## 2026-06-11 , T16 (#16, F1): poängfunktionerna identitets-rymd-ROBUSTA (code vs id-drift, tyst noll)
+
+**Beslut (korrekthets-fynd, latent kritisk):** ett pool-tips LAGRAS som versal FIFA-code ("BRA",
+DB-constraint `^[A-Z]{3}$`, hela write-kedjan UI->API->DB), men det FAKTISKA facit härleds ur
+`computeStandings`/`deriveBracket`, vars `teamId`/`winnerTeamId` är Team.id = GEMEN kod ("bra",
+`teamId(code)=code.toLowerCase()` i team-refs.ts). Poängfunktionerna (`scoreGroupPrediction`/
+`scoreBracketAdvance`/`scoreChampionPrediction`) jämförde rena strängar (`a === b`), så när T17/T16b
+matar ett standings-härlett `actual` (id) mot ett code-lagrat tips blir det TYST 0p för ALLA tips
+(`'BRA' === 'bra'` är false), inte ett fel. Probe-bevisat: `scoreGroupPrediction({BRA,ARG},{bra,arg})`
+gav 0, borde vara 5. **Fix (strukturell, inte pinnad):** en liten `normalizeTeamRef` (toUpperCase) +
+`sameTeam` normaliserar BÅDA sidor till samma rymd FÖRE jämförelse, så driften strukturellt inte kan
+uppstå oavsett om konsumenten matar code eller id. **Kanon-rymd = VERSAL** (toUpperCase) för att det
+är tipsens lagrings-form och DB-constraintens form (`^[A-Z]{3}$`), så normaliseringen drar mot
+write-sidans sanning. Kontraktet är låst i docstrings PÅ poängfunktionerna ("accepterar både code BRA
+och id bra, normaliserar"). Test som NÅR seamen: kör de RIKTIGA `computeStandings`/`deriveBracket` på
+en fixture, plockar härlett `teamId`/`winnerTeamId` (gemen id), matar mot ett code-lagrat tips, kräver
+full poäng. Bevisat true regression: utan normaliseringen failar testet rött med `expected +0 to be 5`.
+Detta SLÅR ev. framtida `TeamCode`-branded-type-ambition (lärdomens alternativ a): normaliseringen är
+robust även om en otypad sträng slinker in, branded type kan läggas ovanpå senare utan att ändra
+kontraktet. (Källa till id-rymden: `teamId` i src/data/wc2026/team-refs.ts; reviewer-lärdom T16 F1.)
+
 ## 2026-06-11 , T16 (#16): pool-tipsen, gruppvinnar-tips + bracket-/slutspels-tips (modell + poäng + RLS)
 
 VM-poolens kärna (SPEC §6: GroupPrediction + BracketPrediction). Bygger PÅ T15:s mönster

@@ -34,6 +34,39 @@
 import type { KnockoutStage } from '../../domain/bracket/bracket-structure';
 
 /* ------------------------------------------------------------------ *
+ * IDENTITETS-RYMD: code (BRA) vs id (bra), normalisering.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Normalisera en lag-referens till EN identitets-rymd (versal FIFA-kod) före
+ * jämförelse. Domänen bär två stabila identiteter för samma lag:
+ *   - Team.code  = VERSAL FIFA-kod  ("BRA"), så lagras ett tips (UI-option ->
+ *     API -> DB, constraint ^[A-Z]{3}$), och
+ *   - Team.id    = GEMEN kod        ("bra"), `teamId(code)=code.toLowerCase()`,
+ *     vilket är vad det HÄRLEDDA facit bär (computeStandings.teamId,
+ *     deriveBracket.winnerTeamId propagerar Team.id).
+ *
+ * Poängfunktionerna nedan jämför ett LAGRAT tips (code) mot ett HÄRLETT facit
+ * (id). Utan normalisering möts de två rymderna först i poäng-seamen och ger
+ * TYST 0 poäng för alla tips (`'BRA' === 'bra'` är false), ett fel som inget
+ * happy-path-test fångar (se docs/decisions.md T16, F1). Genom att normalisera
+ * BÅDA sidor till versal kod INNAN jämförelse kan driften strukturellt inte
+ * uppstå, oavsett om konsumenten matar code eller id på endera sidan.
+ *
+ * Versal (toUpperCase) väljs som kanon-rymd för att den är tipsens lagrings-form
+ * och DB-constraintens form (^[A-Z]{3}$), så normaliseringen drar mot sanningen
+ * på write-sidan, inte mot en härledd biform.
+ */
+function normalizeTeamRef(teamRef: string): string {
+  return teamRef.toUpperCase();
+}
+
+/** Lika lag oavsett identitets-rymd (code "BRA" === id "bra"). En sanning för seam-jämförelsen. */
+function sameTeam(a: string, b: string): boolean {
+  return normalizeTeamRef(a) === normalizeTeamRef(b);
+}
+
+/* ------------------------------------------------------------------ *
  * GRUPP-TIPS: gruppvinnare + grupptvåa.
  * ------------------------------------------------------------------ */
 
@@ -66,16 +99,22 @@ export type GroupPredictionPick = GroupOutcome;
  * tipset, en "rätt lag fel position"-delpoäng skulle göra regeln tvetydig och är
  * inte vedertagen i grupp-pooler. (Bracket-tipsen hanterar "rätt lag" separat.)
  *
- * @param predicted  Det gissade grupputfallet (1:a + 2:a).
- * @param actual     Det faktiska grupputfallet (1:a + 2:a ur färdig tabell).
+ * IDENTITETS-KONTRAKT: båda sidor får bära lag-referensen i ENDERA rymden,
+ * code (versal "BRA", som tipset LAGRAS) eller id (gemen "bra", som facit
+ * HÄRLEDS ur computeStandings/deriveBracket). Funktionen normaliserar båda
+ * sidor (sameTeam) före jämförelse, så ett code-lagrat tips mot ett
+ * standings-härlett actual ger rätt poäng i stället för tyst 0 (T16 F1).
+ *
+ * @param predicted  Det gissade grupputfallet (1:a + 2:a), code eller id.
+ * @param actual     Det faktiska grupputfallet (1:a + 2:a ur färdig tabell), code eller id.
  * @returns          0-5 poäng (3 för rätt 1:a, 2 för rätt 2:a, oberoende).
  */
 export function scoreGroupPrediction(predicted: GroupPredictionPick, actual: GroupOutcome): number {
   let points = 0;
-  if (predicted.winnerTeamId === actual.winnerTeamId) {
+  if (sameTeam(predicted.winnerTeamId, actual.winnerTeamId)) {
     points += GROUP_PREDICTION_POINTS.winner;
   }
-  if (predicted.runnerUpTeamId === actual.runnerUpTeamId) {
+  if (sameTeam(predicted.runnerUpTeamId, actual.runnerUpTeamId)) {
     points += GROUP_PREDICTION_POINTS.runnerUp;
   }
   return points;
@@ -88,9 +127,19 @@ export function scoreGroupPrediction(predicted: GroupPredictionPick, actual: Gro
 /**
  * Poäng per slutspelsrunda för ett rätt "går vidare"-tips. STIGER med rundan:
  * ett rätt-tips längre fram är svårare och väger tyngre (vedertaget i bracket-
- * pooler). `third-place` (bronsmatchen) och `final` poängsätts som att man rätt
- * gissade vilket lag som NÅDDE den matchen (en semifinal-vinst respektive den
- * andra semifinal-vinsten), därför samma vikt som de djupaste rundorna.
+ * pooler). `third-place` och `final` får samma vikt som de djupaste rundorna.
+ *
+ * VAD `actual` BETYDER PER SLOT (kontrakt för den som matar in facit, T16b):
+ * `actual` = laget som GÅR VIDARE ur slottens match (deriveBracket-utfallet),
+ * vilket skiljer sig mellan rundor:
+ *   - round-of-32 .. semi-final: vinnaren som avancerar till nästa runda.
+ *   - final (M104): FINAL-VINNAREN, dvs VM-mästaren (samma lag som
+ *     scoreChampionPrediction belönar, men här via final-slottens utfall).
+ *   - third-place (M103, bronsmatchen): BRONSMATCH-VINNAREN = 3:e plats i VM.
+ *     OBS: M103:s DELTAGARE är semifinal-FÖRLORARNA (slotten matas av
+ *     `match-loser` av M101/M102, se derive-bracket.ts), så "går vidare ur
+ *     M103" är INTE en semifinal-vinst utan bronsmatch-segern. `actual` här
+ *     är alltså den som VANN bronsmatchen, inte den som nådde semifinalen.
  *
  * Nyckeln är KnockoutStage (domänens slutspelsrundor), så skalan kan aldrig
  * drifta från strukturens rundor (kompileringsfel om en runda byter namn).
@@ -109,8 +158,13 @@ export const CHAMPION_PREDICTION_POINTS = 8;
 
 /**
  * Poängsätt ett "vem går vidare"-tips på EN slutspelsmatch mot vem som FAKTISKT
- * gick vidare. `predicted` och `actual` är lag-id (det lag man tror/vet avancerade
- * ur matchen). Rätt lag ger rundans poäng, annars 0.
+ * gick vidare. Rätt lag ger rundans poäng, annars 0.
+ *
+ * IDENTITETS-KONTRAKT: `predicted` och `actual` får bära lag-referensen i
+ * ENDERA rymden, code (versal "BRA", tipsets lagrings-form) eller id (gemen
+ * "bra", som deriveBracket.winnerTeamId HÄRLEDER). Funktionen normaliserar
+ * båda (sameTeam) före jämförelse, så ett code-lagrat tips mot ett
+ * bracket-härlett actual ger rundans poäng i stället för tyst 0 (T16 F1).
  *
  * VIKTIGT (anti-dubbelräkning, källmedvetet): ett bracket-tips poängsätts mot vem
  * som AVANCERADE (vann matchen enligt T9:s vinnar-härledning, som inkluderar
@@ -120,8 +174,8 @@ export const CHAMPION_PREDICTION_POINTS = 8;
  * mäter olika saker och får inte blandas ihop.
  *
  * @param stage      slutspelsrundan matchen tillhör (avgör poängvikten).
- * @param predicted  lag-id man tippade skulle gå vidare ur matchen.
- * @param actual     lag-id som FAKTISKT gick vidare (T9:s vinnar-härledning).
+ * @param predicted  lag man tippade skulle gå vidare ur matchen (code eller id).
+ * @param actual     lag som FAKTISKT gick vidare, T9:s vinnar-härledning (code eller id).
  * @returns          rundans poäng vid rätt lag, annars 0.
  */
 export function scoreBracketAdvance(
@@ -129,16 +183,20 @@ export function scoreBracketAdvance(
   predicted: string,
   actual: string
 ): number {
-  return predicted === actual ? BRACKET_ROUND_POINTS[stage] : 0;
+  return sameTeam(predicted, actual) ? BRACKET_ROUND_POINTS[stage] : 0;
 }
 
 /**
  * Poängsätt VM-VINNAR-tipset (mästaren) mot den faktiska mästaren (final-vinnaren).
  * Rätt mästare ger CHAMPION_PREDICTION_POINTS, annars 0.
  *
- * @param predictedChampion  lag-id man tippade som mästare (före turneringen).
- * @param actualChampion     lag-id som faktiskt vann finalen (mästaren).
+ * IDENTITETS-KONTRAKT: båda argument får bära lag-referensen i ENDERA rymden,
+ * code (versal "BRA", tipsets lagrings-form) eller id (gemen "bra", som facit
+ * härleds). Normaliseras (sameTeam) före jämförelse (T16 F1).
+ *
+ * @param predictedChampion  lag man tippade som mästare före turneringen (code eller id).
+ * @param actualChampion     lag som faktiskt vann finalen, mästaren (code eller id).
  */
 export function scoreChampionPrediction(predictedChampion: string, actualChampion: string): number {
-  return predictedChampion === actualChampion ? CHAMPION_PREDICTION_POINTS : 0;
+  return sameTeam(predictedChampion, actualChampion) ? CHAMPION_PREDICTION_POINTS : 0;
 }
