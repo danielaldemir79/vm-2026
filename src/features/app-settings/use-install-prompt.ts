@@ -37,7 +37,7 @@ export function useInstallPrompt(): InstallPromptApi {
   // omrendering när ett senare event dyker upp eller nollas. Detta är rotfixen
   // för T39: knappen kan inte längre missa ett tidigt event. getSnapshot
   // returnerar event:et självt (stabil referens medan det inte ändras), så
-  // useSyncExternalStores referens-likhet inte loopar.
+  // useSyncExternalStore referens-likhet inte loopar.
   const promptEvent = useSyncExternalStore(subscribeDeferredPrompt, getDeferredPrompt);
   // Standalone/iOS är stabila per session, läs en gång (lazy init).
   const [isStandalone, setIsStandalone] = useState(() => detectStandalone(window));
