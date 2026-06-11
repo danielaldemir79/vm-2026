@@ -46,6 +46,18 @@ const FINISHED_GROUP: Match = {
   result: null,
 };
 
+const KNOCKOUT: Match = {
+  id: 'M73',
+  stage: 'round-of-32',
+  groupId: null,
+  homeTeamId: 'mex',
+  awayTeamId: 'kor',
+  kickoff: '2026-07-04T18:00:00Z',
+  venue: 'X',
+  status: 'scheduled',
+  result: null,
+};
+
 function roomsStore(): RoomsStore {
   return { enabled: true } as unknown as RoomsStore;
 }
@@ -129,6 +141,21 @@ describe('AdminResultEntry, save mot global facit', () => {
       expect.objectContaining({ matchId: 'g-A-1', homeGoals: 2, awayGoals: 1, status: 'finished' })
     );
     expect(await screen.findByText(/gäller nu för alla rum/i)).toBeInTheDocument();
+  });
+
+  // Copilot R1: straff-fälten ska visas på lika-ställning i slutspel även när målen
+  // skrivs med olika strängformat ("01" vs "1"), eftersom valideringen kräver straffar
+  // vid lika. Lika räknas på parsade heltal, inte strängjämförelse.
+  it('visar straff-fälten vid lika slutspelsställning med ledande nolla ("01" mot "1")', () => {
+    adminMatchesState.matches = [KNOCKOUT];
+    renderSection(officialStore({ isAdmin: true }));
+
+    fireEvent.change(screen.getByLabelText('Match'), { target: { value: 'M73' } });
+    fireEvent.change(screen.getByLabelText('Mål hemma'), { target: { value: '01' } });
+    fireEvent.change(screen.getByLabelText('Mål borta'), { target: { value: '1' } });
+
+    // status default 'finished'; "01" === "1" som tal -> lika -> straff-fälten visas.
+    expect(document.querySelector('[data-admin-entry-penalties]')).not.toBeNull();
   });
 
   it('avvisar ogiltig inmatning (negativt mål) utan att anropa save', async () => {

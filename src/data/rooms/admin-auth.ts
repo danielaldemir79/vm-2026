@@ -59,7 +59,9 @@ export async function requestAdminEmailUpgrade(
   await ensureSession(client);
   const { error } = await client.auth.updateUser({ email: trimmed });
   if (error) {
-    throw new Error(`[VM2026] Kunde inte skicka inloggningslänk: ${error.message}`);
+    // Flödet är KOD-baserat (6-siffrig kod / verifyOtp), så felet talar om kod, inte
+    // länk (Copilot R1), konsekvent med UI-texten ("inloggningskod").
+    throw new Error(`[VM2026] Kunde inte skicka inloggningskoden: ${error.message}`);
   }
 }
 

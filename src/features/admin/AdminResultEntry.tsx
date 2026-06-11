@@ -59,7 +59,19 @@ export function AdminResultEntry() {
   );
 
   const isKnockout = selected ? selected.stage !== 'group' : false;
-  const showPenalties = isKnockout && status === 'finished' && home !== '' && home === away;
+  // Lika-ställning räknas på PARSADE heltal, inte strängar (Copilot R1): "1" och "01"
+  // är samma mål men olika strängar, och en sträng-jämförelse skulle då dölja straff-
+  // fälten samtidigt som validateResultEntry KRÄVER straffar vid lika i slutspel, ett
+  // läge där spara aldrig går igenom. toGoal ger samma parsning som submit använder.
+  const homeGoal = toGoal(home);
+  const awayGoal = toGoal(away);
+  const isTie =
+    homeGoal !== null &&
+    awayGoal !== null &&
+    Number.isInteger(homeGoal) &&
+    Number.isInteger(awayGoal) &&
+    homeGoal === awayGoal;
+  const showPenalties = isKnockout && status === 'finished' && isTie;
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
