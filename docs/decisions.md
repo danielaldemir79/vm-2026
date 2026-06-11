@@ -33,12 +33,15 @@ matar BÅDA källor samtidigt med OLIKA värden för samma match och bevisar att
 live och rummets (1-1) i fixtures , ett test som bara matade EN källa skulle inte skilja "läser
 official" från "läser room".
 
-**2. RESULTAT-INMATNINGEN (ResultEntryView) ADMIN-GATAD I LIVE:** ny ren regel `shouldShowResultEntry
-(live, isAdmin, simulating)` + tunn wrapper `ResultEntryGate`. FIXTURES: visa alltid (oförändrat).
-LIVE + admin: visa. LIVE + icke-admin (eller admin-status okänd än, fail-safe mot blink): visa BARA
-när simulering är PÅ. Regeln bor i en EGEN modul (`result-entry-gate-rule.ts`) skild från komponenten
+**2. RESULTAT-INMATNINGEN (ResultEntryView) GATAD I LIVE TILL "TÄNK OM":** ren regel
+`shouldShowResultEntry(live, simulating)` + tunn wrapper `ResultEntryGate`. FIXTURES: visa alltid
+(oförändrat). LIVE: visa BARA när simulering är PÅ , annars dold för ALLA, även arrangören (Daniels
+feedback F2). Skälet: i live matas de OFFICIELLA resultaten in via den dedikerade `AdminResultEntry`
+(AdminSection); att också visa den lokala ResultEntryView vid sidan om gav admin TVÅ inmatnings-ytor
+("vilken är den riktiga?"). En sanning för officiell inmatning = admin-formen; den lokala vyn är
+renodlat "tänk om". Regeln bor i en EGEN modul (`result-entry-gate-rule.ts`) skild från komponenten
 så ResultEntryView förblir en REN, fristående-testbar vy (renderas i fixtures-paritetstester utan
-facit-lager) och react-refresh-regeln hålls ren. Uttömmande testad över alla 6 fall.
+facit-lager) och react-refresh-regeln hålls ren. Uttömmande testad (regel: 4 fall; komponent: 3).
 
 **3. SIMULERING (T12) vs OFFICIELL INMATNING , den rena avgränsningen:** simuleringen ÅTERANVÄNDER
 ResultEntryView som sin "tänk om"-input (samma `submitResult`-seam, men i sim-läge går skrivningen till

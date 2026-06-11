@@ -3,46 +3,32 @@ import { describe, expect, it } from 'vitest';
 import { ResultEntryGate } from './ResultEntryGate';
 import { shouldShowResultEntry } from './result-entry-gate-rule';
 import { ResultsStoreContext, type ResultsStore } from './results-context';
-import {
-  OfficialResultsStoreContext,
-  type OfficialResultsStore,
-} from '../official-results/official-results-context';
 import type { DataSourceMode } from '../../data';
 
 // ============================================================================
 // T48 (#81): grinden för resultatinmatnings-vyn. Det STARKA invariantet, en
-// vanlig vän ska ALDRIG se den delade/officiella inmatningen i live-läge, men
-// får simulera. Vi testar BÅDE den rena regeln (uttömmande över alla 6 fall) OCH
-// komponenten (visar/döljer faktiskt vyn).
+// vanlig vän ska ALDRIG se den lokala/officiella inmatningen i live-läge, men
+// får simulera. Efter F2 (Daniels feedback) gäller detta ÄVEN admin: i live
+// matas officiella resultat in via AdminResultEntry, så den lokala vyn visas i
+// live BARA i "tänk om"-läge, för alla. Vi testar BÅDE den rena regeln
+// (uttömmande) OCH komponenten (visar/döljer faktiskt vyn).
 // ============================================================================
 
 describe('shouldShowResultEntry (ren regel, uttömmande)', () => {
-  // FIXTURES-läge: visa ALLTID, oavsett admin/sim (lokal utveckling oförändrad).
-  it('fixtures: visar alltid (icke-admin, ej sim)', () => {
-    expect(shouldShowResultEntry(false, false, false)).toBe(true);
+  // FIXTURES-läge (live=false): visa ALLTID (lokal utveckling/test oförändrad).
+  it('fixtures + ej sim: visar (lokal inmatning driver tabellerna)', () => {
+    expect(shouldShowResultEntry(false, false)).toBe(true);
   });
-  it('fixtures: visar alltid (admin)', () => {
-    expect(shouldShowResultEntry(false, true, false)).toBe(true);
-  });
-  it('fixtures: visar alltid (admin-status okänd)', () => {
-    expect(shouldShowResultEntry(false, null, false)).toBe(true);
+  it('fixtures + sim: visar', () => {
+    expect(shouldShowResultEntry(false, true)).toBe(true);
   });
 
-  // LIVE-läge: admin visar, icke-admin bara i sim.
-  it('live + admin: visar (arrangören får mata in)', () => {
-    expect(shouldShowResultEntry(true, true, false)).toBe(true);
+  // LIVE-läge: visa BARA i sim-läget ("tänk om"), aldrig som delad/officiell inmatning.
+  it('live + ej sim: DÖLJER (ingen ser en lokal/officiell inmatning, ej heller admin)', () => {
+    expect(shouldShowResultEntry(true, false)).toBe(false);
   });
-  it('live + icke-admin + ej sim: DÖLJER (vanlig vän ser ingen delad inmatning)', () => {
-    expect(shouldShowResultEntry(true, false, false)).toBe(false);
-  });
-  it('live + icke-admin + sim PÅ: visar (lokal "tänk om"-lek)', () => {
-    expect(shouldShowResultEntry(true, false, true)).toBe(true);
-  });
-  it('live + admin-status okänd + ej sim: DÖLJER (fail-safe under laddning)', () => {
-    expect(shouldShowResultEntry(true, null, false)).toBe(false);
-  });
-  it('live + admin-status okänd + sim PÅ: visar (sim är öppet för alla)', () => {
-    expect(shouldShowResultEntry(true, null, true)).toBe(true);
+  it('live + sim PÅ: visar (lokal "tänk om"-lek, skriver bara till sim-overlayn)', () => {
+    expect(shouldShowResultEntry(true, true)).toBe(true);
   });
 });
 
@@ -65,25 +51,10 @@ function resultsStore(mode: DataSourceMode, simulating: boolean): ResultsStore {
   };
 }
 
-function officialStore(isAdmin: boolean | null): OfficialResultsStore {
-  return {
-    enabled: true,
-    status: 'ready',
-    error: null,
-    results: [],
-    isAdmin,
-    client: null,
-    saveOfficialResult: async () => {},
-    refresh: async () => {},
-  };
-}
-
-function renderGate(mode: DataSourceMode, isAdmin: boolean | null, simulating: boolean) {
+function renderGate(mode: DataSourceMode, simulating: boolean) {
   return render(
     <ResultsStoreContext.Provider value={resultsStore(mode, simulating)}>
-      <OfficialResultsStoreContext.Provider value={officialStore(isAdmin)}>
-        <ResultEntryGate surface={(c) => <div data-testid="surface">{c}</div>} />
-      </OfficialResultsStoreContext.Provider>
+      <ResultEntryGate surface={(c) => <div data-testid="surface">{c}</div>} />
     </ResultsStoreContext.Provider>
   );
 }
@@ -96,25 +67,20 @@ async function expectEntryVisible() {
 }
 
 describe('ResultEntryGate (komponent)', () => {
-  it('live + icke-admin + ej sim: renderar VARKEN vyn NÄR ytan (ingen tom ruta)', () => {
-    renderGate('live', false, false);
+  it('live + ej sim: renderar VARKEN vyn ELLER ytan (ingen tom ruta)', () => {
+    renderGate('live', false);
     expect(screen.queryByRole('region', { name: /Mata in resultat/i })).toBeNull();
     expect(screen.queryByTestId('surface')).toBeNull();
   });
 
-  it('live + admin: renderar vyn (i ytan)', async () => {
-    renderGate('live', true, false);
+  it('live + sim PÅ: renderar vyn (tänk om-leken, i ytan)', async () => {
+    renderGate('live', true);
     await expectEntryVisible();
     expect(screen.getByTestId('surface')).toBeInTheDocument();
   });
 
-  it('live + icke-admin + sim PÅ: renderar vyn (tänk om-leken)', async () => {
-    renderGate('live', false, true);
-    await expectEntryVisible();
-  });
-
-  it('fixtures + icke-admin: renderar vyn (oförändrat lokalt läge)', async () => {
-    renderGate('fixtures', false, false);
+  it('fixtures + ej sim: renderar vyn (oförändrat lokalt läge)', async () => {
+    renderGate('fixtures', false);
     await expectEntryVisible();
   });
 });
