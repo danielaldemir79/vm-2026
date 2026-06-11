@@ -19,5 +19,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts"]
+  /* vite.config + en smal lokal ambient-deklaration (build-env.d.ts) för exakt de
+     Node-bitar bygget behöver (process.env, node:child_process). Vi drar INTE in
+     hela @types/node, det skulle läcka Node-globaler (t.ex. NodeJS.Timeout) in i
+     app-projektet via vitest-typerna och bryta browser-setTimeout-typningen. */
+  "include": ["vite.config.ts", "build-env.d.ts"]
 }
