@@ -52,3 +52,14 @@ export {
   type BracketPrediction,
   type BracketPredictionInput,
 } from './bracket-predictions-api';
+
+// T52 (#91): kopiera MINA tips mellan rum (match + grupp + bracket), ärlig rapport.
+export {
+  copyMyPredictions,
+  type CopyCategory,
+  type CopyOutcome,
+  type CopyItemResult,
+  type CopyCategorySummary,
+  type CopyReport,
+  type CopyLockSets,
+} from './copy-predictions';
