@@ -43,6 +43,23 @@ kontroll med identisk aria, edge: allt inom fönstret -> ingen knapp, bevarad os
 toggle) + `components/ExpandToggle.test.tsx` (etikett/böjning, aria-expanded/-controls, name-namnrymd).
 Spårbar via #68 (+ #63 för fönster-delen).
 
+## 2026-06-11 , T39 (#68 F1): kommentar-sanning om install-gaten (Panel-F1)
+
+**Fix:** `App.tsx`-kommentaren vid install-banner-gaten påstod att bannern döljs medan touren är öppen
+för att "touren har ett eget install-steg att installera FRÅN". Tourens install-steg (`onboarding.ts`,
+steget `install`) är REN INFO (titel + brödtext + illustration, ingen install-knapp/-action). Man kan
+alltså inte installera från touren. Kommentaren är rättad till sanningen: tourens install-steg BESKRIVER
+installationen, man installerar via DENNA banner EFTER att touren stängts. (Reviewer-fynd, lessons
+`kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller`.)
+
+## 2026-06-11 , T39 (#68 F2): test vaktar footer-länkens tabnabbing-skydd (Panel-F2)
+
+**Beslut:** footer-signaturens hemsidelänk (`[data-app-signature] a` -> `www.danielaldemir.com`) hade
+korrekta attribut men inget test som vaktade dem. Ett test i `App.test.tsx` asserterar nu
+`href=https://www.danielaldemir.com`, `target=_blank` och `rel` som innehåller BÅDE `noopener`
+(kapar `window.opener`, hindrar tabnabbing) och `noreferrer`. Så kan en framtida refaktor inte tyst
+tappa target/rel (öppna i samma flik eller exponera opener). Ordnings-oberoende koll på rel-tokens.
+
 ## 2026-06-11 , T39 (#68): install-knappen, rotorsak + standalone-detektering
 
 **Symptom (Daniel):** "Installera som app"-knappen gör inget vid klick. Bekräftat blockerande inför

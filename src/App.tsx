@@ -136,9 +136,10 @@ function AppShell() {
             vid FÖRSTA besöket och ligger ÖVER denna banner, så en första-gångs-vän
             som öppnar delningslänken inte kan klicka install-knappen förrän touren
             stängts (den ser ut att "inte göra något"). Medan touren är öppen visas
-            därför INTE den fristående bannern, touren har ett eget install-steg att
-            installera FRÅN. När touren är klar/hoppad faller bannern tillbaka på sin
-            vanliga logik (promptbar + ej standalone => visas). */}
+            därför INTE den fristående bannern. Tourens install-steg (onboarding.ts)
+            BESKRIVER installationen (ren info, ingen install-knapp); man installerar
+            via DENNA banner EFTER att touren stängts. När touren är klar/hoppad faller
+            bannern tillbaka på sin vanliga logik (promptbar + ej standalone => visas). */}
         {onboarding.open ? null : (
           <Slide direction="up">
             <InstallBanner />
