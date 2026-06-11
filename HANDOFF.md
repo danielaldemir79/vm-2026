@@ -5,6 +5,80 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-11 , T16b/#59 (Bracket-tips-UI) KLAR - PR #61 väntar på merge
+
+**Branch:** `feature/T16b-bracket-tips-ui` @ HEAD `47b9881`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/61 mot `develop` (Closes #59, state: OPEN)
+**Board:** issue #59 i "In Review" (korrekt). Dirigenten stänger issue #59 MANUELLT och flyttar kort #59 till Done EFTER merge.
+
+**Autonomt läge:** Daniel borta (semester), dirigenten har fullmakt hela vägen till slutet.
+
+**VM-poolen KOMPLETT:** Grupp-tips (T16) + match-tips (T15) + bracket-tips (T16b) är nu alla klara. Nästa task: T17 (#17, topplista + tips-avslöjande).
+
+**KLART med bevis (SHA-lista, nyaste sist):**
+- `a79fb9f` - feat(tips): T16b bracket-tips-UI + provider + 30 tester (#59, bygge)
+- `a7f871f` - design: champion-hero + slot-kupong (#59)
+- `c4bfd97` - fix(tips): legend a11y (Copilot runda 1, #59)
+- `47b9881` - fix(tips): champion-anim + last-dampning (Copilot runda 2, HEAD)
+
+**Verifiering:** 953 tester gröna + 29 env-skippade (+30 nya). Lokal panel: godkänd (1 avvisad nit, code-vs-id-seamen verifierad airtight via negativ kontroll). Copilot 3 rundor (1->2->0). Build/lint/format rent. Datakärnan/RLS oförändrad sedan T16.
+
+**Alla 5/5 acceptanskriterier bockade i issue #59** (journalisten 2026-06-11).
+
+**PINNADE punkter (oförändrade, bär framåt):**
+- **code-vs-id branded TeamCode-kontraktet:** `TeamCode` (branded type) måste användas genomgående i T17 och framåt. T17 konsumerar scorePrediction + bonus-score + list-API:erna och härleder faktiskt utfall ur standings/deriveBracket - ALLA lookups måste använda TeamCode, aldrig rå strängar. Kontraktet definieras i bracket_predictions-API:t.
+- **Sekretess-avslöjande:** andras tips visas FÖRST efter deadline. RLS sköter det (bevisad i T16), T17:s UI visar dem vid rätt tillfälle.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort #48 i Ready.
+- **#56 (delad modal-primitiv):** F4 från T32-panelen, rule-of-three ej nådd. Kort #56 i Ready.
+- **KA-F4-notering:** bundle ~717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go vid hemkomst.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+
+**IMPROVEMENTS-kandidater (dirigenten skriver i IMPROVEMENTS.md):**
+1. "När en task medvetet pinnar konsument-seamen till en senare task, kräv att data-/identitets-KONTRAKTET skrivs där funktionen DEFINIERAS, inte bara i decisions.md." (F1-fällan: code-vs-id tyst noll hade hindrats av ett kontrakt vid definitions-stället.)
+2. "Supabase deadline-lås + sekretess-RLS-mönstret (rls-tidslås-sekretess-mot-kallankrad-referenstabell) verifierat 3 gånger (T14/T15/T16) med 3 rena RLS-pass. Playbook-post nu på Förekomst 2 - nästa förekomst triggar Förekomst >= 3 och befordransregeln. Kandidat för senior-developer-rekommendation i README."
+
+**FORTSÄTTNINGS-PROMPT (autonom session):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`. Daniel är borta (semester) och har gett dirigenten full fullmakt hela vägen till slutet.
+>
+> Om PR #61 (T16b/#59, feature/T16b-bracket-tips-ui) ÄNNU INTE mergad:
+> Merga mot develop: `gh pr merge 61 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #59 manuellt (`gh issue close 59`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #59 till Done på boarden.
+> Verifiera att vm-2026.pages.dev visar bracket-tips-kupong med champion-hero, slot-kupong, deadline-lås och att bracket-tips sparas i rum-läge.
+>
+> Om PR #61 REDAN mergad:
+> T16b är klar och mergad. VM-poolen är komplett (grupp-tips T16 + match-tips T15 + bracket-tips T16b).
+> **Nästa task: T17 (#17, topplista + tips-avslöjande)** - konsumerar scorePrediction (T15) + bonus-score (T16/T16b) + list-API:erna, härleder faktiskt utfall ur standings/deriveBracket.
+> **HARD-pin:** använd TeamCode-typen genomgående - code-vs-id-tyst-noll får INTE återintroduceras vid poäng-aggregeringen.
+> Sekretess-avslöjandet: andras tips visas FÖRST efter deadline (RLS sköter det, T17:s UI visar dem).
+> Se issue #17 för fullständigt scope.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare, fyll när verifierad per-match-källa finns.
+> - **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+> - **Stegnings-dubblett:** 2 användningar, extrahera vid 3:e.
+> - **#48 (demo-chip a11y):** kort i Ready, plockas som liten task.
+> - **#56 (delad modal-primitiv):** kort i Ready, plockas när rule-of-three nås.
+> - **KA-F4-notering:** bundle ~717 kB - manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 2 befordringar (Förekomst 3), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-11 , T16/#16 (Grupp- och slutspels-tips datakärna) KLAR - PR #60 väntar på merge
 
 **Branch:** `feature/T16-bracket-tips` @ HEAD `3a987a6`
