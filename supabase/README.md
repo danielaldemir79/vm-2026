@@ -86,8 +86,9 @@ Båda låsen + sekretessen är RLS, klockan = DB:ns `now()`, ankarena slås upp 
 `match_kickoffs` (T15, redan seedad med alla 104 kickoffs, ingen ny seed behövs). De två nya
 helpers är SECURITY DEFINER med samma härdning som `match_kickoff`/`is_room_member`
 (`search_path=''`, EXECUTE för anon/authenticated). FAIL-SAFE: okänd grupp/slot => NULL-deadline =>
-skriv nekas + andras tips dolda. Poängreglerna (3p/2p grupp, 1..5 bracket-runda, 8p mästare) är
-rena funktioner i `src/data/predictions/bonus-score.ts`. Allt i `docs/decisions.md` (T16).
+skriv nekas + andras tips dolda. Poängreglerna (3p/2p grupp, 1..5 bracket-runda, 20p mästare) är
+rena funktioner i `src/data/predictions/bonus-score.ts`. Allt i `docs/decisions.md` (T16, mästar-
+poängen höjd 8 -> 20 i T49 #84).
 
 Bevisat SERVER-SIDE med riktiga roller (DO-block, 9 prov: medlemskap, deadline-lås per grupp/slot/
 champion, förfalskning, sekretess, utomstående) av senior-developern, med tre kickoff-tider

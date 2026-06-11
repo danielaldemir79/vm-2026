@@ -90,10 +90,10 @@ describe('scoreBracketAdvance (rätt lag vidare, stigande per runda)', () => {
   });
 });
 
-describe('scoreChampionPrediction (VM-vinnaren, 8p)', () => {
-  it('rätt mästare ger 8', () => {
+describe('scoreChampionPrediction (VM-vinnaren, 20p)', () => {
+  it('rätt mästare ger 20', () => {
     expect(scoreChampionPrediction('BRA', 'BRA')).toBe(CHAMPION_PREDICTION_POINTS);
-    expect(CHAMPION_PREDICTION_POINTS).toBe(8);
+    expect(CHAMPION_PREDICTION_POINTS).toBe(20);
   });
 
   it('fel mästare ger 0', () => {
