@@ -60,7 +60,7 @@ describe('buildLeaderboard, summa över de tre tips-typerna mot facit', () => {
               updatedAt: '',
             },
           ],
-          // Rätt slot-avancerare R32 (1p) + rätt mästare (8p).
+          // Rätt slot-avancerare R32 (1p) + rätt mästare (20p).
           bracketPredictions: [
             { slotId: 'M73', userId: 'u1', advancingTeamId: code('BRA'), updatedAt: '' },
             { slotId: CHAMPION_SLOT_ID, userId: 'u1', advancingTeamId: code('ARG'), updatedAt: '' },
@@ -70,8 +70,8 @@ describe('buildLeaderboard, summa över de tre tips-typerna mot facit', () => {
     ]);
     const board = buildLeaderboard([member('u1', 'Anna')], preds, facit);
     expect(board).toHaveLength(1);
-    // 3 (exakt match) + 5 (grupp) + 1 (slot) + 8 (mästare) = 17.
-    expect(board[0].points).toBe(17);
+    // 3 (exakt match) + 5 (grupp) + 1 (slot) + 20 (mästare) = 29.
+    expect(board[0].points).toBe(29);
     expect(board[0].exactHits).toBe(1);
     expect(board[0].rank).toBe(1);
   });

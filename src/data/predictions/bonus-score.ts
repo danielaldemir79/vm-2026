@@ -18,7 +18,7 @@
 //     * rätt lag VIDARE ur en slutspelsmatch -> poäng som STIGER med rundan
 //       (R32=1, R16=2, kvart=3, semi=4, brons/final-deltagare=5), så ett
 //       djupare och svårare rätt-tips väger tyngre (vedertaget i bracket-pooler).
-//     * rätt VM-VINNARE (mästaren) -> 8 poäng (separat tippning före turneringen).
+//     * rätt VM-VINNARE (mästaren) -> 20 poäng (separat tippning före turneringen).
 //
 // VARFÖR denna gradient (källmedvetet): exakt som T15:s "exakt > utfall" är detta
 // den etablerade pool-formen där ett mer specifikt/svårare rätt belönas högre. Den
@@ -153,8 +153,17 @@ export const BRACKET_ROUND_POINTS: Readonly<Record<KnockoutStage, number>> = {
   final: 5,
 };
 
-/** Bonus för att tippa rätt VM-VINNARE (mästaren), separat tippning före turneringen. */
-export const CHAMPION_PREDICTION_POINTS = 8;
+/**
+ * Bonus för att tippa rätt VM-VINNARE (mästaren), separat tippning före turneringen.
+ *
+ * VARFÖR 20 (Daniels beslut, T49 #84, pre-share): mästar-tipset ska väga TYDLIGT
+ * tyngst, det är turneringens svåraste enskilda gissning (1 lag av 48, blint före
+ * första matchen). 20 är satt så bonusen matchar match-skalan rent: exakt match = 3p,
+ * så 20 mästar-poäng motsvarar dryga 6 exakta matcher, en känn-bar men inte absurd
+ * tyngd (Daniel sänkte från sitt ursprungliga 50 just för att hålla skalan rimlig
+ * mot 3p-matcherna). Källa: docs/decisions.md T49 (#84), Daniels poäng-beslut.
+ */
+export const CHAMPION_PREDICTION_POINTS = 20;
 
 /**
  * Poängsätt ett "vem går vidare"-tips på EN slutspelsmatch mot vem som FAKTISKT

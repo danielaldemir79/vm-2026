@@ -21,7 +21,7 @@
 --
 -- Per-slot-modellen tippar alltså LAGET som avancerar, inte målställningen (det
 -- är T15:s predictions). Poäng: scoreBracketAdvance (stigande per runda) +
--- scoreChampionPrediction (8p), src/data/predictions/bonus-score.ts.
+-- scoreChampionPrediction (20p, höjt från 8p i T49 #84), src/data/predictions/bonus-score.ts.
 -- ============================================================================
 --
 -- DEADLINE-LÅS + SEKRETESS bor i RLS (..._t16_bracket_predictions_rls):
