@@ -3,6 +3,7 @@
 
 export { LeaderboardSection } from './LeaderboardSection';
 export { LeaderboardProvider } from './LeaderboardProvider';
+export { LeaderboardSummary } from './LeaderboardSummary';
 export { LeaderboardView } from './LeaderboardView';
 export { RevealView } from './RevealView';
 export {
@@ -27,3 +28,4 @@ export {
   type BracketFacit,
 } from './derive-facit';
 export { buildMatchReveal, type RevealedMatch, type RevealedMatchPick } from './reveal';
+export { deriveSelfSummary, type SelfSummary } from './self-summary';
