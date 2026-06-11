@@ -13,6 +13,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     leaderboard: [],
     reveal: [],
     teams: [],
+    currentUserId: null,
     ...partial,
   };
 }
@@ -101,5 +102,53 @@ describe('LeaderboardView, rangordnad lista + data-seam', () => {
       r.getAttribute('data-user-id')
     );
     expect(ids).toEqual(['u1', 'u2', 'u3']);
+  });
+});
+
+describe('LeaderboardView, premium-finish (podium + du + ledare)', () => {
+  const board = [
+    entry('u1', 'Anna', 12, 1, 2),
+    entry('u2', 'Bertil', 8, 2),
+    entry('u3', 'Cecilia', 5, 3),
+    entry('u4', 'David', 2, 4),
+  ];
+
+  it('topp-3 bär pallplats-MEDALJER (guld/silver/brons), plats 4+ en neutral rank-bricka', () => {
+    const { container } = renderView(store({ leaderboard: board }));
+    const rows = Array.from(container.querySelectorAll('[data-leaderboard-row]'));
+    const rankCell = (row: Element) => row.querySelector('[data-leaderboard-rank]');
+    expect(rankCell(rows[0])?.classList.contains('vm-pool-medal--gold')).toBe(true);
+    expect(rankCell(rows[1])?.classList.contains('vm-pool-medal--silver')).toBe(true);
+    expect(rankCell(rows[2])?.classList.contains('vm-pool-medal--bronze')).toBe(true);
+    // Plats 4: ingen medalj, neutral rank-bricka i stället.
+    expect(rankCell(rows[3])?.classList.contains('vm-board-rank')).toBe(true);
+    expect(rankCell(rows[3])?.classList.contains('vm-pool-medal')).toBe(false);
+  });
+
+  it('ledar-raden (rank 1) markeras färg-OBEROENDE via data-leader (dekor-hak)', () => {
+    const { container } = renderView(store({ leaderboard: board }));
+    const rows = container.querySelectorAll('[data-leaderboard-row]');
+    expect(rows[0].getAttribute('data-leader')).toBe('true');
+    expect(rows[1].getAttribute('data-leader')).toBeNull();
+  });
+
+  it('EGNA raden ("du") framhävs färg-OBEROENDE: data-self + en läsbar "Du"-bricka', () => {
+    const { container } = renderView(store({ leaderboard: board, currentUserId: 'u3' }));
+    const rows = Array.from(container.querySelectorAll('[data-leaderboard-row]'));
+    const self = rows.find((r) => r.getAttribute('data-user-id') === 'u3');
+    expect(self?.getAttribute('data-self')).toBe('true');
+    // Brickan finns BARA på egna raden (en redundant TEXT-signal, inte bara färg).
+    expect(self?.querySelector('[data-leaderboard-self]')?.textContent).toBe('Du');
+    const others = rows.filter((r) => r.getAttribute('data-user-id') !== 'u3');
+    for (const o of others) {
+      expect(o.getAttribute('data-self')).toBeNull();
+      expect(o.querySelector('[data-leaderboard-self]')).toBeNull();
+    }
+  });
+
+  it('utan känd egen identitet (currentUserId null) markeras INGEN rad som "du"', () => {
+    const { container } = renderView(store({ leaderboard: board, currentUserId: null }));
+    expect(container.querySelector('[data-self="true"]')).toBeNull();
+    expect(container.querySelector('[data-leaderboard-self]')).toBeNull();
   });
 });

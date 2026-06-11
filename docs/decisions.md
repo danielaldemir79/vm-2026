@@ -71,6 +71,77 @@ och sektionen kan ligga UTANFÖR ResultsProvider, alongside tips-sektionerna). E
 mini-ligor (T20) out of scope. Premium-finish (medaljer, rörelse-polish) lämnas till design-frontend
 ovanpå data-attribut-seamen (samma arbetsdelning som T15/T16).
 
+## 2026-06-11 , T17-visuellt (#17): topplistans + tips-avslöjandets premium-finish (KRÖNINGEN)
+
+Det visuella lagret ovanpå senior-devs funktionella topplista + tips-avslöjande. Mål: VM-poolens
+KRÖNING , topplistan är vad kompisarna kollar VARJE dag, den ska kännas LEVANDE och TÄVLINGSINRIKTAD,
+och avslöjandet ska bli ett FACIT-ÖGONBLICK. Allt inom "arena i kvällsljus"-familjen (SPEC §7) och
+utan att röra senior-devs data-attribut/test-kontrakt (rank-ordning, poäng-strängar, reveal-gate).
+
+**1. TOPPLISTAN = PODIUM + RACE (taskens punkt 1):** topp-3 bär riktiga PALLPLATS-medaljer , 1:a guld,
+2:a silver, 3:a BRONS , via samma färg-OBEROENDE solid-bricka-medalj som grupp-tipsets podium (T16,
+`.vm-pool-medal`, DRY) + en NY `.vm-pool-medal--bronze`-modifierare. Brons krävde tre nya tokens
+(`--vm-bronze`/`-ink`/`-text`) i BÅDA teman, samma guld/silver-disciplin: rå brons = DEKOR (medalj-
+fyllning), all brons-TEXT använder den AA-mätta `--vm-bronze-text`. Ledar-raden (rank 1) får en varm
+guld-glow (`[data-leader]`) + gulda poäng-tal (`--color-warning`) så ögat dras dit. Plats 4+ får en
+neutral rank-bricka (`.vm-board-rank`). RÖRELSE: senior-devs `motion.li layout='position'`-glid
+behölls och fick en premium spring (`stiffness 520, damping 38`) + en kort ENGÅNGS highlight-puls
+(`.vm-board-row[data-rank-changed]`, CSS) på en rad som JUST bytt placering, så ögat hänger med i
+racet. Puls-spårningen jämför rank mot förra renderingen (useRef), pulsar bara vid en ÄNDRING (inte
+första laddningen = brus), och sätts ALDRIG vid reducerad rörelse.
+
+**2. "DU" = FÄRG-OBEROENDE framhävd egen rad (taskens punkt 1):** den egna raden markeras med accent-
+ring + svag accent-tint + en läsbar "DU"-bricka (`.vm-board-self-badge`, solid accent + accent-fg-ink),
+INTE bara en färg , så den syns för en färgblind användare och i båda teman (form + text + färg, tre
+redundanta signaler). NY SEAM: `currentUserId` trådd genom storen (rummets `rooms.userId`); null =
+ingen rad markeras (auth-sessionen ej klar). Vyn jämför rad-userId mot den. Sekretess hänger INTE på
+den (bara en visnings-hak).
+
+**3. TIPS-AVSLÖJANDET = FACIT-ÖGONBLICK (taskens punkt 2):** facit-talet (det faktiska resultatet) är
+HJÄLTEN , en solid guld-bricka med mörk ink (`.vm-reveal-actual`, samma solid-bricka-form som
+medaljerna). Varje pick får en FÄRG-OBEROENDE utfalls-markör (IKON + FORM, inte bara färg): EXAKT (3p)
+= bock i solid grön medalj, RÄTT UTFALL (1p) = halv-cirkel i solid guld-medalj, MISS (0p) = kryss i en
+neutral ring + en grön/guld vänsterkant per rad. Kategorin HÄRLEDS ur `pick.points` mot den testade
+poängregeln (`PREDICTION_POINTS = {exact:3,outcome:1,miss:0}`), ingen ny tröskel. En dold `sr-only`-
+etikett ("Exakt rätt"/"Rätt utfall"/"Bom") ger skärmläsaren samma besked i ord. Så man ser på en blink
+vem som prickade rätt och vem som bommade, oavsett färgseende.
+
+**KONTRAST (taskens punkt 3, canvas-komposit VÄRSTA fall, BÅDA teman, UPPMÄTT + KORSVERIFIERAT live):**
+all läsbar text står på OPAK surface/surface-raised eller på en LÅG-alfa tint mätt som canvas-komposit.
+Medalj-/markör-/facit-SIFFRORNA är mörk ink på SOLID bricka (färg-oberoende solid-bricka-form T9/T11/
+T16), aldrig ljus medalj-färg-text på tint. Guld-TEXT = `--color-warning`, brons-TEXT = `--vm-bronze-
+text`. Värden beräknade i `scripts/contrast-t17.mjs` (alfa-komposit) OCH korsverifierade i browsern
+(Playwright `getComputedStyle`, faktisk render) , de två metoderna gav IDENTISKA siffror:
+
+| Yta (värsta fall) | Mörkt | Ljust | Tröskel |
+|---|---|---|---|
+| Guld-medalj siffra (coupon-ink på solid gold) | 10.90:1 | 5.03:1 | 4.5 |
+| Silver-medalj siffra (silver-ink på solid silver) | 10.99:1 | 8.40:1 | 4.5 |
+| Brons-medalj siffra (bronze-ink på solid bronze) | 6.60:1 | 4.87:1 | 4.5 |
+| "DU"-bricka (accent-fg på solid accent) | 10.85:1 | 5.40:1 | 4.5 |
+| Ledar-rad namn (fg) på guld-7%-glow-rad | 15.24:1 | 16.19:1 | 4.5 |
+| Ledar-rad poäng (warning) på guld-glow-rad | 10.09:1 | 5.36:1 | 4.5 |
+| Egen rad namn (fg) på accent-8/10%-tint | 15.24:1 | 15.61:1 | 4.5 |
+| Eyebrow/facit-tal (warning) på surface | 10.09:1 | 5.92:1 | 4.5 |
+| Facit-tal (coupon-ink på solid gold) | 10.90:1 | 5.03:1 | 4.5 |
+| Exakt-markör ink (on-success på solid success) | 9.97:1 | 5.47:1 | 4.5 |
+| Utfall-markör ink (coupon-ink på solid gold) | 10.90:1 | 5.03:1 | 4.5 |
+| Miss-markör glyf (fg-muted på surface-raised) | 6.23:1 | 6.52:1 | 3.0 |
+| Reveal pick namn (fg) / tippning (fg-muted) | 15.24 / 7.50 | 17.91 / 6.52 | 4.5 |
+
+**MIN över ALLA nya normal-text-ytor: 6.60:1 (mörkt) / 4.87:1 (ljust), alla >= AA.** Den nya brons-
+tokenen valdes så även dess medalj-ink klarar AA i ljust tema (4.87:1, samma guld/silver-på-ljus-
+disciplin). **RESPONSIVT + ÖVRIG VERIFIERING:** Playwright mot Vite-render (faktisk rendering, båda
+teman) på 280 (foldable cover) / 760 / 1440px , noll horisontell overflow. En FÄLLA fångad i 280px-
+verifieringen: "DU"-brickan låg nästlad i namn-gruppen och ÖVERLAPPADE poängen 26px när namnet
+truncats till 0 bredd; fixat genom att flatta brickan + poängen till `shrink-0`-SYSKON av namnet
+(flex reserverar deras plats först, kan aldrig kollidera, mätt gap 12px efter fix). Animation
+verifierad i KOMPILERAD CSS (`dist/assets/*.css`, lessons `verifiera-animation-mot-kompilerad-css`):
+`vm-board-rank-pulse`-keyframe finns OCH ligger inuti `@media (prefers-reduced-motion: no-preference)`
+(reduced-motion-användare får ingen puls; dubbelt skydd med JS-gaten). Inga tester rörda i kontrakt;
+7 NYA tester låser premium-seamen (podium-medaljer, ledar-/du-markering, currentUserId-null-fallet,
+färg-oberoende reveal-markörer + sr-only-orden). 1006 gröna (var 999).
+
 ## 2026-06-11 , T16b-visuellt (#59): bracket-tips-lagrets premium-finish ("vägen till bucklan")
 
 **Kontext:** ovanpå senior-devs funktionella lager (data-attribut-seam + semantik + tester) la

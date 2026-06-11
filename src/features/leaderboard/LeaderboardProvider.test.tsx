@@ -33,6 +33,7 @@ vi.mock('../../data', () => ({
 const roomsState = vi.hoisted(() => ({
   members: [] as RoomMember[],
   activeRoom: { id: 'r1' } as { id: string } | null,
+  userId: null as string | null,
 }));
 vi.mock('../rooms', () => ({
   useRoomsStore: () => roomsState,
