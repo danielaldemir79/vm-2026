@@ -52,6 +52,15 @@ automatiskt när PR:en mergas till `develop`. Inga tecken på fördröjd/utebliv
 konfiguration (CI gör bara kvalitetsgrinden, deployen ägs av Cloudflare-dashboarden). Cloudflare-
 konfig orörd (utanför repots kontroll, PRINCIPLES §7).
 
+**Fail-loud vid misslyckad SW-registrering (#74, Copilot C3):** `registerAppSw`-catchen sväljde
+tidigare felet TYST, så en felkonfig (saknad/oladdbar `virtual:pwa-register`, inget SW-stöd där det
+förväntas) skulle göra cache-/uppdaterings-problemet osynligt igen , precis det tasken löser. Nu loggas
+felet med `console.warn('[VM2026] ...')` (samma fail-loud-men-inte-fatalt-kontrakt som
+`src/lib/safe-storage.ts`): en misslyckad registrering kraschar ALDRIG appen (den renderas vidare utan
+offline/uppdaterings-prompt) men blir SYNLIG i konsolen. Modul-importören är nu ett injicerbart andra
+argument till `registerAppSw` (default = riktiga importet) enbart för att göra catch-grenen testbar
+(`register-sw.test.ts`) utan att den virtuella modulen behöver lösas i Vitest.
+
 ---
 
 ## 2026-06-11 , T39 (#68): tips-listan får 3-dagars fönster + expandera (delad ExpandToggle)
