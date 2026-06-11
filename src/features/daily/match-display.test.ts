@@ -42,6 +42,30 @@ describe('teamDisplayName, namn ur uppslag eller platshållare (gissar aldrig)',
   });
 });
 
+describe('teamDisplayName, KORT namn i trånga ytor (matchkort/slutspelsträd, T50)', () => {
+  // Matchkortet och slutspelsträdets celler är trånga; ett lag med långt namn bär
+  // ett shortName som visas där (det fulla name står kvar i lagprofilen).
+  const bih: Team = {
+    id: 'bih',
+    name: 'Bosnien och Hercegovina',
+    shortName: 'Bosnien',
+    code: 'BIH',
+    group: 'B',
+  };
+  const teamsById = new Map<string, Team>([
+    ['bih', bih],
+    ['mex', team('mex', 'Mexiko')],
+  ]);
+
+  it('visar shortName när laget har ett (det LÅNGA name trycker ihop kortet)', () => {
+    expect(teamDisplayName('bih', teamsById)).toBe('Bosnien');
+  });
+
+  it('faller tillbaka till name när laget INTE satt shortName (default-fallet)', () => {
+    expect(teamDisplayName('mex', teamsById)).toBe('Mexiko');
+  });
+});
+
 describe('isVenuePlaceholder, känner igen "ej verifierad"-platshållaren (#35)', () => {
   it('är true för parserns platshållare', () => {
     expect(isVenuePlaceholder('Arena ej verifierad (egen data-punkt)')).toBe(true);

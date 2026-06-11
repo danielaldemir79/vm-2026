@@ -21,6 +21,7 @@
 
 import type { CSSProperties } from 'react';
 import type { GroupStanding, GroupId, Team } from '../../domain/types';
+import { teamShortName } from '../../domain';
 import { TeamNameButton } from '../team-profile';
 
 /** Hur många lag som går vidare DIREKT från gruppen (etta + tvåa, SPEC §5). */
@@ -73,9 +74,17 @@ function teamLabel(
   known: boolean;
 } {
   const team = teamsById.get(teamId);
+  // Grupptabellens lag-kolumn är TRÅNG (8 statistik-kolumner bredvid), så vi visar
+  // det KORTA namnet (teamShortName: shortName om satt, annars name), t.ex. "Bosnien"
+  // i stället för "Bosnien och Hercegovina" som tryckte ihop kolumnerna (T50). Det
+  // fulla namnet står kvar i lagprofilen (TeamProfilePanel) där det finns plats.
   // Saknas laget i uppslaget är det en data-inkonsistens; visa id:t synligt i
   // stället för att tyst dölja det (fail loud light), så felet märks i UI:t.
-  return { name: team?.name ?? teamId, code: team?.code ?? '???', known: team !== undefined };
+  return {
+    name: team ? teamShortName(team) : teamId,
+    code: team?.code ?? '???',
+    known: team !== undefined,
+  };
 }
 
 /**

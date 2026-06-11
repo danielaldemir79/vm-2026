@@ -5,6 +5,28 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-11 , T50 (#86): kort visningsnamn (shortName) för trånga ytor
+
+Daniels live-feedback: "Bosnien och Hercegovina" (grupp B) tryckte ihop grupptabellens övriga
+kolumner. Lösningen är GENERELL, inte en hårdkodad specialregel i komponenten: ett VALFRITT
+`shortName`-fält på `Team` (`src/domain/types.ts`), satt i lag-datan (`src/data/wc2026/team-refs.ts`).
+Default är `name`, så bara lag vars fulla namn är för långt sätter en kortform.
+
+**Regel + en sanning:** fallback-regeln (`shortName ?? name`) bor i `teamShortName`
+(`src/domain/team-name.ts`), så de trånga ytorna importerar samma regel i stället för att
+upprepa `?? name`.
+Trånga ytor som visar kortformen: grupptabellen (`GroupTable`), matchkortet + slutspelsträdet (båda
+via `teamDisplayName` i `src/features/daily/match-display.ts`). Det FULLA namnet står kvar i
+lagprofilen (`TeamProfilePanel`, hero-rubriken) där utrymmet finns, SPEC-andan "fullt där det ryms".
+
+**Källa till kortformen (gissas inte):** det fulla `name` är fortfarande den verifierade lottnings-
+datan (oförändrad). "Bosnien" är den vedertagna svenska kortformen för Bosnien och Hercegovina
+(svenskt vardagsbruk för landet). Det är ENDA laget bland VM 2026:s 48 vars namn är så långt att en
+kortform behövs (övriga ryms i de trånga ytorna), test-vaktat i `teams.test.ts` (listan med shortName
+== `['BIH']`), så ett framtida långt lagnamn måste läggas till medvetet, inte smyga in ohanterat.
+
+---
+
 ## 2026-06-11 , T49 (#84): VM-vinnar-poängen höjd 8p -> 20p
 
 `CHAMPION_PREDICTION_POINTS` (`src/data/predictions/bonus-score.ts`) ändrad från 8 till **20**.

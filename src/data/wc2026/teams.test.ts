@@ -89,6 +89,28 @@ describe('VM 2026 lag-/gruppdata: referentiell integritet', () => {
   });
 });
 
+describe('VM 2026 lag-data: kortnamn för trånga ytor (T50)', () => {
+  it('Bosnien och Hercegovina bär det FULLA namnet + kortformen "Bosnien"', () => {
+    const bih = WC2026_TEAMS.find((t) => t.code === 'BIH');
+    expect(bih?.name).toBe('Bosnien och Hercegovina');
+    expect(bih?.shortName).toBe('Bosnien');
+  });
+
+  it('lag utan långt namn sätter inget shortName (default = name via teamShortName)', () => {
+    // Bara lag vars fulla namn är för långt får en kortform; övriga lämnar fältet
+    // odefinierat och visar sitt vanliga namn (default-fallet). Spot-check: Kanada.
+    const canada = WC2026_TEAMS.find((t) => t.code === 'CAN');
+    expect(canada?.shortName).toBeUndefined();
+  });
+
+  it('Bosnien är det ENDA laget med kortform i VM 2026:s 48 (övriga ryms)', () => {
+    // Lås invarianten: introduceras ett nytt långt lagnamn ska den som lägger till
+    // det medvetet uppdatera detta test, inte smyga in ett ohanterat långt namn.
+    const withShort = WC2026_TEAMS.filter((t) => t.shortName !== undefined).map((t) => t.code);
+    expect(withShort).toEqual(['BIH']);
+  });
+});
+
 describe('VM 2026 lag-/gruppdata: fungerar mot härledd-state-motorn', () => {
   it('en grupps lag går att beräkna till en (tom) tabell utan fel', () => {
     const groupF = WC2026_GROUPS.find((g) => g.id === 'F')!;

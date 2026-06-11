@@ -133,6 +133,44 @@ describe('GroupTable, kvalificeringszon (markeras tillgängligt, inte med färg)
   });
 });
 
+describe('GroupTable, KORT namn i den trånga lag-kolumnen (T50)', () => {
+  // Ett lag med långt namn (Bosnien och Hercegovina) bär ett shortName; tabellen
+  // (trång, 8 statistik-kolumner bredvid) ska visa kortformen, inte det fulla
+  // namnet som tryckte ihop kolumnerna. Det fulla namnet bor i lagprofilen.
+  const withBosnia = new Map<string, Team>([
+    [
+      'bih',
+      { id: 'bih', name: 'Bosnien och Hercegovina', shortName: 'Bosnien', code: 'BIH', group: 'B' },
+    ],
+    ['can', { id: 'can', name: 'Kanada', code: 'CAN', group: 'B' }],
+  ]);
+
+  it('visar lagets KORTA namn i tabellen (Bosnien), inte det långa', () => {
+    render(
+      <TeamProfileStub>
+        <GroupTable groupId="B" standings={[row('bih', 1), row('can', 2)]} teamsById={withBosnia} />
+      </TeamProfileStub>
+    );
+    // Kortformen är synlig som rad-header; det fulla namnet finns inte i tabellen.
+    expect(screen.getByRole('rowheader', { name: /Bosnien/ })).toBeInTheDocument();
+    expect(screen.queryByText('Bosnien och Hercegovina')).not.toBeInTheDocument();
+    // Knappens a11y-namn följer den synliga kortformen (en sanning, inget dubbelnamn).
+    expect(
+      screen.getByRole('button', { name: /Visa lagprofil för Bosnien$/i })
+    ).toBeInTheDocument();
+  });
+
+  it('visar det vanliga namnet för ett lag UTAN shortName (default-fallet)', () => {
+    render(
+      <TeamProfileStub>
+        <GroupTable groupId="B" standings={[row('bih', 1), row('can', 2)]} teamsById={withBosnia} />
+      </TeamProfileStub>
+    );
+    // Kanada har ingen kortform satt -> det vanliga namnet visas.
+    expect(screen.getByRole('rowheader', { name: /Kanada/ })).toBeInTheDocument();
+  });
+});
+
 describe('GroupTable, fel-väg: okänt lag-id maskeras inte', () => {
   it('visar id:t synligt om ett lag saknas i uppslaget (fail loud light)', () => {
     // En standings-rad för ett lag som inte finns i teamsById, ska inte tyst
