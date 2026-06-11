@@ -11,6 +11,12 @@ export type { ResultsStore, ResultsLoadStatus } from './results-context';
 // Inmatnings-UI:t.
 export { ResultEntryView } from './ResultEntryView';
 export type { ResultEntryViewProps } from './ResultEntryView';
+
+// Live-grind runt inmatnings-vyn (T48, #81): bara admin ser den delade/officiella
+// inmatningen i live-läge; en vanlig vän ser den bara i "tänk om"-simulering.
+export { ResultEntryGate } from './ResultEntryGate';
+export type { ResultEntryGateProps } from './ResultEntryGate';
+export { shouldShowResultEntry } from './result-entry-gate-rule';
 export { ResultEntryForm } from './ResultEntryForm';
 export type { ResultEntryFormProps } from './ResultEntryForm';
 
