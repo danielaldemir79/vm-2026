@@ -68,6 +68,28 @@ export const registerAppSw = (
   callbacks: AppSwCallbacks,
   importModule: ImportPwaRegister = importPwaRegister
 ): ((reloadPage?: boolean) => Promise<void>) => {
+  // TYST AUTO-UPPDATERING (hotfix): med skipWaiting + clientsClaim aktiveras en ny
+  // SW direkt och TAR ÖVER de öppna flikarna. Då fyrar `controllerchange`. Vi laddar
+  // om sidan EN gång så användaren ser nya versionen utan något handgrepp.
+  //
+  // VAKT 1 (ingen omladdning vid FÖRSTA installationen): vi laddar bara om när sidan
+  // REDAN kontrollerades av en SW vid registreringen, en ny-installation (controller
+  // == null) ska inte ge en onödig omladdning.
+  // VAKT 2 (ingen omladdnings-loop): `reloaded` ser till att vi laddar om högst en gång.
+  // jsdom/SSR saknar navigator.serviceWorker, typeof-vakten gör detta till en no-op
+  // i test (register-sw.test.ts injicerar bara importModule och rör aldrig detta).
+  if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+    const hadControllerAtStart = navigator.serviceWorker.controller !== null;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadControllerAtStart || reloaded) {
+        return;
+      }
+      reloaded = true;
+      window.location.reload();
+    });
+  }
+
   let updateSW: (reloadPage?: boolean) => Promise<void> = async () => {};
   // Dynamiskt import: modulen finns bara i ett Vite-bygge. I en miljö där den
   // saknas blir updateSW en no-op (appen fungerar, bara utan SW-uppdatering).
