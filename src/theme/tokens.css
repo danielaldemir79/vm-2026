@@ -712,9 +712,11 @@ body {
    den varma guld-radialen ersatt av en neutral grå radial, den gyllene inset-topplisten
    och vilo-kanten neutraliserade till border-tonen, och hela kortet en aning lägre i
    mättnad/ljus (filter). Resultatet är omisskännligt "låst/inlämnad" utan att skrika.
-   Text-lagret (låst-etikett + mitt-tips-tal) rörs INTE av filtret , det bär full
-   kontrast (vi filtrerar fonden via box-shadow/bakgrund + en svag grayscale, inte en
-   opacity som skulle sänka textens läsbarhet). GÄLLER ALLA tips-kupong-typerna:
+   OBS sanning om filtret (copilot R1): `filter: saturate(0.85)` verkar på HELA
+   elementet, alltså även text-lagret. Det är OK just för att det är en mättnads-
+   sänkning, inte en opacity/ljushets-ändring: texten är nära-neutral (fg på opak yta)
+   så dess luminans-kontrast påverkas försumbart, och AA är uppmätt KOMPOSITERAT med
+   filtret aktivt i båda teman (se decisions.md T35). GÄLLER ALLA tips-kupong-typerna:
    match-tipset (data-prediction-locked), grupp-tipset (data-group-prediction-locked)
    OCH slutspels-tipsets slot-kuponger (data-bracket-prediction-locked) , en sanning. */
 .vm-coupon-card[data-prediction-locked],
@@ -736,10 +738,10 @@ body {
   box-shadow:
     var(--vm-shadow-card),
     inset 0 1.5px 0 0 var(--color-border);
-  /* En svag avmättnad (saturate 0.85, 15% mindre mättnad) gör kortets resterande
-     dekor (flaggor, chip-tinter) gråare, så hela kortet känns inlämnat. Hålls lågt
-     så valda lag-flaggor fortfarande går att känna igen, det är en gråmarkering,
-     inte en utsuddning. */
+  /* En svag avmättnad (saturate 0.85, 15% mindre mättnad) över HELA kortet (inkl.
+     text, se blockkommentaren ovan) gör dekor (flaggor, chip-tinter) gråare, så
+     kortet känns inlämnat. Hålls lågt så valda lag-flaggor fortfarande går att
+     känna igen, det är en gråmarkering, inte en utsuddning. */
   filter: saturate(0.85);
 }
 

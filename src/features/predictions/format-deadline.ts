@@ -32,11 +32,11 @@ export interface DeadlineMessage {
   /** Exakt tidpunkt, t.ex. "fredag 11 juni kl 21:00" (svensk tid). */
   absolute: string;
   /**
-   * Relativ närhet (för en mjuk brådska-känsla), eller null när den inte tillför
-   * (mer än en dag kvar och inte idag). T.ex. "idag", "imorgon", "om 3 dagar".
-   * Aldrig en exakt timme/minut, det vore en andra sanning om samma tid.
+   * Relativ närhet (för en mjuk brådska-känsla), ALLTID satt (copilot R1, ärligt
+   * kontrakt): "idag", "imorgon" eller "om N dagar". Aldrig en exakt timme/minut,
+   * det vore en andra sanning om samma tid.
    */
-  relative: string | null;
+  relative: string;
 }
 
 /** En svensk dag, i millisekunder. Bara för den GROVA relativa etiketten (dagar). */
@@ -61,8 +61,8 @@ function swedishDayDiff(nowMs: number, deadlineMs: number): number {
   return Math.round((toNoonMs(deadlineKey) - toNoonMs(nowKey)) / DAY_MS);
 }
 
-/** Den grova relativa etiketten (dagar), eller null när den inte tillför. */
-function relativeLabel(dayDiff: number): string | null {
+/** Den grova relativa etiketten (dagar): "idag", "imorgon" eller "om N dagar". */
+function relativeLabel(dayDiff: number): string {
   if (dayDiff <= 0) {
     // <= 0: deadlinen är idag (eller, teoretiskt, redan passerad, men då är kortet
     // låst och denna text visas inte). "idag" bär brådskan.

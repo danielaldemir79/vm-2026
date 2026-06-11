@@ -76,12 +76,11 @@ export function DeadlineNotice({
         <time dateTime={deadlineIso} className="font-semibold text-fg">
           {msg.absolute}
         </time>
-        {msg.relative ? (
-          <span className="text-fg-muted">
-            {' · '}
-            {msg.relative}
-          </span>
-        ) : null}
+        {/* relative är ALLTID satt (ärligt kontrakt i DeadlineMessage, copilot R1). */}
+        <span className="text-fg-muted">
+          {' · '}
+          {msg.relative}
+        </span>
       </span>
     </p>
   );
