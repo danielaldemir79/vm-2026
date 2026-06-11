@@ -80,6 +80,9 @@ export function useAdminAuthFlow(client: VmSupabaseClient | null): AdminAuthFlow
   const reset = useCallback(() => {
     setStep('email');
     setError(null);
+    // Nolla busy (Copilot R1): "Börja om" efter en påbörjad/hängande request ska
+    // alltid ge ett interaktivt startläge, annars kan knapparna fastna inaktiva.
+    setBusy(false);
   }, []);
 
   return { step, email, busy, error, setEmail, requestCode, confirmCode, reset };

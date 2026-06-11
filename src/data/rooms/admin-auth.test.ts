@@ -39,7 +39,7 @@ describe('requestAdminEmailUpgrade', () => {
     const updateUser = vi.fn().mockResolvedValue({ data: {}, error: { message: 'rate limit' } });
     await expect(
       requestAdminEmailUpgrade(mockClient({ updateUser }), 'daniel@example.com')
-    ).rejects.toThrow(/Kunde inte skicka inloggningslänk: rate limit/);
+    ).rejects.toThrow(/Kunde inte skicka inloggningskoden: rate limit/);
   });
 });
 
