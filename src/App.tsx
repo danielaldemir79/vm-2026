@@ -28,6 +28,7 @@ import {
   OnboardingDialog,
   OnlineStatusIndicator,
   SettingsControl,
+  useOnboarding,
 } from './features/app-settings';
 
 /** Ett innehållskort på en yt-token, delad yt-form för app-vyns sektioner. */
@@ -63,6 +64,9 @@ export default function App() {
 }
 
 function AppShell() {
+  // EN onboarding-instans ägs här och delas med både touren och install-gaten,
+  // så "är touren öppen?" är EN sanning (inte två divergerande hook-tillstånd).
+  const onboarding = useOnboarding();
   return (
     // min-h-dvh + overflow-x-clip = aldrig horisontell scroll på någon skärm.
     // Den dekorativa gröna glow-fonden ligger bakom innehållet via en pseudo-yta.
@@ -126,10 +130,20 @@ function AppShell() {
             hemskärmen. Visar en install-knapp i Chrome/Android (beforeinstallprompt),
             en "Dela -> Lägg till på hemskärm"-instruktion i iOS Safari, och inget
             alls när appen redan är installerad eller tipset avfärdats. Bär sin egen
-            synlighets-logik (useInstallPrompt), så den tar ingen plats när dold. */}
-        <Slide direction="up">
-          <InstallBanner />
-        </Slide>
+            synlighets-logik (useInstallPrompt), så den tar ingen plats när dold.
+
+            GATAD bakom onboarding (T39/#68, F1): touren är en z-50 helskärms-overlay
+            vid FÖRSTA besöket och ligger ÖVER denna banner, så en första-gångs-vän
+            som öppnar delningslänken inte kan klicka install-knappen förrän touren
+            stängts (den ser ut att "inte göra något"). Medan touren är öppen visas
+            därför INTE den fristående bannern, touren har ett eget install-steg att
+            installera FRÅN. När touren är klar/hoppad faller bannern tillbaka på sin
+            vanliga logik (promptbar + ej standalone => visas). */}
+        {onboarding.open ? null : (
+          <Slide direction="up">
+            <InstallBanner />
+          </Slide>
+        )}
 
         {/* Gruppspelsvyn (T5) + resultatinmatningen (T6) delar EN ResultsProvider
             (T6:s delade store): en inmatning i ResultEntryView uppdaterar samma
@@ -298,9 +312,9 @@ function AppShell() {
 
       {/* Onboarding-touren (T13): visas EN gång vid första start (localStorage-
           flagga), aldrig igen efter klar/hoppad. Ligger på rot-nivå (utanför main)
-          så modalen täcker hela skärmen. Bär sin egen öppen-logik (useOnboarding),
-          renderar inget när touren redan setts. */}
-      <OnboardingDialog />
+          så modalen täcker hela skärmen. Får den DELADE onboarding-instansen så
+          install-gaten ovan och touren stänger i takt (EN sanning, T39/#68 F1). */}
+      <OnboardingDialog onboarding={onboarding} />
     </div>
   );
 }

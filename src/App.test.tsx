@@ -1,10 +1,14 @@
-import { render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { act, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.tsx';
 import { ThemeProvider, THEME_ATTRIBUTE } from './theme';
 import { MotionProvider } from './motion';
 import { SettingsProvider } from './features/app-settings';
 import { ONBOARDING_DONE_KEY } from './features/app-settings';
+import {
+  registerInstallPromptCapture,
+  resetInstallPromptCaptureForTest,
+} from './features/app-settings/install-prompt-capture';
 
 // Nollställ delat tema-tillstånd så default-temat (mörkt) gäller oavsett
 // testordning, annars kan ett tidigare tests sparade tema läcka in via localStorage.
@@ -95,5 +99,66 @@ describe('App-skalet', () => {
     expect(signature).not.toBeNull();
     expect(signature).toHaveTextContent('Made by Daniel Aldemir');
     await waitForAppSettled();
+  });
+});
+
+// Install-bannern gatas bakom onboarding-touren (T39/#68, F1): touren är en z-50
+// helskärms-overlay vid första besöket och ligger ÖVER bannern, så install-knappen
+// ser ut att "inte göra något". Medan touren är öppen ska den fristående bannern
+// alltså INTE finnas i DOM:en; när touren är klar/hoppad visas den normalt (om
+// promptbar). Testerna verifierar BÅDA grenarna av gaten.
+describe('App-skalet, install-banner gatad bakom onboarding (T39/#68)', () => {
+  beforeEach(() => {
+    resetInstallPromptCaptureForTest();
+    registerInstallPromptCapture();
+    // En promptbar (Chrome/Android) kontext: utan ett fångat event vore bannern
+    // dold ändå, så gaten skulle inte gå att skilja från "inget att installera".
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (X11; Linux) Chrome/120');
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetInstallPromptCaptureForTest();
+  });
+
+  /** Fyra ett fejk-beforeinstallprompt-event (Chrome/Android-vägen). */
+  function fireBeforeInstallPrompt() {
+    const event = new Event('beforeinstallprompt') as Event & {
+      preventDefault: () => void;
+      prompt: ReturnType<typeof vi.fn>;
+      userChoice: Promise<{ outcome: string }>;
+    };
+    event.preventDefault = vi.fn();
+    event.prompt = vi.fn().mockResolvedValue(undefined);
+    event.userChoice = Promise.resolve({ outcome: 'accepted' });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+  }
+
+  it('döljer den fristående install-bannern medan onboarding-touren är ÖPPEN', async () => {
+    // Touren öppen = flaggan EJ satt (renderApp:s beforeEach satte den, rensa den
+    // här för att simulera en första-gångs-vän som öppnar delningslänken).
+    window.localStorage.removeItem(ONBOARDING_DONE_KEY);
+    renderApp();
+    fireBeforeInstallPrompt();
+
+    // Touren ligger över allt; den fristående bannern får inte finnas i DOM:en.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(document.querySelector('[data-install-banner]')).not.toBeInTheDocument();
+    await waitForAppSettled();
+  });
+
+  it('visar den fristående install-bannern när onboarding är klar (flaggan satt) + promptbar', async () => {
+    // renderApp:s beforeEach sätter ONBOARDING_DONE_KEY = '1' (touren redan sedd),
+    // så detta är "onboarding klar"-grenen.
+    renderApp();
+    fireBeforeInstallPrompt();
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Vänta in att skalet SETTLAT (laddnings-texten borta) FÖRST, så bannern
+    // bedöms i ett stabilt träd och inget state-update sker efter testet (act).
+    await waitForAppSettled();
+    expect(document.querySelector('[data-install-banner]')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Installera' })).toBeInTheDocument();
   });
 });
