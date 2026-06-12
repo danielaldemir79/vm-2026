@@ -29,5 +29,11 @@ export {
   type TipsSlotState,
   type TipsSlotResolution,
 } from './derive-tips-bracket';
+// Treorna ur match-tipsen (T64, #118): simulerade tabeller -> Article 13 -> Annexe C.
+export {
+  deriveTipsThirdSeeding,
+  type MatchTipScore,
+  type TipsThirdSeeding,
+} from './derive-tips-thirds';
 export { useTipsBracketData, type TipsBracketData } from './use-tips-bracket-data';
 export { TipsBracketView, type TipsBracketViewProps } from './TipsBracketView';

@@ -20,7 +20,7 @@ import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
 import { OfficialResultsProvider } from './features/official-results';
-import { PredictionSection } from './features/predictions';
+import { PredictionSection, PredictionsProvider } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
 import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
@@ -272,29 +272,38 @@ function AppShell() {
             ingen sektion påverkas i fixtures-läge. Tidigare ägde LeaderboardSection sin
             egen provider; den hoistades hit just för att tips-vyn skulle nå samma store. */}
         <LeaderboardProvider>
-          {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
-              så PredictionSection visar tips-vyn när det sociala lagret är konfigurerat
-              (live-läge), med "gå med i ett rum för att tippa" tills ett rum är aktivt.
-              Deadline-låset (inget tips efter avspark) + tips-sekretessen (andras tips
-              dolda före avspark) upprätthålls SERVER-SIDE av RLS, bevisat med riktiga
-              sessioner. Poäng-summeringen överst (T58) läser den delade providern.
-              Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik +
-              data-attribut, samma #39-formspråk som resultatinmatningen); design-
-              frontend ger premium-finish ovanpå. */}
-          <Slide direction="up">
-            <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
-          </Slide>
+          {/* EN DELAD PredictionsProvider (T64, #118) omsluter match-tips-sektionen OCH
+              grupp-tips-sektionen, så grupp-tips-vyns SIMULERADE slutspelsträd kan läsa
+              MINA MATCH-tips (och härleda de 8 bästa treorna ur dem, Article 13 + Annexe
+              C) UTAN en andra hämtning. Tidigare ägde PredictionSection sin egen provider;
+              den hoistades hit (samma mönster som LeaderboardProvider, T58) just för att
+              den tips-härledda treplats-seedningen skulle nå samma match-tips-store.
+              Providern är vilande (enabled=false) utan Supabase/aktivt rum, så fixtures-
+              läget är oförändrat. */}
+          <PredictionsProvider>
+            {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
+                så PredictionSection visar tips-vyn när det sociala lagret är konfigurerat
+                (live-läge), med "gå med i ett rum för att tippa" tills ett rum är aktivt.
+                Deadline-låset (inget tips efter avspark) + tips-sekretessen (andras tips
+                dolda före avspark) upprätthålls SERVER-SIDE av RLS, bevisat med riktiga
+                sessioner. Poäng-summeringen överst (T58) läser den delade providern.
+                Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik +
+                data-attribut, samma #39-formspråk som resultatinmatningen); design-
+                frontend ger premium-finish ovanpå. */}
+            <Slide direction="up">
+              <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
+            </Slide>
 
-          {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
-              grupp FÖRE gruppspelet. Per rum, deadline per grupp (gruppens första
-              match), server-side RLS-lås + sekretess (bevisat med riktiga sessioner).
-              Funktionellt + tillgängligt UI byggs här; design-frontend ger finishen.
-              Bracket-/slutspels-tipsen (vem går vidare per slot + VM-vinnaren) har
-              full datakärna (schema/RLS/poäng/API) men dess UI är en pinnad
-              fortsättning, se T16 HANDOFF + docs/decisions.md. */}
-          <Slide direction="up">
-            <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
-          </Slide>
+            {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
+                grupp FÖRE gruppspelet. Per rum, deadline per grupp (gruppens första
+                match), server-side RLS-lås + sekretess (bevisat med riktiga sessioner).
+                Funktionellt + tillgängligt UI byggs här; design-frontend ger finishen.
+                Den tips-härledda slutspelsbilden under kupongerna (T51/T64) läser mina
+                grupp-tips OCH mina match-tips (treorna seedas ur match-tipsen). */}
+            <Slide direction="up">
+              <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
+            </Slide>
+          </PredictionsProvider>
 
           {/* Bracket-/slutspels-tipsen (T16b, #59): tippa VM-vinnaren + vem som går
               vidare ur varje slutspels-slot (M73-M104). Per rum, deadline per slot

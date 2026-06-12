@@ -306,10 +306,14 @@
      - TIPPAD (resolution='tipped'): laget kommer UR mina tips. Mest visuell vikt,
        en accent-vänsterbar (form) + en svag accent-yt-ton, fet text. "Det här
        valde JAG."
-     - ÖPPEN TREA (resolution='open-third'): en av de 8 bästa treorna, som avgörs
-       av de RIKTIGA resultaten (FIFA-seedning), gissas aldrig. En ärlig, inbjudande
+     - ÖPPEN TREA (resolution='open-third'): en av de 8 bästa treorna, ÄNNU inte
+       seedad ur tipsen (match-tipsen är ofullständiga). En ärlig, inbjudande
        platshållare: en streckad vänsterkant (väntar på att fyllas) + en lugn ton,
        plus "Öppen"-brickan i markup. Neutral, inte ett fel.
+     - TIPS-SEEDAD TREA (resolution='tipped-third', T64, #118): en av de 8 bästa
+       treorna, nu HÄRLEDD ur mina match-tips (FIFA Article 13 + Annexe C) när alla
+       gruppmatcher är tippade. Laget är placerat (vikt som en tippad rad) men med en
+       PRICKAD/ring-markör + "3:a"-bricka, så det skiljs från en grupp-tippad 1:a/2:a.
      - TBD / STRUKTUR (resolution='tbd'): "Vinnare M73" osv, vägen vidare som tipsen
        inte uttalar sig om. Dämpad (lägst vikt), så den läser som struktur, inte
        som ett påstått lag.
@@ -359,6 +363,40 @@
 .vm-tips-open-badge {
   border-color: color-mix(in srgb, var(--color-fg-muted) 35%, var(--color-border));
   background-color: color-mix(in srgb, var(--color-fg) 4%, transparent);
+}
+
+/* TIPS-SEEDAD TREA (resolution='tipped-third', T64, #118): en av de 8 bästa treorna,
+   nu HÄRLEDD ur mina MATCH-tips (Article 13 + Annexe C) i stället för öppen. Laget är
+   placerat, så raden bär vikt som en tippad rad, men med ett EGET, FÄRG-OBEROENDE
+   språk så man ser att det är en SIMULERAD trea (ur matchtipsen), inte en grupp-tippad
+   1:a/2:a: en PRICKAD vänsterbar (samma "härlett ur tipsen, inte direkt valt"-nyans)
+   + en svag accent-ton, plus "3:a"-brickan i markup. Texten är font-semibold + text-fg
+   (seamen) på den opaka kort-ytan, tonen är bara förstärkning (kontrast-vakt som §6). */
+.vm-bracket-slot[data-tips-slot-resolution='tipped-third'] {
+  background-color: color-mix(in srgb, var(--color-accent) 5%, transparent);
+  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+/* En liten RING-prick FÖRE den seedade trean (form-signal, syns i gråskala): en
+   ofylld/ring-punkt (mot tippade radens IFYLLDA prick), så "tippad 1:a/2:a" och
+   "simulerad trea ur matchtipsen" går att skilja på en blink utan färg. */
+.vm-bracket-slot[data-tips-slot-resolution='tipped-third'] .vm-bracket-slot-name::before {
+  content: '';
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-right: 0.4375rem;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-accent);
+  vertical-align: middle;
+}
+
+/* "3:a"-brickan (markup): en lugn pill som markerar att laget är en seedad trea ur
+   matchtipsen. Samma neutrala, AA-säkra fg-muted-på-svag-tint som "Öppen"-brickan,
+   ingen alarmistisk färg (formen + texten bär betydelsen). */
+.vm-tips-third-badge {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 6%, transparent);
 }
 
 /* TBD / STRUKTUR ("Vinnare M73"): dämpad, så den läser som vägen-vidare-struktur,
