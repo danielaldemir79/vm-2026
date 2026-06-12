@@ -525,7 +525,7 @@ export function buildMatches(
  * regenerera-och-diffa. Prettier föredrar SINGLE quotes, MEN byter till double quotes
  * när strängen innehåller en apostrof och inget citationstecken (så apostrofen slipper
  * escapas, t.ex. "Levi's Stadium, Santa Clara"). Vi replikerar den regeln EXAKT (samma
- * motgift som team-profiles-parser.tsString); annars skriver `prettier --write` om
+ * motgift som funktionen tsString i team-profiles-parser.ts); annars skriver `prettier --write` om
  * raden och bryter låset. De flesta värden (lag-id, ISO-datum, grupp-id, kanal, de
  * flesta arenor) saknar apostrof och blir single-citerade som förr.
  */
