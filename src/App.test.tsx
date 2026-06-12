@@ -89,15 +89,19 @@ describe('App-skalet', () => {
     });
   });
 
-  it('visar upphovs-signaturen "Made by Daniel Aldemir" i footern (T38, #67)', async () => {
+  it('visar upphovs-signaturen "Byggd av Daniel Aldemir" i footern (T38, #67; copy T44 runda 2, #75)', async () => {
     const { container } = renderApp();
 
     // Render-test (inte bara en konstant): bevisar att signaturen faktiskt NÅR
     // DOM:en, så en framtida refaktor inte tappar raden tyst. Data-attributet är
-    // krok för design-frontends finputs.
+    // krok för design-frontends finputs. T44 runda 2 (#75, Daniels feedback "footern
+    // ska lyfta upp mig"): avsändar-prefixet ändrades från "Made by" till svenska
+    // "Byggd av" och namnet lyftes till en egen, framträdande rad (blickfång), så
+    // testet vaktar nu den svenska eyebrow:n + namnet, inte den gamla engelska copyn.
     const signature = container.querySelector('[data-app-signature]');
     expect(signature).not.toBeNull();
-    expect(signature).toHaveTextContent('Made by Daniel Aldemir');
+    expect(signature).toHaveTextContent('Byggd av');
+    expect(signature).toHaveTextContent('Daniel Aldemir');
     await waitForAppSettled();
   });
 
@@ -116,6 +120,56 @@ describe('App-skalet', () => {
     const rel = (link?.getAttribute('rel') ?? '').split(/\s+/);
     expect(rel).toContain('noopener');
     expect(rel).toContain('noreferrer');
+    await waitForAppSettled();
+  });
+
+  it('visar appens adress vm-2026.pages.dev synligt och klickbart i footern (T44, #75)', async () => {
+    const { container } = renderApp();
+
+    // Daniels feedback (#75): adressen ska SYNAS så folk kan skriva av den / säga den
+    // högt, inte bara gömmas bakom en delningsknapp. Vi vaktar att den synliga LÄNK-
+    // TEXTEN finns (inte bara href:en) och pekar på rätt URL med tabnabbing-skydd, så
+    // en framtida refaktor inte tyst tappar den synliga adressen eller säkerhets-rel:en.
+    const addressLink = Array.from(container.querySelectorAll('footer a')).find(
+      (a) => a.textContent?.trim() === 'vm-2026.pages.dev'
+    ) as HTMLAnchorElement | undefined;
+    expect(addressLink).toBeDefined();
+    expect(addressLink).toHaveAttribute('href', 'https://vm-2026.pages.dev');
+    expect(addressLink).toHaveAttribute('target', '_blank');
+    const rel = (addressLink?.getAttribute('rel') ?? '').split(/\s+/);
+    expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
+    await waitForAppSettled();
+  });
+
+  it('visar danielaldemir.com som egen synlig CTA-länk i signaturen med tabnabbing-skydd (T44, #75)', async () => {
+    const { container } = renderApp();
+
+    // Daniels feedback (#75): adressen synlig och tydligt klickbar (förr låg den bara i
+    // title/aria-label). Sedan runda 2 renderas den som en egen CTA-pill-länk på egen rad
+    // UNDER namnet. Vi vaktar den SYNLIGA "danielaldemir.com"-länken (skild från
+    // namn-länken, som har texten "Daniel Aldemir") inom signaturen, med rätt mål +
+    // tabnabbing-skydd.
+    const signature = container.querySelector('[data-app-signature]');
+    expect(signature).not.toBeNull();
+    const addressLink = Array.from(signature?.querySelectorAll('a') ?? []).find(
+      (a) => a.textContent?.trim() === 'danielaldemir.com'
+    ) as HTMLAnchorElement | undefined;
+    expect(addressLink).toBeDefined();
+    expect(addressLink).toHaveAttribute('href', 'https://www.danielaldemir.com');
+    expect(addressLink).toHaveAttribute('target', '_blank');
+    const rel = (addressLink?.getAttribute('rel') ?? '').split(/\s+/);
+    expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
+    await waitForAppSettled();
+  });
+
+  it('promotar Daniel som utvecklare med en titel-rad i footern (T44, #75)', async () => {
+    renderApp();
+
+    // Daniels feedback (#75): tydligare promotion av Daniel som utvecklare. Den lugna
+    // titel-raden ska nå DOM:en, så promotion-elementet inte tyst försvinner i en refaktor.
+    expect(screen.getByText('.NET-systemutvecklare')).toBeInTheDocument();
     await waitForAppSettled();
   });
 });
