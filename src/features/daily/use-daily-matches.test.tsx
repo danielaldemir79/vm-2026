@@ -337,6 +337,43 @@ describe('useDailyMatches, dag-bläddraren auto-flyttar till AKTUELL dag vid mid
     await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-12'));
   });
 
+  it('bläddrar användaren bort och TILLBAKA till idag återupptas följ-läget (dygnsväxling flyttar igen)', async () => {
+    // REGRESSION (reviewerns F1): goToIndex pinnade tidigare ALLTID den valda
+    // dagens nyckel, även när målet var den härledda aktuella dagen. Bläddrade
+    // användaren bort och tillbaka till idag blev idag PERMANENT pinnad, så nästa
+    // dygnsväxling i en öppen flik flyttade INTE bläddraren (Daniels symptom, fast
+    // efter en bläddring i samma session). Kravet: navigering till idag ska
+    // NOLLSTÄLLA pinningen så följ-läget återupptas.
+    vi.setSystemTime(new Date('2026-06-11T21:59:00.000Z')); // 23:59 svensk 11 juni
+    const { result } = renderHook(() => useDailyWithStore(), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+
+    act(() =>
+      result.current.setMatches([
+        sched('d1', '2026-06-11T17:00:00.000Z'),
+        sched('d2', '2026-06-12T17:00:00.000Z'),
+      ])
+    );
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-11'));
+
+    // Bläddra FRAMÅT till 12 juni (pinnar), sedan TILLBAKA till idag (11 juni).
+    act(() => result.current.daily.goToIndex(1));
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-12'));
+    act(() => result.current.daily.goToIndex(0)); // 0 = idag, den härledda aktuella dagen
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-11'));
+
+    // Dygnet 11->12 växlar: eftersom följ-läget återupptogs (pinningen nollställd)
+    // ska bläddraren auto-flytta till 12 juni, precis som om användaren aldrig hade
+    // bläddrat. Hade idag blivit pinnad skulle den stå kvar på 11 juni.
+    act(() => {
+      vi.setSystemTime(new Date('2026-06-11T22:01:00.000Z')); // 00:01 svensk 12 juni
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-12'));
+  });
+
   it('om användaren MEDVETET bläddrat till en dag stannar den kvar när dygnet växlar (hoppar inte under hen)', async () => {
     vi.setSystemTime(new Date('2026-06-11T21:59:00.000Z'));
     const { result } = renderHook(() => useDailyWithStore(), {
