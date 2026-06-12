@@ -26,7 +26,7 @@ import { BracketPredictionSection } from './features/bracket-predictions';
 import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
 import { AdminSection } from './features/admin';
 import {
-  InstallBanner,
+  InstallButton,
   OnboardingDialog,
   OnlineStatusIndicator,
   SettingsControl,
@@ -137,23 +137,34 @@ function AppShell() {
           </section>
         </Fade>
 
-        {/* Installations-bannern (T13): diskret erbjudande att lägga till på
-            hemskärmen. Visar en install-knapp i Chrome/Android (beforeinstallprompt),
-            en "Dela -> Lägg till på hemskärm"-instruktion i iOS Safari, och inget
-            alls när appen redan är installerad eller tipset avfärdats. Bär sin egen
-            synlighets-logik (useInstallPrompt), så den tar ingen plats när dold.
+        {/* Den KOMPAKTA install-knappen (T63, #113): ytan överst är en diskret,
+            klickbar "Installera som app"-pill, INGEN informationsruta som tar fokus
+            (Daniels förtydligande). Install-INFON visas bara NÄR man klickar: ett
+            klick ger webbläsarens äkta install-prompt på Android/desktop (T39:s
+            beforeinstallprompt-mekanik), öppnar kom-igång-guiden (T54) på iPhone-
+            fliken på iOS, eller öppnar guiden som ärlig fallback när ingen prompt finns
+            (aldrig en död knapp). HELT dold i app-läge (standalone): InstallButton
+            renderar då ingenting (Daniels skarpa krav, "onödigt surr där då den redan
+            är installerad"). Bär sin egen synlighets-logik (useInstallPrompt), så den
+            tar ingen plats när dold.
+
+            ERSÄTTER den gamla InstallBannern (T13/T39) på huvudytan: bannern var just
+            den informationsruta Daniel inte vill ha framme. Den diskreta knappen är ett
+            enradigt erbjudande som inte stjäl fokus; den utförliga guiden (samma som
+            inställnings-portalens "Kom igång") når man bakom ett klick. Kom-igång-raden
+            i inställningarna (SettingsControl) finns kvar som gömd hjälp-yta.
 
             GATAD bakom onboarding (T39/#68, F1): touren är en z-50 helskärms-overlay
-            vid FÖRSTA besöket och ligger ÖVER denna banner, så en första-gångs-vän
-            som öppnar delningslänken inte kan klicka install-knappen förrän touren
-            stängts (den ser ut att "inte göra något"). Medan touren är öppen visas
-            därför INTE den fristående bannern. Tourens install-steg (onboarding.ts)
-            BESKRIVER installationen (ren info, ingen install-knapp); man installerar
-            via DENNA banner EFTER att touren stängts. När touren är klar/hoppad faller
-            bannern tillbaka på sin vanliga logik (promptbar + ej standalone => visas). */}
+            vid FÖRSTA besöket och ligger ÖVER denna yta, så en första-gångs-vän som
+            öppnar delningslänken inte kan klicka knappen förrän touren stängts (den
+            skulle se ut att "inte göra något"). Medan touren är öppen visas därför INTE
+            knappen; när touren är klar/hoppad faller den tillbaka på sin vanliga logik
+            (ej standalone => visas, väg enligt plattform/event). */}
         {onboarding.open ? null : (
           <Slide direction="up">
-            <InstallBanner />
+            <div className="flex">
+              <InstallButton />
+            </div>
           </Slide>
         )}
 

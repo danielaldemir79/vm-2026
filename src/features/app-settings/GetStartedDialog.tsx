@@ -55,6 +55,13 @@ export interface GetStartedDialogProps {
   onDialogKeyDown: (e: ReactKeyboardEvent<HTMLDivElement>) => void;
   /** true => animera panelen (reducerad rörelse gatar bort den). Ägs av triggern. */
   motionEnabled: boolean;
+  /**
+   * Tvinga en START-flik i stället för den browser-härledda förvalda (T63, #113): den
+   * kompakta install-knappens iOS-gren öppnar dialogen direkt på iPhone-fliken, så en
+   * iPhone-vän ser sina steg utan att leta. Utelämnas => förvald flik härleds som förr
+   * (resolveGetStartedState). Påverkar bara STARTfliken; alla flikar är fortsatt nåbara.
+   */
+  initialPlatform?: GetStartedPlatform;
 }
 
 /**
@@ -67,11 +74,15 @@ export function GetStartedDialog({
   closeButtonRef,
   onDialogKeyDown,
   motionEnabled,
+  initialPlatform,
 }: GetStartedDialogProps) {
   // Härled läget ur webbläsaren en gång vid öppning (standalone? + förvald plattform).
   const [{ isStandalone, defaultPlatform }] = useState(() => resolveGetStartedState(window));
-  // Vilken plattforms-flik som är aktiv (startar på den förvalda, kan bytas).
-  const [activePlatform, setActivePlatform] = useState<GetStartedPlatform>(defaultPlatform);
+  // Vilken plattforms-flik som är aktiv: en utifrån PÅTVINGAD startflik (T63) går före
+  // den härledda förvalda. Läses en gång vid mount (lazy init), användaren kan sen byta.
+  const [activePlatform, setActivePlatform] = useState<GetStartedPlatform>(
+    () => initialPlatform ?? defaultPlatform
+  );
 
   const headingId = 'kom-igang-rubrik';
   const introId = 'kom-igang-intro';

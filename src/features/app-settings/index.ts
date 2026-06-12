@@ -21,12 +21,25 @@ export type { FeedbackSettings } from './feedback';
 // Inställnings-kontroll (kugghjul + dialog).
 export { SettingsControl } from './SettingsControl';
 
-// Installations-prompt (ren logik + hook + banner).
-export { resolveInstallMode, detectStandalone, detectIos } from './install-prompt';
-export type { InstallUiMode, InstallContext } from './install-prompt';
+// Installations-prompt (ren logik + hook + knapp).
+export {
+  resolveInstallMode,
+  resolveInstallButtonAction,
+  detectStandalone,
+  detectIos,
+} from './install-prompt';
+export type {
+  InstallUiMode,
+  InstallContext,
+  InstallButtonAction,
+  InstallButtonContext,
+} from './install-prompt';
 export { useInstallPrompt } from './use-install-prompt';
 export type { InstallPromptApi } from './use-install-prompt';
-export { InstallBanner } from './InstallBanner';
+// Den kompakta install-knappen (T63, #113): ytan överst, en diskret "Installera som
+// app"-pill. Native-prompt direkt där det går, annars kom-igång-guiden, dold i standalone.
+// ERSÄTTER den tidigare InstallBannern (informationsrutan Daniel inte ville ha framme).
+export { InstallButton } from './InstallButton';
 // Tidig beforeinstallprompt-fångst, registreras från main.tsx FÖRE React-mount
 // (T39/#68: annars tappas ett tidigt event och install-knappen gör inget).
 export { registerInstallPromptCapture } from './install-prompt-capture';

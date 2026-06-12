@@ -5,6 +5,50 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T63 (#113): ytan överst blir en KOMPAKT install-knapp (ersätter info-bannern), tre klick-grenar
+
+**Symptom/önskan (Daniels issue #113 + två förtydliganden 2026-06-12):** "info överst som ser ut som en
+knapp med info installerad app" ska gå att KLICKA och "autonomt lösa installationen". Förtydligande 1:
+install-INFON ska BARA visas NÄR man klickar, inte ligga framme och ta fokus, ytan överst = en KOMPAKT,
+diskret knapp (ingen informationsruta). Förtydligande 2: i app-läge (standalone) ska INGEN install-yta
+synas alls ("onödigt surr där då den redan är installerad"); kom-igång-raden i inställningarna får finnas
+kvar (gömd hjälp-yta).
+
+**Beslut (ERSÄTT InstallBannern med en kompakt knapp, INTE samexistens):** Den gamla `InstallBanner`
+(T13/T39) ÄR just informationsrutan Daniel inte vill ha framme (rubrik + brödtext + Play Protect-not +
+"Inte nu"). Daniels förtydligande "ingen informationsruta, install-INFON bara vid klick" går inte att
+förena med att låta bannern ligga kvar. Därför tas `InstallBanner.tsx` (+ test) bort från huvudytan och
+ERSÄTTS av en ny `InstallButton`: en diskret, surface-tonad "Installera som app"-pill. Den utförliga
+guiden (samma som inställnings-portalens "Kom igång") når man bakom ETT klick. `InstallBanner`-komponenten
+raderades (den renderades ingenstans efter bytet, dead UI); den rena logiken (`resolveInstallMode`,
+`ANDROID_PLAY_PROTECT_NOTE`, detektorerna) är kvar i `install-prompt.ts` (återanvänds av guiden T54).
+
+**Regeln (tre klick-grenar, ren funktion `resolveInstallButtonAction`, `install-prompt.ts`):** härledd ur
+de REDAN källhänvisade T39/T54-detektorerna (gissas inte), bara en UI-vägsregel ovanpå:
+- `native-prompt`: ett `beforeinstallprompt`-event finns (Chrome/Android/desktop) -> ETT klick öppnar
+  webbläsarens äkta prompt direkt (T39:s `consumeDeferredPrompt`). Källa för engångs-prompt-mekaniken:
+  MDN "beforeinstallprompt" + web.dev "Customize the install experience" (källhänvisat i T39, oförändrat).
+- `guide-ios`: iOS saknar programmatiskt install-API (Apple exponerar inget, källhänvisat T39/T54) ->
+  öppna kom-igång-guiden (T54) PÅ iPhone-fliken (`initialPlatform='ios'`), steg för steg, ingen falsk
+  autonomi.
+- `guide`: icke-iOS UTAN event (kriterier ej uppfyllda / prompt nyligen avvisad) -> öppna guiden ändå.
+  ALDRIG en död knapp (#113-AC): finns ingen native-väg just nu visar vi vägen i stället för ingenting.
+- `hidden`: BARA i standalone -> rendera ingenting (Daniels skarpa krav, inget surr i app-läge).
+
+**Subtilitet (medveten skillnad mot `resolveInstallMode`):** `resolveInstallButtonAction` läser INTE
+`dismissed`. Den gamla bannern hade "Inte nu" och respekterade ett permanent avfärdande; den kompakta
+knappen har ingen sådan affordans, den är en alltid-nåbar CTA. En avvisad native-prompt faller till
+`guide`, knappen försvinner inte. (Annars vore knappen en "död yta" efter ett oavsiktligt avvisande,
+tvärtemot #113-AC.) Standalone är den enda gömnings-grenen.
+
+**Återanvändning (ingen dubblett):** native-vägen = `useInstallPrompt`/`install-prompt-capture` (T39);
+guide-vägen = `GetStartedControl`/`GetStartedDialog` (T54) via en ny `'install'`-variant + en ny valfri
+`initialPlatform`-prop (icke-brytande, default = browser-härledd flik som förr), så HELA dialog-a11y:n
+(fokus-fälla, Escape-capture, fokus-återställning, portal) ärvs orörd. `InstallButton` väljer bara väg.
+
+**Gating oförändrad (T39/#68 F1):** knappen är fortsatt gömd medan onboarding-touren är öppen (touren är
+en z-50 overlay över ytan vid första besöket), faller tillbaka på sin vanliga logik efteråt.
+
 ## 2026-06-12 , T62 (#111): tips-/resultatfönstret utökas BAKÅT med igår (nyss spelade matcher syns)
 
 **Symptom (Daniels rapport 2026-06-12):** "jag ser fortfarande inte aktuell tips-resultat på varje
