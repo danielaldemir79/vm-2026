@@ -2316,3 +2316,45 @@ body {
 .vm-admin-scroll--room {
   max-height: 14rem;
 }
+
+/* =============================================================================
+   24. DEMO-DATA-CHIPPET, "det här är exempel-data, inte facit" (T29, issue #48
+   + T56-review F4).
+   =============================================================================
+
+   FYRA vyer (Gruppspelet, Slutspelsträdet, Dagens matcher, Vad krävs) bär ett litet
+   "Demo-data"-märke i rubriken när appen kör på fixtures (mode === 'fixtures', default
+   före live). Samma roll på alla fyra ytor, så det bor HÄR i EN delad klass (samma
+   single-sourcing som .vm-install-pill), inte i fyra kopierade inline-recept som kan
+   drifta isär.
+
+   AA-FIXET (issue #48 + T56-review F4, lessons aa-kontrast-pastad-...-text-på-tint):
+   det GAMLA utseendet var rå --vm-gold som TEXT på en --vm-gold-12%-tint. I MÖRKT tema
+   är gulden ljus (#f3c14e) så det höll, men i LJUST tema byter --vm-gold till en mörk
+   amber (#b07d10) medan ytan är nästan vit -> UPPMÄTT 3.17:1 (canvas-komposit, under
+   AA-text 4.5:1). Det är exakt gold-on-tint-fällan. Fixet: den färg-OBEROENDE solid-
+   bricka-formen, en SOLID --vm-gold-yta med mörk ink (--vm-coupon-ink), samma form som
+   .vm-coupon-mine / .vm-reveal-actual / .vm-tips-sim-badge bär i hela appen. UPPMÄTT
+   --vm-coupon-ink (#1c1403) på SOLID --vm-gold per tema: LJUST (gold #b07d10) = 5.03:1,
+   MÖRKT (gold #f3c14e) = 10.90:1 (det ljusare guldet i mörkt tema ger den HÖGRE ration
+   mot mörk ink). Båda >= 4.5, AA i BÅDA teman. Mätt med scripts/contrast-t29.mjs,
+   källskannat av demo-chip-aa-guard.test.ts. Tonalt samma varma "hejarklacks-guld" som
+   resten av kupong-/tips-världen, nu AA-säkert. */
+.vm-demo-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  padding: 0.125rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  /* Mjuk inre högdager + en hårfin yttre guld-glow ger märket samma präglade, "stolta"
+     yta som de övriga solid-guld-brickorna (DRY mot .vm-tips-sim-badge). Ren dekor,
+     bär ingen läsbarhet. */
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.3),
+    0 2px 8px -3px color-mix(in srgb, var(--vm-gold) 60%, transparent);
+}

@@ -137,18 +137,7 @@ export function GroupStageView() {
           <h2 id="gruppspel-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
             Gruppspelet
           </h2>
-          {mode === 'fixtures' ? (
-            <span
-              className="rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-fg-muted"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--vm-gold) 45%, transparent)',
-                backgroundColor: 'color-mix(in srgb, var(--vm-gold) 12%, transparent)',
-                color: 'var(--vm-gold)',
-              }}
-            >
-              Demo-data
-            </span>
-          ) : null}
+          {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}
         </div>
         <p className="max-w-2xl text-sm text-fg-muted">
           De 12 grupperna A till L. Tabellerna räknas om automatiskt när resultat ändras, etta och
