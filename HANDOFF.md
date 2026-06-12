@@ -7,8 +7,8 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ## RESUME-HERE , 2026-06-12 , T24/#24 (reaktioner) KLAR - PR vantar pa merge
 
-**Branch:** `feature/T24-reaktioner` @ HEAD `401188a` (journalist-commit väntar)
-**PR:** skapas av journalisten i detta steg - se nedan
+**Branch:** `feature/T24-reaktioner` @ HEAD `ef63455` (journalist-commit)
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/128 mot `develop` (Closes #24, state: OPEN)
 **Board:** Kort #24 satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekräftat).
 
 **Vad T24 levererade:**
