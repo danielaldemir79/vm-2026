@@ -518,7 +518,7 @@ describe('TeamProfilePanel, edge-fall: stjärnspelare saknas (ärligt tomt, inte
       fifaRanking: 99,
     };
     const groups: Group[] = [{ id: 'A', teamIds: ['ghost'] }];
-    const { container } = render(
+    render(
       <ResultsStoreContext.Provider value={storeWith([starless], groups)}>
         <TeamProfilePanel openTeamId="ghost" onClose={() => {}} />
       </ResultsStoreContext.Provider>
@@ -529,7 +529,9 @@ describe('TeamProfilePanel, edge-fall: stjärnspelare saknas (ärligt tomt, inte
     expect(dialog).toHaveAccessibleName(/Spöklandet/);
     // Stjärnspelar-sektionen visar det ärliga tom-tillståndet: tom-markören
     // data-profile-stars="empty" med texten "Data saknas", och INGEN spelar-lista.
-    const emptyStars = container.querySelector('[data-profile-stars="empty"]');
+    // Sök i den ÖPPNA dialog-noden (inte RTL-container): modalen portaleras numera
+    // till document.body (T33 delade <Modal>), så innehållet ligger utanför container.
+    const emptyStars = dialog.querySelector('[data-profile-stars="empty"]');
     expect(emptyStars).not.toBeNull();
     expect(emptyStars).toHaveTextContent('Data saknas');
     expect(within(dialog).queryByRole('list', { name: /Stjärnspelare/i })).not.toBeInTheDocument();
@@ -612,13 +614,14 @@ describe('TeamProfilePanel, lagets väg: motståndare saknas i uppslaget (fail-l
     // -> teamsById-uppslaget missar. Panelen ska då visa id:t synligt (fail-loud-light),
     // inte gömma inkonsistensen bakom "Ej klart".
     const match = sweMatch('m-phantom', 'phantom');
-    const { container } = render(
+    render(
       <ResultsStoreContext.Provider value={storeWith([swedenTeam], groups, [match])}>
         <TeamProfilePanel openTeamId="swe" onClose={() => {}} />
       </ResultsStoreContext.Provider>
     );
 
-    const row = container.querySelector('[data-profile-path-match="m-phantom"]')!;
+    // Sök i dialog-noden (portalerad till body via delade <Modal>, T33), inte container.
+    const row = screen.getByRole('dialog').querySelector('[data-profile-path-match="m-phantom"]')!;
     expect(row).not.toBeNull();
     // Id-strängen syns (felet är synligt), och raden visar INTE det maskerande "Ej klart".
     expect(row).toHaveTextContent('phantom');
@@ -630,13 +633,14 @@ describe('TeamProfilePanel, lagets väg: motståndare saknas i uppslaget (fail-l
     // FORTSATT visa "Ej klart". Fixen får inte över-korrigera och börja visa något annat
     // för det legitima obestämda fallet.
     const match = sweMatch('m-open', null);
-    const { container } = render(
+    render(
       <ResultsStoreContext.Provider value={storeWith([swedenTeam], groups, [match])}>
         <TeamProfilePanel openTeamId="swe" onClose={() => {}} />
       </ResultsStoreContext.Provider>
     );
 
-    const row = container.querySelector('[data-profile-path-match="m-open"]')!;
+    // Sök i dialog-noden (portalerad till body via delade <Modal>, T33), inte container.
+    const row = screen.getByRole('dialog').querySelector('[data-profile-path-match="m-open"]')!;
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent('Ej klart');
   });

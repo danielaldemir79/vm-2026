@@ -5,21 +5,15 @@
 // monteras i inställnings-portalen (SettingsControl). Komponenten äger bara öppet/
 // stängt-tillståndet + a11y-fokus; allt innehåll bor i GetStartedDialog/-steps.
 //
-// A11y-fokus-kontraktet (samma hjälpare som ScoreGuide T34 / SettingsControl T32):
-// Escape stänger, fokus flyttas in i dialogen vid öppning och ÅTERSTÄLLS till just
-// den knapp som öppnade den vid stängning (trigger fångas i en lokal variabel i
-// effekten, så fokus återlämnas korrekt även om ref:en hunnit ändras), en enkel
-// fokus-fälla håller Tab inom dialogen.
+// A11y-dialog-kontraktet ägs nu av den delade <Modal>-primitiven (T33/#56): Escape,
+// fokus in/ut, fokus-fälla, portal, motion-gating. VIKTIGT: kom-igång-guiden kan öppnas
+// OVANPÅ onboardingen ("Visa hur"-CTA:n i install-steget), så den sätter escapeCapture
+// (capture-fas + stopPropagation) så ett Escape bara stänger guiden, inte den
+// underliggande touren (T54/#93 F2, bevarat). Övriga dialoger lyssnar i bubble-fasen.
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from 'react';
-import { useReducedMotion } from 'motion/react';
-import { GetStartedDialog } from './GetStartedDialog';
+import { useRef, useState } from 'react';
+import { Modal } from '../../components/Modal';
+import { GetStartedDialog, GET_STARTED_HEADING_ID, GET_STARTED_INTRO_ID } from './GetStartedDialog';
 import type { GetStartedPlatform } from './get-started-steps';
 
 /** Variant styr hur triggern ser ut beroende på var den monteras. */
@@ -45,69 +39,9 @@ export function GetStartedControl({
   initialPlatform,
 }: GetStartedControlProps) {
   const [open, setOpen] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const motionEnabled = useReducedMotion() === false;
 
-  const close = useCallback(() => setOpen(false), []);
-
-  // Escape stänger. Lyssnaren bara när öppen (städas vid stängning/unmount).
-  // CAPTURE-fas + stopPropagation (copilot R2): dialogen kan öppnas OVANPÅ en annan
-  // modal (onboardingens "Visa hur"-CTA), och båda lyssnar på document. Utan detta
-  // når samma Escape-tryck även den underliggande modalens lyssnare och stänger
-  // BÅDA på en gång. Capture låter den överst liggande dialogen konsumera Escape
-  // först; den underliggande stängs av nästa tryck, som förväntat.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        close();
-      }
-    };
-    document.addEventListener('keydown', onKeyDown, true);
-    return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [open, close]);
-
-  // Fokus in vid öppning, tillbaka till triggern vid stängning. Triggern fångas i en
-  // lokal variabel vid öppningen och används i cleanup (samma grepp som de andra
-  // modalerna), så fokus alltid återlämnas till just den knapp som öppnade dialogen.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const trigger = triggerRef.current;
-    closeButtonRef.current?.focus();
-    return () => {
-      trigger?.focus?.();
-    };
-  }, [open]);
-
-  // Fokus-fälla: håll Tab inom dialogen (samma hjälpare som de andra modalerna).
-  const onDialogKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Tab' || dialogRef.current === null) {
-      return;
-    }
-    const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-      'button, a[href], input, [tabindex]:not([tabindex="-1"])'
-    );
-    if (focusable.length === 0) {
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-    if (e.shiftKey && active === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && active === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }, []);
+  const close = () => setOpen(false);
 
   const inline = variant === 'inline';
   const install = variant === 'install';
@@ -115,7 +49,6 @@ export function GetStartedControl({
   return (
     <>
       <button
-        ref={triggerRef}
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
@@ -184,14 +117,26 @@ export function GetStartedControl({
       </button>
 
       {open ? (
-        <GetStartedDialog
+        // Den delade <Modal> äger dialog-kontraktet. escapeCapture: guiden kan ligga
+        // OVANPÅ onboardingen, så den konsumerar Escape först (stänger bara sig själv).
+        // Fokus in till stäng-knappen (closeButtonRef bor i GetStartedDialog).
+        <Modal
+          name="get-started"
+          escapeCapture
           onClose={close}
-          dialogRef={dialogRef}
-          closeButtonRef={closeButtonRef}
-          onDialogKeyDown={onDialogKeyDown}
-          motionEnabled={motionEnabled}
-          initialPlatform={initialPlatform}
-        />
+          labelledById={GET_STARTED_HEADING_ID}
+          describedById={GET_STARTED_INTRO_ID}
+          initialFocusRef={closeButtonRef}
+          overlayClassName="backdrop-blur-sm"
+          overlayStyle={{ backgroundColor: 'color-mix(in srgb, var(--color-bg) 70%, transparent)' }}
+          panelClassName="relative flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-card border border-border bg-surface shadow-[var(--vm-shadow-raised)] sm:max-h-[88dvh] sm:rounded-card"
+        >
+          <GetStartedDialog
+            onClose={close}
+            closeButtonRef={closeButtonRef}
+            initialPlatform={initialPlatform}
+          />
+        </Modal>
       ) : null}
     </>
   );

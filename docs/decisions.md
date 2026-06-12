@@ -5,6 +5,69 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T33 (#56): delad `<Modal>`-primitiv (a11y-dialog-kontraktet, EN sanning)
+
+**Beslut (ren refaktor, beteende-neutral):** det a11y-dialog-kontrakt som FEM dialoger handrullade
+identiskt (TeamProfilePanel T10, OnboardingDialog T13, SettingsControl T32, ScoreGuide T34,
+GetStartedDialog T54) lyftes till en delad `src/components/Modal.tsx`. Rule-of-three var passerad 5+
+gånger; ScoreGuide- och GetStarted-filerna FLAGGADE själva i sina headers att tröskeln nåtts och att
+extraktionen skulle bli en egen task. Detta är den tasken. Primitiven äger: portal till body,
+role="dialog" + aria-modal + aria-labelledby/-describedby, Escape, bakgrundsklick (av/på), fokus in
+(till caller-vald startpunkt) + fokus-retur till öppnaren, fokus-fälla (Tab/Shift-Tab), motion-gating
+(reducerad rörelse). Den äger INTE innehållet eller den visuella overlay-/panel-stilen, det är
+`children` + styling-slots (`overlayClassName/Style`, `panelClassName/Style`, `name`-baserad
+data-attribut-namnrymd `data-${name}-overlay`/`-panel`), så varje dialog behåller SIN visuella identitet
+(hero-band etc.). Samma form som den andra delade primitiven CollapsibleSection (T68).
+
+**Escape-fasen är per-dialog, INTE "alla på capture" (beteende-neutralitet + verifierad jsdom-semantik):**
+default är bubble-fas (de fyra dialoger som förr lyssnade så). GetStarted-guiden sätter `escapeCapture`
+(capture-fas + stopPropagation), eftersom den kan öppnas OVANPÅ onboardingen ("Visa hur"-CTA:n) och
+måste konsumera Escape FÖRST så bara den översta stängs (T54/#93 F2, bevarat). VARFÖR inte göra ALLA
+capture (vilket först verkade ge "alla dialoger stack-safe gratis"): **empiriskt probe-bevisat (T33)**
+att två CAPTURE-lyssnare på SAMMA target (document) fyrar i REGISTRERINGS-ordning, så den UNDERSTA
+(monterad först) fyrar FÖRE den översta och stänger sig själv innan stopPropagation hinner verka, dvs
+"alla på capture" stänger BÅDA. Den fungerande stapel-semantiken är capture-OVANPÅ-bubble (översta
+capture fyrar i capture-fasen och stoppar den understas bubbel-lyssnare). En generell "vilken modal
+som helst stack-safe"-lösning kräver en delad modal-stack (z-index-topp äger Escape), flaggad som
+Improvement, inte smyglagd här. Probe: två capture-lyssnare -> `order: outer,inner` (outer fyrar);
+capture(top) + bubble(under) -> bubble når aldrig (stopPropagation i capture).
+
+**C7/C9-invarianterna (TeamProfilePanel) bevarade utan stabil-id-plumbing:** primitiven monteras BARA
+när dialogen är öppen (callern villkorsrenderar den), så Escape-/fokus-effekterna löper exakt en gång
+per öppning via mount/unmount, inte vid varje store-uppdatering (live/realtid T18). TeamProfilePanel
+behöll sin `if (profile === null) return null` och renderar `<Modal>` bara när en profil finns; dess
+C7/C9-tester (fokus stabilt + keydown-lyssnare läggs en gång, ingen churn vid store-uppdatering) är
+gröna oförändrade.
+
+**Fokus-retur via `document.activeElement` (mer generell än den gamla trigger-ref-fångsten):** primitiven
+minns det element som var fokuserat när modalen MONTERADES och återför fokus dit vid unmount. I en riktig
+webbläsare flyttar ett klick på trigger-knappen fokus dit, så `document.activeElement` === triggern vid
+öppning -> retur till triggern, identiskt med det gamla beteendet i praktiken. Tre dialoger fångade förr
+`triggerRef.current` explicit; den nya fångsten är korrekt i ALLA fall (även keyboard-öppning).
+
+**Test-/markup-ändringar (ärligt listade, alla justerade BARA där de testade implementations-detaljer):**
+- Panel-data-attributet normaliserades till `data-${name}-panel` (förr `-dialog`/`-onboarding-dialog`/
+  `-settings-dialog`). INGEN CSS eller annan komponent refererade dessa (grep-verifierat); enda referens
+  var ScoreGuide-testets `[data-score-guide-dialog]` -> uppdaterad till `[data-score-guide-panel]`
+  (samma per-surface stabila krok på dialog-noden, bara namnet följer primitivens enhetliga konvention).
+- TeamProfilePanel portaleras NU (förr inline). Tre tester använde `container.querySelector(...)` för
+  innehåll som nu ligger i body-portalen -> bytta till `screen.getByRole('dialog').querySelector(...)`
+  (samma assertion, rätt sök-rot efter portalen). Portalen är en BEVIS-bar förbättring (samma T32-robusthet
+  som de tre redan-portalerade dialogerna), inget visuellt.
+- GetStartedControl-testet "återställer fokus till triggern": lade `trigger.focus()` INNAN klick, för att
+  spegla en riktig webbläsares klick-fokus (jsdom:s fireEvent.click fokuserar inte), så det testar
+  `<Modal>`:s document.activeElement-fångst korrekt (samma grepp som TeamProfile-/Onboarding-testerna).
+- `src/test/setup.ts`: WARM:ar motion-reduced-motion-init en gång (renderar en minimal hook-komponent),
+  så motions globala lazy-init inte sker mot ett transient matchMedia-spion-läge i ett senare test (med
+  primitiven körs useReducedMotion först vid dialog-ÖPPNING, inte vid parent-mount som förr). Produktionen
+  påverkas inte; ren testmiljö-härdning, samma anda som matchMedia-/MotionGlobalConfig-stubbarna.
+
+**Bevarat exakt:** lag-profilens panel reser 28 px (de andra 24), så `<Modal panelRisePx>` defaultar 24
+och lag-profilen skickar 28, in-animationen pixel-identisk. Overlay-layout-ryggraden (fixed inset-0 z-50,
+bottom-sheet-på-mobil -> centrerad-på-desktop) bor i primitivens base; den dialog-specifika finishen
+(backdrop-blur, .vm-profile-overlay-blur) i `overlayClassName`. Onboardingen behåller `closeOnBackdrop=false`.
+Full svit grön (176 testfiler, exit 0) efter VARJE migrering (en i taget).
+
 ## 2026-06-12 , T69 (#132): FIFA-ranking uppdaterad till juniutgåvan (2026-06-11)
 
 **Beslut (data-uppdatering, gissas ALDRIG):** `Team.fifaRanking` för alla 48 VM-lag uppdaterades

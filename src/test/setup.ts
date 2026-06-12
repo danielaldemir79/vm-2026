@@ -2,7 +2,9 @@
 // jest-dom ger läsbara DOM-assertions (t.ex. toBeInTheDocument) och rensas
 // automatiskt mellan tester av @testing-library/react.
 import '@testing-library/jest-dom/vitest';
-import { MotionGlobalConfig } from 'motion/react';
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { MotionGlobalConfig, useReducedMotion } from 'motion/react';
 import { vi } from 'vitest';
 
 // virtual:pwa-register finns BARA i ett riktigt Vite-bygge, inte i Vitest. Tester
@@ -45,3 +47,27 @@ if (!window.matchMedia) {
     dispatchEvent: vi.fn(),
   }));
 }
+
+// EAGER motion-reduced-motion-init (T33): motion lazy-initierar sin globala
+// prefers-reduced-motion-lyssnare FÖRSTA gången useReducedMotion() anropas i en worker,
+// via window.matchMedia('(prefers-reduced-motion)').addEventListener(...). Förr körde
+// varje dialog-ägande komponent useReducedMotion EAGERT vid mount (mot den rena stubben
+// ovan), så init skedde tidigt och säkert. Med den delade <Modal>-primitiven (T33) körs
+// useReducedMotion först när en dialog ÖPPNAS, vilket kan inträffa i ett test där en
+// matchMedia-spion (vi.spyOn ... mockImplementation/restoreAllMocks) tillfälligt gör att
+// reduced-motion-frågan saknar addEventListener -> motion-init kraschar (recovered
+// concurrent-render-fel, brusar i svit-loggen). Vi WARM:ar motion-init EN gång här genom
+// att rendera en minimal komponent som anropar useReducedMotion, mot den KOMPLETTA stubben
+// ovan (innan någon spion hinner störa), så motions globala flagga sätts säkert och lazy-
+// init aldrig sker mot ett transient matchMedia-läge senare. Produktionen påverkas inte
+// (riktig matchMedia finns alltid); detta härdar bara testmiljön, samma anda som
+// matchMedia-/MotionGlobalConfig-stubbarna ovan.
+function MotionInitWarmup() {
+  useReducedMotion();
+  return null;
+}
+const warmupRoot = createRoot(document.createElement('div'));
+act(() => {
+  warmupRoot.render(createElement(MotionInitWarmup));
+});
+warmupRoot.unmount();
