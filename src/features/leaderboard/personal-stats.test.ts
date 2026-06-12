@@ -70,7 +70,10 @@ describe('derivePersonalStats, edge-fall', () => {
   });
 
   it('ett tips på en match som inte finns i listan ignoreras (ingen krasch, 0 avgjorda)', () => {
-    const stats = derivePersonalStats([tip('saknas', 1, 0)], [finished('m1', 0, 0, 'k')]);
+    const stats = derivePersonalStats(
+      [tip('saknas', 1, 0)],
+      [finished('m1', 0, 0, '2026-06-11T18:00:00Z')]
+    );
     expect(stats.decidedTips).toBe(0);
   });
 
