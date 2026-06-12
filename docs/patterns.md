@@ -421,12 +421,13 @@ Tre saker värda att lyfta för nästa data-task:
    `<span>`) med ett explicit `aria-label` ("Visa lagprofil för X"), så den nås med tangentbord och har
    rätt roll. Degraderar till ren `<span>` när entiteten är okänd (id null), så vi aldrig erbjuder en
    knapp som inte gör något. Inkopplad i flera vyer (matchkort + tabell) utan att de känner till modalen.
-4. MODALEN (`TeamProfilePanel.tsx`) är en KORREKT a11y-dialog: `role="dialog"` + `aria-modal` +
-   `aria-labelledby` (rubriken), Escape/stäng-knapp/bakgrundsklick stänger (panelen `stopPropagation`:ar
-   så ett klick i den inte bubblar till overlayns onClose), fokus flyttas IN vid öppning (stäng-knappen,
-   stabil startpunkt) och ÅTERSTÄLLS till öppnaren vid stängning, plus en enkel fokus-fälla (Tab cyklar
-   inom dialogen). Innehållet HÄRLEDS av en ren funktion (`deriveTeamProfile`) och saknad data visas
-   ärligt ("Data saknas"), aldrig gissat. Stabil semantik + data-attribut (`data-team-profile-panel/
+4. MODALEN (`TeamProfilePanel.tsx`) är en KORREKT a11y-dialog. OBS (T33/#56): a11y-dialog-kontraktet
+   (`role="dialog"` + `aria-modal` + `aria-labelledby`, Escape, bakgrundsklick, fokus in/ut, fokus-fälla,
+   portal) ägs numera av den DELADE `<Modal>`-primitiven (se recept `delad-modal-primitiv-agar-a11y-
+   dialog-kontraktet-en-gang` nedan); TeamProfilePanel renderar `<Modal>` när en profil finns och bidrar
+   med innehållet + overlay-/panel-stilen. Fokus flyttas IN till stäng-knappen (stabil startpunkt) och
+   ÅTERSTÄLLS till öppnaren. Innehållet HÄRLEDS av en ren funktion (`deriveTeamProfile`) och saknad data
+   visas ärligt ("Data saknas"), aldrig gissat. Stabil semantik + data-attribut (`data-team-profile-panel/
    -overlay/-trigger`, `data-profile-ranking/-stars/-trivia/-path`) som design-frontend stylar ovanpå.
 5. TÄCKNING: trigger (öppnar rätt id, null -> ej knapp), navigering (öppna från BÅDA vyerna), dialog
    (stäng på 3 sätt, aria-modal + fokus-flytt), edge (okänt id -> ingen dialog, saknad data -> "Data
@@ -1015,3 +1016,65 @@ brytpunkten, och genom att återanvända `ExpandToggle` ärver hela sidan en red
 kontroll med rätt a11y. Design-frontend stylar via de stabila `data-${name}-toggle` / `data-collapsible-*`-
 hakarna. Källa: T68 (#129), `src/components/CollapsibleSection.tsx` + wiring i groups/scenarios/bracket/
 group-predictions/bracket-predictions/admin/leaderboard.
+
+### delad-modal-primitiv-agar-a11y-dialog-kontraktet-en-gang (React + motion, VM 2026)
+
+**Recept (EN primitiv som äger hela a11y-dialog-kontraktet, varje dialog behåller sin visuella identitet):**
+
+1. **EN `src/components/Modal.tsx`** äger det FUNKTIONELLA + a11y-lagret som annars handrullas per dialog:
+   portal till `document.body`, `role="dialog"` + `aria-modal` + `aria-labelledby` (+ valfri
+   `aria-describedby`), Escape stänger, bakgrundsklick stänger (panel-klick bubblar inte via
+   `stopPropagation`), fokus flyttas IN till en caller-vald startpunkt och ÅTERSTÄLLS till öppnaren,
+   fokus-fälla (Tab/Shift-Tab cyklar i panelen), motion-gating (`useReducedMotion() === false`, annars
+   bara opacitet, WCAG 2.3.3). Samma form som CollapsibleSection (T68): en delad primitiv i
+   `src/components/` med en `name`-baserad data-attribut-namnrymd.
+2. **Primitiven äger INTE innehållet eller utseendet.** Allt INNEHÅLL (hero, sektioner, knappar) är
+   `children`. Den distinkta overlay-/panel-STILEN skickas via slots: `overlayClassName/Style`,
+   `panelClassName/Style`, och `name` -> `data-${name}-overlay`/`-panel` (test-/styling-krokar; en caller
+   som behöver ett VÄRDE i kroken, t.ex. ScoreGuides per-surface-namnrymd, skickar `overlayValue/panelValue`).
+   Primitivens default-overlay-klass bär bara den GEMENSAMMA layout-ryggraden (fixed inset-0 z-50,
+   bottom-sheet-på-mobil -> centrerad-på-desktop), aldrig en dialogs färg/blur/form.
+3. **Montera primitiven BARA när dialogen är öppen** (callern villkorsrenderar `<Modal>`). Då löper
+   Escape-/fokus-effekterna exakt EN gång per öppning via mount/unmount, vilket bevarar
+   "lyssnaren läggs en gång + churnar inte vid store-uppdatering mitt under öppen modal"-invarianten
+   (TeamProfilens C7/C9) UTAN en stabil-id-bindning per callsite. En dialog som läser en delad store och
+   härleder innehåll (TeamProfilePanel) behåller sin `if (... null) return null` och renderar `<Modal>`
+   bara när det finns innehåll.
+4. **Escape-fasen är PER-DIALOG, gör INTE "alla på capture".** Default = bubble-fas. En dialog som kan
+   öppnas OVANPÅ en annan (GetStarted-guiden över onboardingen) sätter `escapeCapture` (capture-fas +
+   stopPropagation) så bara den översta stänger på ett Escape. VARFÖR inte alla capture: två capture-
+   lyssnare på SAMMA target (document) fyrar i REGISTRERINGS-ordning, så den UNDERSTA (monterad först)
+   fyrar FÖRST och stänger sig själv innan stopPropagation hinner verka -> "alla på capture" stänger BÅDA.
+   Den fungerande semantiken är capture-OVANPÅ-bubble. **Probe-verifiera event-semantiken i jsdom innan
+   du litar på den** (gissa aldrig event-ordning): två capture -> outer fyrar; capture(top)+bubble(under)
+   -> bubble når aldrig. En generell "vilken modal som helst stack-safe" kräver en delad modal-stack
+   (z-index-topp äger Escape), bygg inte det på spek.
+5. **Fokus-retur via `document.activeElement` vid mount** (mer generell än trigger-ref-fångst): minns det
+   fokuserade elementet vid öppning, återför dit vid unmount. I en riktig webbläsare fokuserar ett
+   trigger-klick knappen, så detta === triggern; korrekt även vid keyboard-öppning. **jsdom-not:**
+   `fireEvent.click` fokuserar INTE en knapp, så ett fokus-retur-test måste `.focus()` triggern först för
+   att spegla browsern.
+6. **Migrera EN dialog i taget med full svit grön mellan varje** (beteende-neutralt). Behåll varje dialogs
+   exakta visuella detaljer: t.ex. en panel som reste 28 px (lag-profilen) skickar `panelRisePx={28}` när
+   default är 24, så in-animationen är pixel-identisk; en dialog som inte ska stänga på bakgrundsklick
+   (onboardingens första-gångs-tour) skickar `closeOnBackdrop={false}`. Ändra tester BARA där de testade
+   implementations-detaljer (t.ex. `container.querySelector` för innehåll som nu portaleras -> sök i
+   dialog-noden; ett normaliserat panel-data-attribut), och motivera varje teständring.
+
+**Test-miljö-gotcha (motion lazy-init):** motion initierar sin globala prefers-reduced-motion-lyssnare
+FÖRSTA gången `useReducedMotion()` anropas i en worker (via `matchMedia('(prefers-reduced-motion)')
+.addEventListener`). När den anropas EAGERT vid parent-mount (som de gamla dialogerna) sker init säkert
+mot test-stubben; när den anropas först vid dialog-ÖPPNING (med primitiven) kan ett senare test ha en
+matchMedia-spion som gör frågan ofullständig -> motion-init kraschar (recovered concurrent-render-fel,
+brus i loggen). Fix: WARM:a motion-init EN gång i `src/test/setup.ts` (rendera en minimal
+`useReducedMotion`-komponent) mot den kompletta stubben, så lazy-init aldrig sker mot ett transient läge.
+Produktionen påverkas inte.
+
+**Varför:** ett a11y-dialog-kontrakt som handrullas 5+ gånger driver oundvikligen isär (en skärmläsare/
+tangentbordsanvändare får motstridigt beteende per yta). EN primitiv gör kontraktet till en sanning,
+testat EN gång i `Modal.test.tsx`; varje dialog verifierar bara sin egen wiring + sitt innehåll.
+Styling-slottarna + `children` bevarar varje dialogs distinkta visuella identitet, så designarnas arbete
+är orört. Generaliserar det tidigare `klickbar-entitet-oeppnar-en-delad-modal`-receptet (T10): dess
+inline a11y-dialog ÄR nu `<Modal>`. Källa: T33 (#56), `src/components/Modal.tsx` (+ `Modal.test.tsx`),
+migrerade dialoger: `TeamProfilePanel` (T10), `OnboardingDialog` (T13), `SettingsControl` (T32),
+`ScoreGuide` (T34), `GetStartedDialog`/`GetStartedControl` (T54).

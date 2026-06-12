@@ -78,7 +78,10 @@ describe('ScoreGuide, "Så funkar poängen"-knapp + a11y-dialog', () => {
     fireEvent.click(trigger);
     await screen.findByRole('dialog');
     expect(document.querySelector('[data-score-guide-overlay="topplista"]')).not.toBeNull();
-    expect(document.querySelector('[data-score-guide-dialog="topplista"]')).not.toBeNull();
+    // Panel-kroken bär nu det normaliserade `-panel`-namnet (delade <Modal>-konventionen
+    // data-${name}-panel, T33), tidigare `-dialog`. Samma per-surface stabila krok på
+    // dialog-noden, bara namnet följer primitivens enhetliga konvention.
+    expect(document.querySelector('[data-score-guide-panel="topplista"]')).not.toBeNull();
   });
 
   it('surface med whitespace id-saniteras i aria-id:n (IDREF tål inte mellanslag)', async () => {
