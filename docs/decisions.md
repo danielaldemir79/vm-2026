@@ -20,8 +20,11 @@ kvar (gömd hjälp-yta).
 förena med att låta bannern ligga kvar. Därför tas `InstallBanner.tsx` (+ test) bort från huvudytan och
 ERSÄTTS av en ny `InstallButton`: en diskret, surface-tonad "Installera som app"-pill. Den utförliga
 guiden (samma som inställnings-portalens "Kom igång") når man bakom ETT klick. `InstallBanner`-komponenten
-raderades (den renderades ingenstans efter bytet, dead UI); den rena logiken (`resolveInstallMode`,
-`ANDROID_PLAY_PROTECT_NOTE`, detektorerna) är kvar i `install-prompt.ts` (återanvänds av guiden T54).
+raderades (den renderades ingenstans efter bytet, dead UI). Kvar i `install-prompt.ts`: detektorerna +
+`ANDROID_PLAY_PROTECT_NOTE` (de ÅTERANVÄNDS faktiskt av guiden T54) samt `resolveInstallMode`/`dismiss`-
+maskineriet, som efter T63 saknar produktions-konsument och behålls enbart som testad reserv för en
+eventuell framtida banner-väg (review-F2: ärlig motivering, inte "återanvänds av guiden"). Kandidat för
+en framtida lean-städning.
 
 **Regeln (tre klick-grenar, ren funktion `resolveInstallButtonAction`, `install-prompt.ts`):** härledd ur
 de REDAN källhänvisade T39/T54-detektorerna (gissas inte), bara en UI-vägsregel ovanpå:
