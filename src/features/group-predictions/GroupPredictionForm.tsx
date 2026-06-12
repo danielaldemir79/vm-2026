@@ -474,7 +474,9 @@ export function GroupPredictionForm({
                 Föreslå ur mina matchtips
               </button>
               {/* Ärlig förklaring när förslaget inte går att räkna (ofullständigt tippad
-                  grupp). role=note via id-koppling till knappen (aria-describedby). */}
+                  grupp). Hinten kopplas till knappen via aria-describedby, en ren
+                  beskrivnings-relation (ingen role sätts, review-F1: kommentaren ska
+                  inte påstå ARIA-semantik som koden inte skriver). */}
               {suggestion === null ? (
                 <p
                   id={`${baseId}-suggest-hint`}
