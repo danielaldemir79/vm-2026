@@ -5,6 +5,45 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T66 (#121): kommentarer i rummet (medlemmar snackar match live)
+
+**Beslut:** Ny tabell `public.room_comments` (id, room_id, user_id, body, created_at) för korta
+meddelanden per rum. Migration `20260612103836_t66_room_comments_schema_rls_realtime.sql`, applicerad
+LIVE och committad 1:1 (samma version + namn + innehåll = fresh-replaybar, repo == live-historik).
+**Varför:** Daniel lovade klassen i lanseringstexten ("snart kommer en kommentar-funktion"). Snacket
+runt matcherna är halva nöjet. Enkel, ärlig MVP: ingen trådning, ingen redigering, inga reaktioner
+(#24 är separat).
+
+**Beslut (designval): visningsnamnet DENORMALISERAS INTE.** `room_comments` bär bara `user_id`; klienten
+slår upp namnet i medlemslistan (`room_members.display_name`) som RoomsProvider redan har.
+**Varför:** EN sanning för namnet (room_members), inget driv-isär om en vän byter visningsnamn, och
+mindre yta att skriva/validera (KISS). Avvägning: en kommentar från en vän som SEDAN lämnat rummet
+saknar namn i listan -> klienten faller till "Tidigare medlem" (ofarligt, ingen krasch). Alternativet
+(spara display_name på raden) hade gett "namnet som det var då" men dubblerat en muterbar sanning och
+krävt en andra längd-validering; vi valde enkelheten.
+
+**RLS-modell (anon = authenticated i Supabase, RLS är ENDA skyddet, samma som room_match_results):**
+SELECT bara rumsmedlem (`is_room_member(room_id)`), INSERT bara medlem OCH `user_id = auth.uid()`
+(ingen förfalskning; user_id sätts av DB-default `auth.uid()`), DELETE bara egen rad
+(`user_id = auth.uid()`), INGEN UPDATE i v1 (kommentarer redigeras inte = minsta yta). Längd 1-500
+tecken via `room_comments_body_len` CHECK (klienten har samma gräns, men DB:n är sanningen).
+
+**RLS BEVISAT (T53-playbook):** (1) under bygget med simulerade sessioner (set role authenticated +
+request.jwt.claims, isolerat test-rum, städat) , medlem läser/skriver, utomstående ser/skriver INGET,
+bara egen rad raderas, tom + 501 tecken nekas. (2) Env-gatat integrationstest med RIKTIGA anon-sessioner
+mot produktion (`src/data/rooms/comments-rls.integration.test.ts`, kördes grönt live, städar rummet i
+afterAll). En mock kan inte bevisa RLS, regeln lever i databasen.
+
+**Realtid (T18-mönstret, signal-inte-data):** `room_comments` ligger i `supabase_realtime`-publikationen.
+En ny/raderad kommentar ger en postgres_changes-SIGNAL till rummets MEDLEMMAR (RLS släpper bara raderna
+till medlemmar). Klienten läser ALDRIG payloadens rad; den kör en TYST re-fetch genom RLS (egen kanal
+`vm2026-room-comments`, egen nonce i load-effektens deps, samma T55/T61-mönster som tips-vyerna). Inget
+flimrande "Laddar..." vid en väns kommentar, datan behålls under den tysta omhämtningen.
+
+**Säker rendering (HARD):** kommentar-texten renderas som ren React-text-nod (default-escaping), ALDRIG
+`dangerouslySetInnerHTML`. En `<script>`-sträng visas bokstavligt, ingen HTML/JS injiceras (test:
+escape-rendering med taggig sträng).
+
 ## 2026-06-12 , T67 (#123): flytta den FÖRLÄNGDA deadlinen från 14 juni till SÖNDAG 21 juni
 
 **Daniels beslut 2026-06-12 (källa, gissas inte):** "vald datum nu är för nära och kommer stressa
