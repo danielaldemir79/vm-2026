@@ -1,7 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRef } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { CollapsibleBody, CollapsibleSection } from './CollapsibleSection';
+
+/**
+ * jsdom ger 0 för clientHeight/scrollHeight (ingen layout), så CollapsibleBody:s
+ * measure() rör aldrig isClipped (stannar på default true). För att testa
+ * isClipped-GATINGEN ärligt (T68-F1) stubbar vi mätningen: vi definierar
+ * clientHeight/scrollHeight på prototypen så measure() kör med riktiga tal och kan
+ * sätta isClipped till false (allt ryms) eller bekräfta true (klipps). Återställs
+ * efteråt så övriga tester behåller jsdom-kontraktet (clientHeight=0).
+ */
+function stubBodyMeasurement(clientHeight: number, scrollHeight: number) {
+  const clientSpy = vi
+    .spyOn(HTMLElement.prototype, 'clientHeight', 'get')
+    .mockReturnValue(clientHeight);
+  const scrollSpy = vi
+    .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+    .mockReturnValue(scrollHeight);
+  return () => {
+    clientSpy.mockRestore();
+    scrollSpy.mockRestore();
+  };
+}
 
 // Den DELADE komprimerings-primitiven (T68, #129). EN komponent som ger hela sidan
 // ETT överblickbart komprimerings-mönster: rubrik + beskrivning ALLTID synliga,
@@ -138,5 +159,74 @@ describe('CollapsibleBody (innehålls-kompressorn sektionerna använder)', () =>
     const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
     expect(body).toHaveAttribute('data-collapsed', 'false');
     expect(body.querySelector('[data-collapsible-fade]')).toBeNull();
+  });
+
+  // T68-F1 (#136): den ÖVRE ExpandToggle gatas på SAMMA isClipped-mätning som faden.
+  // Klipps inget (kort innehåll, t.ex. tomt/laddnings-/utan-rum-tillstånd som ryms inom
+  // collapsedMaxHeight) ska VARKEN fade NI övre "Visa alla"-knapp visas, båda vore ett
+  // falskt "mer nedanför"-löfte.
+  describe('isClipped gatar BÅDE fade och övre toggle (T68-F1)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('ICKE-klippt innehåll (allt ryms): ingen övre toggle OCH ingen fade', () => {
+      // scrollHeight (100) <= clientHeight (200) -> measure() sätter isClipped=false.
+      const restore = stubBodyMeasurement(200, 100);
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Kort innehåll som ryms helt.</p>
+        </CollapsibleBody>
+      );
+      const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+      // Komprimerat (default) men inget klipps: ingen expandera-knapp, ingen fade.
+      expect(body).toHaveAttribute('data-collapsed', 'true');
+      expect(screen.queryByRole('button', { name: /Visa admin/i })).toBeNull();
+      expect(body.querySelector('[data-collapsible-fade]')).toBeNull();
+      restore();
+    });
+
+    it('KLIPPT innehåll (svämmar över): övre toggle OCH fade visas (positiv kontroll)', () => {
+      // scrollHeight (300) > clientHeight (100) -> measure() sätter isClipped=true.
+      const restore = stubBodyMeasurement(100, 300);
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Långt innehåll som klipps.</p>
+        </CollapsibleBody>
+      );
+      const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+      expect(body).toHaveAttribute('data-collapsed', 'true');
+      // Klipps -> det FINNS mer att visa -> både knapp och fade.
+      expect(screen.getByRole('button', { name: /Visa admin/i })).toBeInTheDocument();
+      expect(body.querySelector('[data-collapsible-fade]')).toBeInTheDocument();
+      restore();
+    });
+
+    it('ICKE-klippt men UTFÄLLD: den övre toggeln finns ändå (man måste kunna fälla ihop)', () => {
+      // Även om inget klipps måste utfällt läge ha en kontroll för att komprimera igen.
+      const restore = stubBodyMeasurement(200, 100);
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+          startExpanded
+        >
+          <p>Kort innehåll, men startar utfälld.</p>
+        </CollapsibleBody>
+      );
+      const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      // Utfälld: komprimera-kontrollen måste finnas (annars går läget inte att stänga).
+      expect(screen.getAllByRole('button', { name: /Visa färre/i }).length).toBeGreaterThanOrEqual(
+        1
+      );
+      restore();
+    });
   });
 });
