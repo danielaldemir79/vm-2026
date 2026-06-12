@@ -84,6 +84,36 @@ export default defineConfig({
     __APP_SHA__: JSON.stringify(BUILD_INFO.sha),
     __APP_BUILT_AT__: JSON.stringify(BUILD_INFO.builtAt),
   },
+  build: {
+    // CODE-SPLITTING (T25, KA-F4-pinnen från T13 "manualChunks om LCP-problem"):
+    // bundlen var EN monolitisk chunk (~895 kB / ~246 kB gzip), så ALLT, app-koden
+    // OCH alla tunga vendor-paket, laddades och parsades som ett enda block. Vi
+    // delar de STORA, SÄLLAN-ÄNDRADE vendor-paketen till egna chunks så att:
+    //   1. app-koden (den som ändras varje deploy) inte invaliderar vendor-cachen
+    //      vid varje release, en återbesökare hämtar bara den lilla app-delta:n.
+    //   2. de tre vendorerna laddas parallellt i stället för seriellt-inbäddat.
+    // VARFÖR just dessa tre: react/react-dom (renderaren, tyngst), motion
+    // (animations-motorn) och @supabase/supabase-js (live-klienten) är de enda
+    // riktigt tunga, tredjeparts-beroendena. supabase-js dras dessutom bara in via
+    // dynamisk import (data-source.ts) i live-läge, så i fixtures-bygget hamnar den
+    // i en egen, vilande chunk som aldrig laddas. INGEN per-vy-lazy-load: appen är
+    // EN skroll-sida där alla sektioner renderas direkt (ingen router), så att
+    // Suspense-dela mitt-på-sidan-sektioner skulle lägga till komplexitet utan att
+    // krympa det INITIALA innehållet (de syns redan vid laddning). Vendor-splitten
+    // är den värdefulla, låg-risk-vinsten. Före/efter-siffror: docs/decisions.md (T25).
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Matchar både 'react'/'react-dom' OCH deras interna djup (react-dom/client,
+          // scheduler dras in transitivt) genom att Rollup grupperar allt vars
+          // modul-id faller under dessa paket-rötter. Nyckeln blir chunk-filnamnet.
+          'react-vendor': ['react', 'react-dom'],
+          'motion-vendor': ['motion'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+        },
+      },
+    },
+  },
   plugins: [
     themeNoFlashPlugin(),
     react(),
@@ -133,6 +163,12 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    // Vitest äger BARA enhets-/komponenttesterna under src/. E2E-sviten (e2e/*.spec.ts)
+    // körs av Playwright via `npm run test:e2e`, ALDRIG av Vitest (T25): Playwrights
+    // test.describe kraschar under Vitest ("did not expect test.describe() to be called
+    // here"). Default-globben skulle annars plocka upp e2e/*.spec.ts. Vi pinnar därför
+    // include till src/ så de två svitarna är helt åtskilda. Se docs/decisions.md (T25).
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // Sviten har vuxit (689+ tester) och flera är render-tunga integrationstester
     // (full ResultsProvider + 12 grupptabeller + inmatning). Under full parallell
     // fork-last kan en sådan rendering + async-seedning legitimt ta > 5 s, så
