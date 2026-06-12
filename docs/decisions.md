@@ -1942,9 +1942,10 @@ https://web.dev/articles/customize-install). Live-verifierat i Chrome mot byggd 
 TRE standard-signalerna (web.dev "Detecting PWA standalone mode",
 https://web.dev/learn/pwa/detection): (1) `matchMedia('(display-mode: standalone)')`, (2) iOS
 `navigator.standalone === true` (icke-standard, MDN), (3) `document.referrer.startsWith('android-app://')`
-(TWA / Android-app-wrapper). I standalone returnerar `resolveInstallMode` 'hidden', så VARKEN Chrome-
-knappen, iOS-instruktionen ELLER Play Protect-noten visas. Källhänvisat inline i `install-prompt.ts`
-och `install-prompt-capture.ts`.
+(TWA / Android-app-wrapper). I standalone returnerade dåvarande `resolveInstallMode` 'hidden'
+(funktionen togs bort i T70; den levande ekvivalenten är `resolveInstallButtonAction` -> 'hidden'),
+så VARKEN install-ytan, iOS-instruktionen ELLER Play Protect-noten visas. Källhänvisat inline i
+`install-prompt.ts` och `install-prompt-capture.ts`.
 
 **Findings:** Onboarding-touren (T13) renderar en full-skärms overlay (z-50) vid första besök som
 ligger ÖVER install-bannern, så en FÖRSTA-gångs-användare kan inte klicka install-knappen förrän
