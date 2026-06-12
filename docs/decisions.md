@@ -41,6 +41,21 @@ refaktor-task (T34/#62-flaggan), inte smyglagd här.
 (samma grepp som T39); flikbyte, webb-läges-info, standalone-kortet och båda call-sites (inställningar +
 onboarding) render-testas. Build/test/lint/format grönt.
 
+**Copilot runda 3 (#93) , a11y-flikar + Escape-regression:**
+- **WAI-ARIA Tabs-tangentbord i `PlatformTabs` (F1):** plattforms-flikarna fick förut hela Tab-ordningen
+  och saknade pil-stöd. Implementerat enligt WAI-ARIA APG Tabs-mönstret
+  (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/): roving tabindex (bara aktiv flik tabIndex=0),
+  vänster/höger-pil med wrap + Home/End. **Tolkningsval: AUTOMATIC ACTIVATION (selection follows
+  focus)** , att flytta fokus byter direkt vald flik + panel. APG tillåter både automatic och manual
+  activation; automatic rekommenderas när panelinnehållet är billigt att visa (här ren, redan laddad
+  data) och flikantalet är litet (3 st), så det valdes (enklast, vanligast). Inline källhänvisat i
+  `GetStartedDialog.tsx`.
+- **Regressionstest för capture-Escape (F2):** capture-fas + `stopPropagation` (så en Escape bara
+  stänger översta dialogen vid staplade modaler) saknade test. Lagt i `GetStartedControl.test.tsx`,
+  mutationsverifierat (borttagen capture ELLER stopPropagation => rött). jsdom-not: i jsdom stoppar
+  `stopPropagation` i capture-fasen även en bubbel-lyssnare på SAMMA target (document) , empiriskt
+  probe-bekräftat innan testet skrevs, så testet vilar inte på en gissad event-semantik.
+
 ## 2026-06-12 , T60 (#102): 4 röda baslinje-tester var tidskopplade, inte en regression
 
 **Symtom:** `feedback-seam.test.tsx` (3 fall) + `ResultEntryView.test.tsx` (1 fall, "Unable to find

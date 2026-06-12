@@ -141,6 +141,130 @@ describe('GetStartedDialog, innehåll, båda vägarna + ärlig webb-info', () =>
   });
 });
 
+// WAI-ARIA Tabs-tangentbordsmönstret (copilot R3, F1): roving tabindex + piltangenter
+// + Home/End med wrap, och selection-follows-focus (att flytta fokus byter vald flik
+// + panel). https://www.w3.org/WAI/ARIA/apg/patterns/tabs/
+describe('GetStartedDialog, tablist-tangentbord (roving tabindex + piltangenter)', () => {
+  beforeEach(() => {
+    // Desktop-förvalet => desktop är initialt aktiv flik (index 2 i ['ios','android',
+    // 'desktop']-ordningen). Förutsägbart utgångsläge för pil-stegen.
+    mockStandalone(false);
+    mockUserAgent(DESKTOP_CHROME_UA);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** Flikarna i renderad ordning + hjälpare för att läsa aktiv/tabindex. */
+  async function openTabs() {
+    render(<GetStartedControl />);
+    const dialog = await openDialog();
+    const tabs = within(dialog).getAllByRole('tab');
+    return { dialog, tabs };
+  }
+
+  const selectedOf = (tabs: HTMLElement[]) =>
+    tabs.find((t) => t.getAttribute('aria-selected') === 'true');
+
+  it('roving tabindex: bara aktiva fliken har tabIndex=0, övriga -1 (Tab landar bara på en)', async () => {
+    const { tabs } = await openTabs();
+    const active = selectedOf(tabs);
+    expect(active).toBeDefined();
+    // Exakt en flik i Tab-ordningen (tabIndex=0), och det är den aktiva.
+    const inTabOrder = tabs.filter((t) => t.tabIndex === 0);
+    expect(inTabOrder).toEqual([active]);
+    for (const tab of tabs) {
+      expect(tab.tabIndex).toBe(tab === active ? 0 : -1);
+    }
+  });
+
+  it('Höger-pil flyttar fokus + val (och panel) till nästa flik', async () => {
+    const { dialog, tabs } = await openTabs();
+    // Desktop aktiv ('På datorn'). Höger-pil ska wrappa till första fliken ('På iPhone').
+    const desktopTab = within(dialog).getByRole('tab', { name: 'På datorn' });
+    desktopTab.focus();
+    fireEvent.keyDown(desktopTab, { key: 'ArrowRight' });
+
+    const iosTab = within(dialog).getByRole('tab', { name: 'På iPhone' });
+    expect(iosTab).toHaveAttribute('aria-selected', 'true');
+    expect(document.activeElement).toBe(iosTab);
+    // Panelen följer med (selection follows focus): iOS-stegen renderas.
+    expect(document.querySelector('[data-get-started-steps="ios"]')).not.toBeNull();
+    // Roving tabindex flyttades: nya aktiva fliken är nu i Tab-ordningen.
+    expect(iosTab.tabIndex).toBe(0);
+    expect(desktopTab.tabIndex).toBe(-1);
+    void tabs;
+  });
+
+  it('Vänster-pil flyttar fokus + val till föregående flik', async () => {
+    const { dialog } = await openTabs();
+    // Desktop aktiv. Vänster-pil ska gå till föregående ('På Android').
+    const desktopTab = within(dialog).getByRole('tab', { name: 'På datorn' });
+    desktopTab.focus();
+    fireEvent.keyDown(desktopTab, { key: 'ArrowLeft' });
+
+    const androidTab = within(dialog).getByRole('tab', { name: 'På Android' });
+    expect(androidTab).toHaveAttribute('aria-selected', 'true');
+    expect(document.activeElement).toBe(androidTab);
+    expect(document.querySelector('[data-get-started-steps="android"]')).not.toBeNull();
+  });
+
+  it('Höger-pil WRAPpar från sista fliken till första', async () => {
+    const { dialog } = await openTabs();
+    // Sista fliken ('På datorn', index 2) är aktiv. Höger -> wrap till index 0 ('På iPhone').
+    const desktopTab = within(dialog).getByRole('tab', { name: 'På datorn' });
+    desktopTab.focus();
+    fireEvent.keyDown(desktopTab, { key: 'ArrowRight' });
+    expect(within(dialog).getByRole('tab', { name: 'På iPhone' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('Vänster-pil WRAPpar från första fliken till sista', async () => {
+    const { dialog } = await openTabs();
+    // Gå först till första fliken ('På iPhone'), tryck sedan Vänster -> wrap till sista.
+    const iosTab = within(dialog).getByRole('tab', { name: 'På iPhone' });
+    fireEvent.click(iosTab);
+    iosTab.focus();
+    fireEvent.keyDown(iosTab, { key: 'ArrowLeft' });
+    expect(within(dialog).getByRole('tab', { name: 'På datorn' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(document.activeElement).toBe(within(dialog).getByRole('tab', { name: 'På datorn' }));
+  });
+
+  it('Home går till första fliken, End till sista', async () => {
+    const { dialog } = await openTabs();
+    const desktopTab = within(dialog).getByRole('tab', { name: 'På datorn' });
+    desktopTab.focus();
+
+    // Home -> första ('På iPhone').
+    fireEvent.keyDown(desktopTab, { key: 'Home' });
+    const iosTab = within(dialog).getByRole('tab', { name: 'På iPhone' });
+    expect(iosTab).toHaveAttribute('aria-selected', 'true');
+    expect(document.activeElement).toBe(iosTab);
+
+    // End -> sista ('På datorn'), från den nu fokuserade iOS-fliken.
+    fireEvent.keyDown(iosTab, { key: 'End' });
+    expect(within(dialog).getByRole('tab', { name: 'På datorn' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(document.activeElement).toBe(within(dialog).getByRole('tab', { name: 'På datorn' }));
+  });
+
+  it('orörda tangenter (t.ex. Down) ändrar inte vald flik', async () => {
+    const { dialog } = await openTabs();
+    const desktopTab = within(dialog).getByRole('tab', { name: 'På datorn' });
+    desktopTab.focus();
+    fireEvent.keyDown(desktopTab, { key: 'ArrowDown' });
+    // Down ingår inte i en horisontell tablist => ingen ändring.
+    expect(desktopTab).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
 describe('GetStartedDialog, rätt instruktion för rätt enhet (plattformsgrenar)', () => {
   afterEach(() => {
     vi.restoreAllMocks();

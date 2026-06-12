@@ -31,7 +31,7 @@
 // till en delad <Modal> i denna task (det är en egen refaktor-task, T34 flaggade
 // tröskeln till dirigenten), så T54 inte rör fyra testade dialog-filer på spek.
 
-import { useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { springs, transitions } from '../../motion';
@@ -361,10 +361,23 @@ function WebModeSection({ introId }: { introId: string }) {
 }
 
 /**
- * Plattforms-flikarna. En tablist (WCAG: role="tablist"/"tab", aria-selected), så en
- * skärmläsare/tangentbordsanvändare förstår att det är växlingsbara vägar. Den aktiva
- * fliken bär aria-selected=true; klick byter aktiv väg. Varje flik har en enkel,
- * varumärkesneutral enhets-glyf (dekor) + sin etikett.
+ * Plattforms-flikarna. En tablist enligt WAI-ARIA Tabs-mönstret
+ * (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/), så att BÅDE skärmläsar- och
+ * tangentbordsanvändare hanterar flikarna som riktiga flikar:
+ *
+ *  - ROVING TABINDEX: bara den AKTIVA fliken ligger i Tab-ordningen (tabIndex=0),
+ *    övriga tabIndex=-1. Tab tar dig alltså IN i och UT ur fliklisten i ETT steg
+ *    (inte en flik i taget); piltangenter rör sig MELLAN flikarna. Detta är APG-kravet
+ *    och det copilot-R3 flaggade saknades (alla flikar låg förut i Tab-ordningen utan
+ *    pil-stöd).
+ *  - PILTANGENTER vänster/höger flyttar fokus mellan flikar, med WRAP (sista -> första
+ *    och tvärtom). Home/End hoppar till första/sista fliken.
+ *  - SELECTION FOLLOWS FOCUS (automatic activation): att flytta fokus byter också vald
+ *    flik + panel direkt. APG rekommenderar detta när panelinnehållet är billigt att
+ *    visa (här: ren, redan laddad data) och antalet flikar är litet (3 st), vilket är
+ *    enklast och vanligast. Klick byter väg på samma sätt.
+ *
+ * Varje flik har en enkel, varumärkesneutral enhets-glyf (dekor) + sin etikett.
  */
 function PlatformTabs({
   activePlatform,
@@ -373,16 +386,61 @@ function PlatformTabs({
   activePlatform: GetStartedPlatform;
   onSelectPlatform: (platform: GetStartedPlatform) => void;
 }) {
+  // En ref per flik-knapp, så piltangent-handlern kan flytta DOM-fokus till den nya
+  // fliken efter att valet bytts. Knapparna monteras inte om vid byte (bara tabIndex/
+  // stil ändras), så ref:erna pekar stabilt på samma noder mellan renderingar.
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const activeIndex = GET_STARTED_PATHS.findIndex((path) => path.platform === activePlatform);
+
+  // Flytta fokus + val till fliken på `nextIndex` (selection follows focus). Anropas
+  // bara med ett index som redan beräknats med wrap, så det är alltid i intervallet.
+  const focusTab = (nextIndex: number) => {
+    onSelectPlatform(GET_STARTED_PATHS[nextIndex].platform);
+    tabRefs.current[nextIndex]?.focus();
+  };
+
+  // WAI-ARIA Tabs-tangentbordsmönstret (horisontell tablist): vänster/höger med wrap,
+  // Home/End till ändarna. Övriga tangenter lämnas orörda.
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const count = GET_STARTED_PATHS.length;
+    switch (e.key) {
+      case 'ArrowRight':
+        e.preventDefault();
+        focusTab((activeIndex + 1) % count);
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        focusTab((activeIndex - 1 + count) % count);
+        break;
+      case 'Home':
+        e.preventDefault();
+        focusTab(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        focusTab(count - 1);
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
     <div role="tablist" aria-label="Välj enhet" className="flex flex-wrap gap-2">
-      {GET_STARTED_PATHS.map((path) => {
+      {GET_STARTED_PATHS.map((path, index) => {
         const selected = path.platform === activePlatform;
         return (
           <button
             key={path.platform}
+            ref={(node) => {
+              tabRefs.current[index] = node;
+            }}
             type="button"
             role="tab"
             aria-selected={selected}
+            // Roving tabindex: bara aktiv flik (tabIndex=0) i Tab-ordningen, övriga -1.
+            tabIndex={selected ? 0 : -1}
             // aria-controls BARA på den valda fliken (copilot R2): bara den aktiva
             // tabpanel:n finns i DOM, och en IDREF mot ett orenderat id är ogiltig
             // ARIA. Ovalda flikar utan aria-controls är tillåtet mönster.
@@ -390,6 +448,7 @@ function PlatformTabs({
             id={`kom-igang-flik-${path.platform}`}
             data-get-started-tab={path.platform}
             onClick={() => onSelectPlatform(path.platform)}
+            onKeyDown={onKeyDown}
             className="inline-flex items-center gap-2 rounded-pill border px-3.5 py-2 font-display text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
             style={{
               backgroundColor: selected ? 'var(--color-accent)' : 'var(--color-surface)',
