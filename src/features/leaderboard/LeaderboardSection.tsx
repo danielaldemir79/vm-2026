@@ -11,12 +11,16 @@
 // poängen", T46) + topplistan (alltid) + avslöjandet (renderar sig självt tyst tills första
 // matchen avgjorts). Alla läser samma store.
 //
+// PROVIDERN ÄR HOISTAD (T58, #99): LeaderboardProvider bor nu i App och OMSLUTER både
+// tips-sektionen (dess poäng-summering) OCH denna sektion, så de delar EN store och EN
+// hämtning (ingen dubbel fetch). Denna sektion KONSUMERAR alltså den befintliga providern
+// i stället för att skapa en egen (annars vore det två providers = två hämtningar).
+//
 // ORDNING (T46, #79, Daniels begäran): sammanfattningen ÖVERST så man ser sina egna poäng
 // utan att skrolla, topplistan (full lista) KVAR längst ned, avslöjandet sist.
 
 import type { ReactNode } from 'react';
 import { useRoomsStore } from '../rooms';
-import { LeaderboardProvider } from './LeaderboardProvider';
 import { LeaderboardSummary } from './LeaderboardSummary';
 import { LeaderboardView } from './LeaderboardView';
 import { RevealView } from './RevealView';
@@ -26,15 +30,11 @@ export function LeaderboardSection({ surface }: { surface: (children: ReactNode)
   if (!rooms.enabled) {
     return null;
   }
-  return (
-    <LeaderboardProvider>
-      {surface(
-        <>
-          <LeaderboardSummary />
-          <LeaderboardView />
-          <RevealView />
-        </>
-      )}
-    </LeaderboardProvider>
+  return surface(
+    <>
+      <LeaderboardSummary />
+      <LeaderboardView />
+      <RevealView />
+    </>
   );
 }

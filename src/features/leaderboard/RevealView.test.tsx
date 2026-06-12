@@ -20,6 +20,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     reveal: [],
     teams: TEAMS,
     currentUserId: null,
+    selfBreakdown: null,
     ...partial,
   };
 }
@@ -167,8 +168,30 @@ describe('RevealView, FÄRG-OBEROENDE facit-markörer (premium-finish)', () => {
       r.textContent?.replace(/\s+/g, ' ').trim()
     );
     // Orsaken står som ren text (läses även av skärmläsare), med poängtillägget: 0 utan
-    // plustecken (ingen vinst), vinster med +.
+    // plustecken (ingen vinst), vinster med +. Facit 2-1 (hemmavinst) -> "Rätt vinnare".
     expect(reasons).toEqual(['Exakt resultat +3', 'Rätt vinnare +1', 'Miss 0']);
+  });
+
+  // HARD (#69 kryss-noten): på ett OAVGJORT facit får en 1-poängare ALDRIG heta "Rätt
+  // vinnare". Detta är just buggen T58 rättar (etiketten var fel, poängen rätt).
+  it('rätt utfall på ett OAVGJORT facit visar "Rätt kryss +1", aldrig "Rätt vinnare"', () => {
+    const drawMatch: RevealedMatch = {
+      ...revealedMatch,
+      actual: { homeGoals: 1, awayGoals: 1 }, // facit OAVGJORT
+      picks: [
+        {
+          userId: 'u1',
+          displayName: 'Anna',
+          predicted: { homeGoals: 0, awayGoals: 0 }, // rätt kryss, ej exakt -> 1p
+          points: 1,
+          pointType: 'outcome',
+        },
+      ],
+    };
+    const { container } = renderView(store({ reveal: [drawMatch] }));
+    const reason = container.querySelector('[data-reveal-reason]');
+    expect(reason?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Rätt kryss +1');
+    expect(container).not.toHaveTextContent('Rätt vinnare');
   });
 });
 

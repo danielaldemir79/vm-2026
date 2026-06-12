@@ -20,6 +20,11 @@ export {
   type MatchPointType,
 } from './score';
 
+// T58 (#99): EN sanning för match-tipsens VARFÖR-etikett (utfalls-medveten), delad av
+// avslöjande-vyn OCH tips-listans poäng-rad, så ordet aldrig dubbleras eller driftar
+// (#69 kryss-noten: aldrig "Rätt vinnare" på ett oavgjort).
+export { matchPointLabel } from './match-point-label';
+
 // T53 (#95): pool-tipsens FÖRLÄNGDA deadline (grupp + champion) , delad sanning för
 // fasta söndagstiden + GREATEST-regeln, speglar RLS-helpers (klient + DB en sanning).
 export { POOL_EXTENDED_DEADLINE_ISO, applyExtendedDeadline } from './prediction-deadline';

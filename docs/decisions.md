@@ -5,6 +5,36 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T58 (#99): poäng synliga i tips-vyn (per-match-etikett + summering + käll-detalj)
+
+**Beslut 1, utfalls-MEDVETEN per-match-etikett (en sanning, #69 kryss-noten):** match-tipsens
+VARFÖR-etikett ("Exakt resultat" / "Rätt vinnare" / "Rätt kryss" / "Miss") bor nu i EN ren funktion,
+`matchPointLabel(pointType, actualOutcome)` (`src/data/predictions/match-point-label.ts`), delad av
+avslöjande-vyn (RevealView) OCH tips-listans poäng-rad. Tidigare bodde pointType -> etikett lokalt i
+RevealView, och en 1-poängare på ett OAVGJORT facit visades felaktigt som "Rätt vinnare".
+**Källa till regeln (gissas inte):** issue #69:s kryss-kommentar (Daniels fråga 2026-06-11): etiketten
+ska vara utfalls-medveten/-neutral, ALDRIG "Rätt vinnare" när utfallet var oavgjort. Vi valde den
+utfalls-MEDVETNA varianten ("Rätt kryss" vid draw, "Rätt vinnare" vid hemma/borta), starkare än enbart
+neutral text, så ordet aldrig kan motsäga verkligheten. Håller samma sanning som poäng-guiden
+(score-explainer-items: "Rätt vinnare (eller oavgjord)"). Poänglogiken var redan rätt (outcomeOf
+hanterar draw, score.ts), bara ordvalet i etiketten rättades.
+
+**Beslut 2, summering + käll-detalj ur SAMMA poäng-väg (ingen dubbelräkning, HARD):** tips-vyn får en
+panel överst med total + placering (deriveSelfSummary, samma härledning som topplistan) + en detalj
+per källa (matchtips / grupptippning / slutspelsträd / VM-vinnare). Käll-uppdelningen exponeras ur
+aggregeringen (`scoreMemberBreakdown`, `aggregate-scores.ts`): scoreMember ackumulerar nu per källa och
+totalen HÄRLEDS ur källsummorna, så invarianten "summan av källorna === total" gäller per konstruktion.
+Mästar-poängen hålls SKILD från bracket (egen detalj-rad). Rad-ordning + etiketter bor i
+`source-breakdown-rows.ts` (en sanning, mutations-vaktad: radernas summa === totalen).
+
+**Beslut 3, EN delad LeaderboardProvider (ingen dubbelhämtning, HARD):** providern hoistades från
+LeaderboardSection upp till App, så att OMSLUTA både tips-poolens sektioner OCH topplistan. Tips-vyns
+summering (TipsScoreSummary) konsumerar då SAMMA store som topplistan (samma fetch, samma facit), i
+stället för en andra provider = en andra Supabase-hämtning. Aktuell användares käll-uppdelning
+(selfBreakdown) beräknas en gång i providern (där predictionsByUser + facit redan finns) och läggs på
+storen. **Varför hoist (inte T51:s prop-injektion):** providern NÅR båda sektionerna efter hoist, så
+den rena delningen via context är möjlig; prop-injektion behövs bara när providern inte når.
+
 ## 2026-06-12 , T57 (#98): dagens match-vy lever, fokus följer nästa match + dag följer verklig dag + resultat i listan
 
 **Beslut (fokus, krav 1):** "Match of the day" (hero-kortets fokus) väljs nu som dagens tidigaste

@@ -104,6 +104,11 @@ function Probe() {
       </span>
       <span data-testid="reveal">{store.reveal.length}</span>
       <span data-testid="error">{store.error ?? ''}</span>
+      <span data-testid="self-breakdown">
+        {store.selfBreakdown
+          ? `${store.selfBreakdown.total}:${store.selfBreakdown.bySource.match}/${store.selfBreakdown.bySource.group}/${store.selfBreakdown.bySource.bracket}/${store.selfBreakdown.bySource.champion}`
+          : 'null'}
+      </span>
     </div>
   );
 }
@@ -112,6 +117,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   roomsState.members = [];
   roomsState.activeRoom = { id: 'r1' };
+  roomsState.userId = null;
   dataState.status = 'ready';
   dataState.teams = TEAMS;
   dataState.groups = WC2026_GROUPS;
@@ -169,6 +175,44 @@ describe('LeaderboardProvider, wiring + aggregering', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
     // Full grupp-poäng (3 + 2 = 5), INTE tyst 0, trots code-vs-id-rymderna.
     expect(screen.getByTestId('board')).toHaveTextContent('Anna:5:1');
+  });
+
+  it('exponerar AKTUELL användares käll-uppdelning (selfBreakdown) ur samma scoreMember-väg (T58)', async () => {
+    // Grupp C färdigspelad (facit 1:a BRA, 2:a MAR), Anna = aktuell användare (userId u1).
+    const groupC = WC2026_GROUPS.find((g) => g.id === 'C')!;
+    const [bra, mar, hai, sco] = groupC.teamIds;
+    dataState.matches = [
+      groupMatch('C', bra, mar, 1, 0),
+      groupMatch('C', bra, hai, 2, 0),
+      groupMatch('C', bra, sco, 3, 0),
+      groupMatch('C', mar, hai, 2, 0),
+      groupMatch('C', mar, sco, 1, 0),
+      groupMatch('C', hai, sco, 0, 0),
+    ];
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+    roomsState.userId = 'u1'; // jag ÄR Anna
+    api.listRoomGroupPredictions.mockResolvedValue([
+      {
+        groupId: 'C',
+        userId: 'u1',
+        winnerTeamId: asTeamCode('BRA'),
+        runnerUpTeamId: asTeamCode('MAR'),
+        updatedAt: '',
+      },
+    ]);
+
+    renderProvider(new Date('2026-06-13T00:00:00Z'));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    // total 5, all i grupp-källan (match/bracket/champion = 0). Summan === topplistans tal.
+    expect(screen.getByTestId('self-breakdown')).toHaveTextContent('5:0/5/0/0');
+  });
+
+  it('selfBreakdown är null utan känd identitet (currentUserId null) -> ingen egen detalj', async () => {
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+    roomsState.userId = null; // ingen identitet
+    renderProvider(new Date('2026-06-13T00:00:00Z'));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('self-breakdown')).toHaveTextContent('null');
   });
 
   it('rangordnar flera medlemmar med delad placering vid lika poäng', async () => {
