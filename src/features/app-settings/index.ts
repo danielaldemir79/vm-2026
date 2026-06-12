@@ -22,18 +22,8 @@ export type { FeedbackSettings } from './feedback';
 export { SettingsControl } from './SettingsControl';
 
 // Installations-prompt (ren logik + hook + knapp).
-export {
-  resolveInstallMode,
-  resolveInstallButtonAction,
-  detectStandalone,
-  detectIos,
-} from './install-prompt';
-export type {
-  InstallUiMode,
-  InstallContext,
-  InstallButtonAction,
-  InstallButtonContext,
-} from './install-prompt';
+export { resolveInstallButtonAction, detectStandalone, detectIos } from './install-prompt';
+export type { InstallButtonAction, InstallButtonContext } from './install-prompt';
 export { useInstallPrompt } from './use-install-prompt';
 export type { InstallPromptApi } from './use-install-prompt';
 // Den kompakta install-knappen (T63, #113): ytan överst, en diskret "Installera som
@@ -84,4 +74,4 @@ export type { RegisterAppSw, AppSwCallbacks } from './register-sw';
 
 // Persistens-nycklar (exporteras så App-/integrationstester kan sätta dem för
 // att försätta appen i ett känt läge, t.ex. onboarding redan sedd).
-export { INSTALL_DISMISSED_KEY, ONBOARDING_DONE_KEY, HAPTICS_KEY, SOUND_KEY } from './storage-keys';
+export { ONBOARDING_DONE_KEY, HAPTICS_KEY, SOUND_KEY } from './storage-keys';

@@ -1,7 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useInstallPrompt } from './use-install-prompt';
-import { INSTALL_DISMISSED_KEY } from './storage-keys';
 import {
   registerInstallPromptCapture,
   resetInstallPromptCaptureForTest,
@@ -42,16 +41,16 @@ describe('useInstallPrompt, beforeinstallprompt-flöde', () => {
     resetInstallPromptCaptureForTest();
   });
 
-  it('är dold tills ett beforeinstallprompt-event fångats', () => {
+  it('faller till GUIDE tills ett beforeinstallprompt-event fångats (aldrig en död knapp)', () => {
     const { result } = renderHook(() => useInstallPrompt());
-    expect(result.current.mode).toBe('hidden');
+    expect(result.current.buttonAction).toBe('guide');
   });
 
-  it('går till PROMPT-läge när event:et fångas, och hindrar webbläsarens default', () => {
+  it('går till NATIVE-PROMPT när event:et fångas, och hindrar webbläsarens default', () => {
     const { result } = renderHook(() => useInstallPrompt());
     const event = fireBeforeInstallPrompt();
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(result.current.mode).toBe('prompt');
+    expect(result.current.buttonAction).toBe('native-prompt');
   });
 
   it('surfar ett event som fångades FÖRE mount (rotorsaken till T39, regressionsvakt)', () => {
@@ -62,68 +61,33 @@ describe('useInstallPrompt, beforeinstallprompt-flöde', () => {
     const event = fireBeforeInstallPrompt(); // fyras INNAN renderHook
     const { result } = renderHook(() => useInstallPrompt());
     expect(event.preventDefault).toHaveBeenCalled();
-    expect(result.current.mode).toBe('prompt');
+    expect(result.current.buttonAction).toBe('native-prompt');
     // Och klick på den ska kunna trigga prompt() på det tidigt-fångade event:et.
     act(() => result.current.promptInstall());
     expect(event.prompt).toHaveBeenCalledTimes(1);
   });
 
-  it('promptInstall() anropar event.prompt() och nollar läget (engångs-event)', () => {
+  it('promptInstall() anropar event.prompt() och nollar event:et (engångs-event -> guide)', () => {
     const { result } = renderHook(() => useInstallPrompt());
     const event = fireBeforeInstallPrompt();
     act(() => result.current.promptInstall());
     expect(event.prompt).toHaveBeenCalledTimes(1);
-    // Event:et kan bara användas en gång -> läget döljs efter prompten.
-    expect(result.current.mode).toBe('hidden');
+    // Event:et kan bara användas en gång -> knappen faller till guide-läget efteråt.
+    expect(result.current.buttonAction).toBe('guide');
   });
 
-  it('dismiss() persistar avfärdandet och döljer bannern (visas inte igen)', () => {
+  it('faller till GUIDE när appen installeras (appinstalled-event nollar event:et)', () => {
     const { result } = renderHook(() => useInstallPrompt());
     fireBeforeInstallPrompt();
-    expect(result.current.mode).toBe('prompt');
-    act(() => result.current.dismiss());
-    expect(result.current.mode).toBe('hidden');
-    expect(window.localStorage.getItem(INSTALL_DISMISSED_KEY)).toBe('1');
-  });
-
-  it('förblir dold vid en ny mount efter avfärdande (persistensen respekteras)', () => {
-    window.localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
-    const { result } = renderHook(() => useInstallPrompt());
-    fireBeforeInstallPrompt();
-    // Även om ett event kommer in ska ett tidigare avfärdande hålla bannern dold.
-    expect(result.current.mode).toBe('hidden');
-  });
-
-  it('döljer bannern när appen installeras (appinstalled-event)', () => {
-    const { result } = renderHook(() => useInstallPrompt());
-    fireBeforeInstallPrompt();
-    expect(result.current.mode).toBe('prompt');
+    expect(result.current.buttonAction).toBe('native-prompt');
     act(() => {
       window.dispatchEvent(new Event('appinstalled'));
     });
-    expect(result.current.mode).toBe('hidden');
+    // appinstalled speglar isStandalone -> hela ytan döljs (Daniels skarpa krav, #113).
+    expect(result.current.buttonAction).toBe('hidden');
   });
 
-  it('visar iOS-instruktion på iOS Safari (inget beforeinstallprompt finns där)', () => {
-    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
-      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari'
-    );
-    const { result } = renderHook(() => useInstallPrompt());
-    expect(result.current.mode).toBe('ios-instructions');
-  });
-
-  // T63 (#113): hooken exponerar nu också den kompakta knappens beslut (buttonAction)
-  // + isStandalone, härlett ur SAMMA event/plattform. Direkta kontrakt-tester här
-  // (InstallButton.test.tsx täcker end-to-end), särskilt den subtila regeln att
-  // `dismissed` INTE påverkar buttonAction (knappen är ingen avfärdbar banner).
-  it('buttonAction = native-prompt när ett event finns (T63)', () => {
-    const { result } = renderHook(() => useInstallPrompt());
-    expect(result.current.buttonAction).toBe('guide'); // ingen prompt än
-    fireBeforeInstallPrompt();
-    expect(result.current.buttonAction).toBe('native-prompt');
-  });
-
-  it('buttonAction = guide-ios på iOS (T63)', () => {
+  it('GUIDE-IOS på iOS Safari (inget beforeinstallprompt finns där)', () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
       'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari'
     );
@@ -131,16 +95,7 @@ describe('useInstallPrompt, beforeinstallprompt-flöde', () => {
     expect(result.current.buttonAction).toBe('guide-ios');
   });
 
-  it('buttonAction PÅVERKAS INTE av dismiss (knappen är ingen avfärdbar banner, T63)', () => {
-    // Avfärdande döljer den GAMLA bannern (mode -> hidden) men den kompakta knappen ska
-    // fortsatt fungera: en avvisad native-prompt faller till guiden, knappen försvinner inte.
-    window.localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
-    const { result } = renderHook(() => useInstallPrompt());
-    expect(result.current.mode).toBe('hidden'); // gamla banner-läget döljs
-    expect(result.current.buttonAction).toBe('guide'); // men knappen lever (guide-fallback)
-  });
-
-  it('isStandalone + buttonAction=hidden i app-läge (standalone, T63)', () => {
+  it('HIDDEN i app-läge (standalone): inget surr när appen redan är installerad, #113', () => {
     vi.spyOn(window, 'matchMedia').mockImplementation(
       (query: string) =>
         ({
@@ -155,7 +110,6 @@ describe('useInstallPrompt, beforeinstallprompt-flöde', () => {
         }) as unknown as MediaQueryList
     );
     const { result } = renderHook(() => useInstallPrompt());
-    expect(result.current.isStandalone).toBe(true);
     expect(result.current.buttonAction).toBe('hidden');
   });
 });

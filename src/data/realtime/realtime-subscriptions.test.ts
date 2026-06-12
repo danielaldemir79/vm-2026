@@ -175,4 +175,20 @@ describe('subscribeToTableChanges', () => {
     expect(warn.mock.calls[0][0]).toContain('CHANNEL_ERROR');
     warn.mockRestore();
   });
+
+  it('TYSTAR en status som anländer EFTER rivning (T70: inget CLOSED-brus i teardown)', () => {
+    // subscribe-callbacken är asynkron och kan fyra ett 'CLOSED' EFTER att vi rivit
+    // kanalen (unsubscribe) eller efter att jsdom tagits ner mellan testfiler. En sådan
+    // status är inte intressant (vi kopplar inte upp igen) och ska INTE loggas, annars
+    // brusar full-svit-teardown (rotorsaken till de intermittenta teardown-felen i #136).
+    const m = makeMockClient();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const unsubscribe = subscribeToTableChanges(baseConfig(m.client, vi.fn()));
+    unsubscribe(); // river kanalen (removed = true)
+    // Ett sent CLOSED som anländer efter rivningen ska tystas (väntad följd av VÅR
+    // egen removeChannel), inte loggas.
+    m.setStatus('CLOSED');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
