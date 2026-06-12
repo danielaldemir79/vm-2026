@@ -67,10 +67,32 @@ export interface LeaderboardEntry {
  * Poäng per medlem (summa över de tre tips-typerna mot facit).
  * ------------------------------------------------------------------ */
 
-/** Detalj-summa för en medlem: total + antal exakta match-träffar (för tiebreak). */
+/**
+ * Poäng UPPDELAD per tips-KÄLLA (T58, #99). En medlems total = summan av dessa fyra.
+ * Vi bär uppdelningen så detalj-vyn ("var kommer poängen ifrån?") kan läsa den ur
+ * SAMMA scoreMember-väg, i stället för en parallell omräkning (en sanning, HARD).
+ * Invariant (testad): match + group + bracket + champion === total.
+ */
+export interface ScoreBySource {
+  /** Match-resultat-tips (T15), poäng mot avgjorda matchers ordinarie mål. */
+  match: number;
+  /** Grupp-tips (T16), poäng mot klara gruppers 1:a/2:a. */
+  group: number;
+  /** Bracket-/slutspels-tips (T16), poäng mot avgjorda slotars avancerare (EXKL. mästaren). */
+  bracket: number;
+  /** VM-mästar-tipset (T16), poäng mot final-vinnaren. Skilt från bracket (egen rad i UI:t). */
+  champion: number;
+}
+
+/** En medlem helt utan poäng (alla källor 0). Delad noll-form (DRY). */
+const EMPTY_BY_SOURCE: ScoreBySource = { match: 0, group: 0, bracket: 0, champion: 0 };
+
+/** Detalj-summa för en medlem: total + antal exakta match-träffar (för tiebreak) + käll-uppdelning. */
 interface MemberScore {
   points: number;
   exactHits: number;
+  /** Per-källa-uppdelning, summerar till points (T58, #99). */
+  bySource: ScoreBySource;
 }
 
 /** Indexera facit-listorna för O(1)-uppslag per nyckel. */
@@ -91,11 +113,16 @@ function indexFacit(facit: PoolFacit): FacitIndex {
 }
 
 /**
- * Summera en medlems poäng över de tre tips-typerna mot facit. Ett tips bidrar
- * BARA om dess utfall finns i facit (= är avgjort); annars 0 (inget facit än).
+ * Summera en medlems poäng över de tre tips-typerna mot facit, UPPDELAT per källa
+ * (T58, #99). Ett tips bidrar BARA om dess utfall finns i facit (= är avgjort);
+ * annars 0 (inget facit än). `points` HÄRLEDS ur källsummorna (en addition, samma
+ * sanning som detalj-vyn läser), så totalen och käll-uppdelningen aldrig kan drifta.
  */
 function scoreMember(member: MemberPredictions, index: FacitIndex): MemberScore {
-  let points = 0;
+  let matchPoints = 0;
+  let groupPoints = 0;
+  let bracketPoints = 0;
+  let championPoints = 0;
   let exactHits = 0;
 
   // 1) Match-resultat-tips (T15): mot avgjord matchs ordinarie mål.
@@ -108,7 +135,7 @@ function scoreMember(member: MemberPredictions, index: FacitIndex): MemberScore 
       { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals },
       facit.actual
     );
-    points += p;
+    matchPoints += p;
     if (p === PREDICTION_POINTS.exact) {
       exactHits += 1;
     }
@@ -120,18 +147,20 @@ function scoreMember(member: MemberPredictions, index: FacitIndex): MemberScore 
     if (!facit) {
       continue; // gruppen ännu inte klar
     }
-    points += scoreGroupPrediction(
+    groupPoints += scoreGroupPrediction(
       { winnerTeamId: pred.winnerTeamId, runnerUpTeamId: pred.runnerUpTeamId },
       facit.actual
     );
   }
 
-  // 3) Bracket-/slutspels-tips (T16) + mästaren: mot avgjord slots avancerare.
+  // 3) Bracket-/slutspels-tips (T16) + mästaren: mot avgjord slots avancerare. Mästaren
+  // hålls i en EGEN summa (championPoints), inte bracketPoints: UI:t visar VM-vinnaren
+  // som en egen detalj-rad, och CHAMPION_SLOT_ID är inte en riktig bracket-slot.
   for (const pred of member.bracketPredictions) {
     if (pred.slotId === CHAMPION_SLOT_ID) {
       // Mästar-tipset: mot final-vinnaren (mästaren), om finalen är avgjord.
       if (index.champion !== null) {
-        points += scoreChampionPrediction(pred.advancingTeamId, index.champion);
+        championPoints += scoreChampionPrediction(pred.advancingTeamId, index.champion);
       }
       continue;
     }
@@ -139,10 +168,19 @@ function scoreMember(member: MemberPredictions, index: FacitIndex): MemberScore 
     if (!facit) {
       continue; // slotten ännu inte avgjord
     }
-    points += scoreBracketAdvance(facit.stage, pred.advancingTeamId, facit.advancingTeam);
+    bracketPoints += scoreBracketAdvance(facit.stage, pred.advancingTeamId, facit.advancingTeam);
   }
 
-  return { points, exactHits };
+  const bySource: ScoreBySource = {
+    match: matchPoints,
+    group: groupPoints,
+    bracket: bracketPoints,
+    champion: championPoints,
+  };
+  // Totalen HÄRLEDS ur källsummorna (inte en separat ackumulator), så invarianten
+  // "summan av källorna === total" gäller per konstruktion (T58 #99, en sanning).
+  const points = bySource.match + bySource.group + bySource.bracket + bySource.champion;
+  return { points, exactHits, bySource };
 }
 
 /* ------------------------------------------------------------------ *
@@ -231,7 +269,10 @@ export function buildLeaderboard(
 
   const lines: MemberLine[] = members.map((member) => {
     const preds = predictionsByUser.get(member.userId);
-    const score = preds ? scoreMember(preds, index) : { points: 0, exactHits: 0 }; // medlem utan tips: 0 poäng, men med i listan
+    // Medlem utan tips: 0 poäng (alla källor 0), men med i listan.
+    const score = preds
+      ? scoreMember(preds, index)
+      : { points: 0, exactHits: 0, bySource: EMPTY_BY_SOURCE };
     return {
       userId: member.userId,
       displayName: member.displayName,
@@ -242,4 +283,22 @@ export function buildLeaderboard(
 
   const sorted = [...lines].sort(compareEntries);
   return assignRanks(sorted);
+}
+
+/**
+ * Aktuell medlems poäng UPPDELAD per tips-källa + totalen (T58, #99). Härleds ur
+ * EXAKT samma scoreMember-väg som topplistan (samma poängfunktioner, samma facit),
+ * så detalj-vyn aldrig räknar om i en parallell väg (HARD, en sanning). Invariant:
+ * bySource.match + .group + .bracket + .champion === total (bevisat i testet).
+ *
+ * @param member  En medlems tre tips-typer (samma form aggregeringen tar).
+ * @param facit   Det härledda facit (derive-facit), allt i CODE-rymden.
+ * @returns       { bySource, total } för medlemmen mot facit.
+ */
+export function scoreMemberBreakdown(
+  member: MemberPredictions,
+  facit: PoolFacit
+): { bySource: ScoreBySource; total: number } {
+  const score = scoreMember(member, indexFacit(facit));
+  return { bySource: score.bySource, total: score.points };
 }
