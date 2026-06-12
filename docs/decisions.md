@@ -35,6 +35,9 @@ MATCH-tips-poäng DUBBLAS (×2, `JOKER_MULTIPLIER`, issue #19 "dubblar poängen"
 aggregering (scoreMember-vägen, EN sanning, summan==delarna-invarianten består). Eftersom jokern
 delas + poängsätts för ALLA medlemmar måste den persisteras (inte härledas). Migrationer
 `20260612150000_t19_room_jokers_schema.sql` + `..._t19_room_jokers_rls.sql`, applicerade LIVE.
+OBS precision (review-F3): live-versionsstämplarna är MCP-genererade (`20260612123326`/`123346`)
+och skiljer från filnamnens, samma kända nyans som T15/T16/T53/T67; SQL-innehållet är verifierat
+funktionellt identiskt mot live, en fresh `db reset` replayar samma slutläge under andra stämplar.
 
 **Beslut: EN joker per användare och KALENDERDAG (svensk tid).** "Per omgång" tolkas som per
 svensk kalenderdag (den naturliga VM-omgången, en dags matcher). Regeln upprätthålls STRUKTURELLT

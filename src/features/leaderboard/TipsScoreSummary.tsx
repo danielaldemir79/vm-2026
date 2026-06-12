@@ -173,7 +173,9 @@ export function TipsScoreSummary() {
             >
               <span aria-hidden="true" className="vm-badge-marker translate-y-px" />
               <span>{badge.label}</span>
-              <span className="sr-only"> , {badge.description}</span>
+              {/* Rent kolon i sr-only (review-F1): hus-stilens mellanslag-komma är en
+                  DOC-konvention, skärmläsare ska få naturlig interpunktion. */}
+              <span className="sr-only">: {badge.description}</span>
             </li>
           ))}
         </ul>

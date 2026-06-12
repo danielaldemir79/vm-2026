@@ -141,14 +141,24 @@ describe('joker dubblar match-poängen i aggregeringen', () => {
     expect(total).toBe(0);
   });
 
-  it('joker på en match medlemmen INTE tippade påverkar inget (ingen match-poäng att dubbla)', () => {
+  it('joker på en TIPPAD match dubblar just den matchens poäng (review-F2: sant namn)', () => {
     const board = buildLeaderboard(
       [member('u1', 'Anna')],
-      predsWithJoker(new Set(['g-A-2'])), // joker på g-A-2 som ÄR tippad -> kontroll: dubblas
+      predsWithJoker(new Set(['g-A-2'])), // joker på g-A-2 som ÄR tippad -> dubblas
       FACIT
     );
     // g-A-2 (3p) dubblas -> 6; g-A-1 3p; grupp 5p = 14.
     expect(board[0].points).toBe(14);
+  });
+
+  it('joker på en match medlemmen INTE tippade är en no-op (ingen match-poäng att dubbla)', () => {
+    const board = buildLeaderboard(
+      [member('u1', 'Anna')],
+      predsWithJoker(new Set(['g-B-1'])), // g-B-1 saknar tips från medlemmen
+      FACIT
+    );
+    // Baslinje utan dubbling: g-A-1 3p + g-A-2 3p + grupp 5p = 11.
+    expect(board[0].points).toBe(11);
   });
 
   it('exactHits (tiebreak) påverkas INTE av jokern (ett antal, inte poäng)', () => {
