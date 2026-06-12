@@ -5,6 +5,32 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T60 (#102): 4 röda baslinje-tester var tidskopplade, inte en regression
+
+**Symtom:** `feedback-seam.test.tsx` (3 fall) + `ResultEntryView.test.tsx` (1 fall, "Unable to find
+button /Spara/") failade konsekvent på develop, även isolerat, och normaliserade en röd svit.
+
+**ROTORSAK:** Alla fyra renderade `ResultEntryView` mot fixtures UTAN att frysa klockan och sparade
+premiärmatchen `g-A-1` (svensk dag 2026-06-11). `ResultEntryView`:s 3-dagars fönster (#39, commit
+6ce12ce/34fdd28) ankrar på "idag" när turneringen har börjat och DÖLJER (hidden, inte filtrerar bort,
+C2-designen) matcher utanför fönstret. Testing Librarys roll-/etikett-queries hoppar över
+hidden-subträd, så Spara-knappen + målfälten blev oåtkomliga. Testerna skrevs när 2026-06-11 låg i
+framtiden (ankaret = premiären, g-A-1 inom fönstret -> grönt). Dagen den verkliga väggklockan passerade
+premiär-fönstret (idag är 2026-06-12) gled fönstret till 12-14 juni, g-A-1 blev hidden och queryn
+slutade hitta knappen. Det var alltså en TIDSKOPPLAD test-röta, INGEN app- eller seam-regression:
+DOM:en var korrekt hela tiden (knappen finns i node-dumpen, bara inom ett hidden <li>).
+
+**Beslut:** Frys klockan till premiärdagen (`vi.useFakeTimers({ toFake: ['Date'] })` +
+`setSystemTime('2026-06-11T08:00:00.000Z')`) i båda testfilerna, exakt mönstret #39/C1/T28-blocken i
+samma fil redan använder. Då ankrar fönstret deterministiskt på 11-13 juni och g-A-1 är alltid synlig,
+oavsett vilken dag sviten körs. Ingen `.skip` (en riktig fix var rimlig), ingen produktionskodsändring.
+**Varför just premiärdagen:** det är den enda dag-ankringen som garanterat innehåller g-A-1, och den
+matchar systerblockens existerande tids-ankare (en sanning för "stabilt fönster i test").
+
+**Lärdom (mönster för minnet):** ett test som renderar en tids-fönstrad vy mot fast fixtures-data och
+läser den med a11y-queries MÅSTE frysa klockan, annars är det grönt bara så länge väggklockan råkar
+ligga i fönstret och rödnar tyst när tiden passerar gränsen.
+
 ## 2026-06-12 , T56 (#100): levande slutspelsträd redan under gruppspelet (preliminärt läge, ärligt märkt)
 
 Daniels live-feedback: "kolla även varför slutspelsträdet inte är levande nu direkt. även fast de
