@@ -5,6 +5,59 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T62/#111 (Gårdagens matcher i tips-fönstret) KLAR - PR #115 väntar på merge
+
+**Branch:** `feature/T62-tips-fonster-bakat` @ HEAD `f3a2147`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/115 mot `develop` (Closes #111, state: OPEN)
+**Board:** issue #111 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #111 MANUELLT och flyttar kort #111 till Done EFTER merge.
+
+**Vad T62 levererade:**
+- Rotorsak: tips-listans 3-dagars fönster ankrade bara framåt, gårdagens avgjorda matcher (de enda med T58-poäng) gled ut ur default-vyn utan "Visa alla".
+- Fix: `LOOKBACK_DAYS=1` införd i den delade `windowMatches`-hjälparen (igår + idag + 2 framåt), premiär-golv bevarat (inga tomma "förrgår"-rader dag 1), pariteten tips-vy/resultat-vy bevarad medvetet och dokumenterad, commit `f8fe0ed`.
+- T58-poäng-brickan bevisad synlig i default-vyn via callsite + render-test. "X öppna att tippa"-räknaren opåverkad. Negativ kontroll: LOOKBACK_DAYS=0 gav exakt 9 T62-tester röda (verifierat av oberoende granskare).
+- Copilot R1: fail-loud vid omvända fönster-nycklar (startDay > endDay kastar) + sann describe-rubrik, commit `f3a2147`.
+- Copilot R2: 0 fynd, exit.
+
+**Commits:**
+- `f8fe0ed` - fix(tips): utöka fönstret bakåt med igår så nyss spelade poäng syns (#111)
+- `f3a2147` - T62: copilot R1, fail-loud vid omvända fönster-nycklar + sann describe-rubrik (#111) - HEAD
+
+**Verifiering:** build EXIT 0, 1485+ gröna, 0 röda, lint/format rena. Lokal panel: PASS 7/7. Copilot: R1 2 fynd åtgärdade, R2 0 fynd, exit.
+
+**Acceptanskriterier issue #111 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: nyss avgjorda matcher med användarens poäng syns i tips-listans default-vy
+- [x] AC#2: fönster-logiken delad/härledd (ingen ny dubblett), LOOKBACK_DAYS i delade windowMatches
+- [x] AC#3: paritetsguarden tips-vy/resultat-vy uppdaterad medvetet (parity bevarad, dokumenterad)
+- [x] AC#4: tester + grönt + reviewad (build EXIT 0, 1485+ gröna, lokal panel PASS 7/7, Copilot R1+R2 exit)
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #115 (T62/#111, feature/T62-tips-fonster-bakat) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 115 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #111 manuellt (`gh issue close 111`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #111 till Done på boarden (nu i "In Review", projekt 2).
+> Merga även äldre öppna PR:er om de fortfarande är öppna: PR #112 (T54/#93), PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #115 REDAN mergad:
+> T62 klar. Nästa task i kön: **#113 (T63 ett-klicks-install)** - läs issuen noggrant, Daniels 2 förtydliganden: kompakt knapp överst, info BARA vid klick, native-prompt där det går, helt dold i standalone.
+> Därefter: #18 (realtid) -> #76 (T45) -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready. Ny kandidat från T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3+/4), 5 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook + T58-callsite-krav), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T61/#110 (Kopierade tips syns direkt) KLAR - PR #114 väntar på merge
 
 **Branch:** `feature/T61-copy-refresh` @ HEAD `ad74e76`
