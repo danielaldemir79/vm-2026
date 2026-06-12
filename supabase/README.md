@@ -120,6 +120,35 @@ i slutläget (verifierat mot `list_tables` + RLS-proven).
 "Multicolumn Indexes") och droppades, se `docs/decisions.md` T15 C10 (EXPLAIN-bevisat att PK:n
 servar alla tre query-formerna).
 
+## T18 (#18): Realtime , vilka tabeller broadcastas (och vilka INTE)
+
+Migrationen `t18_realtime_publication` lägger tre tabeller i `supabase_realtime`-
+publikationen så postgres_changes-händelser skickas till anslutna klienter:
+
+| Tabell | Varför med | Sekretess |
+|---|---|---|
+| `official_match_results` | Globalt facit (admin matar in) driver tracker + topplista live. | SELECT öppen (`omr_select_all`), inget att läcka. |
+| `room_match_results` | Rummets delade resultat syns live för medlemmar. | RLS `rmr_select_member` = `is_room_member`, bara medlemmar får raderna. |
+| `room_members` | En vän som går med syns live i rummet. | RLS `room_members_select_same_room`, bara samma-rum-medlemmar. |
+
+**predictions / group_predictions / bracket_predictions är MEDVETET UTELÄMNADE
+(sekretess-HARD):** andras tips är hemliga före avspark (RLS: eget alltid, andras bara
+`now() >= kickoff`). Även om postgres_changes respekterar RLS (Supabase "Realtime
+Authorization" -> "Interaction with Postgres Changes": rader skickas bara till klienter
+som får läsa dem) väljer vi försvar-på-djupet: ingen tips-tabell broadcastas, så det
+finns NOLL yta för en pre-avspark-tips att läcka via realtidskanalen. Tips-färskhet
+drivs i stället av att resultat-/medlemshändelserna triggar en TYST RE-FETCH i klienten
+(`tipsRefreshNonce`), som går genom RLS som vanligt. Se `docs/decisions.md` (T18).
+
+Verifierbart mot live: `select tablename from pg_publication_tables where pubname =
+'supabase_realtime' and schemaname = 'public'` ska ge exakt de tre tabellerna ovan
+(INTE någon predictions-tabell). Klient-seamen + sekretess-beviset (onChange får aldrig
+payloadens rad-data): `src/data/realtime/realtime-subscriptions.test.ts`.
+
+**Migration-historik (T18):** applicerad 1:1 från den committade filen via
+`apply_migration`; `list_migrations` visar `t18_realtime_publication` med version
+`20260612072518` (samma stämpel som filnamnet, ingen drift).
+
 ## Migrationer
 
 Migrationerna ligger i `supabase/migrations/` och är applicerade på projektet via

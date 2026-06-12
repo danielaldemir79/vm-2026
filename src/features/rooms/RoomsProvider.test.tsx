@@ -40,6 +40,22 @@ vi.mock('../../data/predictions', async (importActual) => {
   return { ...actual, copyMyPredictions: (...a: unknown[]) => copyApi.copyMyPredictions(...a) };
 });
 
+// REALTID (T18, #18): mocka realtids-seamen så vi fångar de options provider:n
+// registrerar (enabled, subscriptionKey, tables, onChange) och kan fyra en simulerad
+// postgres_changes-händelse manuellt, utan en riktig kanal.
+interface CapturedRealtime {
+  enabled: boolean;
+  subscriptionKey?: string | null;
+  tables: { table: string; filter?: string }[];
+  onChange: () => void;
+}
+const realtime = vi.hoisted(() => ({ lastOptions: null as CapturedRealtime | null }));
+vi.mock('../../data/realtime', () => ({
+  useRealtimeSubscription: (opts: CapturedRealtime) => {
+    realtime.lastOptions = opts;
+  },
+}));
+
 // En attrapp-klient räcker (provider:n skickar bara vidare den till API:t, som
 // är mockat). Injiceras via `client`-proppen så ingen riktig Supabase skapas.
 const fakeClient = {} as VmSupabaseClient;
@@ -79,6 +95,7 @@ function renderProvider(env: ImportMetaEnv, liveReady = true) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  realtime.lastOptions = null;
   // Rensa persistens-nyckeln mellan testerna (jsdoms localStorage delas annars),
   // så rum-persistens-testerna är isolerade.
   window.localStorage.clear();
@@ -190,6 +207,96 @@ describe('RoomsProvider, handlingar', () => {
     await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:none'));
     expect(screen.getByTestId('probe')).toHaveTextContent('rooms:0');
     expect(api.leaveRoom).toHaveBeenCalledWith(fakeClient, 'r1');
+  });
+});
+
+describe('RoomsProvider, realtid (T18, #18)', () => {
+  it('prenumerationen är vilande utan aktivt rum (enabled false)', async () => {
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    // Inget aktivt rum än -> ingen kanal ska öppnas.
+    expect(realtime.lastOptions).not.toBeNull();
+    expect(realtime.lastOptions!.enabled).toBe(false);
+  });
+
+  it('med aktivt rum: prenumererar på room_match_results + room_members filtrerat på rummet', async () => {
+    api.createRoom.mockResolvedValue({ id: 'r1', name: 'Nytt', code: 'bbb22' });
+    api.listMembers.mockResolvedValue([{ userId: 'me', displayName: 'Daniel' }]);
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    await act(async () => {
+      await store.createRoom('Nytt', 'Daniel');
+    });
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:Nytt'));
+
+    expect(realtime.lastOptions!.enabled).toBe(true);
+    expect(realtime.lastOptions!.subscriptionKey).toBe('r1');
+    expect(realtime.lastOptions!.tables).toEqual([
+      { table: 'room_match_results', filter: 'room_id=eq.r1' },
+      { table: 'room_members', filter: 'room_id=eq.r1' },
+    ]);
+  });
+
+  it('en Realtime-händelse re-fetchar rummets data OCH bumpar tips-räknaren', async () => {
+    api.createRoom.mockResolvedValue({ id: 'r1', name: 'Nytt', code: 'bbb22' });
+    api.listMembers.mockResolvedValue([{ userId: 'me', displayName: 'Daniel' }]);
+    api.listRoomResults.mockResolvedValue([]);
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    await act(async () => {
+      await store.createRoom('Nytt', 'Daniel');
+    });
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('members:1'));
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '0');
+
+    // Simulera att en vän gick med / matade in ett delat resultat: servern har ny data.
+    api.listMembers.mockResolvedValue([
+      { userId: 'me', displayName: 'Daniel' },
+      { userId: 'bob', displayName: 'Bob' },
+    ]);
+    api.listRoomResults.mockResolvedValue([
+      {
+        matchId: 'g-A-1',
+        homeGoals: 1,
+        awayGoals: 0,
+        penalties: null,
+        status: 'finished',
+        updatedBy: 'bob',
+      },
+    ]);
+
+    const callsBefore = api.listMembers.mock.calls.length;
+    // Fyra realtids-händelsen.
+    await act(async () => {
+      realtime.lastOptions!.onChange();
+    });
+
+    // Rummets data re-fetchades (members växte, resultat kom in)...
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('members:2'));
+    expect(screen.getByTestId('probe')).toHaveTextContent('results:1');
+    expect(api.listMembers.mock.calls.length).toBeGreaterThan(callsBefore);
+    // ...OCH tips-invaliderings-räknaren bumpades (tips-vyer/topplista hämtar om via RLS).
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '1');
+  });
+
+  it('subscriptionKey följer rum-bytet (ny filtrerad kanal per rum)', async () => {
+    api.joinRoomByCode.mockResolvedValueOnce({ id: 'rA', name: 'A', code: 'aaa11' });
+    api.listMembers.mockResolvedValue([]);
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    await act(async () => {
+      await store.joinRoom('aaa11', 'Daniel');
+    });
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('active:A'));
+    expect(realtime.lastOptions!.subscriptionKey).toBe('rA');
   });
 });
 

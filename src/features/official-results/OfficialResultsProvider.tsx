@@ -24,6 +24,7 @@ import {
 } from '../../data/official';
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
 import { isSupabaseConfigured, LIVE_READY } from '../../data';
+import { useRealtimeSubscription } from '../../data/realtime';
 import {
   OfficialResultsStoreContext,
   type OfficialResultsStatus,
@@ -156,6 +157,27 @@ export function OfficialResultsProvider({
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [enabled, supabase]);
+
+  // REALTID (T18, #18): prenumerera på det GLOBALA facit-bordet. När admin (Daniel)
+  // matar in ett officiellt resultat skickar Supabase en postgres_changes-händelse
+  // till ALLA anslutna klienter, och vi kör SAMMA tysta refresh som fokus/online gör.
+  // Då uppdateras hela tracker-kedjan (tabeller/träd/reveal, via useOfficialResultsSync)
+  // OCH topplistans poäng (useLeaderboardData väver in samma facit) live, utan reload.
+  // Vi merge:ar ALDRIG payloadens rad (härledd state): händelsen är bara signalen,
+  // refresh() hämtar färska rader genom RLS. Statisk prenumeration (facit är globalt,
+  // inget rum-filter). Skyddsnäten (fokus/online + minut-tick) är medvetet kvar.
+  useRealtimeSubscription({
+    enabled,
+    client: supabase,
+    channelName: 'vm2026-official-results',
+    tables: [{ table: 'official_match_results' }],
+    onChange: () => {
+      refreshRef.current().catch(() => {
+        // Samma fail-safe som fokus/online: en miss kraschar inte appen, nästa
+        // händelse/fokus försöker igen (vi har redan ett giltigt facit).
+      });
+    },
+  });
 
   const saveOfficialResult = useCallback(
     async (input: OfficialResultInput) => {

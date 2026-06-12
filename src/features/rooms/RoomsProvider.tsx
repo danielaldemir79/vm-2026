@@ -32,6 +32,7 @@ import {
 } from '../../data/rooms';
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
 import { isSupabaseConfigured, LIVE_READY } from '../../data';
+import { useRealtimeSubscription } from '../../data/realtime';
 import { copyMyPredictions, type CopyReport } from '../../data/predictions';
 import { WC2026_MATCHES } from '../../data/wc2026';
 import { RoomsStoreContext, type RoomsStatus, type RoomsStore } from './rooms-context';
@@ -215,6 +216,43 @@ export function RoomsProvider({
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [enabled, supabase, loadRoomData]);
+
+  // REALTID (T18, #18): prenumerera på det AKTIVA rummets delade data (medlemmar +
+  // delade resultat), filtrerat på rummet så vi bara väcks av relevanta ändringar.
+  // När en vän går med eller matar in ett delat resultat skickar Supabase en
+  // postgres_changes-händelse till de andra MEDLEMMARNA (RLS släpper bara rader till
+  // rum-medlemmar, så ingen utanför rummet väcks), och vi kör SAMMA tysta re-fetch som
+  // fokus/online + bumpar tips-invaliderings-räknaren så tips-vyerna/topplistan hämtar
+  // om sina RLS-synliga rader (avslöjade tips kommer in, dolda förblir dolda, sekretessen
+  // är server-side). Vi merge:ar ALDRIG payloadens rad (härledd state); händelsen är bara
+  // signalen, re-fetchen går genom RLS. subscriptionKey = rum-id, så ett rum-byte river
+  // den gamla kanalen och öppnar en ny filtrerad (cleanup vid rum-byte/unmount). Inget
+  // aktivt rum -> enabled false -> ingen kanal. Skyddsnäten (fokus/online + minut-tick)
+  // är medvetet kvar. Tips-tabellerna prenumererar vi INTE på (sekretess-HARD, se
+  // migrationen 20260612072518_t18_realtime_publication.sql).
+  const activeRoomId = activeRoom?.id ?? null;
+  useRealtimeSubscription({
+    enabled: enabled && activeRoomId !== null,
+    client: supabase,
+    channelName: 'vm2026-room',
+    subscriptionKey: activeRoomId,
+    tables:
+      activeRoomId !== null
+        ? [
+            { table: 'room_match_results', filter: `room_id=eq.${activeRoomId}` },
+            { table: 'room_members', filter: `room_id=eq.${activeRoomId}` },
+          ]
+        : [],
+    onChange: () => {
+      loadRoomData(activeRoomRef.current).catch(() => {
+        // Samma fail-safe som fokus/online: en miss kraschar inte appen.
+      });
+      // En delad ändring (nytt delat resultat / ny medlem) kan ändra vad topplistan/
+      // tips-avslöjandet ska visa, så väck den tysta tips-re-fetchen (samma seam som
+      // copyMyTips), den går genom RLS så sekretessen bevaras.
+      setTipsRefreshNonce((n) => n + 1);
+    },
+  });
 
   const createRoom = useCallback(
     async (name: string, displayName: string) => {
