@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Match } from '../../domain/types';
-import { windowMatches, WINDOW_DAYS } from './result-window';
+import { selectTodayMatches, windowMatches, WINDOW_DAYS } from './result-window';
 
 // En minimal schemalagd match (bara fälten fönster-urvalet bryr sig om: id +
 // kickoff). Samma stil som group-matches-by-day.test.ts.
@@ -259,6 +259,70 @@ describe('windowMatches, midnatts-gränsfall (svensk dag, inte UTC-dygn)', () =>
     // synas, en ren UTC-datumklippning (06-17) hade felräknat gränsen.
     const matches = [sched('midnight', '2026-06-17T22:00:00.000Z')];
     const result = windowMatches(matches, nowOn('2026-06-16'));
+    expect(result.visible.map((m) => m.id)).toEqual(['midnight']);
+    expect(result.hiddenCount).toBe(0);
+  });
+});
+
+describe('selectTodayMatches (tips-listans dagens-fönster, T68/#129)', () => {
+  it('visar BARA dagens matcher, döljer gårdagens OCH framtida', () => {
+    // Klockan FRYST: idag = 2026-06-16. Bara 16 juni-matcherna ska synas i default.
+    const matches = [
+      onDay('y', '2026-06-15'), // igår -> DOLD (skiljer sig från resultatvyns fönster)
+      onDay('t0', '2026-06-16'), // idag -> synlig
+      onDay('t1', '2026-06-16'), // idag -> synlig
+      onDay('tom', '2026-06-17'), // i morgon -> DOLD
+      onDay('far', '2026-06-25'), // långt fram -> DOLD
+    ];
+    const result = selectTodayMatches(matches, nowOn('2026-06-16'));
+    expect(result.visible.map((m) => m.id)).toEqual(['t0', 't1']);
+    expect(result.hiddenCount).toBe(3);
+    expect(result.anchorKey).toBe('2026-06-16');
+  });
+
+  it('bevarar indata-ordningen i visible (vyn äger ordningen)', () => {
+    const matches = [onDay('b', '2026-06-16'), onDay('a', '2026-06-16'), onDay('c', '2026-06-17')];
+    const result = selectTodayMatches(matches, nowOn('2026-06-16'));
+    expect(result.visible.map((m) => m.id)).toEqual(['b', 'a']);
+  });
+
+  it('turneringen EJ börjad -> visar premiärdagens matcher (inte tom port)', () => {
+    // Idag = 2026-06-01, VM börjar 11 juni. Default ska visa premiärdagen, annars
+    // vore tips-porten tom hela tiden före VM-start.
+    const matches = [
+      onDay('p0', '2026-06-11'), // premiär
+      onDay('p1', '2026-06-11'),
+      onDay('p2', '2026-06-12'), // dag efter premiär -> DOLD
+    ];
+    const result = selectTodayMatches(matches, nowOn('2026-06-01'));
+    expect(result.anchorKey).toBe('2026-06-11');
+    expect(result.visible.map((m) => m.id)).toEqual(['p0', 'p1']);
+    expect(result.hiddenCount).toBe(1);
+  });
+
+  it('idag är en VILODAG mitt i turneringen -> tom default (allt nås via expandera)', () => {
+    // Idag = 2026-06-20 (ingen match), turneringen pågår (matcher 18 + 22 juni).
+    // "Bara dagens" => tomt idag (Daniels regel), allt fälls ut.
+    const matches = [onDay('a', '2026-06-18'), onDay('b', '2026-06-22')];
+    const result = selectTodayMatches(matches, nowOn('2026-06-20'));
+    expect(result.visible).toEqual([]);
+    expect(result.hiddenCount).toBe(2);
+    expect(result.anchorKey).toBe('2026-06-20');
+  });
+
+  it('tom indata -> tom visible, hiddenCount 0, anchorKey null', () => {
+    const result = selectTodayMatches([], nowOn('2026-06-16'));
+    expect(result.visible).toEqual([]);
+    expect(result.hiddenCount).toBe(0);
+    expect(result.anchorKey).toBeNull();
+  });
+
+  it('en match 00:00 svensk tid räknas till den svenska dagen (inte UTC-dygnet)', () => {
+    // 2026-06-15 22:00 UTC = 2026-06-16 00:00 svensk tid (sommartid +2). Med idag =
+    // 2026-06-16 ska matchen synas som "idag", en ren UTC-datumklippning (06-15) hade
+    // felräknat den till "igår" och dolt den.
+    const matches = [sched('midnight', '2026-06-15T22:00:00.000Z')];
+    const result = selectTodayMatches(matches, nowOn('2026-06-16'));
     expect(result.visible.map((m) => m.id)).toEqual(['midnight']);
     expect(result.hiddenCount).toBe(0);
   });

@@ -135,10 +135,36 @@ describe('selectPredictableBracket', () => {
       new Date('2026-06-01T00:00:00Z')
     );
     expect(result.champion.slotId).toBe('champion');
-    // Alla 4 lagen (KISS, fritt val), som versal code.
-    expect(result.champion.teams.map((t) => t.code)).toEqual(['BRA', 'ARG', 'FRA', 'ESP']);
+    // Alla 4 lagen (KISS, fritt val), som versal code, ALFABETISKT sorterade på namn
+    // (T68/#129 punkt 12, sv-locale): Argentina, Brasilien, Frankrike, Spanien.
+    expect(result.champion.teams.map((t) => t.code)).toEqual(['ARG', 'BRA', 'FRA', 'ESP']);
     expect(result.champion.locked).toBe(false);
     expect(result.champion.deadlineIso).toBe(POOL_EXTENDED_DEADLINE_ISO);
+  });
+
+  it('CHAMPION (T68/#129): VM-mästar-listan är ALFABETISK på namn (svensk locale)', () => {
+    // Daniels spec punkt 12: bland alla lag är det enklast att hitta sitt lag när
+    // listan är i bokstavsordning. Lägg in lag i OORDNAD ordning + en med å/ä/ö (Österrike)
+    // så vi bevisar svensk kollation (Ö EFTER Z, inte som O). Indata-ordning != utdata.
+    const teams: Team[] = [
+      { id: 'ost', name: 'Österrike', code: 'OST', group: 'A' },
+      { id: 'bra', name: 'Brasilien', code: 'BRA', group: 'B' },
+      { id: 'arg', name: 'Argentina', code: 'ARG', group: 'C' },
+      { id: 'ang', name: 'Angola', code: 'ANG', group: 'D' },
+    ];
+    const result = selectPredictableBracket(
+      bracket([]),
+      teams,
+      MATCHES,
+      new Date('2026-06-01T00:00:00Z')
+    );
+    // Svensk ordning: Angola, Argentina, Brasilien, ... Österrike (Ö sist, efter Z).
+    expect(result.champion.teams.map((t) => t.name)).toEqual([
+      'Angola',
+      'Argentina',
+      'Brasilien',
+      'Österrike',
+    ]);
   });
 
   it('CHAMPION (T67): ÖPPEN igen efter turneringsstart, fram till fasta tiden (reopen)', () => {

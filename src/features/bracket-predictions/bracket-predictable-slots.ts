@@ -157,7 +157,16 @@ export function selectPredictableBracket(
   const championDeadlineIso = applyExtendedDeadline(deadlineIsoFor(CHAMPION_SLOT_ID, matchById));
   const champion: ChampionSlot = {
     slotId: CHAMPION_SLOT_ID,
-    teams: teams.map((t) => ({ code: teamCode(t.code), name: t.name })),
+    // VM-MÄSTAR-LISTAN SORTERAS ALFABETISKT (T68/#129, Daniels spec punkt 12): bland
+    // alla 48 lag är det enklast att hitta sitt lag när listan är i bokstavsordning.
+    // localeCompare med svensk locale ('sv') så å/ä/ö sorteras EFTER z (svensk
+    // kollation), inte som a/a/o (default Unicode-ordning skulle placera dem fel).
+    // Vi sorterar en KOPIA (teams muteras inte) på visningsnamnet (det användaren ser
+    // i väljaren). Match-SLOTSEN (M73..M104) nedan är binära (hemma/borta) och behåller
+    // sin naturliga ordning, bara champion-listan sorteras.
+    teams: teams
+      .map((t) => ({ code: teamCode(t.code), name: t.name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'sv')),
     locked: isLocked(championDeadlineIso, nowMs),
     deadlineIso: championDeadlineIso,
   };
