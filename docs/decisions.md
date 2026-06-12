@@ -35,6 +35,23 @@ stället för en andra provider = en andra Supabase-hämtning. Aktuell användar
 storen. **Varför hoist (inte T51:s prop-injektion):** providern NÅR båda sektionerna efter hoist, så
 den rena delningen via context är möjlig; prop-injektion behövs bara när providern inte når.
 
+**Beslut 4, poäng PER MATCH på själva tips-kortet (krav 1, KOMPLETTERING 2026-06-12):** den första
+versionen av T58 byggde den delade `matchPointLabel` + summeringen (besluten ovan) men kopplade ALDRIG
+in poäng-raden i tips-listan (`features/predictions`), så Daniels krav 1 ("under tippa matcherna ska
+poängen redovisas för VARJE match") var inte levererat. Nu visar `PredictionForm` , på en AVGJORD match
+användaren tippade , poängen + VARFÖR direkt i låst-etiketten: "+3 · Exakt resultat" / "+1 · Rätt
+vinnare" / "+1 · Rätt kryss" / "0 · Miss". **En sanning, ingen ny beräkning:** siffran kommer ur
+`scorePrediction`, typen ur `pointTypeOf`, orden ur den delade `matchPointLabel` (samma funktion
+avslöjande-vyn använder). Facit läses ur den VÄVDA matchdatan (`match.result` via `isFinished`-
+narrowing, exakt samma kontrakt som T57:s dag-kort), inte en ny källa. **Två ärliga gränser (HARD):**
+en PÅGÅENDE (låst men ospelad, status 'live') match visar BARA "Ditt tips", ingen poäng , vi gissar
+aldrig en poäng på en oavgjord match (T55-principen). En match användaren INTE tippade visar ingen
+poäng-rad alls , ingen "0 · Miss" för den som inte var med (det vore oärligt, hen bommade inte, hen
+deltog inte). Format-skillnad mot avslöjande-vyn (som skriver "Exakt resultat +3", ord-först): tips-
+listan skriver delta-FÖRST med en mittpunkt ("+3 · Exakt resultat"), orden är dock EXAKT samma
+(matchPointLabel), bara ordningen i brickan skiljer. Data-hakar: `data-tip-result`, `data-tip-points`,
+`data-tip-point-type` (för design-finish + test).
+
 ## 2026-06-12 , T57 (#98): dagens match-vy lever, fokus följer nästa match + dag följer verklig dag + resultat i listan
 
 **Beslut (fokus, krav 1):** "Match of the day" (hero-kortets fokus) väljs nu som dagens tidigaste

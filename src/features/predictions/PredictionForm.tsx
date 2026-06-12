@@ -18,6 +18,14 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { MatchContextRow } from '../results/MatchContextRow';
+import { isFinished } from '../daily';
+import {
+  matchPointLabel,
+  outcomeOf,
+  pointTypeOf,
+  scorePrediction,
+  type MatchPointType,
+} from '../../data/predictions';
 
 // Delade fält-klasser, SAMMA premium-formspråk som resultatinmatningen (#39):
 // stark tema-trogen fokus-ring (WCAG 2.4.7), mjuk hover. Färgen är accent
@@ -87,6 +95,58 @@ function isNonNegativeInteger(value: number | null): value is number {
 }
 
 /**
+ * Poäng-resultatet för MITT tips på en AVGJORD match: siffran + typen + VARFÖR-orden.
+ * EN sanning, allt härlett ur score.ts (pointTypeOf/scorePrediction) + den delade
+ * matchPointLabel (samma funktion avslöjande-vyn använder, #99 anti-dubblett). Bara
+ * relevant när matchen är 'finished' OCH jag tippade, annars finns ingen poäng att visa
+ * (en pågående match ger ALDRIG en gissad poäng, HARD T55, och en otippad match har
+ * inget tips att döma, alltså ingen "0 Miss"-rad för den som inte var med).
+ */
+interface MyMatchPoints {
+  /** Tilldelade poäng (3/1/0), ur scorePrediction (slår upp PREDICTION_POINTS via typen). */
+  points: number;
+  /** Poäng-TYPEN ('exact' | 'outcome' | 'miss'), data-hook + ord-uppslag. */
+  type: MatchPointType;
+  /** VARFÖR i ord ("Exakt resultat" / "Rätt vinnare" / "Rätt kryss" / "Miss"). */
+  reason: string;
+}
+
+/**
+ * Härled MITT poäng-resultat för matchen, eller null om det inte FINNS en poäng att
+ * visa ärligt. Returnerar null för en match som inte är avgjord (ingen gissad poäng,
+ * T55) och för en match jag inte tippade (current === null: inget tips att döma).
+ * När den returnerar ett värde är BÅDE siffran och orden samma sanning som topplistan.
+ */
+function myMatchPoints(
+  match: Match,
+  current: { homeGoals: number; awayGoals: number } | null
+): MyMatchPoints | null {
+  if (current === null || !isFinished(match)) {
+    return null;
+  }
+  // isFinished narrowar match.result till MatchResult (icke-null) via unions-kontraktet,
+  // så ingen egen null-check behövs. Poängen avgörs på ORDINARIE mål (score.ts-regeln);
+  // straffar rör inte tips-poängen (de styr slutspelsTRÄDET, inte tipset).
+  const actual = match.result;
+  const type = pointTypeOf(current, actual);
+  return {
+    points: scorePrediction(current, actual),
+    type,
+    // Utfalls-medveten (#69): "Rätt kryss" på ett oavgjort facit, aldrig "Rätt vinnare".
+    reason: matchPointLabel(type, outcomeOf(actual)),
+  };
+}
+
+/**
+ * Poäng-tillägget i ord för tips-radens bricka: "+3", "+1" eller "0". Ett 0 får inget
+ * plustecken (det är ingen vinst). Samma talform som avslöjande-vyns formatPointDelta,
+ * men ordningen här är delta-FÖRST ("+3 · Exakt resultat"), tips-listans format.
+ */
+function formatPointDelta(points: number): string {
+  return points > 0 ? `+${points}` : `${points}`;
+}
+
+/**
  * Biljett-/kupong-ikonen (kupong-huvudets dekor-glyf): en liten perforerad biljett.
  * Ren dekoration (aria-hidden), den ger kupong-känslan utan att bära text.
  */
@@ -144,6 +204,12 @@ export function PredictionForm({
   const away = teamName(match.awayTeamId, teamsById);
   const homeCode = teamCode(match.homeTeamId, teamsById);
   const awayCode = teamCode(match.awayTeamId, teamsById);
+
+  // MITT poäng-resultat (siffra + varför) för en AVGJORD match jag tippade, annars null.
+  // Visas i låst-etiketten bredvid "Ditt tips". En pågående (men låst) match ger null
+  // -> bara "Ditt tips", ingen gissad poäng (HARD T55). En otippad avgjord match ger
+  // också null (current === null) -> ingen "0 Miss"-rad för den som inte var med (ärligt).
+  const points = myMatchPoints(match, current);
 
   // Seeda fälten från mitt nuvarande tips (redigera = se det jag tippat).
   const [homeGoals, setHomeGoals] = useState<string>(current ? String(current.homeGoals) : '');
@@ -267,19 +333,47 @@ export function PredictionForm({
             <span className="mt-0.5 shrink-0 text-warning">
               <CouponLockIcon />
             </span>
-            <p className="m-0 text-[0.8125rem] font-semibold leading-snug text-fg">
-              Tipset är låst, matchen har sparkat igång.{' '}
-              <span className="font-medium text-fg-muted">
-                Låst vid avspark, så alla tippar blint, det är spelets rättvisa.
-              </span>{' '}
-              {current ? (
-                <span className="whitespace-nowrap">
-                  Ditt tips: {current.homeGoals}–{current.awayGoals}.
+            <div className="m-0 flex flex-col gap-1.5">
+              <p className="m-0 text-[0.8125rem] font-semibold leading-snug text-fg">
+                Tipset är låst, matchen har sparkat igång.{' '}
+                <span className="font-medium text-fg-muted">
+                  Låst vid avspark, så alla tippar blint, det är spelets rättvisa.
+                </span>{' '}
+                {current ? (
+                  <span className="whitespace-nowrap">
+                    Ditt tips: {current.homeGoals}–{current.awayGoals}.
+                  </span>
+                ) : (
+                  <span className="text-fg-muted">Du hann inte tippa.</span>
+                )}
+              </p>
+
+              {/* POÄNG-RADEN (T58 krav 1): på en AVGJORD match jag tippade visas poängen
+                  + VARFÖR direkt på tips-kortet ("+3 · Exakt resultat" / "+1 · Rätt kryss"
+                  / "0 · Miss"). Härlett ur SAMMA poäng-väg som topplistan (scorePrediction
+                  + matchPointLabel, en sanning, ingen ny beräkning). Visas BARA när points
+                  finns: en pågående låst match ger inget (T55, inga gissade poäng), och en
+                  match jag inte tippade ger inget (ingen "0 Miss" för den som inte var med).
+                  data-tip-points/-point-type = stabila hakar för design + test. */}
+              {points ? (
+                <span
+                  data-tip-result=""
+                  data-tip-points={points.points}
+                  data-tip-point-type={points.type}
+                  className={`inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none ${
+                    points.type === 'exact'
+                      ? 'vm-coupon-mine'
+                      : 'border border-[color-mix(in_srgb,var(--vm-gold)_28%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_7%,var(--color-bg))] text-fg'
+                  }`}
+                >
+                  <span className="tabular-nums">{formatPointDelta(points.points)}</span>
+                  <span aria-hidden="true" className="text-fg-muted">
+                    ·
+                  </span>
+                  <span>{points.reason}</span>
                 </span>
-              ) : (
-                <span className="text-fg-muted">Du hann inte tippa.</span>
-              )}
-            </p>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
