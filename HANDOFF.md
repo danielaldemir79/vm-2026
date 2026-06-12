@@ -5,6 +5,73 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T66/#121 (kommentarer i rummet) KLAR - PR #125 väntar pa merge
+
+**Branch:** `feature/T66-kommentarer` @ HEAD `7510789`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/125 mot `develop` (Closes #121, state: OPEN)
+**Board:** kort #121 tillagd och satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekraftat).
+**T67-retro:** PR #124 (feature/T67-deadline-21juni) REDAN MERGAD fore denna journalist-korning. Kort #123 satts till "Done".
+
+**Vad T66 levererade:**
+- Ny tabell `room_comments` (id, room_id, user_id, content, created_at): schema + RLS live-applicerad 1:1 mot Supabase via MCP.
+- RLS-bevis med 3 riktiga sessioner: anon nekas, utomstande rum nekas, agare-delete bevisat. Icke-medlem kan varken lasa eller skriva.
+- Realtime: ny kanal `room_comments:{roomId}` via befintlig signal-inte-data-infra (T18). INSERT-event triggar tyst refetch.
+- Input-validering: langdgrans (max 500 tecken), XSS-sakert via React-textrendering.
+- Chatt-design med AA-matningar (min 4.5:1), scroll till senaste meddelande, aria-live-region.
+- Review-F1 (design-frontend): ivrig modul-konstant brot 2 orelaterade testfiler via barrel-mockar. Latat till funktion. Lesson skriven.
+- 1552 grona tester / 158 filer, build EXIT 0, lint/format rena. Reviewer: FAIL->atgardad->PASS.
+
+**T67-retro (PR #124 mergad, retroaktivt dokumenterad):**
+- pool_extended_deadline flytad 14/6 -> 21/6 (2026-06-21T21:59:00Z), live-applicerad + bevisad via read-only SQL.
+- Klient-paritet mutations-vaktad: POOL_EXTENDED_DEADLINE_ISO = DB-instanten, en sanning.
+- Forkorta-aldrig vaktas syntetiskt (ingen grupp brod granssen).
+- Reviewer PASS, F1: MCP oversatte svensk SQL-kommentar till engelska i live-migrationens body - precisions-not tillagd i decisions.md.
+
+**Commits (T66):**
+- `a41fc4d` - T66 (#121): kommentarer i rummet (schema + RLS + Realtime + klient)
+- `f16eb34` - T66 (#121): premium chatt-finish (design, AA, aria)
+- `7510789` - T66: review-F1, countWarnAt lat funktion i stallet for ivrig modul-konstant (#121) - HEAD
+
+**Verifiering:** build EXIT 0, 1552 grona, 0 roda, lint/format rena. Lokal reviewer PASS.
+
+**Acceptanskriterier issue #121 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Rumsmedlem kan skriva + se kommentarer i sitt rum, live utan reload
+- [x] AC2: Icke-medlem ser/skriver inget (RLS-bevisat med 3 riktiga sessioner)
+- [x] AC3: Radera egen kommentar, aldrig andras
+- [x] AC4: Langdgrans + saker rendering, tester, gront + reviewad
+
+**FORTSATTNINGS-PROMPT (autonom ko):**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #125 (T66/#121, feature/T66-kommentarer) ANNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 125 --merge --repo danielaldemir79/vm-2026`.
+> Stang issue #121 manuellt (`gh issue close 121`).
+> Flytta kort #121 till Done pa boarden (nu i "In Review", projekt 2, item PVTI_lAHODcT4Cc4BaIWPzgvihIc).
+> Merga aven aldre oppna PR:er om de fortfarande ar oppna: PR #122 (T65/#119), PR #120 (T64/#118), PR #116 (T63/#113), PR #115 (T62/#111), PR #114 (T61/#110), PR #117 (T18/#18), PR #112 (T54/#93), PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stang resp. issue och flytta till Done.
+>
+> Om PR #125 REDAN mergad:
+> T66 klar. Nasta task i kon: **#76 (T45 admin-statistik)** - las issuen noggrant.
+> Darefter: #19 -> #24 -> #64 -> D-resten.
+>
+> Bar framat (alla tasks):
+> - **#35 (arena/stad):** venue = platshallar.
+> - **FNV-hash:** konsolidera vid 3:e anvandning.
+> - **Stegnings-dubblett:** extrahera vid 3:e anvandning.
+> - **#48 (demo-chip a11y):** kort i Ready. 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **Lean-stad-kandidat (T63):** resolveInstallMode/dismiss-maskineriet produktions-dott, pinnat for framtida task.
+> - **T16b-pin:** slot-tippbarhet ur simulering = eget framtida server-side-beslut.
+> - **"Behover Daniel"-ko:** push-notiser (T22), befordran kommentar-pastar Forekomst 6 (reviewer.md, vantar godkannande), 3 aldre befordringar (Forekomst 3+/4), 5 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook + T58-callsite-krav), FIFA-juni-ranking, release-granssen, #39-F1-produktbeslut, T48b.
+> - **Daniels process-beslut:** Copilot-loopen PAUSAD, lokala granskningen ar sista grinden. Aterstarts nar lanseringstrycket ar over.
+> - **Vakthund-rutinen (2026-06-12):** varje vantan far deadline + eskalering, nasta steg dispatchas i samma tur.
+> - **T26 DR-webb-inbaddning:** SKIPPAD, stangd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vagen till slutet.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T65/#119 (föreslå-knapp) KLAR - PR #122 väntar på merge
 
 **Branch:** `feature/T65-foresla-knapp` @ HEAD `3c39b1e`
