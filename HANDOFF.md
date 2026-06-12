@@ -5,6 +5,69 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T4c (#35) arena/stad per match , PR #141 mot develop , KLAR
+
+**Branch:** `feature/T4c-arena-stad` @ HEAD `c0fb8dc`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/141 mot `develop` (Closes #35, state: OPEN)
+**Live preview:** varje commit till branchen syns via Cloudflare PR-preview. Develop-main: vm-2026.pages.dev
+
+### Vad T4c levererade
+
+T4b:s matches.ts hade ett `VENUE_UNKNOWN`-platshallare per match (gissa-aldrig-policy). T4c fyller
+arenan + vaardstaden per match ur FIFAs officiella spelschema, alla 104 matcher, for alla 16 arenor
+i USA/Mexiko/Kanada. Inga arenor handskrivna i matches.ts - allt ar sparbat till kallan.
+
+**Leveranser (commit 6f5c97a):**
+- `src/data/wc2026/venue-source.txt` - gold source, en rad per match (MATCH_ID | venue=Arena, Stad | match=etikett)
+- `src/data/wc2026/venue-parser.ts` - ren parser, fail-loud pa okant id / dubblett / saknad match
+- `src/data/wc2026/venue-source.test.ts` - 22 tester: regenerera-och-diffa + mutationstest + 104/16-integritet + AT&T=9-aggregat-korskoll
+- `src/data/wc2026/matches.ts` - regenererad (BARA venue-faltet aendrat, byte-identisk kickoff/lag/id)
+- `docs/decisions.md` - T4c-blocket med 16-arenors-tabell + kallfoerteckning + avvikelseflagg
+
+**Copilot R1-fix (commit c0fb8dc):** kommentar-referensen "funktionen tsString i team-profiles-parser.ts"
+rattad att peka pa funktionens egen fil.
+
+**Kallor (haamtade 2026-06-12):**
+- PRIMAR: FIFAs spelschema via Wikipedia + Al Jazeera + Wikipedia knockout stage
+- KORSKOLL: MLSSoccer, ESPN, Wikipedia per-grupp-sidor, matchrapporter for spelade matcher
+- AVVIKELSE LOEST: g-G-1 (Belgien-Egypten) - Al Jazeera sade Vancouver, 4 andra kaller sager
+  Lumen Field Seattle. Vald Seattle (4 mot 1, inklusive arenans egen event-sida).
+
+**Verifiering (HEAD c0fb8dc):** build EXIT 0, npm test 1727 groena/48 skip/0 fail (178 filer),
+lint + format:check EXIT 0. Lokal panel GODKAEND (egna fakta-stickprov mot externa kallor, alla groena;
+F1 kosmetisk testsiffra i commit-meddelandet, uttryckligen avvisad). Copilot R1: 1 trivialt fynd,
+atgaardat i c0fb8dc.
+
+**Acceptanskriterier issue #35 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Alla 104 matcher har verifierad arena + vaardstad, inga platshallare
+- [x] AC2: Gold source + parser + regenerera-och-diffa-test (samma monster som T4/T4b)
+- [x] AC3: Matches.ts regenererad, BARA venue-faeltet aendrat
+- [x] AC4: Build, test, lint groent; lokal panel PASS; Copilot R1 atgaerdat
+
+### Nasta steg
+
+**Om PR #141 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 141 --merge --repo danielaldemir79/vm-2026`.
+Stang issue #35: `gh issue close 35`. Flytta kort #35 till Done pa boarden.
+
+**Om PR #141 REDAN mergad:**
+T4c klar. Naasta och SISTA task i Daniels beordrade koe: **#23 (T23 pinnat favoritlag + personlig statistik)**.
+Koe tom efter T23 (issue #20/#21/#22 staangda not planned).
+
+Skippade tasks: #20/#21/#22 staangda not planned - dessa ska INTE byggas.
+
+**Behoever-Daniel-listan (oforaendrad fran T44):**
+- Befordringar (vaantar pa godkaannande): kommentar-pastar Forekomst 8, uttommande-test Forekomst 3,
+  pastar-filer-saknas Forekomst 3 (journalist).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- Release-graansen develop->main: naer ska main fa en formell release?
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T48b: recoverable admin-login (#81 OPEN).
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- Board-kort #129/#132/#136: verifiera att de visas som Done i GitHub Projects.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T44 (#75) footer-promo , PR #140 mot develop , Copilot-loopen aterupptas
 
 **Branch:** `feature/T44-footer-promo` @ HEAD `267017b`
