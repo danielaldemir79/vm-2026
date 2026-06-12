@@ -26,8 +26,9 @@ import {
  * det sätt PWA-installation skiljer sig per plattform (se install-prompt.ts):
  *   - 'android': Chrome/Android, install-knappen finns (beforeinstallprompt) + en
  *     lugnande Play Skydd-rad.
- *   - 'ios':     iPhone/iPad Safari, ingen install-knapp finns, manuell väg via
- *     Dela-menyn, och Safari KRÄVS (Chrome på iOS kan inte lägga till på hemskärmen).
+ *   - 'ios':     iPhone/iPad, ingen install-knapp finns, manuell väg via Dela-menyn.
+ *     Safari REKOMMENDERAS (enklast), men sedan iOS 16.4 funkar Dela-menyn även i
+ *     Chrome m.fl. (se IOS_SAFARI_REQUIREMENT, review-F1-rättad).
  *   - 'desktop': dator, install-ikon i adressfältet.
  * Övriga vägar är alltid nåbara bakom flikar i dialogen (en vän kan ha fel gissad
  * plattform, eller vilja hjälpa någon med en annan enhet).
@@ -52,8 +53,9 @@ export interface GetStartedPath {
   steps: readonly GetStartedStep[];
   /**
    * En extra, dämpad rad under stegen: på Android den lugnande Play Skydd-noten,
-   * på iOS det hårda Safari-kravet. null när vägen inte behöver någon. Skild från
-   * stegen så UI:t kan rendera den med egen (dämpad/varnande) ton.
+   * på iOS Safari-rekommendationen (bra-att-veta, inget exklusivt krav, review-F1).
+   * null när vägen inte behöver någon. Skild från stegen så UI:t kan rendera den
+   * med egen (dämpad) ton.
    */
   note: string | null;
 }

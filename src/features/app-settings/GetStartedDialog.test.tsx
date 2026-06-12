@@ -154,7 +154,7 @@ describe('GetStartedDialog, rätt instruktion för rätt enhet (plattformsgrenar
 
     const iosTab = within(dialog).getByRole('tab', { name: 'På iPhone' });
     expect(iosTab).toHaveAttribute('aria-selected', 'true');
-    // Det hårda Safari-kravet ska synas på iOS-vägen.
+    // Safari-rekommendationen (review-F1: inget hårt krav) ska synas på iOS-vägen.
     expect(within(dialog).getByText(IOS_SAFARI_REQUIREMENT)).toBeInTheDocument();
   });
 
