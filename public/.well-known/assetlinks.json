@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.vm2026.twa",
+      "sha256_cert_fingerprints": [
+        "PLACEHOLDER_PLACEHOLDER_PLACEHOLDER_PLACEHOLDER_PLACEHOLDER_FILL_IN_AFTER_PLAY_APP_SIGNING_SEE_DOCS_TWA_GUIDE"
+      ]
+    }
+  }
+]

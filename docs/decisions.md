@@ -5,6 +5,87 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T36 (#64): TWA-vägen runt Play Protect-varningen, utredd + assetlinks förberedd
+
+**Bakgrund:** T30 (#50) fastställde att Play Protect-varningen "byggd för en äldre version av Android"
+styrs av WebAPK:ns `targetSdkVersion`, som sätts av webbläsarens MINTNINGSSERVER (Chrome/Google eller
+Samsung Internet), inte av vårt manifest, och alltså ligger UTANFÖR vår kontroll. Daniel ser ändå
+varningen och accepterar inte att leva med den. T36 utreder en VÄG RUNT: paketera PWA:n som en
+**Trusted Web Activity (TWA)** , en riktig, signerad Android-app , och publicera via Google Play.
+
+**Beslut / slutsats (research-tung, gissa-aldrig, allt källhänvisat):**
+
+En **Play-publicerad TWA får INTE Play Protect-varningen.** Kedjan, verifierad mot officiella källor:
+1. Varningen triggas BARA när appens `targetSdkVersion` är mer än 2 nivåer under enhetens Android-API-
+   nivå. Källa: Google, "Developer Guidance for Google Play Protect Warnings"
+   (https://developers.google.com/android/play-protect/warning-dev-guidance), exakt: "These Play Protect
+   warnings will show only if the app's targetSdkVersion is more than 2 versions lower than the current
+   Android API level."
+2. Google Play KRÄVER sedan 2025-08-31 att nya appar och uppdateringar targetar **Android 15 (API 35)**
+   eller högre. Källa: Play Console Help, "Meet Google Play's target API level requirement"
+   (https://support.google.com/googleplay/android-developer/answer/11926878), exakt: "New apps and app
+   updates must target Android 15 (API level 35) or higher to be submitted to Google Play." En TWA
+   byggd och uppladdad NU får alltså en aktuell targetSdk , varningens utlösande villkor uppfylls inte.
+3. Appen signeras dessutom (Play App Signing, krav sedan augusti 2021), och Play Protect blockerar
+   osignerade/felsignerade APK:er. En korrekt signerad, targetSdk-aktuell Play-app faller alltså utanför
+   BÅDA utlösarna. Skillnaden mot dagens WebAPK: där sätts targetSdk av browser-mintningen (33, gammal),
+   här av vårt eget bygge (35+) + Play.
+
+**Vad TWA-vägen KRÄVER (källhänvisad krav-lista):**
+- **Google Play Developer-konto: 25 USD ENGÅNGSAVGIFT** (inte årlig, till skillnad från Apple). Källa:
+  Play Console Help, "Get started with Play Console"
+  (https://support.google.com/googleplay/android-developer/answer/6112435) + flera 2026-bekräftelser.
+  **= Daniels beslut, kräver hans konto, kan inte göras autonomt.**
+- **Paketeringsverktyg.** PWABuilder (GUI, lättast) ELLER Bubblewrap (Googles officiella CLI).
+  PWABuilder kör Bubblewrap under huven , samma output (`.aab` för Play + `.apk` för test). Källa:
+  Google codelab "Adding Your PWA to Google Play" (https://developers.google.com/codelabs/pwa-in-play)
+  + pwa-builder/pwabuilder-google-play (README). Rekommendation till Daniel: PWABuilder (ingen lokal
+  JDK/Android-SDK, allt i webben), Bubblewrap som alternativ om han vill ha CLI-kontroll.
+- **Digital Asset Links (`assetlinks.json`)** på sajtens rot under `/.well-known/`, som binder appen till
+  vm-2026.pages.dev. relation = `delegate_permission/common.handle_all_urls`, namespace = `android_app`,
+  plus package_name + SHA-256-fingerprinten från **Play App Signing** (Play Console -> Setup -> App
+  integrity). Källor: Chrome for Developers, "Android Concepts for Web Developers"
+  (https://developer.chrome.com/docs/android/trusted-web-activity/android-for-web-devs) + PWABuilder
+  Asset-links.md. **Fingerprinten finns först EFTER signering , Daniels steg.**
+- **TWA-kvalitetskriterier:** PWA:n måste vara installerbar och nå Lighthouse performance-score >= 80.
+  Källa: Chromium Blog, "Changes to quality criteria for PWAs using Trusted Web Activity"
+  (https://blog.chromium.org/2020/06/changes-to-quality-criteria-for-pwas.html). VM 2026 är redan en
+  installerbar PWA (T30-manifestet), så detta är sannolikt uppfyllt , verifieras med Lighthouse.
+- **Store-listning + granskning:** Play kräver app-namn, ikon, beskrivning, skärmdumpar, integritets-
+  policy + innehållsklassificering, och en granskningstid (timmar-dagar för nya konton). Daniels steg.
+
+**Alternativen som övervägdes:**
+- **Vänta på WebAPK-fix?** Avvisat som enda lösning: targetSdk-bumpen ligger hos browser-leverantörerna
+  (särskilt Samsung Internets egen pipeline, T30) och har ingen utlovad tidpunkt. TWA är det enda vi
+  KAN styra själva.
+- **PWABuilder vs Bubblewrap:** se ovan , samma resultat, PWABuilder enklare för Daniel.
+
+**Vad som LEVERERADES NU (utan Daniels Play-konto):**
+1. `public/.well-known/assetlinks.json` , en korrekt strukturerad STUB med en MEDVETEN platshållar-
+   fingerprint (måste bytas efter signering). Källankrat av `src/pwa/assetlinks.test.ts` (giltig JSON +
+   exakt relation/namespace + platshållaren kvar).
+2. `docs/twa-guide.md` , pedagogisk svensk steg-för-steg för Daniel (PWABuilder/Bubblewrap, konto,
+   signering, assetlinks, upload) + en numrerad "Behöver Daniel"-lista.
+
+**Cloudflare Pages + `.well-known` (ärlig osäkerhet, MÅSTE verifieras efter deploy):** LOKALT bevisat
+att `vite build` kopierar `public/.well-known/` -> `dist/.well-known/` och att `vite preview` serverar
+`/.well-known/assetlinks.json` (HTTP 200, `application/json`). Det som INTE gått att verifiera autonomt
+(Daniel offline, ingen deploy-access): att Cloudflare Pages serverar en dot-prefixad mapp på edge. Det
+finns motstridiga community-rapporter om att Pages historiskt strippat dotfiler; den fixen (cloudflare/
+wrangler-legacy PR #1566) gällde dock det GAMLA Workers-Sites-flödet, inte nödvändigtvis Pages. Cloudflares
+egen dokumentation listar det INTE som känd begränsning och refererar själv till `/.well-known/acme-
+challenge/`, men det är inget garanti-bevis. **Efter nästa deploy: `curl -i https://vm-2026.pages.dev/.well-known/assetlinks.json`
+ska ge 200 + JSON, inte index.html.** Misslyckas det finns dokumenterade fallbackar i twa-guiden
+(`_redirects`, Pages Function, eller Worker framför Pages). Filen är korrekt , bara serverings-vägen
+kan behöva ett extra handgrepp.
+
+**Avgränsning (ärlig):** Issue #64:s punkt 3 (förbättra själva install-instruktionen i appen, tydligare
+än T30:s rad) ligger UTANFÖR denna tasks dispatch-scope (research + TWA-förberedelse). Den befintliga
+`ANDROID_PLAY_PROTECT_NOTE` (T30) finns kvar och visas i kom-igång-guiden. Punkt 3 lämnas som ett eget
+nästa-steg (se handoff Next), så denna task håller fokus och inte sväller.
+
+---
+
 ## 2026-06-12 , T24-visuellt (#24, design-frontend): reaktionsradens premium-finish, AA UPPMÄTT i båda teman
 
 **Beslut:** Den visuella finishen på reaktionsraden bor i `rooms.css` §9 (`.vm-reaction-*`), samma seam
