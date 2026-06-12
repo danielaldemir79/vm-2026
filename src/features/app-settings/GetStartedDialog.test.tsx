@@ -192,8 +192,9 @@ describe('GetStartedDialog, rätt instruktion för rätt enhet (plattformsgrenar
       'aria-selected',
       'true'
     );
-    // iOS-stegen (Dela-knappen) + Safari-kravet syns nu.
-    expect(within(dialog).getByText(/Dela-knappen/i)).toBeInTheDocument();
+    // iOS-stegen + Safari-rekommendationen syns nu. getAllByText eftersom
+    // "Dela-knappen" förekommer både i steg-texten och i F1-rättade noten.
+    expect(within(dialog).getAllByText(/Dela-knappen/i).length).toBeGreaterThan(0);
     expect(within(dialog).getByText(IOS_SAFARI_REQUIREMENT)).toBeInTheDocument();
   });
 

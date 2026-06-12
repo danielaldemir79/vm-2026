@@ -62,17 +62,18 @@ export interface GetStartedPath {
 // importerad ovan), så samma sanning visas i install-bannern OCH här (ingen drift).
 
 /**
- * Det hårda iOS-kravet: "Lägg till på hemskärmen" finns BARA i Safari på iPhone/iPad,
- * inte i Chrome (eller andra webbläsare) på iOS. Det är en plattformsbegränsning, inte
- * ett val: på iOS använder alla webbläsare Apples WebKit, men Apple exponerar bara
- * "Add to Home Screen" via Safaris egen Dela-meny, inte för tredjeparts-webbläsare.
- * Att INTE säga det leder en Chrome-på-iOS-användare in i en återvändsgränd (Daniels
- * feedback-poäng). Källa: Apple "Add a website to your Home Screen" (iPhone-användar-
- * guide) som beskriver flödet via Safaris Dela-knapp; den saknas i Chrome iOS.
+ * iOS-rekommendationen (review-F1-rättad, verifierad 2026-06-12): Safari är den
+ * ENKLASTE och mest välbekanta vägen, men sedan iOS 16.4 (mars 2023) kan även
+ * tredjeparts-webbläsare på iOS (Chrome/Edge/Firefox) lägga till på hemskärmen via
+ * sin Dela-meny (alla kör WebKit i Sverige, EU-undantaget med alternativ motor är
+ * irrelevant för målgruppen). Texten får därför INTE påstå Safari-exklusivitet,
+ * det vore att leda en Chrome-på-iPhone-vän fel åt andra hållet. Källor: Apple
+ * "Add a website to your Home Screen" (beskriver Safari-vägen, fastställer ingen
+ * exklusivitet) + Progressier "PWA installation" (tredjepartsstödet sedan 16.4).
  * Källhänvisat i docs/decisions.md (T54).
  */
 export const IOS_SAFARI_REQUIREMENT =
-  'Det här fungerar bara i Safari på iPhone och iPad, inte i Chrome eller andra appar. Öppna länken i Safari först.';
+  'Enklast i Safari: tryck på Dela-knappen och välj "Lägg till på hemskärmen". Använder du Chrome eller en annan webbläsare på iPhone finns samma val i dess Dela-meny.';
 
 /**
  * Plattforms-vägarnas steg är EXTERNA fakta (var "lägg till på hemskärmen" sitter på

@@ -126,10 +126,12 @@ describe('GET_STARTED_PATHS, dataintegritet (steg + noter källhänvisade)', () 
     expect(getPathFor('android')?.note).toBe(ANDROID_PLAY_PROTECT_NOTE);
   });
 
-  it('iOS-vägens not bär det hårda Safari-kravet (Chrome på iOS funkar inte)', () => {
+  it('iOS-vägens not rekommenderar Safari UTAN att påstå exklusivitet (review-F1)', () => {
     expect(getPathFor('ios')?.note).toBe(IOS_SAFARI_REQUIREMENT);
-    // Kravet ska nämna Safari (det är hela poängen för en Chrome-på-iOS-vän).
+    // Safari ska rekommenderas (enklaste vägen) men texten får inte längre påstå att
+    // andra webbläsare inte funkar (sedan iOS 16.4 funkar Dela-menyn även i Chrome).
     expect(IOS_SAFARI_REQUIREMENT).toMatch(/Safari/);
+    expect(IOS_SAFARI_REQUIREMENT).not.toMatch(/fungerar bara|inte i Chrome/);
   });
 
   it('desktop-vägen har ingen extra not (ingen plattforms-varning behövs där)', () => {
