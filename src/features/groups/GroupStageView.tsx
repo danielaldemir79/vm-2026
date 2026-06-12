@@ -17,6 +17,7 @@ import { useMemo } from 'react';
 import { GROUP_IDS } from '../../domain/types';
 import type { GroupTable as GroupTableData, Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
+import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupData } from './use-group-data';
 import { GroupTable } from './GroupTable';
 
@@ -176,59 +177,72 @@ export function GroupStageView() {
         </p>
       </header>
 
-      {status === 'loading' ? (
-        <>
-          {/* role="status" så skärmläsare annonserar laddningen (aria-live: polite). */}
-          <p role="status" className="text-sm text-fg-muted">
-            Laddar gruppspelet ...
-          </p>
-          {/* Skelett-kort i samma rutnät OCH samma antal som det förväntade
+      {/* KOMPRIMERING (T68/#129): rubrik + beskrivning ovan ALLTID synliga, här under
+          komprimeras grid:en så bara FÖRSTA RADEN grupper syns som default (responsivt
+          antal: höjd-klipp visar en kort-rad oavsett hur många kort som ryms per rad på
+          skärmbredden). Faden tonar mot app-bakgrunden (--color-bg), denna sektion
+          ligger inte på en surface-Panel. ~13.5rem ~= en grupp-korts-höjd (header + 4
+          lag-rader). Tomma/laddnings-/fel-tillstånd är korta, faden stör dem inte. */}
+      <CollapsibleBody
+        name="groups"
+        toggleLabels={{ expand: 'Visa alla 12 grupper', collapse: 'Visa färre grupper' }}
+        collapsedMaxHeight="13.5rem"
+        fadeTo="var(--color-bg)"
+      >
+        {status === 'loading' ? (
+          <>
+            {/* role="status" så skärmläsare annonserar laddningen (aria-live: polite). */}
+            <p role="status" className="text-sm text-fg-muted">
+              Laddar gruppspelet ...
+            </p>
+            {/* Skelett-kort i samma rutnät OCH samma antal som det förväntade
               gruppantalet (GROUP_IDS.length, en sanning ur domänmodellen), så
               ready-läget renderar lika många kort och inget under vyn (typografi-
               panel, footer) skjuts ned när datan landar (ingen layout-shift, CLS).
               Härleds ur GROUP_IDS, aldrig en magisk siffra, så det inte kan glida
               isär från det verkliga gruppantalet. */}
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              {GROUP_IDS.map((groupId) => (
+                <SkeletonCard key={groupId} />
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        {status === 'error' ? (
+          // role="alert" så felet annonseras direkt (fail loud, inte tyst tom vy).
+          <Fade>
+            <p
+              role="alert"
+              className="flex items-start gap-3 rounded-card border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--color-danger) 50%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
+                color: 'var(--color-danger)',
+              }}
+            >
+              <span aria-hidden="true" className="mt-0.5 text-base leading-none">
+                !
+              </span>
+              <span>Kunde inte ladda gruppspelet: {error}</span>
+            </p>
+          </Fade>
+        ) : null}
+
+        {status === 'ready' && tables.length === 0 ? (
+          <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
+            Inga grupper att visa än.
+          </p>
+        ) : null}
+
+        {status === 'ready' && tables.length > 0 ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {GROUP_IDS.map((groupId) => (
-              <SkeletonCard key={groupId} />
+            {tables.map((table, i) => (
+              <GroupCard key={table.groupId} table={table} teamsById={teamsById} index={i} />
             ))}
           </div>
-        </>
-      ) : null}
-
-      {status === 'error' ? (
-        // role="alert" så felet annonseras direkt (fail loud, inte tyst tom vy).
-        <Fade>
-          <p
-            role="alert"
-            className="flex items-start gap-3 rounded-card border px-4 py-3 text-sm"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-danger) 50%, transparent)',
-              backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
-              color: 'var(--color-danger)',
-            }}
-          >
-            <span aria-hidden="true" className="mt-0.5 text-base leading-none">
-              !
-            </span>
-            <span>Kunde inte ladda gruppspelet: {error}</span>
-          </p>
-        </Fade>
-      ) : null}
-
-      {status === 'ready' && tables.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
-          Inga grupper att visa än.
-        </p>
-      ) : null}
-
-      {status === 'ready' && tables.length > 0 ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {tables.map((table, i) => (
-            <GroupCard key={table.groupId} table={table} teamsById={teamsById} index={i} />
-          ))}
-        </div>
-      ) : null}
+        ) : null}
+      </CollapsibleBody>
     </section>
   );
 }

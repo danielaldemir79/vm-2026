@@ -959,3 +959,46 @@ utan att gömma något. Genom att DÖLJA (inte filtrera) bevaras halvskriven inm
 parameteriserad toggle + ett delat rent urval gör att resultat- och tips-listan delar EN sanning för
 både fönster-regeln och kontrollen. Källa: T27/#39 (resultatinmatning), generaliserad i T39/#68
 (tips-listan + `ExpandToggle` lyft till `src/components/`).
+
+### delad-komprimerings-sektion-hojd-klipp-plus-expandtoggle (React, VM 2026)
+
+**Recept (ge HELA sidan ETT överblickbart komprimerings-mönster, en komponent, inte N varianter):**
+
+1. **EN delad primitiv** (`src/components/CollapsibleSection.tsx`): `CollapsibleBody` (klipp-kroppen +
+   de två toggle-kontrollerna, UTAN egen `<section>`/header) + `CollapsibleSection` (grön-fälts-
+   komposition: section + header + CollapsibleBody). De befintliga sektionerna äger redan sitt eget
+   `<section aria-labelledby>` + `<header>` (rubrik + beskrivning), så de lägger bara en
+   `CollapsibleBody` runt sitt INNEHÅLL (efter headern). Rubrik + beskrivning förblir ALLTID synliga,
+   bara innehållet komprimeras, med minimal omskrivning per vy.
+2. **Återanvänd `ExpandToggle` (T39/#68), bygg ingen ny kontroll.** Den utökades med en valfri binär
+   `labels`-prop (`{ expand, collapse }`); utan den behåller den sin count-etikett ("Visa alla matcher
+   (N dolda)") för resultat-/tips-listan. Så HELA sidans expandera-kontroller bär IDENTISK a11y-semantik
+   (aria-expanded/-controls, chevron-affordans, namnrymd `data-${name}-toggle`), EN sanning, ingen drift.
+3. **KOMPRIMERINGS-METOD = HÖJD-KLIPP + gradient-fade, inte render-subset.** "Första raden"/"toppen" är
+   RESPONSIV (ett grid visar 1/2/3/4 kort per rad beroende på skärmbredd; ett träd har en topp-del
+   oavsett kort-antal). En render-subset kan inte veta brytpunkten vid render-tid, så ett
+   `max-height`-klipp + `overflow-hidden` + en `pointer-events-none` gradient-fade över underkanten är
+   den ÄRLIGA "första raden synlig"-effekten oavsett skärmbredd (mobil först). `collapsedMaxHeight` per
+   sektion (en kort-rad-höjd för grid, lite mer för träd). Faden tonar mot sektionens bakyta (`fadeTo`,
+   `--color-surface` på en Panel, `--color-bg` på app-bakgrunden).
+4. **Komprimerat DÖLJER inte ur a11y-trädet.** `hidden`/`aria-hidden` används ALDRIG på kroppen, bara
+   höjden klipps; allt innehåll syns visuellt + nås av skärmläsare/tangentbord. Expandera-knappen styr
+   bara den VISUELLA klippningen, inte tillgängligheten. (Skiljer sig från tips-/resultatlistans
+   `hidden`-på-`<li>`-mönster, som bevarar osparad inmatning i en count-baserad lista.)
+5. **Fokus-flytt vid ihopfällning** (samma a11y-grepp som tips-/resultatlistan): NEDRE toggeln finns
+   bara i utfällt läge, och en ihopfällning därifrån flyttar fokus (via `requestAnimationFrame` efter
+   re-render) till den ÖVRE toggeln, så användaren förs upp till sektionens topp i stället för att bli
+   kvar där den nedre kontrollen just försvann. Testa med `waitFor` (rAF körs av jsdom).
+6. **State överlever INTE reload** (KISS): expanderat/komprimerat är lokal `useState`. En sektion som
+   ska starta utfälld (t.ex. avslöjandet) styrs per call-site via `startExpanded`.
+7. **Test per sektion:** komprimerad default (`data-collapsed="true"` på `[data-collapsible-body]`),
+   expandera (`data-collapsed="false"` + nedre toggel dyker upp), komprimera tillbaka, och att
+   innehållet finns kvar i DOM i komprimerat läge (höjd-klipp, inte borttagning). Primitivens kontrakt
+   testas EN gång i `CollapsibleSection.test.tsx`, sektionerna verifierar bara sin wiring.
+
+**Varför:** "gör sidan överblickbar" (#129) löses bäst av EN delad primitiv, inte 8 handgjorda
+komprimeringar som driver isär. Höjd-klipp + fade respekterar responsiv "första raden" utan att gissa
+brytpunkten, och genom att återanvända `ExpandToggle` ärver hela sidan en redan testad, AA-säker
+kontroll med rätt a11y. Design-frontend stylar via de stabila `data-${name}-toggle` / `data-collapsible-*`-
+hakarna. Källa: T68 (#129), `src/components/CollapsibleSection.tsx` + wiring i groups/scenarios/bracket/
+group-predictions/bracket-predictions/admin/leaderboard.

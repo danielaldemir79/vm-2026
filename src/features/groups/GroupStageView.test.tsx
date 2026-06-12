@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { GroupStageView } from './GroupStageView';
 import { ResultsProvider } from '../results/ResultsProvider';
@@ -80,6 +80,38 @@ describe('GroupStageView, renderar gruppspelet', () => {
     const COLUMN_INDEX = { played: 1, points: 8 } as const;
     expect(cells[COLUMN_INDEX.played]).toHaveTextContent('0'); // S: 0 spelade än
     expect(cells[COLUMN_INDEX.points]).toHaveTextContent('0'); // P: 0 poäng än
+  });
+});
+
+describe('GroupStageView, komprimering (T68/#129)', () => {
+  it('komprimerad som default: rubrik + beskrivning synliga, grid:en höjd-klippt (toppen)', async () => {
+    renderView(fixturesEnv());
+    await waitFor(() => {
+      expect(screen.getAllByRole('table')).toHaveLength(12);
+    });
+    // Rubrik + beskrivning är ALLTID synliga (utanför den komprimerade kroppen).
+    expect(screen.getByRole('heading', { level: 2, name: /Gruppspelet/i })).toBeInTheDocument();
+    // Kroppen är komprimerad som default (data-haken speglar läget). Grid:en + alla
+    // 12 tabeller finns kvar i DOM (höjd-klipp döljer inte innehåll, det syns i a11y-
+    // trädet), men visuellt visas bara första radens kort tack vare max-height.
+    const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+    expect(body).toHaveAttribute('data-collapsed', 'true');
+    expect(within(body).getAllByRole('table')).toHaveLength(12);
+  });
+
+  it('expandera -> komprimera tillbaka (toppen igen)', async () => {
+    renderView(fixturesEnv());
+    await waitFor(() => {
+      expect(screen.getAllByRole('table')).toHaveLength(12);
+    });
+    const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+    // Expandera via den övre toggeln (namnrymd 'groups').
+    fireEvent.click(screen.getByRole('button', { name: /Visa alla 12 grupper/i }));
+    expect(body).toHaveAttribute('data-collapsed', 'false');
+    // Komprimera tillbaka.
+    const [topCollapse] = screen.getAllByRole('button', { name: /Visa färre grupper/i });
+    fireEvent.click(topCollapse);
+    expect(body).toHaveAttribute('data-collapsed', 'true');
   });
 });
 
