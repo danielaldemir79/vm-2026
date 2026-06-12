@@ -132,43 +132,109 @@ describe('isGroupStageComplete', () => {
   });
 });
 
-describe('deriveBracket, GRUPPSPEL PÅGÅR (möjliga lag + etiketter)', () => {
+describe('deriveBracket, GRUPPSPEL PÅGÅR, PRELIMINÄRT levande läge (T56, #100)', () => {
+  // Alla 12 grupper har spelat 1 match (inProgressTable: rank 1-4 finns, men INTE
+  // färdigspelat). Trädet ska visa det NUVARANDE läget levande: nuvarande 1:a/2:a
+  // i slotarna + de 8 nuvarande bästa treorna seedade (Annexe C), allt 'preliminary'.
   const tables = GROUP_IDS.map(inProgressTable);
   const state = deriveBracket(
     tables,
     ROUND_OF_32.map((m) => knockoutMatch(m.id))
   );
 
-  it('är INTE låst medan gruppspelet pågår', () => {
+  it('är INTE låst men ÄR preliminärt (driver UI:ts ärliga "Nuvarande ställning"-märkning)', () => {
     expect(state.locked).toBe(false);
+    expect(state.preliminary).toBe(true);
   });
 
-  it('en gruppvinnar-slot visar etikett "1:a grupp X" och inget låst lag', () => {
-    // M73 home = Runner-up A, away = Runner-up B (se bracket-structure).
-    // M75 home = Winner F. Hitta en winner-slot.
+  it('en gruppvinnar-slot fylls PRELIMINÄRT med gruppens nuvarande 1:a + bär möjliga lag', () => {
+    // M74 home = Winner E (bracket-structure). Grupp E:s nuvarande 1:a = E1.
     const m74 = state.matches.find((m) => m.matchId === 'M74')!;
-    // M74 home = Winner E.
     expect(m74.home.label).toBe('1:a grupp E');
-    expect(m74.home.resolution).toBe('possible');
-    expect(m74.home.teamId).toBeNull();
-    // Möjliga lag = grupp E:s nuvarande lag.
+    expect(m74.home.resolution).toBe('preliminary');
+    // Det preliminära laget är gruppens NUVARANDE etta (rör sig vid nästa resultat).
+    expect(m74.home.teamId).toBe('E1');
+    // Möjliga lag finns kvar parallellt (alla i gruppen kan ännu ta platsen).
     expect(m74.home.candidateTeamIds).toContain('E1');
+    expect(m74.home.candidateTeamIds).toContain('E4');
   });
 
-  it('en bästa-trea-slot visar etiketten EXAKT enligt motorns eligibleGroups (Art. 12.6)', () => {
+  it('en grupptvåa-slot fylls PRELIMINÄRT med gruppens nuvarande 2:a', () => {
+    // M73 home = Runner-up A. Grupp A:s nuvarande 2:a = A2.
+    const m73 = state.matches.find((m) => m.matchId === 'M73')!;
+    expect(m73.home.label).toBe('2:a grupp A');
+    expect(m73.home.resolution).toBe('preliminary');
+    expect(m73.home.teamId).toBe('A2');
+  });
+
+  it('en bästa-trea-slot seedas PRELIMINÄRT (Annexe C) men bär ändå sin behörighets-etikett + möjliga lag', () => {
     // M74 away = Best 3rd of A,B,C,D,F (bracket-structure).
     const m74 = state.matches.find((m) => m.matchId === 'M74')!;
     expect(m74.away.label).toBe('3:a A/B/C/D/F');
-    expect(m74.away.resolution).toBe('possible');
-    // Kandidater = de NUVARANDE treorna i just de behöriga grupperna.
+    expect(m74.away.resolution).toBe('preliminary');
+    // Den preliminärt seedade trean MÅSTE vara en av de behöriga gruppernas trea
+    // (Annexe C ger en av eligibleGroups, gissas aldrig fram en otillåten).
+    expect(['A3', 'B3', 'C3', 'D3', 'F3']).toContain(m74.away.teamId);
+    // Möjliga lag = de NUVARANDE treorna i de behöriga grupperna (kvar parallellt).
     expect(m74.away.candidateTeamIds).toEqual(['A3', 'B3', 'C3', 'D3', 'F3']);
   });
 
-  it('en senare runda (åttondel) utan kända föregångare är TBD med vinnar-etikett', () => {
+  it('de 8 preliminärt seedade treorna är KOLLISIONSFRIA (samma Annexe C-garanti som skarpa läget)', () => {
+    const prelimThirds = state.matches
+      .flatMap((m) => [m.home, m.away])
+      .filter((s) => s.label.startsWith('3:a') && s.resolution === 'preliminary')
+      .map((s) => s.teamId);
+    expect(prelimThirds).toHaveLength(8);
+    expect(prelimThirds.every((t) => t !== null)).toBe(true);
+    // 8 distinkta treor (ingen grupp seedas till två matcher).
+    expect(new Set(prelimThirds).size).toBe(8);
+  });
+
+  it('en senare runda (åttondel) visar de två preliminära föregångar-lagen som möjliga (levande framåt)', () => {
+    // M89 home = Winner M74. M74:s två slots är nu preliminärt fyllda (E1 + en trea),
+    // så åttondels-sloten visar dem som möjliga lag (vägen framåt känns levande),
+    // utan att GISSA en vinnare (teamId null, resolution 'possible' inte 'resolved').
     const m89 = state.matches.find((m) => m.matchId === 'M89')!;
-    // M89 home = Winner M74.
     expect(m89.home.label).toBe('Vinnare M74');
-    expect(m89.home.resolution).toBe('tbd');
+    expect(m89.home.resolution).toBe('possible');
+    expect(m89.home.teamId).toBeNull();
+    expect(m89.home.candidateTeamIds.length).toBe(2);
+  });
+});
+
+describe('deriveBracket, GRUPPSPEL PÅGÅR, ÄRLIG GRÄNS (ingen preliminär seedning på ofullständig data)', () => {
+  // Bara 2 grupper har spelat (A, B). Då kan de 12 treorna INTE rangordnas
+  // övergripande (Article 13 kräver alla 12 jämförbara), så bästa-trea-slotarna
+  // får INTE en preliminär trea, de stannar i 'possible' (bara möjliga lag).
+  const tables = [inProgressTable('A'), inProgressTable('B')];
+  const state = deriveBracket(
+    tables,
+    ROUND_OF_32.map((m) => knockoutMatch(m.id))
+  );
+
+  it('en grupp MED en nuvarande tabell fylls ändå preliminärt (1:a/2:a är ärligt)', () => {
+    // M73 home = Runner-up A; grupp A har en tabell, så dess 2:a (A2) är preliminär.
+    const m73 = state.matches.find((m) => m.matchId === 'M73')!;
+    expect(m73.home.resolution).toBe('preliminary');
+    expect(m73.home.teamId).toBe('A2');
+  });
+
+  it('en grupp UTAN tabell faller tillbaka till possible (ingen gissning)', () => {
+    // M74 home = Winner E; grupp E saknar tabell här, alltså inget preliminärt lag.
+    const m74 = state.matches.find((m) => m.matchId === 'M74')!;
+    expect(m74.home.resolution).toBe('possible');
+    expect(m74.home.teamId).toBeNull();
+    expect(m74.home.candidateTeamIds).toHaveLength(0);
+  });
+
+  it('bästa-trea-slotarna stannar i possible (treorna kan inte rangordnas ärligt)', () => {
+    // M74 away = Best 3rd of A,B,C,D,F. Inte alla 12 grupper har en trea, så ingen
+    // preliminär seedning, bara de nuvarande treor som RÅKAR finnas som möjliga lag.
+    const m74 = state.matches.find((m) => m.matchId === 'M74')!;
+    expect(m74.away.resolution).toBe('possible');
+    expect(m74.away.teamId).toBeNull();
+    // Bara A3/B3 finns (grupp A+B har en trea), C/D/F saknar tabell.
+    expect(m74.away.candidateTeamIds).toEqual(['A3', 'B3']);
   });
 });
 
@@ -193,8 +259,15 @@ describe('deriveBracket, GRUPPERNA KLARA (låst till riktiga lag via FIFA-seedni
     ROUND_OF_32.map((m) => knockoutMatch(m.id))
   );
 
-  it('är LÅST när alla grupper är klara', () => {
+  it('är LÅST när alla grupper är klara, och INTE preliminärt (skarpt läge, facit rörs ej)', () => {
     expect(state.locked).toBe(true);
+    // locked och preliminary är ömsesidigt uteslutande: en låst seedning är facit,
+    // aldrig märkt "Nuvarande ställning" (T56). Inga slots är 'preliminary' när låst.
+    expect(state.preliminary).toBe(false);
+    const anyPreliminary = state.matches
+      .flatMap((m) => [m.home, m.away])
+      .some((s) => s.resolution === 'preliminary');
+    expect(anyPreliminary).toBe(false);
   });
 
   it('gruppvinnar-/tvåa-slots är resolved till rätt lag (rank 1/2)', () => {

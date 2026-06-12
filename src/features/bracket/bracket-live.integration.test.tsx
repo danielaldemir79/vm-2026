@@ -2,7 +2,7 @@ import { render, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { useEffect } from 'react';
 import type { Match } from '../../domain/types';
-import { WC2026_GROUPS, WC2026_MATCHES } from '../../data/wc2026';
+import { WC2026_GROUPS, WC2026_MATCHES, WC2026_TEAMS } from '../../data/wc2026';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { useResultsStore } from '../results/results-context';
 import { BracketView } from './BracketView';
@@ -79,6 +79,123 @@ function Harness({ matches }: { matches: Match[] }) {
   }, [status]);
   return <BracketView />;
 }
+
+/**
+ * Live-harness: applicerar `matches` via setMatches OCH kör om varje gång `matches`
+ * ändras (inte bara en gång). Driver AC#2-testet (T56): ett nytt resultat under
+ * gruppspelet ska räkna om det PRELIMINÄRA trädet utan ny polling, samma reaktivitet
+ * som tabellerna redan har (useBracketData useMemo på matches i den delade storen).
+ */
+function LiveHarness({ matches }: { matches: Match[] }) {
+  const { status, setMatches } = useResultsStore();
+  useEffect(() => {
+    if (status === 'ready') {
+      setMatches(matches);
+    }
+  }, [status, setMatches, matches]);
+  return <BracketView />;
+}
+
+describe('slutspelsträdet LIVE under GRUPPSPELET (T56, #100): preliminärt träd rör sig vid resultat', () => {
+  // Grupp A:s första match (lag 0 mot lag 1 i Group.teamIds-ordning). Vi sätter ett
+  // resultat och vänder det sedan, och bevisar att den PRELIMINÄRA gruppvinnar-slot:en
+  // (M74-area: M73 i sextondelen matas av grupp A) byter lag i trädet, levande.
+  const groupA = WC2026_GROUPS.find((g) => g.id === 'A')!;
+  const [a0, a1] = groupA.teamIds; // lag 0 och lag 1 i grupp A
+
+  /** Den första gruppspelsmatchen i grupp A mellan a0 och a1 (oavsett hemma/borta). */
+  function firstGroupAMatch(): Match {
+    const m = WC2026_MATCHES.find(
+      (mm) =>
+        mm.stage === 'group' &&
+        mm.groupId === 'A' &&
+        ((mm.homeTeamId === a0 && mm.awayTeamId === a1) ||
+          (mm.homeTeamId === a1 && mm.awayTeamId === a0))
+    );
+    return m!;
+  }
+
+  /** Alla matcher med grupp A:s a0-vs-a1-match satt så att `winnerId` vinner 3-0. */
+  function withGroupAWinner(winnerId: string): Match[] {
+    const target = firstGroupAMatch();
+    return WC2026_MATCHES.map((m): Match => {
+      if (m.id !== target.id) {
+        return m;
+      }
+      const homeWins = m.homeTeamId === winnerId;
+      return {
+        ...m,
+        status: 'finished',
+        result: homeWins ? { homeGoals: 3, awayGoals: 0 } : { homeGoals: 0, awayGoals: 3 },
+      };
+    });
+  }
+
+  /** Grupp A:s nuvarande 1:a (Team.id) ur de härledda tabellerna för en matchlista. */
+  function currentGroupAWinner(matches: Match[]): string {
+    const tables = deriveGroupTables(WC2026_GROUPS, matches);
+    return tables.find((t) => t.groupId === 'A')!.standings[0].teamId;
+  }
+
+  /** Kort visningsnamn (det trädet renderar) för ett Team.id ur den verifierade datan. */
+  function shortNameOf(teamId: string): string {
+    const team = WC2026_TEAMS.find((t) => t.id === teamId)!;
+    return team.shortName ?? team.name;
+  }
+
+  it('byter det PRELIMINÄRA gruppvinnar-laget när grupp A:s resultat vänds (utan låsning)', async () => {
+    // M79 home = Winner A (bracket-structure: grupp A:s vinnare är hemma i M79). Vi
+    // läser den slot:ens text (lagnamn) före och efter att resultatet vänds.
+    const firstWinnerId = a0;
+    const firstName = shortNameOf(currentGroupAWinner(withGroupAWinner(firstWinnerId)));
+    const { rerender } = render(
+      <ResultsProvider env={fixturesEnv()}>
+        <LiveHarness matches={withGroupAWinner(firstWinnerId)} />
+      </ResultsProvider>
+    );
+
+    // Trädet är preliminärt (inte låst). Vänta tills resultatet vävts in i storen
+    // och M79-home (Winner A) visar a0:s lagnamn (setMatches körs i en effekt efter
+    // ready, så vi väntar in det i stället för att läsa det initiala fixtures-läget).
+    await waitFor(() => {
+      const m79Home = document
+        .querySelector('[data-bracket-match="M79"]')!
+        .querySelector('[data-bracket-slot]')!;
+      expect(m79Home.textContent).toContain(firstName);
+    });
+    expect(document.querySelector('[data-bracket-preliminary]')).not.toBeNull();
+    expect(document.querySelector('[data-bracket-locked]')).toBeNull();
+    expect(
+      document
+        .querySelector('[data-bracket-match="M79"]')!
+        .querySelector('[data-bracket-slot]')!
+        .getAttribute('data-slot-resolution')
+    ).toBe('preliminary');
+
+    // VÄND resultatet: nu vinner a1 i stället. Det preliminära trädet ska räkna om
+    // och M79-home (Winner A) ska byta till a1:s lagnamn (rör sig vid nytt resultat).
+    const secondWinnerId = a1;
+    const secondName = shortNameOf(currentGroupAWinner(withGroupAWinner(secondWinnerId)));
+    expect(secondName).not.toBe(firstName); // förutsättning: namnen skiljer sig
+    rerender(
+      <ResultsProvider env={fixturesEnv()}>
+        <LiveHarness matches={withGroupAWinner(secondWinnerId)} />
+      </ResultsProvider>
+    );
+
+    // KÄRNAN (AC#2): slot:en bär nu det NYA lagnamnet, inte det gamla. Trädet rörde sig.
+    await waitFor(() => {
+      const m79Home = document
+        .querySelector('[data-bracket-match="M79"]')!
+        .querySelector('[data-bracket-slot]')!;
+      expect(m79Home.textContent).toContain(secondName);
+    });
+    const m79HomeAfter = document
+      .querySelector('[data-bracket-match="M79"]')!
+      .querySelector('[data-bracket-slot]')!;
+    expect(m79HomeAfter.getAttribute('data-slot-resolution')).toBe('preliminary');
+  });
+});
 
 describe('slutspelsträdet LIVE: gruppspel klart -> låst -> vinnaren förs fram', () => {
   it('LÅSER trädet och seedar riktiga lag när alla grupper är färdigspelade', async () => {
