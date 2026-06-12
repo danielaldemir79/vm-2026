@@ -70,9 +70,10 @@ export default function App() {
     <RoomsProvider>
       <OfficialResultsProvider>
         {/* FavoriteTeamProvider (T23, #23): det pinnade favoritlaget (localStorage,
-            per-enhet, ingen Supabase-yta). Omsluter hela appen så både dagsvyn (lyfter
-            favoritlagets matcher) och tips-vyns personliga statistik når samma store.
-            Vilande utan effekt om inget lag är pinnat; helt oberoende av Supabase. */}
+            per-enhet, ingen Supabase-yta). Omsluter hela appen så dagsvyn (lyfter
+            favoritlagets matcher) och favoritlags-väljaren delar samma favorit-store.
+            (Personliga statistiken läser LeaderboardStore, inte denna.) Vilande utan
+            effekt om inget lag är pinnat; helt oberoende av Supabase. */}
         <FavoriteTeamProvider>
           <AppShell />
         </FavoriteTeamProvider>
