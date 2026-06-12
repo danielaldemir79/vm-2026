@@ -89,15 +89,19 @@ describe('App-skalet', () => {
     });
   });
 
-  it('visar upphovs-signaturen "Made by Daniel Aldemir" i footern (T38, #67)', async () => {
+  it('visar upphovs-signaturen "Byggd av Daniel Aldemir" i footern (T38, #67; copy T44 runda 2, #75)', async () => {
     const { container } = renderApp();
 
     // Render-test (inte bara en konstant): bevisar att signaturen faktiskt NÅR
     // DOM:en, så en framtida refaktor inte tappar raden tyst. Data-attributet är
-    // krok för design-frontends finputs.
+    // krok för design-frontends finputs. T44 runda 2 (#75, Daniels feedback "footern
+    // ska lyfta upp mig"): avsändar-prefixet ändrades från "Made by" till svenska
+    // "Byggd av" och namnet lyftes till en egen, framträdande rad (blickfång), så
+    // testet vaktar nu den svenska eyebrow:n + namnet, inte den gamla engelska copyn.
     const signature = container.querySelector('[data-app-signature]');
     expect(signature).not.toBeNull();
-    expect(signature).toHaveTextContent('Made by Daniel Aldemir');
+    expect(signature).toHaveTextContent('Byggd av');
+    expect(signature).toHaveTextContent('Daniel Aldemir');
     await waitForAppSettled();
   });
 
