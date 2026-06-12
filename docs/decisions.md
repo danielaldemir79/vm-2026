@@ -52,6 +52,43 @@ listan skriver delta-FÖRST med en mittpunkt ("+3 · Exakt resultat"), orden är
 (matchPointLabel), bara ordningen i brickan skiljer. Data-hakar: `data-tip-result`, `data-tip-points`,
 `data-tip-point-type` (för design-finish + test).
 
+**Beslut 5, PREMIUM-FINISH (design-frontend, 2026-06-12, ovanpå data-attribut-seamen):** den
+funktionella basen (besluten ovan) polerades till appens "arena i kvällsljus"-språk utan att röra
+logik, härledningar eller test-hakar.
+
+- **Summeringspanelen som "skyltfönster" (krav 1):** `.vm-tips-score-summary` (tokens.css §20) lyftes
+  från en oformaterad ruta till en STOLT liten hero-panel , surface med en svag guld-hörn-glow (8%) +
+  en hårfin inset guld-topplist (samma kvällsljus-signatur som `.vm-coupon-card` §10 / `.vm-reveal-card`
+  §13, DRY). TOTALEN bärs av en SOLID guld-bricka med mörk ink (`.vm-tips-summary-total`, den färg-
+  oberoende solid-bricka-formen, DRY mot `.vm-coupon-mine`/`.vm-reveal-actual`/`.vm-score-points`), så
+  ögat landar på "så många poäng har JAG" först. PLACERINGEN fick en lugn `#N`-bricka
+  (`.vm-tips-summary-rank-badge`, surface-raised + fg, samma neutrala bricka-roll som topplistans
+  `.vm-board-rank`) + "av M" som dämpad text. Hela meningen ("Plats N av M") ligger kvar som `sr-only` i
+  `data-tips-summary-rank`, så skärmläsaren läser placeringen i ord OCH testet ser den exakta texten;
+  det synliga `#N` + "av M" bär samma besked för seende. Käll-raderna gjordes lugna + skanbara: en pyttig
+  guld-marker (dekor) + dämpad etikett + fg-poäng, med en hårfin guld-divider (`.vm-tips-source-list`).
+- **Poäng-brickan på tips-korten (krav: tydlig men inte skrikig, exakt/utfall/miss skiljbara UTAN färg):**
+  de tre utfallen skiljs nu på FORMEN, inte bara färgen eller ordet (WCAG 1.4.1). Brick-FONDEN: EXAKT =
+  den stolta solida guld-brickan (`.vm-coupon-mine`), UTFALL = en lugnare guld-tint-chip, MISS = en
+  NEUTRAL chip (surface-raised + kant, INGEN guld-tint, så en miss lånar inte den hoppfulla guld-tonen,
+  samma neutrala form som `.vm-reveal-mark--miss`). Dessutom en FÄRG-OBEROENDE markör-glyf (bock ✓ /
+  halv-cirkel ◐ / kryss ✗, SAMMA glyf-familj som RevealView `MARK_BY_TYPE`) ritad via CSS `::before` per
+  `data-tip-point-type` (`.vm-tip-result`, tokens.css §10). **Varför `::before` (inte ett glyf-span):** ett
+  span skulle hamna i elementets `textContent` och tippa poäng-talet ur första positionen (testet vaktar
+  att "0"-brickan börjar med "0", inte med glyfen); pseudo-element-innehåll exponeras varken i `textContent`
+  eller för skärmläsare, så glyfen är ren visuell form och VARFÖR-ordet bär betydelsen.
+
+**AA (T58-visuellt, scripts/contrast-t58.mjs, canvas-komposit VÄRSTA fall = text rakt på guld-glow-toppen,
+BÅDA teman):** all läsbar panel-text står på den nästan-opaka panel-ytan; enda tinten i text-vägen är guld-
+hörn-glow:en vid 8% alfa. Uppmätt över den 8%-tintade fonden: rubrik/placering/käll-poäng (fg) 12.96:1
+mörkt / 16.46:1 ljust, eyebrow (warning guld-TEXT, ALDRIG rå `--vm-gold`) 8.58 / 5.44, käll-etikett
+(fg-muted) 6.38 / 5.99. Total-brickan är coupon-ink på SOLID guld 10.90 / 5.03. MISS-brickan (fg-muted på
+surface-raised) klarar AA som normal text per tema (tokens.css §0-claim). MIN över alla nya text-ytor
+6.38:1 mörkt / 5.03:1 ljust, alla >= 4.5 (normal text). Glow-/topplist-/divider-/marker-/glyf-lagren bär
+ALDRIG läsbar text. Verifierat visuellt i 390px + 280px x mörkt/ljust (statisk markup-harness mot byggd CSS,
+Playwright): inget överflöd, ingen krock, panelen reflowar rent (header `flex-wrap` droppar rank+total till
+egen rad i smalt läge). Reduced-motion: panelen har ingen egen animation (inga keyframes), så inget att nolla.
+
 ## 2026-06-12 , T57 (#98): dagens match-vy lever, fokus följer nästa match + dag följer verklig dag + resultat i listan
 
 **Beslut (fokus, krav 1):** "Match of the day" (hero-kortets fokus) väljs nu som dagens tidigaste
