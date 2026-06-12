@@ -31,7 +31,7 @@ import { useRoomsStore } from '../rooms';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
 import { useLeaderboardData } from './use-leaderboard-data';
 import { derivePoolFacit } from './derive-facit';
-import { buildLeaderboard, type MemberPredictions } from './aggregate-scores';
+import { buildLeaderboard, scoreMemberBreakdown, type MemberPredictions } from './aggregate-scores';
 import { buildMatchReveal } from './reveal';
 import {
   LeaderboardStoreContext,
@@ -240,6 +240,21 @@ export function LeaderboardProvider({
     return buildMatchReveal(data.matches, facit.matches, predictions.match, names, evalNow);
   }, [rooms.members, data.matches, facit.matches, predictions.match, evalNow]);
 
+  // AKTUELL användares poäng UPPDELAD per källa (T58, #99): härledd ur SAMMA
+  // scoreMember-väg som topplistan (scoreMemberBreakdown), inte en omräkning. null tills
+  // vi har en identitet OCH den användaren har tips i rummet (annars finns ingen egen
+  // rad att bryta ner; tips-vyns summering gatar på detta, hellre tyst än en 0-detalj).
+  const selfBreakdown = useMemo(() => {
+    if (rooms.userId === null) {
+      return null;
+    }
+    const mine = predictionsByUser.get(rooms.userId);
+    if (mine === undefined) {
+      return null;
+    }
+    return scoreMemberBreakdown(mine, facit);
+  }, [rooms.userId, predictionsByUser, facit]);
+
   const store: LeaderboardStore = useMemo(
     () => ({
       enabled,
@@ -251,8 +266,20 @@ export function LeaderboardProvider({
       teams: data.teams,
       // "Du"-framhävningens seam: rummets auth-identitet (null tills sessionen klar).
       currentUserId: rooms.userId,
+      // T58 (#99): aktuell användares käll-uppdelning, delad med tips-vyns summering.
+      selfBreakdown,
     }),
-    [enabled, status, error, activeRoomId, leaderboard, reveal, data.teams, rooms.userId]
+    [
+      enabled,
+      status,
+      error,
+      activeRoomId,
+      leaderboard,
+      reveal,
+      data.teams,
+      rooms.userId,
+      selfBreakdown,
+    ]
   );
 
   return (

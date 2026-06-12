@@ -12,7 +12,7 @@
 
 import { createContext, useContext } from 'react';
 import type { Team } from '../../domain/types';
-import type { LeaderboardEntry } from './aggregate-scores';
+import type { LeaderboardEntry, ScoreBySource } from './aggregate-scores';
 import type { RevealedMatch } from './reveal';
 
 /** Laddningstillstånd (samma vokabulär som T15/T16:s stores). */
@@ -40,6 +40,15 @@ export interface LeaderboardStore {
    * sekretess hänger på den, RLS är skyddet); null = ingen rad markeras som "du".
    */
   currentUserId: string | null;
+  /**
+   * AKTUELL användares poäng UPPDELAD per tips-källa + total (T58, #99), eller null
+   * tills vi kan peka ut en egen medlem (ingen identitet / inte medlem i rummet).
+   * Härledd ur SAMMA scoreMember-väg som topplistan (scoreMemberBreakdown), så
+   * detalj-vyn ("var kommer poängen ifrån?") aldrig räknar om i en parallell väg.
+   * Konsumeras av tips-vyns summering, så tips-sektionen och topplistan delar
+   * EN poäng-källa (ingen dubbelhämtning, providern hoistad i App så båda når den).
+   */
+  selfBreakdown: { bySource: ScoreBySource; total: number } | null;
 }
 
 /**

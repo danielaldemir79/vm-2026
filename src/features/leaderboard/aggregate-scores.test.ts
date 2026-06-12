@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { RoomMember } from '../../data/rooms';
 import type { Match, Team } from '../../domain/types';
 import { asTeamCode, type TeamCode } from '../../domain/team-code';
-import { buildLeaderboard, type MemberPredictions } from './aggregate-scores';
+import { buildLeaderboard, scoreMemberBreakdown, type MemberPredictions } from './aggregate-scores';
 import { CHAMPION_SLOT_ID, derivePoolFacit } from './derive-facit';
 import type { PoolFacit } from './derive-facit';
 import { WC2026_GROUPS, WC2026_TEAM_BASES, teamId } from '../../data/wc2026/team-refs';
@@ -150,6 +150,79 @@ describe('buildLeaderboard, summa över de tre tips-typerna mot facit', () => {
     const board = buildLeaderboard([member('u1', 'Anna')], preds, facit);
     // Trots gemen facit ger normaliseringen full grupp-poäng (5).
     expect(board[0].points).toBe(5);
+  });
+});
+
+describe('scoreMemberBreakdown, käll-uppdelning (T58, #99)', () => {
+  // Samma fulla-poäng-uppsättning som första testet: 3 (match) + 5 (grupp) + 1 (slot)
+  // + 20 (mästare) = 29, men nu uppdelat per källa.
+  const FULL_FACIT: PoolFacit = {
+    matches: [{ matchId: 'g-A-1', actual: { homeGoals: 2, awayGoals: 1 } }],
+    groups: [{ groupId: 'A', actual: { winnerTeamId: code('MEX'), runnerUpTeamId: code('KOR') } }],
+    bracketSlots: [{ slotId: 'M73', stage: 'round-of-32', advancingTeam: code('BRA') }],
+    champion: code('ARG'),
+  };
+  const FULL_PREDS: MemberPredictions = {
+    userId: 'u1',
+    matchPredictions: [
+      { matchId: 'g-A-1', userId: 'u1', homeGoals: 2, awayGoals: 1, updatedAt: '' },
+    ],
+    groupPredictions: [
+      {
+        groupId: 'A',
+        userId: 'u1',
+        winnerTeamId: code('MEX'),
+        runnerUpTeamId: code('KOR'),
+        updatedAt: '',
+      },
+    ],
+    bracketPredictions: [
+      { slotId: 'M73', userId: 'u1', advancingTeamId: code('BRA'), updatedAt: '' },
+      { slotId: CHAMPION_SLOT_ID, userId: 'u1', advancingTeamId: code('ARG'), updatedAt: '' },
+    ],
+  };
+
+  it('delar upp poängen per källa: match 3, grupp 5, bracket 1, mästare 20', () => {
+    const { bySource } = scoreMemberBreakdown(FULL_PREDS, FULL_FACIT);
+    expect(bySource).toEqual({ match: 3, group: 5, bracket: 1, champion: 20 });
+  });
+
+  it('käll-detaljens summa === totalen (HARD-invariant, ingen drift mot topplistan)', () => {
+    const { bySource, total } = scoreMemberBreakdown(FULL_PREDS, FULL_FACIT);
+    expect(bySource.match + bySource.group + bySource.bracket + bySource.champion).toBe(total);
+    // Och totalen === topplistans tal för samma medlem (samma scoreMember-väg).
+    const board = buildLeaderboard(
+      [member('u1', 'Anna')],
+      new Map([['u1', FULL_PREDS]]),
+      FULL_FACIT
+    );
+    expect(total).toBe(board[0].points);
+    expect(total).toBe(29);
+  });
+
+  it('mästar-poängen hålls SKILD från bracket (egen detalj-rad, inte hopslaget)', () => {
+    // Bara mästar-tipset rätt, ingen riktig bracket-slot avgjord: champion 20, bracket 0.
+    const onlyChampion: MemberPredictions = {
+      ...emptyPreds('u1'),
+      bracketPredictions: [
+        { slotId: CHAMPION_SLOT_ID, userId: 'u1', advancingTeamId: code('ARG'), updatedAt: '' },
+      ],
+    };
+    const { bySource } = scoreMemberBreakdown(onlyChampion, FULL_FACIT);
+    expect(bySource.champion).toBe(20);
+    expect(bySource.bracket).toBe(0);
+  });
+
+  it('inget avgjort (tom facit) ger alla källor 0 + total 0', () => {
+    const { bySource, total } = scoreMemberBreakdown(FULL_PREDS, EMPTY_FACIT);
+    expect(bySource).toEqual({ match: 0, group: 0, bracket: 0, champion: 0 });
+    expect(total).toBe(0);
+  });
+
+  it('en medlem helt utan tips ger alla källor 0', () => {
+    const { bySource, total } = scoreMemberBreakdown(emptyPreds('u1'), FULL_FACIT);
+    expect(bySource).toEqual({ match: 0, group: 0, bracket: 0, champion: 0 });
+    expect(total).toBe(0);
   });
 });
 
