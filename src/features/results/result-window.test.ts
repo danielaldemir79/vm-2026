@@ -32,7 +32,7 @@ function nowOn(dateYmd: string): Date {
 }
 
 describe('windowMatches, default-fönstret (3 svenska dagar)', () => {
-  it('WINDOW_DAYS är 3 (idag + två följande dagar), den dokumenterade fönsterbredden', () => {
+  it('WINDOW_DAYS är 3 (idag + två följande dagar), den FRAMÅTBLICKANDE fönsterbredden', () => {
     expect(WINDOW_DAYS).toBe(3);
   });
 
@@ -87,13 +87,32 @@ describe('windowMatches, edge-fall: turneringen ej börjad (premiärfönstret)',
     // Alla tre ligger i premiärfönstret 11-13.
     expect(result.hiddenCount).toBe(0);
   });
+
+  it('PÅ premiärdagen läggs INGET bakåt-spann före premiären (golvet är premiären, T62)', () => {
+    // Idag ÄR premiärdagen (11 juni). Igår (10 juni) ligger före första matchen, så
+    // bakåt-spannet (T62) får inte ankra på 10 juni (tom historik som skulle gömma
+    // premiären lägre i listan). Ankaret golvas på premiären. Fönstret = 11-13.
+    const matches = [
+      onDay('p0', '2026-06-11'), // premiär = idag
+      onDay('p1', '2026-06-12'),
+      onDay('p2', '2026-06-13'),
+      onDay('p3', '2026-06-14'), // idag + 3 -> utanför
+    ];
+    const result = windowMatches(matches, nowOn('2026-06-11'));
+
+    expect(result.anchorKey).toBe('2026-06-11'); // golvat på premiären, inte 10 juni
+    expect(result.visible.map((m) => m.id)).toEqual(['p0', 'p1', 'p2']);
+    expect(result.hiddenCount).toBe(1);
+  });
 });
 
 describe('windowMatches, edge-fall: slutet av turneringen (< 3 dagar kvar)', () => {
   it('fönstret slutar naturligt vid sista matchen, uppfinner inga extra dagar', () => {
-    // Idag = näst sista speldagen; bara två speldagar kvar inom fönstret.
+    // Idag = näst sista speldagen; bara två speldagar kvar inom fönstret. Bakåt-
+    // spannet (T62) ankrar på igår (17 juli), men det finns ingen match den dagen, så
+    // bara s0/s1 (18-19 juli) syns. old (15 juni) ligger långt före igår -> döljs.
     const matches = [
-      onDay('old', '2026-06-15'), // passerad, utanför fönstret
+      onDay('old', '2026-06-15'), // passerad, långt utanför fönstret
       onDay('s0', '2026-07-18'),
       onDay('s1', '2026-07-19'), // sista
     ];
@@ -101,19 +120,92 @@ describe('windowMatches, edge-fall: slutet av turneringen (< 3 dagar kvar)', () 
 
     expect(result.visible.map((m) => m.id)).toEqual(['s0', 's1']);
     expect(result.hiddenCount).toBe(1);
-    expect(result.anchorKey).toBe('2026-07-18');
+    expect(result.anchorKey).toBe('2026-07-17'); // igår (T62 bakåt-spann)
   });
 
-  it('hela turneringen passerad: inga kommande matcher i fönstret, allt döljs', () => {
-    // Idag ligger EFTER sista matchen. Det framåtblickande fönstret är tomt; allt
-    // är "historik" som expandera-knappen visar. (Rätt: det finns inget kommande
-    // att lyfta fram, men listan ska inte gå förlorad.)
+  it('hela turneringen passerad för LÄNGE sedan: inget nyss spelat i fönstret, allt döljs', () => {
+    // Idag (1 aug) ligger 13 dagar EFTER sista matchen (19 juli). Bakåt-spannet (T62)
+    // sträcker sig bara till igår (31 juli), så en match som spelades för två veckor
+    // sedan är INTE "nyss spelad" och syns inte i default, den nås via expandera. Det
+    // är rätt avvägning för det fasta bakåt-spannet (LOOKBACK_DAYS): "igår", inte
+    // "senaste spel-dag oavsett hur långt bort" (se LOOKBACK_DAYS-docen + decisions.md).
     const matches = [onDay('a', '2026-06-11'), onDay('b', '2026-07-19')];
     const result = windowMatches(matches, nowOn('2026-08-01'));
 
     expect(result.visible).toEqual([]);
     expect(result.hiddenCount).toBe(2);
-    expect(result.anchorKey).toBe('2026-08-01'); // ankrat på idag (turneringen ej "ej börjad")
+    expect(result.anchorKey).toBe('2026-07-31'); // igår (bakåt-spannet), inget spelat då
+  });
+});
+
+describe('windowMatches, bakåt-fönstret (T62/#111): gårdagens matcher syns kvar', () => {
+  it('gårdagens spelade match syns tillsammans med dagens + morgondagens kommande', () => {
+    // KÄRNAN i T62 (Daniels rapport): idag = 16 juni. Igår (15 juni) spelades en match
+    // (den enda med T58-poäng), idag + i morgon kommer fler. FÖRE T62 ankrade fönstret
+    // på idag (16-18) och gårdagens match (15) gömdes, så användaren mötte aldrig sin
+    // poäng utan "Visa alla". NU tas igår med (anchor = 15), så poängen syns direkt.
+    const matches = [
+      onDay('yesterday', '2026-06-15'), // spelad igår (har poäng)
+      onDay('today', '2026-06-16'),
+      onDay('tomorrow', '2026-06-17'),
+    ];
+    const result = windowMatches(matches, nowOn('2026-06-16'));
+
+    // Fönstret: 15 (igår, bakåt-ankare) .. 18 (idag 16 + WINDOW_DAYS-1). Alla tre ryms.
+    expect(result.anchorKey).toBe('2026-06-15');
+    expect(result.visible.map((m) => m.id)).toEqual(['yesterday', 'today', 'tomorrow']);
+    expect(result.hiddenCount).toBe(0);
+  });
+
+  it('bakåt-utökningen släpper INTE in matcher längre fram än idag + (WINDOW_DAYS-1)', () => {
+    // Regressionsskydd: bakåt-spannet rör bara START-dagen, inte slutet. Det
+    // framåtblickande fönstret (idag + 2) gäller fortfarande, så d3 (idag + 3) döljs.
+    const matches = [
+      onDay('yesterday', '2026-06-15'), // igår -> i fönstret
+      onDay('today', '2026-06-16'),
+      onDay('d2', '2026-06-18'), // idag + 2, sista dagen i fönstret
+      onDay('d3', '2026-06-19'), // idag + 3, UTANFÖR
+    ];
+    const result = windowMatches(matches, nowOn('2026-06-16'));
+
+    expect(result.anchorKey).toBe('2026-06-15');
+    expect(result.visible.map((m) => m.id)).toEqual(['yesterday', 'today', 'd2']);
+    expect(result.hiddenCount).toBe(1); // d3 (19 juni) döljs
+  });
+
+  it('förrgårs match (äldre än igår) döljs, bara gårdagen och framåt syns', () => {
+    // Det fasta bakåt-spannet är IGÅR, inte "alla tidigare spel-dagar". En match från
+    // förrgår (14 juni) ligger före ankaret (igår = 15) och döljs, så historiken inte
+    // växer obegränsat i default-vyn. (Den nås via "Visa alla".)
+    const matches = [
+      onDay('dayBefore', '2026-06-14'), // förrgår -> döljs
+      onDay('yesterday', '2026-06-15'), // igår -> syns
+      onDay('today', '2026-06-16'),
+    ];
+    const result = windowMatches(matches, nowOn('2026-06-16'));
+
+    expect(result.anchorKey).toBe('2026-06-15');
+    expect(result.visible.map((m) => m.id)).toEqual(['yesterday', 'today']);
+    expect(result.hiddenCount).toBe(1); // dayBefore (14 juni) döljs
+  });
+
+  it('MEDVETEN avgränsning: en vilodag-gårdag betyder att förrgårs match inte syns i default', () => {
+    // Dokumenterad avvägning för det FASTA bakåt-spannet (LOOKBACK_DAYS = igår, inte
+    // "senaste spel-dag"): är igår (17 juni) en VILODAG och förrgår (16) hade matcher,
+    // så ligger förrgårs match FÖRE ankaret (igår = 17) och syns inte i default. Den
+    // nås via "Visa alla". I VM:s gruppspel (där Daniels problem uppstår nu) spelas
+    // matcher varje dag, så detta gäller bara i slutspel/fas-glapp där listan ändå är
+    // kort. Detta test LÅSER den medvetna avgränsningen så den inte tyst ändras.
+    const matches = [
+      onDay('dayBefore', '2026-06-16'), // förrgår (har poäng), men ligger före igår
+      // 2026-06-17 = vilodag (igår, ingen match)
+      onDay('today', '2026-06-18'), // idag
+    ];
+    const result = windowMatches(matches, nowOn('2026-06-18'));
+
+    expect(result.anchorKey).toBe('2026-06-17'); // igår (vilodagen), per det fasta spannet
+    expect(result.visible.map((m) => m.id)).toEqual(['today']);
+    expect(result.hiddenCount).toBe(1); // dayBefore (16 juni) ligger före ankaret -> dolt
   });
 });
 

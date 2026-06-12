@@ -48,6 +48,11 @@ function match(id: string, kickoff: string): Match {
   };
 }
 
+/** Samma match men AVGJORD (facit satt), så T58:s poäng-rad kan visas. */
+function finishedMatch(id: string, kickoff: string, homeGoals: number, awayGoals: number): Match {
+  return { ...match(id, kickoff), status: 'finished', result: { homeGoals, awayGoals } };
+}
+
 function store(partial: Partial<PredictionsStore>): PredictionsStore {
   return {
     enabled: true,
@@ -424,5 +429,110 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
       /\(hemma\)/
     ) as HTMLInputElement;
     expect(homeAfter.value).toBe('7');
+  });
+});
+
+// BAKÅT-FÖNSTRET (T62/#111): Daniels rapport var "jag ser fortfarande inte aktuell
+// tips-resultat på varje matchtips-kort". T58:s poäng-bricka finns men visas bara på
+// AVGJORDA matcher, och de enda avgjorda är gårdagens, som det rena framåtblickande
+// fönstret gömde. Detta block är callsite-/render-beviset (lessons "handoff-pastar-
+// ett-krav-levererat-men-koden-wirar-aldrig-in-ytan"): att gårdagens avgjorda+tippade
+// match faktiskt är SYNLIG i default-vyn OCH att poäng-brickan renderas DÄR, inte bara
+// att den rena windowMatches innehåller igår (det testas i result-window.test.ts).
+//
+// Vi FRYSER klockan (T60-mönstret, toFake:['Date'] så useDeadlineTick/useTodayKey-
+// pollingen inte stör waitFor) på en dag MITT i turneringen, med en avgjord match igår.
+describe('PredictionsView, bakåt-fönstret visar gårdagens poäng (T62/#111)', () => {
+  // 16 juni 2026, 12:00 svensk tid (10:00Z). Igår = 15 juni.
+  const TODAY = new Date('2026-06-16T10:00:00.000Z');
+
+  function visibleForms(): HTMLElement[] {
+    return Array.from(document.querySelectorAll('[data-prediction-form]')).filter(
+      (f) => !(f as HTMLElement).closest('li')?.hasAttribute('hidden')
+    ) as HTMLElement[];
+  }
+
+  it('gårdagens avgjorda + tippade match är SYNLIG i default och visar T58-poäng-brickan', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(TODAY);
+      // Igår (15 juni): avgjord 2-1, jag tippade 2-1 = EXAKT (3 p). Idag/imorgon: kommande.
+      dataState.matches = [
+        finishedMatch('y-played', '2026-06-15T18:00:00.000Z', 2, 1),
+        match('t-today', '2026-06-16T18:00:00.000Z'),
+        match('t-tomorrow', '2026-06-17T18:00:00.000Z'),
+      ];
+      const mine: Prediction = {
+        matchId: 'y-played',
+        userId: 'me',
+        homeGoals: 2,
+        awayGoals: 1,
+        updatedAt: 't',
+      };
+      renderView(store({ myPredictions: new Map([['y-played', mine]]) }), TODAY);
+
+      // KÄRNAN (AC1): gårdagens kort är inte hidden -> det är i default-fönstret.
+      const visibleIds = visibleForms().map((f) => f.getAttribute('data-match-id'));
+      expect(visibleIds).toContain('y-played');
+
+      // ...och poäng-brickan (T58) renderas på just det kortet, i default-vyn.
+      const card = document.querySelector(
+        '[data-prediction-form][data-match-id="y-played"]'
+      ) as HTMLElement;
+      const badge = card.querySelector('[data-tip-result]') as HTMLElement | null;
+      expect(badge).not.toBeNull();
+      // Exakt tips -> exact-typen, så vi vet att det är RÄTT poäng-väg (T58), inte tom.
+      expect(badge?.getAttribute('data-tip-point-type')).toBe('exact');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('kronologisk ordning (AC3): gårdagens avgjorda ligger FÖRE dagens kommande, inte huller om buller', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(TODAY);
+      // Avsiktligt indata-OORDNAT: idag före igår i listan. Vyn ska ändå rendera
+      // tidigast-först (selectPredictableMatches sorterar), så gårdagens avgjorda
+      // (lägst kickoff) hamnar överst, dagens kommande efter. Det är kronologiskt
+      // korrekt och inte förvirrande: gårdagens kort bär låst-etikett + poäng.
+      dataState.matches = [
+        match('t-today', '2026-06-16T18:00:00.000Z'),
+        finishedMatch('y-played', '2026-06-15T18:00:00.000Z', 0, 0),
+      ];
+      const mine: Prediction = {
+        matchId: 'y-played',
+        userId: 'me',
+        homeGoals: 0,
+        awayGoals: 0,
+        updatedAt: 't',
+      };
+      renderView(store({ myPredictions: new Map([['y-played', mine]]) }), TODAY);
+
+      const order = visibleForms().map((f) => f.getAttribute('data-match-id'));
+      expect(order).toEqual(['y-played', 't-today']); // tidigast (igår) först
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('räknaren (AC4) räknar bara ÖPPNA matcher, inte gårdagens låsta avgjorda', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(TODAY);
+      // Igår avgjord (låst), idag + imorgon öppna = 2 öppna att tippa. Gårdagens
+      // låsta match får INTE räknas in (den går inte att tippa längre).
+      dataState.matches = [
+        finishedMatch('y-played', '2026-06-15T18:00:00.000Z', 1, 0),
+        match('t-today', '2026-06-16T22:00:00.000Z'), // 22:00Z = efter "nu" (10:00Z) -> öppen
+        match('t-tomorrow', '2026-06-17T18:00:00.000Z'), // öppen
+      ];
+      renderView(store({}), TODAY);
+
+      // "2 matcher öppna att tippa" (plural), gårdagens låsta exkluderad.
+      expect(screen.getByText(/2 matcher öppna att tippa/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
