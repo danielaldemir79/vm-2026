@@ -15,7 +15,8 @@
 // "gissningskanslig-data-genereras-ur-auktoritativ-kalla-med-validerande-generator").
 //
 // KÄLLOR (gissas ALDRIG): se preambeln i team-profiles-source.txt.
-//   - FIFA-ranking: FIFA/Coca-Cola Men's World Ranking, aprilutgåvan 2026-04-01.
+//   - FIFA-ranking: FIFA/Coca-Cola Men's World Ranking, JUNIUTGÅVAN 2026-06-11 (T69,
+//     ersatte aprilutgåvan som var senast vid T10).
 //   - Stjärnspelare: VM 2026:s slutgiltiga 26-mannatrupper (offentliggjorda 2026-06-02),
 //     redaktionellt urval men varje spelare bevisligen i truppen enligt källa.
 //   - Kuriosa: verifierbara VM-fakta (antal tidigare slutspel + bästa placering).
@@ -324,9 +325,10 @@ export function buildProfilesFile(text: string, teams: readonly TeamRef[]): stri
 // parsern (team-profiles-parser.ts), och VÄRDE-LÅST mot källan i CI
 // (team-profiles-source.test.ts: regenerera-och-diffa + mutationstest + 48/48-täckning).
 //
-// KÄLLOR (gissas ALDRIG), hämtade 2026-06-10 (se preambeln i team-profiles-source.txt):
-//   - FIFA-ranking: FIFA/Coca-Cola Men's World Ranking, OFFICIELLA aprilutgåvan
-//     (publicerad 2026-04-01), verifierad mot ESPN + Wikipedia + whereig.com.
+// KÄLLOR (gissas ALDRIG), se preambeln i team-profiles-source.txt:
+//   - FIFA-ranking: FIFA/Coca-Cola Men's World Ranking, OFFICIELLA JUNIUTGÅVAN
+//     (publicerad 2026-06-11, hämtad 2026-06-12, T69), verifierad mot ESPN + Wikipedia
+//     (topp 20 med poäng) + whereig.com. Ersatte aprilutgåvan (2026-04-01) som var senast vid T10.
 //   - Stjärnspelare: VM 2026:s slutgiltiga 26-mannatrupper (offentliggjorda 2026-06-02),
 //     redaktionellt urval, men varje spelare bevisligen i truppen enligt källa.
 //   - Kuriosa: verifierbara VM-fakta (antal tidigare slutspel + bästa placering),

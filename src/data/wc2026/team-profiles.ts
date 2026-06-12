@@ -5,9 +5,10 @@
 // parsern (team-profiles-parser.ts), och VÄRDE-LÅST mot källan i CI
 // (team-profiles-source.test.ts: regenerera-och-diffa + mutationstest + 48/48-täckning).
 //
-// KÄLLOR (gissas ALDRIG), hämtade 2026-06-10 (se preambeln i team-profiles-source.txt):
-//   - FIFA-ranking: FIFA/Coca-Cola Men's World Ranking, OFFICIELLA aprilutgåvan
-//     (publicerad 2026-04-01), verifierad mot ESPN + Wikipedia + whereig.com.
+// KÄLLOR (gissas ALDRIG), se preambeln i team-profiles-source.txt:
+//   - FIFA-ranking: FIFA/Coca-Cola Men's World Ranking, OFFICIELLA JUNIUTGÅVAN
+//     (publicerad 2026-06-11, hämtad 2026-06-12, T69), verifierad mot ESPN + Wikipedia
+//     (topp 20 med poäng) + whereig.com. Ersatte aprilutgåvan (2026-04-01) som var senast vid T10.
 //   - Stjärnspelare: VM 2026:s slutgiltiga 26-mannatrupper (offentliggjorda 2026-06-02),
 //     redaktionellt urval, men varje spelare bevisligen i truppen enligt källa.
 //   - Kuriosa: verifierbara VM-fakta (antal tidigare slutspel + bästa placering),
@@ -24,7 +25,7 @@ import type { TeamProfileTable } from './team-profiles-parser';
 /** Lag-profiler per lag-id (A-L-ordning), källånkrade. */
 export const WC2026_TEAM_PROFILES: TeamProfileTable = {
   mex: {
-    fifaRanking: 15,
+    fifaRanking: 14,
     starPlayers: ['Raúl Jiménez', 'Santiago Giménez'],
     trivia:
       '17 tidigare VM-slutspel. Bäst: kvartsfinal (senast 1986, på hemmaplan). Värdnation 2026.',
@@ -40,7 +41,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '11 tidigare VM-slutspel. Bäst: fjärdeplats (2002, på hemmaplan).',
   },
   cze: {
-    fifaRanking: 41,
+    fifaRanking: 40,
     starPlayers: ['Patrik Schick', 'Tomáš Souček'],
     trivia:
       '9 tidigare VM-slutspel (inkl. Tjeckoslovakien). Bäst: VM-final (silver 1934 och 1962).',
@@ -51,12 +52,12 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '2 tidigare VM-slutspel. Bäst: gruppspel. Värdnation 2026.',
   },
   bih: {
-    fifaRanking: 65,
+    fifaRanking: 64,
     starPlayers: ['Edin Džeko'],
     trivia: '1 tidigare VM-slutspel (2014). Bäst: gruppspel.',
   },
   qat: {
-    fifaRanking: 55,
+    fifaRanking: 56,
     starPlayers: ['Akram Afif', 'Almoez Ali'],
     trivia: '1 tidigare VM-slutspel (värdnation 2022). Bäst: gruppspel.',
   },
@@ -72,7 +73,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
       'Enda landet med i alla 22 VM-slutspel. Bäst: 5 VM-titlar (1958, 1962, 1970, 1994, 2002), flest av alla.',
   },
   mar: {
-    fifaRanking: 8,
+    fifaRanking: 7,
     starPlayers: ['Achraf Hakimi', 'Sofyan Amrabat'],
     trivia:
       '6 tidigare VM-slutspel. Bäst: fjärdeplats (2022), första afrikanska/arabiska semifinallag.',
@@ -83,17 +84,17 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '1 tidigare VM-slutspel (1974). Bäst: gruppspel.',
   },
   sco: {
-    fifaRanking: 43,
+    fifaRanking: 42,
     starPlayers: ['Andy Robertson', 'Scott McTominay'],
     trivia: '8 tidigare VM-slutspel. Bäst: gruppspel (aldrig avancerat).',
   },
   usa: {
-    fifaRanking: 16,
+    fifaRanking: 17,
     starPlayers: ['Christian Pulisic'],
     trivia: '11 tidigare VM-slutspel. Bäst: tredjeplats (1930). Värdnation 2026.',
   },
   par: {
-    fifaRanking: 40,
+    fifaRanking: 41,
     starPlayers: ['Miguel Almirón'],
     trivia: '8 tidigare VM-slutspel. Bäst: kvartsfinal (2010).',
   },
@@ -118,7 +119,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: 'VM-debut 2026, minsta nation (i invånarantal) någonsin i ett VM-slutspel.',
   },
   civ: {
-    fifaRanking: 34,
+    fifaRanking: 33,
     starPlayers: ['Franck Kessié', 'Nicolas Pépé'],
     trivia: '3 tidigare VM-slutspel. Bäst: gruppspel.',
   },
@@ -128,7 +129,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '4 tidigare VM-slutspel. Bäst: åttondelsfinal (2006).',
   },
   ned: {
-    fifaRanking: 7,
+    fifaRanking: 8,
     starPlayers: ['Virgil van Dijk', 'Frenkie de Jong'],
     trivia: '11 tidigare VM-slutspel. Bäst: VM-final tre gånger (silver 1974, 1978, 2010).',
   },
@@ -143,7 +144,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '12 tidigare VM-slutspel. Bäst: VM-final (silver 1958, på hemmaplan).',
   },
   tun: {
-    fifaRanking: 44,
+    fifaRanking: 45,
     starPlayers: ['Hannibal Mejbri'],
     trivia: '6 tidigare VM-slutspel. Bäst: gruppspel.',
   },
@@ -158,7 +159,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '3 tidigare VM-slutspel. Bäst: gruppspel. Första afrikanska VM-laget (1934).',
   },
   irn: {
-    fifaRanking: 21,
+    fifaRanking: 20,
     starPlayers: ['Alireza Jahanbakhsh'],
     trivia: '6 tidigare VM-slutspel. Bäst: gruppspel.',
   },
@@ -174,7 +175,7 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
       '16 tidigare VM-slutspel. Bäst: VM-guld (2010), första VM-titeln vunnen av ett europeiskt lag utanför Europa.',
   },
   cpv: {
-    fifaRanking: 69,
+    fifaRanking: 67,
     starPlayers: ['Jovane Cabral', 'Garry Rodrigues'],
     trivia: 'VM-debut 2026. En av de minsta nationerna någonsin i ett VM-slutspel.',
   },
@@ -184,18 +185,17 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '6 tidigare VM-slutspel. Bäst: åttondelsfinal (1994). Slog Argentina i premiären 2022.',
   },
   uru: {
-    fifaRanking: 17,
+    fifaRanking: 16,
     starPlayers: ['Federico Valverde', 'Darwin Núñez'],
     trivia: '14 tidigare VM-slutspel. Bäst: 2 VM-titlar (1930 som värd, 1950).',
   },
   fra: {
-    fifaRanking: 1,
+    fifaRanking: 3,
     starPlayers: ['Kylian Mbappé', "N'Golo Kanté"],
-    trivia:
-      '16 tidigare VM-slutspel. Bäst: 2 VM-titlar (1998 som värd, 2018). FIFA:s etta inför 2026.',
+    trivia: '16 tidigare VM-slutspel. Bäst: 2 VM-titlar (1998 som värd, 2018).',
   },
   sen: {
-    fifaRanking: 14,
+    fifaRanking: 15,
     starPlayers: ['Sadio Mané', 'Idrissa Gana Gueye'],
     trivia: '3 tidigare VM-slutspel. Bäst: kvartsfinal (2002, i debuten).',
   },
@@ -210,10 +210,10 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '3 tidigare VM-slutspel. Bäst: åttondelsfinal (1998). Första VM sedan 1998.',
   },
   arg: {
-    fifaRanking: 3,
+    fifaRanking: 1,
     starPlayers: ['Lionel Messi', 'Enzo Fernández'],
     trivia:
-      '18 tidigare VM-slutspel. Bäst: 3 VM-titlar (1978 som värd, 1986, 2022). Regerande mästare.',
+      '18 tidigare VM-slutspel. Bäst: 3 VM-titlar (1978 som värd, 1986, 2022). Regerande mästare och FIFA:s etta inför 2026.',
   },
   alg: {
     fifaRanking: 28,
@@ -262,12 +262,12 @@ export const WC2026_TEAM_PROFILES: TeamProfileTable = {
     trivia: '6 tidigare VM-slutspel. Bäst: VM-final (silver 2018) och brons (2022).',
   },
   gha: {
-    fifaRanking: 74,
+    fifaRanking: 73,
     starPlayers: ['Thomas Partey', 'Jordan Ayew'],
     trivia: '4 tidigare VM-slutspel. Bäst: kvartsfinal (2010).',
   },
   pan: {
-    fifaRanking: 33,
+    fifaRanking: 34,
     starPlayers: ['Aníbal Godoy'],
     trivia: '1 tidigare VM-slutspel (2018). Bäst: gruppspel.',
   },
