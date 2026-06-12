@@ -148,8 +148,9 @@ export function selectPredictableBracket(
   const matchById = new Map(matches.map((m) => [m.id, m]));
 
   // Champion-slotten: alla 48 lag (KISS). DEADLINE = GREATEST(g-A-1, fasta söndagstiden
-  // 14/6 21:59Z): T53 (#95) förlängde CHAMPION-tipset (g-A-1 = 11 juni ligger FÖRE fasta
-  // tiden, så champion förlängs till söndagen). applyExtendedDeadline speglar RLS-helpern
+  // 21/6 21:59Z): T53 (#95) införde, T67 (#123) flyttade CHAMPION-tipsets förlängning till
+  // söndag 21/6 (g-A-1 = 11 juni ligger FÖRE fasta tiden, så champion förlängs till
+  // söndagen). applyExtendedDeadline speglar RLS-helpern
   // bracket_deadline_kickoff('champion') EXAKT (greatest(g-A-1, pool_extended_deadline())).
   // OBS: bara CHAMPION berörs , match-SLOTSEN (M73..M104) nedan behåller sina EGNA
   // avsparks-lås orörda (deadlineIsoFor utan förlängning), exakt som RLS slot-grenen.

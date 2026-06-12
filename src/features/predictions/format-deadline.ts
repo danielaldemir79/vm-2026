@@ -5,10 +5,10 @@
 // VARFÖR denna fil finns (Daniels feedback 5): grupp- och bracket-tipsen säger inte
 // klart NÄR tippningen låses. Den verifierade deadline-modellen (mot RLS, docs/
 // decisions.md T16 §4 + T53) är:
-//   * grupp-tips   -> GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 14/6 21:59Z),
+//   * grupp-tips   -> GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 21/6 21:59Z),
 //   * bracket-slot -> slottens egen avspark (M73..M104), OFÖRÄNDRAD,
 //   * champion     -> GREATEST(turneringens första match g-A-1, fasta söndagstiden).
-// T53 (#95) förlängde grupp- + champion-deadlinen till söndag 14/6 (de som inte hann
+// T53 (#95) införde, T67 (#123) flyttade grupp- + champion-deadlinen till söndag 21/6 (de som inte hann
 // före premiären). Funktionen formaterar EXAKT den `deadlineIso` selektorn räknar fram
 // (rå avspark för slots, förlängd söndag för grupp/champion), så budskapet säger den
 // FAKTISKA tidpunkten, aldrig en gissad dag , den må vara en match-avspark eller den
