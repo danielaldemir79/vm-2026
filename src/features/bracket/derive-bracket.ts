@@ -5,15 +5,22 @@
 // sanningen (matchlistan) + den hårt testade FIFA-motorn (T4). Tre lägen, helt
 // datadrivna, ingen gissning:
 //
-//   1. GRUPPSPEL PÅGÅR  -> varje slot visar VILKA lag som KAN hamna där
-//      ("möjliga lag") + en grupp-positions-etikett ("1:a grupp A", "3:a
-//      A/B/C/D/F" enligt FIFA Article 12.6). Bästa-trea-platserna visar de
-//      eligibleGroups som STRUKTUREN (bracket-structure.ts) anger, EXAKT vad
-//      motorn säger, aldrig spekulation om vilka som kvalificerar.
+//   1. GRUPPSPEL PÅGÅR  -> trädet är LEVANDE redan nu (T56, #100): varje slot
+//      fylls PRELIMINÄRT med det lag som leder positionen JUST NU (gruppens
+//      nuvarande 1:a/2:a ur tabellen, och de 8 bästa treorna seedade via FIFA:s
+//      Annexe C på NUVARANDE ställning). Resolution 'preliminary': laget rör sig
+//      vid varje inmatat resultat och är ÄRLIGT MÄRKT i UI:t ("Nuvarande
+//      ställning, inte klart förrän grupperna är färdigspelade"). Slot:en bär
+//      ÄVEN sina "möjliga lag" + positions-etiketten ("1:a grupp A", "3:a
+//      A/B/C/D/F" enligt FIFA Article 12.6), så ingen information går förlorad.
+//      Kan en position inte fyllas preliminärt (gruppen saknar laget, eller
+//      treorna kan inte rangordnas ärligt) faller slot:en tillbaka till
+//      'possible' (bara möjliga lag), aldrig en gissning som facit.
 //   2. GRUPPERNA KLARA  -> slotarna LÅSES till riktiga lag: gruppvinnare/tvåa
 //      ur de härledda tabellerna, och de 8 bästa treorna seedade via FIFA:s
 //      Annexe C (seedThirdPlaces, T4). Treplats-rankningen (Article 13) avgör
-//      VILKA 8 grupper som bidrar (rankThirdPlaces).
+//      VILKA 8 grupper som bidrar (rankThirdPlaces). Detta SKARPA läge är
+//      OFÖRÄNDRAT av T56 (read-only mot facit): det riktiga trädet rörs aldrig.
 //   3. SLUTSPELSRESULTAT FINNS -> vinnaren propagerar till nästa slot
 //      (match-winner), och bronsmatchen matas av semifinal-FÖRLORARNA
 //      (match-loser). En straff-avgjord match (FIFA Art. 14) ger en entydig
@@ -32,13 +39,21 @@ import { GROUP_IDS } from '../../domain/types';
 import { buildBracket, type BracketNode } from '../../domain/bracket/build-bracket';
 import { seedThirdPlaces } from '../../domain/bracket/seed-third-places';
 import { computeThirdPlaceRanking } from '../../domain/bracket/rank-third-places';
+import { preliminaryThirdSeeding } from '../../domain/bracket/preliminary-third-seeding';
 
 /** Hur en slots lag är bestämt just nu. */
 export type SlotResolution =
   // Ett konkret, framräknat lag (gruppspel klart / slutspelsmatch avgjord).
   | 'resolved'
-  // Gruppspelet pågår: laget är inte fastställt, men en mängd MÖJLIGA lag finns
-  // (de lag som ännu kan landa i denna position) + en grupp-positions-etikett.
+  // Gruppspelet pågår men positionen har ett PRELIMINÄRT lag: det lag som leder
+  // positionen JUST NU (nuvarande 1:a/2:a, eller en preliminärt seedad bästa
+  // trea via Annexe C på nuvarande ställning). teamId är satt, men EJ slutgiltigt,
+  // det rör sig vid nästa resultat. Slot:en bär även sina candidateTeamIds.
+  // Ärligt MÄRKT i UI:t ("Nuvarande ställning, inte klart"). (T56, #100.)
+  | 'preliminary'
+  // Gruppspelet pågår och inget preliminärt lag kan ärligt ges (positionen kan
+  // inte fyllas, t.ex. treorna kan inte rangordnas än), men en mängd MÖJLIGA lag
+  // finns (de lag som ännu kan landa i positionen) + en grupp-positions-etikett.
   | 'possible'
   // Inget kan ännu sägas om laget (t.ex. en senare slutspelsmatch vars båda
   // föregångare ännu inte är avgjorda, och inga möjliga lag är meningsfulla).
@@ -92,6 +107,15 @@ export interface BracketState {
    * (true när alla 12 gruppers tabeller är slutgiltiga, se isGroupStageComplete.)
    */
   locked: boolean;
+  /**
+   * Visar trädet ett PRELIMINÄRT läge ur nuvarande ställning (T56, #100)? True när
+   * gruppspelet PÅGÅR och minst en slot har ett preliminärt lag, alltså när UI:t
+   * ska visa den ärliga "Nuvarande ställning, inte klart"-märkningen. False när
+   * trädet är låst (locked) ELLER när inga preliminära lag kunde ges (tidigt i
+   * gruppspelet, bara möjliga lag). Härleds, lagras inte. `locked` och
+   * `preliminary` är ömsesidigt uteslutande.
+   */
+  preliminary: boolean;
 }
 
 /* ------------------------------------------------------------------ *
@@ -173,11 +197,17 @@ function teamAtRank(table: GroupTable | undefined, rank: number): string | null 
 
 /**
  * Bygg lag-tillståndet för en GRUPP-källa (winner/runner-up) i ETT läge.
- * Klart gruppspel -> resolved (rank 1/2). Pågående -> possible: kandidaterna är
- * gruppens nuvarande topp i rätt position-spann (de lag som rimligen kan ta
- * platsen). Vi håller "möjliga lag" enkelt och datadrivet: hela gruppens lag är
- * kandidater tills gruppen är klar (vilket lag som helst kan teoretiskt sluta
- * 1:a/2:a innan alla matcher spelats). UI:t visar etiketten + nuvarande topp.
+ *
+ * Klart gruppspel -> resolved (rank 1/2, slutgiltigt).
+ *
+ * Pågående (T56, #100) -> PRELIMINÄRT: det lag som leder positionen JUST NU
+ * (gruppens nuvarande rank-1/rank-2 ur tabellen, beräknat av compute-standings
+ * med FIFA:s tiebreak) placeras i slot:en (teamId satt, resolution 'preliminary'),
+ * och rör sig vid varje inmatat resultat. Slot:en bär ÄVEN candidateTeamIds (alla
+ * lag i gruppen, vilket som helst kan teoretiskt ta platsen innan alla matcher
+ * spelats), så "möjliga lag" finns kvar parallellt med det preliminära ledar-laget.
+ * Saknas laget på rangen (en tom/ofullständig grupp utan en rad på just den rangen)
+ * faller vi tillbaka till 'possible' (bara möjliga lag), aldrig en gissning.
  */
 function resolveGroupSlot(
   table: GroupTable | undefined,
@@ -191,18 +221,33 @@ function resolveGroupSlot(
   }
   // Gruppspel pågår: alla lag i gruppen är möjliga (positionen är inte avgjord).
   const candidateTeamIds = table ? table.standings.map((r) => r.teamId) : [];
+  // PRELIMINÄRT lag = det som leder rangen just nu (om gruppen har en rad där).
+  const preliminaryTeamId = teamAtRank(table, rank);
+  if (preliminaryTeamId !== null) {
+    return { resolution: 'preliminary', label, teamId: preliminaryTeamId, candidateTeamIds };
+  }
+  // Ingen rad på rangen än (tom/ofullständig grupp): bara möjliga lag, ingen gissning.
   return { resolution: 'possible', label, teamId: null, candidateTeamIds };
 }
 
 /**
  * Bygg lag-tillståndet för en BÄSTA-TREA-källa.
- * Klart gruppspel + seedning löst -> resolved (det specifika lagets trea).
- * Pågående -> possible: kandidaterna är de NUVARANDE treorna i de eligibleGroups
- * som strukturen anger (Article 12.6), EXAKT vad motorn säger.
+ *
+ * Klart gruppspel + skarp seedning löst -> resolved (det specifika lagets trea,
+ * slutgiltigt via Annexe C).
+ *
+ * Pågående (T56, #100): om den PRELIMINÄRA Annexe C-seedningen gav en trea till
+ * just denna match (preliminaryThirdTeamId satt) placeras den nuvarande trean
+ * (resolution 'preliminary', teamId satt). Den rör sig vid varje inmatat resultat
+ * och bär ÄVEN sina candidateTeamIds. Annars (treorna kan inte rangordnas ärligt
+ * än, t.ex. en grupp saknar en nuvarande trea) -> possible: bara de nuvarande
+ * treorna i de behöriga grupperna som kandidater. Aldrig en gissning om vem som
+ * kvalificerar bortom vad Annexe C på nuvarande ställning entydigt ger.
  */
 function resolveBestThirdSlot(
   eligibleGroups: readonly GroupId[],
   seededTeamId: string | null,
+  preliminaryThirdTeamId: string | null,
   tablesByGroup: ReadonlyMap<GroupId, GroupTable>,
   groupComplete: boolean
 ): Pick<BracketSlotState, 'resolution' | 'label' | 'teamId' | 'candidateTeamIds'> {
@@ -210,14 +255,23 @@ function resolveBestThirdSlot(
   if (groupComplete && seededTeamId !== null) {
     return { resolution: 'resolved', label, teamId: seededTeamId, candidateTeamIds: [] };
   }
-  // Pågående (eller seedning ännu inte löst): de nuvarande treorna i de behöriga
-  // grupperna är kandidater. Inga gissningar om vilka som kvalificerar.
+  // Pågående: de nuvarande treorna i de behöriga grupperna är alltid kandidater.
   const candidateTeamIds: string[] = [];
   for (const group of eligibleGroups) {
     const third = teamAtRank(tableOf(tablesByGroup, group), 3);
     if (third !== null) {
       candidateTeamIds.push(third);
     }
+  }
+  // Gav den preliminära Annexe C-seedningen ett konkret lag till denna match? Visa
+  // det preliminärt (rör sig vid nästa resultat), annars bara möjliga lag.
+  if (preliminaryThirdTeamId !== null) {
+    return {
+      resolution: 'preliminary',
+      label,
+      teamId: preliminaryThirdTeamId,
+      candidateTeamIds,
+    };
   }
   return { resolution: 'possible', label, teamId: null, candidateTeamIds };
 }
@@ -321,10 +375,10 @@ export function deriveBracket(
   const matchById = new Map<string, Match>(matches.map((m) => [m.id, m]));
   const groupComplete = isGroupStageComplete(tables);
 
-  // Seeda de 8 bästa treorna (bara när gruppspelet är klart): matchId -> trean.
-  // qualifyingGroups är null tills rangordningen är komplett (en trea per grupp,
-  // alla A-L representerade), då seedar vi inte (möjliga lag-läget gäller). En
-  // giltig kombination ger en kollisionsfri Annexe C-seedning.
+  // SKARP seedning av de 8 bästa treorna (bara när gruppspelet är klart): matchId
+  // -> trean. qualifyingGroups är null tills rangordningen är komplett (en trea per
+  // grupp, alla A-L representerade OCH färdigspelade), då seedar vi inte. En giltig
+  // kombination ger en kollisionsfri Annexe C-seedning. OFÖRÄNDRAT av T56 (facit).
   const thirdByMatchId = new Map<string, string>();
   if (groupComplete) {
     const { qualifyingGroups } = computeThirdPlaceRanking(tables);
@@ -334,6 +388,22 @@ export function deriveBracket(
         if (teamId !== null) {
           thirdByMatchId.set(assignment.matchId, teamId);
         }
+      }
+    }
+  }
+
+  // PRELIMINÄR seedning av de 8 NUVARANDE bästa treorna under gruppspelet (T56,
+  // #100): matchId -> lag-id för den NUVARANDE trean i seedad grupp. Tom Map när
+  // gruppspelet är klart (då gäller den skarpa thirdByMatchId ovan) eller när
+  // treorna inte kan rangordnas ärligt än (preliminaryThirdSeeding returnerar tom
+  // Map då). Samma källlåsta motorer (rankThirdPlaces + seedThirdPlaces/Annexe C),
+  // bara på nuvarande ställning. Lag-id slås upp ur tabellens nuvarande rank-3-rad.
+  const preliminaryThirdByMatchId = new Map<string, string>();
+  if (!groupComplete) {
+    for (const [matchId, group] of preliminaryThirdSeeding(tables)) {
+      const teamId = teamAtRank(tableOf(tablesByGroup, group), 3);
+      if (teamId !== null) {
+        preliminaryThirdByMatchId.set(matchId, teamId);
       }
     }
   }
@@ -365,6 +435,7 @@ export function deriveBracket(
     const homeState = buildSlotState(
       homeNode,
       thirdByMatchId,
+      preliminaryThirdByMatchId,
       tablesByGroup,
       outcomeByMatchId,
       slotStateById,
@@ -373,6 +444,7 @@ export function deriveBracket(
     const awayState = buildSlotState(
       awayNode,
       thirdByMatchId,
+      preliminaryThirdByMatchId,
       tablesByGroup,
       outcomeByMatchId,
       slotStateById,
@@ -402,13 +474,23 @@ export function deriveBracket(
     });
   }
 
-  return { matches: matchStates, locked: groupComplete };
+  // preliminary: gruppspelet pågår OCH minst en slot fick ett preliminärt lag
+  // (nuvarande 1:a/2:a eller en preliminärt seedad trea). Driver UI:ts ärliga
+  // "Nuvarande ställning, inte klart"-märkning. Ömsesidigt uteslutande med locked.
+  const preliminary =
+    !groupComplete &&
+    matchStates.some(
+      (m) => m.home.resolution === 'preliminary' || m.away.resolution === 'preliminary'
+    );
+
+  return { matches: matchStates, locked: groupComplete, preliminary };
 }
 
 /** Bygg en slots fulla tillstånd ur dess källa + det aktuella läget. */
 function buildSlotState(
   node: BracketNode,
   thirdByMatchId: ReadonlyMap<string, string>,
+  preliminaryThirdByMatchId: ReadonlyMap<string, string>,
   tablesByGroup: ReadonlyMap<GroupId, GroupTable>,
   outcomeByMatchId: ReadonlyMap<string, MatchOutcome>,
   slotStateById: ReadonlyMap<string, BracketSlotState>,
@@ -446,6 +528,7 @@ function buildSlotState(
       resolved = resolveBestThirdSlot(
         source.eligibleGroups,
         thirdByMatchId.get(node.matchId) ?? null,
+        preliminaryThirdByMatchId.get(node.matchId) ?? null,
         tablesByGroup,
         groupComplete
       );

@@ -77,6 +77,8 @@ const BRACKET: BracketState = {
     bracketMatch('M74', 'round-of-32', 'fra', null), // okänd motståndare -> TBD
   ],
   locked: true,
+  // preliminary: false = skarpt läge (T56-fältet), vyn testas i låst skarpt läge.
+  preliminary: false,
 };
 
 // Mocka data-laddnings-hooken (vi testar vyns LÄGEN, inte I/O:t).

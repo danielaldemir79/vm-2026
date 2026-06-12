@@ -5,6 +5,56 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T56 (#100): levande slutspelsträd redan under gruppspelet (preliminärt läge, ärligt märkt)
+
+Daniels live-feedback: "kolla även varför slutspelsträdet inte är levande nu direkt. även fast de
+inte spelat så kan man visa det levande nu med de positioner som är nu. så kan den röra sig efter
+varje resultat som matas in. roligt så att se redan nu."
+
+**ROTORSAK (varför det inte kändes levande förut):** trädet var redan REAKTIVT (useBracketData
+useMemo på matches i den delade storen, räknas om vid varje inmatning) och hade ett "gruppspel
+pågår"-läge. MEN under gruppspelet visade grupp-/trea-slotarna BARA sin positions-etikett ("1:a
+grupp E", "3:a A/B/C/D/F") + ett "4 möjliga lag"-chip, aldrig ett KONKRET nuvarande lag. Treornas
+seedning var dessutom gatad bakom `qualifyingGroups === null` (skarp seedning kräver alla 12 grupper
+FÄRDIGSPELADE, medvetet T4-fail-safe). Resultat: man såg inga lag röra sig, bara etiketter, alltså
+"statiskt". (Den binära "tomt bakom isGroupStageComplete"-hypotesen stämde alltså inte exakt, trädet
+var redan tre-läges, men preliminära LAG saknades.)
+
+**Beslut, PRELIMINÄRT läge ('preliminary'-resolution):** under gruppspelet fylls varje slot nu med
+det lag som leder positionen JUST NU, gruppens nuvarande 1:a/2:a ur tabellen (compute-standings med
+FIFA-tiebreak) och de 8 nuvarande bästa treorna seedade via Annexe C. Laget rör sig vid varje inmatat
+resultat (samma reaktivitet som tabellerna, ingen ny polling). Slot:en bär ÄVEN sina möjliga lag +
+positions-etiketten parallellt, så ingen information går förlorad.
+
+**ÅTERANVÄNDER de källlåsta motorerna (ingen parallell seedning, PRINCIPLES §4):** den preliminära
+seedningen (`src/domain/bracket/preliminary-third-seeding.ts`) anropar EXAKT `rankThirdPlaces` (FIFA
+Article 13) + `seedThirdPlaces` (FIFA Annexe C, 495 källlåsta kombinationer). Ingen egen
+rankningstabell, ingen egen Annexe C. Enda skillnaden mot den skarpa vägen är NÄR vi seedar (på
+nuvarande ställning, inte bara när allt är klart), inte HUR. Källa: Regulations for the FIFA World
+Cup 26 (May 2026), Article 13 (sid. 27-28) + Annexe C (sid. 80-97), committat i
+`fifa-knockout-rules-source.txt` / `third-place-table.ts`.
+
+**ÄRLIG GRÄNS (dokumenterad, gissas inte):** FIFA Article 13 rangordnar treorna ÖVER grupper, vilket
+bara är meningsfullt när ALLA 12 grupperna har en nuvarande trea att jämföra. Därför seedar vi
+preliminärt ENDAST när alla 12 kanoniska grupperna har en rank-3-rad just nu (samma unika
+täcknings-krav som den skarpa `qualifyingGroups`, men UTAN kravet på färdigspelat). Saknar någon
+grupp en nuvarande trea (t.ex. en grupp som inte spelat) lämnas bästa-trea-slotarna i 'possible'-läge
+(bara möjliga lag), aldrig en gissad seedning på ofullständig jämförelse. En grupp utan tabell ger
+'possible' även för 1:a/2:a, ingen gissning.
+
+**ÄRLIG MÄRKNING (samma anda som T51):** ett preliminärt träd märks tydligt, header-pillen "Nuvarande
+ställning" + intro-meningen "Inte klart förrän grupperna är färdigspelade", och varje preliminär slot
+bär en under-rad med sin position ("1:a grupp E · nu") + aria-label "..., nuvarande ställning (inte
+klart)". `BracketState.preliminary` (true bara under gruppspel med minst ett preliminärt lag) driver
+märkningen. `locked` och `preliminary` är ömsesidigt uteslutande.
+
+**READ-ONLY mot facit:** det SKARPA låsta läget (`locked === true`, alla grupper färdiga) är
+OFÖRÄNDRAT, deriveBracket räknar fortfarande den riktiga seedningen via `computeThirdPlaceRanking`
+(som fortsatt returnerar null tills allt är klart). Den preliminära vägen körs bara `if
+(!groupComplete)`. Det riktiga trädet rörs aldrig av T56.
+
+---
+
 ## 2026-06-12 , T58 (#99): poäng synliga i tips-vyn (per-match-etikett + summering + käll-detalj)
 
 **Beslut 1, utfalls-MEDVETEN per-match-etikett (en sanning, #69 kryss-noten):** match-tipsens

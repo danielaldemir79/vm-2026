@@ -73,12 +73,18 @@ function possibleTeamsLabel(count: number): string {
 /**
  * Visnings-texten för en slot, beroende på dess tillstånd:
  *   - resolved: lagets namn (gissas aldrig, "Ej klart" om uppslaget saknar det).
+ *   - preliminary (T56): det NUVARANDE ledar-lagets namn, så man ser ett konkret
+ *     lag röra sig i trädet redan under gruppspelet. Det märks ÄRLIGT som
+ *     preliminärt (se nedan), aldrig som facit.
  *   - possible/tbd: positions-etiketten ("1:a grupp E", "3:a A/B/C/D/F",
  *     "Vinnare M89"), så användaren ser VAR laget kommer ifrån även innan det
  *     är känt.
  */
 function slotText(slot: BracketSlotState, teamsById: ReadonlyMap<string, Team>): string {
-  if (slot.resolution === 'resolved' && slot.teamId !== null) {
+  if (
+    (slot.resolution === 'resolved' || slot.resolution === 'preliminary') &&
+    slot.teamId !== null
+  ) {
     return teamDisplayName(slot.teamId, teamsById);
   }
   return slot.label;
@@ -107,6 +113,7 @@ export function SlotRow({
 }) {
   const text = slotText(slot, teamsById);
   const possibleCount = slot.resolution === 'possible' ? slot.candidateTeamIds.length : 0;
+  const isPreliminary = slot.resolution === 'preliminary';
 
   return (
     <li
@@ -115,19 +122,36 @@ export function SlotRow({
       data-winner={isWinner ? '' : undefined}
       className="vm-bracket-slot flex items-center justify-between gap-2 px-2.5 py-1.5"
     >
-      <span className="min-w-0 truncate text-[0.8125rem] leading-tight" title={text}>
-        {/* En resolved slot bär lagnamnet i full kontrast; en obestämd slot bär
-            sin positions-etikett dämpat, så hierarkin syns utan färg-beroende.
-            .vm-bracket-slot-name bär den FÄRG-OBEROENDE vinnar-medaljens glyf
-            (CSS-pseudo ::after), så bocken syns i gråskala/för färgblinda. */}
-        <span
-          className={`vm-bracket-slot-name ${
-            slot.resolution === 'resolved' ? 'font-semibold text-fg' : 'text-fg-muted'
-          }`}
-        >
-          {text}
+      <span className="flex min-w-0 flex-col leading-tight">
+        <span className="min-w-0 truncate text-[0.8125rem]" title={text}>
+          {/* En resolved slot bär lagnamnet i full kontrast; en obestämd slot bär
+              sin positions-etikett dämpat, så hierarkin syns utan färg-beroende.
+              Ett PRELIMINÄRT lag (T56) bär lagnamnet men dämpat (text-fg-muted), så
+              det syns att det inte är ett låst facit ens utan färg. .vm-bracket-slot-
+              name bär den FÄRG-OBEROENDE vinnar-medaljens glyf (CSS-pseudo ::after),
+              så bocken syns i gråskala/för färgblinda. */}
+          <span
+            className={`vm-bracket-slot-name ${
+              slot.resolution === 'resolved' ? 'font-semibold text-fg' : 'text-fg-muted'
+            }`}
+          >
+            {text}
+          </span>
+          {isWinner ? <span className="sr-only"> (vidare)</span> : null}
         </span>
-        {isWinner ? <span className="sr-only"> (vidare)</span> : null}
+        {isPreliminary ? (
+          // Under lagnamnet: dess NUVARANDE position ("1:a grupp E") + att det är
+          // preliminärt, så ett preliminärt lag aldrig läses som facit. aria-label
+          // ger skärmläsaren hela sanningen i en mening (data-slot-resolution +
+          // detta gör att design-frontend kan tonsätta utan att röra semantiken).
+          <span
+            data-slot-preliminary=""
+            className="vm-bracket-slot-prelim min-w-0 truncate text-[0.625rem] font-medium uppercase tracking-wide text-fg-muted"
+            aria-label={`${slot.label}, nuvarande ställning (inte klart)`}
+          >
+            {slot.label} · nu
+          </span>
+        ) : null}
       </span>
       {possibleCount > 0 ? (
         <span
@@ -273,11 +297,48 @@ export function BracketView() {
               Låst seedning
             </span>
           ) : null}
+          {/* PRELIMINÄR-märke (T56): under gruppspelet visas det NUVARANDE läget med
+              konkreta lag. ÄRLIGT märkt så ingen tror att det är klart, samma anda
+              som T51:s simulering. Visas bara när trädet faktiskt har preliminära lag.
+
+              VISUELL FAMILJ (T56-finish): samma LEVANDE accent-pågår-pill som tips-
+              avslöjandets "Pågår"-bricka (T55), inte en guld-VARNINGS-ton. Grön accent
+              = turneringens energi ("ställningen lever, rör sig vid varje resultat"),
+              guld är reserverat för det AVGJORDA (facit/final). En pulsande prick +
+              ordet bär budskapet FÄRG-OBEROENDE (formen syns i gråskala / för färgblind
+              / vid reducerad rörelse, då pricken blir statisk). AA: accent-text på den
+              lätta 9%-accent-tinten = 8.10:1 mörkt / 4.77:1 ljust (samma mätta recept
+              som .vm-reveal-pending, DRY). Den gamla guld-som-text-på-12%-guld-tinten
+              föll under AA i ljust tema (uppmätt 3.17:1, den kända guld-på-tint-fällan). */}
+          {bracket?.preliminary ? (
+            <span
+              data-bracket-preliminary=""
+              className="vm-bracket-prelim-pill inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
+            >
+              <span aria-hidden="true" className="vm-pending-dot" />
+              Nuvarande ställning
+            </span>
+          ) : null}
         </div>
         <p className="max-w-2xl text-sm text-fg-muted">
-          Sextondel till final. Under gruppspelet visar trädet vilka lag som KAN mötas, det låses
-          när grupperna är klara (FIFA-seedningen), och vinnaren förs fram automatiskt när ett
-          slutspelsresultat matas in.
+          {bracket?.preliminary ? (
+            // Den ärliga meningen när trädet visar nuvarande ställning: konkreta lag
+            // syns och rör sig vid varje resultat, men inget är klart förrän
+            // grupperna är färdigspelade. Ingen tvetydighet om vad man ser (T56).
+            <>
+              Trädet visar <strong className="font-semibold text-fg">nuvarande ställning</strong>:
+              gruppernas 1:or och 2:or och de 8 bästa treorna (FIFA-seedningen) fyller platserna
+              preliminärt och rör sig vid varje inmatat resultat.{' '}
+              <strong className="font-semibold text-fg">Inte klart</strong> förrän grupperna är
+              färdigspelade, då låses trädet till de riktiga lagen.
+            </>
+          ) : (
+            <>
+              Sextondel till final. Under gruppspelet visar trädet det nuvarande läget, det låses
+              när grupperna är klara (FIFA-seedningen), och vinnaren förs fram automatiskt när ett
+              slutspelsresultat matas in.
+            </>
+          )}
         </p>
       </header>
 
