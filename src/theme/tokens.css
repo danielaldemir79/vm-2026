@@ -1736,3 +1736,232 @@ body {
   border-radius: var(--radius-pill);
   background-color: color-mix(in srgb, var(--vm-gold) 70%, transparent);
 }
+
+/* =============================================================================
+   21. KOM-IGÅNG-DIALOGEN, "den första handslaget" (T54, issue #93).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET (Daniels live-feedback): det här är Daniels VIKTIGASTE onboarding-yta,
+   den ruta en ofta ICKE-teknisk vän öppnar för att förstå hur man kommer in. Den ska
+   kännas VÄLKOMNANDE och enkel, inte som en teknisk manual: två tydliga vägar (använd
+   direkt i webbläsaren ELLER lägg på hemskärmen) som läses på en sekund, lätta steg att
+   följa med tummen, och lugnande noter som hjälper i stället för att skrämma. Samma
+   "arena i kvällsljus"-familj (SPEC §7) som poäng-guiden (§19), onboarding-strippen (§9)
+   och lag-profilen (§7), i sitt allra varmaste, mest pedagogiska tonläge.
+
+   Rena dekor-lager (ingen bär läsbar text, samma disciplin som hero-syskonen):
+   - HERO-BANDET (.vm-get-started-hero): dialogens topp, en grön + guld arena-glow mot
+     surface-raised, exakt samma radial-recept + AA-mätta alfor som poäng-guidens hero
+     (§19) och onboarding-strippen (§9). Ett ljus-svep (.vm-hero-sheen) väver in, stannar
+     vid reducerad rörelse (index.css).
+   - EMBLEMET (.vm-get-started-emblem): en solid guld-bricka med mörk ink (samma färg-
+     oberoende solid-bricka-form som .vm-score-guide-emblem / .vm-champion-trophy, DRY).
+   - VÄG-GLYFERNA (.vm-get-started-glyph--accent/--gold): en lugn rund glyf-bricka som
+     ankrar var och en av de två vägarna (telefon = hemskärm, glob = webbläsare). En
+     dämpad accent-/guld-tint + ring; glyfen ritas i fg-tonen, så den läses lugnt och
+     bär INGEN läsbarhet (ren dekor, aria-hidden).
+   - VÄG-KORTEN (.vm-get-started-path): de två vägarnas sektioner som distinkta kort
+     (surface med en hårfin top-ljuslist), så de två valen läses som två kort, inte en
+     löptext-vägg.
+   - TAGGARNA (.vm-get-started-tag--gold/--accent): pyttesmå "Snabbast att börja"/
+     "Tryggast"-etiketter. Guld-/accent-TEXT-tonen (warning/accent, AA-säker per tema,
+     ALDRIG rå --vm-gold som text) på en svag tint.
+   - STEG-MEDALJEN (.vm-get-started-step-num): varje stegs nummer som en solid accent-
+     bricka med accent-fg-ink (färg-oberoende solid-bricka-form, samma som de andra tal-
+     brickorna, AA-proven accent-fg på accent).
+   - NOTERNA (.vm-get-started-note--info/--warning): Play Skydd-lugnandet (info, sköld)
+     och iOS-Safari-kravet (warning, info-i) som vänliga rutor med en svag tint + glyf,
+     inte skrämmande röda banners.
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall + guld/accent-på-tint-fällan, mätt
+   med scripts/contrast-t54.mjs, canvas-komposit VÄRSTA fall, BÅDA teman): ALL läsbar text
+   står på OPAKA surface/surface-raised-ytor; den enda tinten i en text-väg är väg-kortens
+   topp-list (dekor, ingen text) och taggarnas/noternas svaga token-tint under sin TEXT,
+   som mätts. Taggars/noters TEXT använder den AA-säkra TEXT-tonen per roll (warning för
+   guld, accent för grön, fg-muted för noterna), ALDRIG rå --vm-gold-text. Emblem/glyf/
+   steg-medalj bär mörk-/ljus-ink på en SOLID token-yta (färg-oberoende solid-bricka-form).
+   De uppmätta MIN-värdena står i docs/decisions.md (T54-visuellt).
+   -------------------------------------------------------------------------- */
+
+/* HERO-BANDET: grön + guld arena-glow mot surface-raised, samma recept + AA-mätta alfor
+   som §9/§19 (grön 0.16 övre vänster, guld 0.10 nedre höger, motsatta hörn så de aldrig
+   möts på full peak). Bär ingen text (texten ligger på den opaka surface-raised-fonden). */
+.vm-get-started-hero {
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(120% 140% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 60%),
+    radial-gradient(
+      100% 140% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 10%, transparent),
+      transparent 58%
+    );
+}
+
+/* HERO-SVEPETS gradient (rörelsen + reduced-motion-grinden delas med hero:n via
+   .vm-hero-sheen, index.css). Samma mjuka, breda sken som dagliga hero:n. */
+.vm-get-started-hero .vm-hero-sheen {
+  background-image: linear-gradient(
+    105deg,
+    transparent 32%,
+    rgb(var(--vm-glow-accent) / 0.1) 50%,
+    transparent 68%
+  );
+}
+
+/* EMBLEMET: solid guld-bricka med mörk ink (färg-oberoende solid-bricka-form, DRY mot
+   .vm-score-guide-emblem). Mjuk inre högdager + yttre ring ger relief utan en bildasset. */
+.vm-get-started-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.4),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 2px 8px -2px color-mix(in srgb, var(--vm-gold) 60%, transparent);
+}
+
+/* VÄG-KORTEN: de två vägarnas sektioner som distinkta surface-kort med en hårfin
+   inset top-ljuslist (samma kvällsljus-signatur som kupongen/summeringen, men neutral
+   ljus-ton, inte guld, eftersom de TVÅ korten ska kännas jämbördiga). Text står på den
+   opaka surface-fonden. En mjuk hover-lyft gör korten taktila (gatad på reduced-motion). */
+.vm-get-started-path {
+  background-color: var(--color-surface);
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1px 0 0 color-mix(in srgb, var(--color-fg) 6%, transparent);
+}
+
+/* VÄG-GLYF-BRICKAN: en lugn rund bricka som ankrar varje väg. En svag token-tint-fond
+   + ring; glyfen ritas i den DÄMPADE fg-tonen (currentColor sätts nedan), så brickan är
+   ren dekor och ingen läsbarhet hänger på tinten. Två toner: accent (hemskärm) + guld
+   (webbläsare), så de två vägarna får var sin tydliga, men jämbördig, signatur. */
+.vm-get-started-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-fg-muted);
+}
+
+.vm-get-started-glyph--accent {
+  background-color: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.vm-get-started-glyph--gold {
+  background-color: color-mix(in srgb, var(--vm-gold) 16%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vm-gold) 34%, transparent);
+}
+
+/* VÄG-TAGGARNA: pyttesmå "Snabbast att börja"/"Tryggast"-etiketter. TEXT-tonen är den
+   AA-säkra TEXT-rollen per färg (warning för guld, accent för grön, mätt per tema), på
+   en svag token-tint. ALDRIG rå --vm-gold som text (guld-på-ljus-fällan, lessons). */
+.vm-get-started-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  padding: 0.0625rem 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.vm-get-started-tag--gold {
+  background-color: color-mix(in srgb, var(--vm-gold) 14%, var(--color-surface));
+  color: var(--color-warning);
+}
+
+.vm-get-started-tag--accent {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  color: var(--color-accent);
+}
+
+/* STEG-MEDALJEN: varje stegs nummer som en solid accent-bricka med accent-fg-ink (den
+   färg-oberoende solid-bricka-formen, AA-proven accent-fg på accent: vit på #0e7a44 =
+   5.40:1 ljust, near-black på #1fe082 = 10.85:1 mörkt, samma par som onboardingens
+   primärknapp §9). Mjuk inre högdager ger den präglade känslan. */
+.vm-get-started-step-num {
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.22),
+    0 1px 2px rgb(0 0 0 / 0.18);
+}
+
+/* DONE-KORTET (standalone "allt klart"): en lugn success-tonad ruta som FIRAR att appen
+   redan körs installerad. Svag success-tint-fond + hårfin success-kant. Text står på den
+   nästan-opaka ytan (success-tinten är låg). */
+.vm-get-started-done {
+  background-color: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 32%, var(--color-border));
+}
+
+/* SUCCESS-BOCK-MEDALJEN i done-kortet: en solid success-yta med mätt ink (--vm-on-success
+   på --vm-success, den färg-oberoende solid-bricka-formen, samma som "Klar"-chippen T11:
+   9.97:1 mörkt / 5.47:1 ljust). Bär bocken (dekor); texten "Allt klart" bär betydelsen. */
+.vm-get-started-done-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background-color: var(--color-success);
+  color: var(--vm-on-success);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.3),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08),
+    0 2px 8px -2px color-mix(in srgb, var(--color-success) 55%, transparent);
+}
+
+/* En lugn engångs-glimt på success-bocken när done-kortet visas (känns som ett "klart!"-
+   lyft), nollad vid reducerad rörelse. Ren dekor; "Allt klart"-texten bär budskapet. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-get-started-done-seal {
+    animation: vm-get-started-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1;
+  }
+}
+
+@keyframes vm-get-started-pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* NOTERNA under stegen: vänliga info-/varnings-rutor (Play Skydd-lugnandet = info/sköld,
+   iOS-Safari-kravet = warning/info-i). En SVAG token-tint-fond + token-tonad kant + en
+   liten token-tonad glyf gör dem hjälpsamma, inte skrämmande. Note-TEXTEN är fg-muted på
+   den nästan-opaka ytan (mätt, den svaga tinten sänker inte AA); glyfen bär token-tonen
+   (dekor). */
+.vm-get-started-note--info {
+  background-color: color-mix(in srgb, var(--color-accent) 7%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 26%, var(--color-border));
+}
+
+.vm-get-started-note--warning {
+  background-color: color-mix(in srgb, var(--color-warning) 9%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-warning) 30%, var(--color-border));
+}
+
+/* Note-glyfens token-ton (TEXT-rollen, AA-säker per tema): info = accent, warning =
+   warning-text-tonen. currentColor på SVG:n ärver detta. Ren dekor (aria-hidden). */
+.vm-get-started-note--info .vm-get-started-note-glyph {
+  color: var(--color-accent);
+}
+
+.vm-get-started-note--warning .vm-get-started-note-glyph {
+  color: var(--color-warning);
+}
