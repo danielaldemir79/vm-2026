@@ -20,6 +20,7 @@
 import { useMemo, type ReactNode } from 'react';
 import type { Team } from '../../domain/types';
 import { Fade } from '../../motion';
+import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { teamDisplayName } from '../daily/match-display';
 import { groupByRound, type BracketSlotState } from './derive-bracket';
 import { useBracketData } from './use-bracket-data';
@@ -342,81 +343,97 @@ export function BracketView() {
         </p>
       </header>
 
-      {status === 'loading' ? (
-        <p role="status" className="text-sm text-fg-muted">
-          Laddar slutspelsträdet ...
-        </p>
-      ) : null}
-
-      {status === 'error' ? (
-        <Fade>
-          <p
-            role="alert"
-            className="flex items-start gap-3 rounded-card border px-4 py-3 text-sm"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-danger) 50%, transparent)',
-              backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
-              color: 'var(--color-danger)',
-            }}
-          >
-            <span aria-hidden="true" className="mt-0.5 text-base leading-none">
-              !
-            </span>
-            <span>Kunde inte ladda slutspelsträdet: {error}</span>
+      {/* KOMPRIMERING (T68/#129): rubrik + beskrivning alltid synliga; här under
+          komprimeras trädet så bara TOPP-DELEN syns som default (höjd-klipp + fade),
+          en tydlig expandera fäller ut hela trädet. Trädet scrollar i sidled, så ett
+          höjd-klipp visar de översta matchkorten per runda (toppen av trädet). Faden
+          tonar mot app-bakgrunden (ingen surface-Panel runt denna sektion). ~17rem
+          visar runda-rubrikerna + de första matchkorten. */}
+      <CollapsibleBody
+        name="bracket"
+        toggleLabels={{ expand: 'Visa hela slutspelsträdet', collapse: 'Visa mindre av trädet' }}
+        collapsedMaxHeight="17rem"
+        fadeTo="var(--color-bg)"
+      >
+        {status === 'loading' ? (
+          <p role="status" className="text-sm text-fg-muted">
+            Laddar slutspelsträdet ...
           </p>
-        </Fade>
-      ) : null}
+        ) : null}
 
-      {status === 'ready' && rounds.length > 0 ? (
-        // vm-bracket: positions-kontext för scroll-edge-maskeringen + hinten.
-        // Trädet är brett till sin natur, så scrollen är en FEATURE (mjuka kant-
-        // toningar + en mobil scroll-hint), inte ett misslyckande.
-        <div className="vm-bracket flex flex-col gap-2">
-          {/* Scroll-hint: bara på smala skärmar (CSS döljer den >= 1024px), där
+        {status === 'error' ? (
+          <Fade>
+            <p
+              role="alert"
+              className="flex items-start gap-3 rounded-card border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--color-danger) 50%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
+                color: 'var(--color-danger)',
+              }}
+            >
+              <span aria-hidden="true" className="mt-0.5 text-base leading-none">
+                !
+              </span>
+              <span>Kunde inte ladda slutspelsträdet: {error}</span>
+            </p>
+          </Fade>
+        ) : null}
+
+        {status === 'ready' && rounds.length > 0 ? (
+          // vm-bracket: positions-kontext för scroll-edge-maskeringen + hinten.
+          // Trädet är brett till sin natur, så scrollen är en FEATURE (mjuka kant-
+          // toningar + en mobil scroll-hint), inte ett misslyckande.
+          <div className="vm-bracket flex flex-col gap-2">
+            {/* Scroll-hint: bara på smala skärmar (CSS döljer den >= 1024px), där
               trädet garanterat svämmar över. En affordans, inte interaktiv. */}
-          <p
-            aria-hidden="true"
-            className="vm-bracket-hint self-end text-[0.6875rem] font-medium uppercase tracking-wide text-fg-muted"
-          >
-            Svep i sidled
-            <span className="vm-bracket-hint-arrow" aria-hidden="true">
-              →
-            </span>
-          </p>
-          {/* overflow-x-auto (seam): trädet scrollas i sidled på smala skärmar i
+            <p
+              aria-hidden="true"
+              className="vm-bracket-hint self-end text-[0.6875rem] font-medium uppercase tracking-wide text-fg-muted"
+            >
+              Svep i sidled
+              <span className="vm-bracket-hint-arrow" aria-hidden="true">
+                →
+              </span>
+            </p>
+            {/* overflow-x-auto (seam): trädet scrollas i sidled på smala skärmar i
               stället för att klämmas ihop (rundorna har fast bredd). Detta är den
               responsiva grunden; vm-bracket-scroll lägger kant-maskeringen ovanpå. */}
-          <div data-bracket-scroll="" className="vm-bracket-scroll -mx-1 overflow-x-auto px-1 pb-2">
-            <div className="flex min-w-max gap-5">
-              {rounds.map((round) => (
-                <RoundColumn
-                  key={round.stage}
-                  stage={round.stage}
-                  label={round.label}
-                  matchCount={round.matches.length}
-                >
-                  {round.matches.map((match) => (
-                    <MatchCard
-                      key={match.matchId}
-                      matchId={match.matchId}
-                      home={match.home}
-                      away={match.away}
-                      winnerSlotId={match.winnerSlotId}
-                      teamsById={teamsById}
-                    />
-                  ))}
-                </RoundColumn>
-              ))}
+            <div
+              data-bracket-scroll=""
+              className="vm-bracket-scroll -mx-1 overflow-x-auto px-1 pb-2"
+            >
+              <div className="flex min-w-max gap-5">
+                {rounds.map((round) => (
+                  <RoundColumn
+                    key={round.stage}
+                    stage={round.stage}
+                    label={round.label}
+                    matchCount={round.matches.length}
+                  >
+                    {round.matches.map((match) => (
+                      <MatchCard
+                        key={match.matchId}
+                        matchId={match.matchId}
+                        home={match.home}
+                        away={match.away}
+                        winnerSlotId={match.winnerSlotId}
+                        teamsById={teamsById}
+                      />
+                    ))}
+                  </RoundColumn>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {status === 'ready' && rounds.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
-          Slutspelsträdet visas när matchdatan är laddad.
-        </p>
-      ) : null}
+        {status === 'ready' && rounds.length === 0 ? (
+          <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
+            Slutspelsträdet visas när matchdatan är laddad.
+          </p>
+        ) : null}
+      </CollapsibleBody>
     </section>
   );
 }

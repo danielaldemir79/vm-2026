@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Match } from '../../domain/types';
 import { ScenarioView } from './ScenarioView';
@@ -70,6 +70,29 @@ describe('ScenarioView, rendering + a11y', () => {
     });
     // Inga fel-alerts (det är ett legitimt produkt-läge, inte ett fel).
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('ScenarioView, komprimering (T68/#129)', () => {
+  it('komprimerad som default, rubrik synlig, expandera -> komprimera tillbaka', async () => {
+    render(
+      <ResultsProvider env={fixturesEnv()}>
+        <ScenarioView />
+      </ResultsProvider>
+    );
+    await waitFor(() => {
+      expect(screen.getAllByText(/Inför sista omgången/i).length).toBe(12);
+    });
+    // Rubriken alltid synlig; kroppen komprimerad som default.
+    expect(screen.getByRole('heading', { level: 2, name: /Vad krävs/i })).toBeInTheDocument();
+    const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+    expect(body).toHaveAttribute('data-collapsed', 'true');
+    // Expandera (namnrymd 'scenarios') -> komprimera tillbaka.
+    fireEvent.click(screen.getByRole('button', { name: /Visa alla grupper/i }));
+    expect(body).toHaveAttribute('data-collapsed', 'false');
+    const [topCollapse] = screen.getAllByRole('button', { name: /Visa färre grupper/i });
+    fireEvent.click(topCollapse);
+    expect(body).toHaveAttribute('data-collapsed', 'true');
   });
 });
 

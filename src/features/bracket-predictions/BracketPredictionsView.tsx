@@ -25,6 +25,7 @@
 // Stabila roller + data-attribut bevaras (senior-devs seam + testkontrakt).
 
 import { useMemo } from 'react';
+import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useBracketPredictionsStore } from './bracket-predictions-context';
 import { useBracketPredictableData } from './use-bracket-predictable-data';
 import { selectPredictableBracket } from './bracket-predictable-slots';
@@ -156,133 +157,149 @@ export function BracketPredictionsView({
         </p>
       </header>
 
-      {/* UTAN aktivt rum (taskens punkt 3): bracket-tips är per rum. En INBJUDANDE
+      {/* KOMPRIMERING (T68/#129 punkt 9): sektionen är väldigt lång (champion-hero + 32
+          slot-kuponger rund-grupperade). Rubrik + beskrivning ovan ALLTID synliga; här
+          under komprimeras innehållet så bara TOPPEN (champion-väljaren) syns som default,
+          en tydlig expandera fäller ut hela vägen till bucklan. Faden tonar mot surface
+          (sektionen ligger på en Panel). ~16rem visar champion-hjälte-toppen. */}
+      <CollapsibleBody
+        name="bracket-predictions"
+        toggleLabels={{ expand: 'Visa hela slutspels-tipset', collapse: 'Visa färre' }}
+        collapsedMaxHeight="16rem"
+      >
+        {/* UTAN aktivt rum (taskens punkt 3): bracket-tips är per rum. En INBJUDANDE
           guld-tonad port med en pokal-ikon + tydlig väg framåt, inte en grå rad, den
           ska kännas som en inbjudan att vara med och tippa bucklan, inte ett fel. */}
-      {!store.enabled ? (
-        <div
-          data-bracket-predictions-no-room=""
-          className="mt-4 flex items-start gap-3 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_6%,var(--color-surface))] p-4 sm:p-5"
-        >
-          {/* Guld-tonad pokal-ikon i en rund bricka. Ikon-färgen är --color-warning
-              (AA-säker guld-text-ton), tinten är dekor. aria-hidden, rubriken bär text. */}
-          <span
-            aria-hidden="true"
-            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--vm-gold)_14%,transparent)] text-warning"
+        {!store.enabled ? (
+          <div
+            data-bracket-predictions-no-room=""
+            className="mt-4 flex items-start gap-3 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_6%,var(--color-surface))] p-4 sm:p-5"
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            {/* Guld-tonad pokal-ikon i en rund bricka. Ikon-färgen är --color-warning
+              (AA-säker guld-text-ton), tinten är dekor. aria-hidden, rubriken bär text. */}
+            <span
+              aria-hidden="true"
+              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--vm-gold)_14%,transparent)] text-warning"
             >
-              <path d="M7 4h10v4a5 5 0 0 1-10 0z" />
-              <path d="M7 5H4.5a1.5 1.5 0 0 0 0 5H7M17 5h2.5a1.5 1.5 0 0 1 0 5H17" />
-              <path d="M12 13v3M9 20h6M9.5 20a2.5 2.5 0 0 1 5 0" />
-            </svg>
-          </span>
-          <div className="min-w-0">
-            <p className="m-0 font-display text-sm font-semibold text-fg">
-              Gå med i ett rum för att tippa slutspelet
-            </p>
-            <p className="m-0 mt-1 text-sm text-fg-muted">
-              Bracket-tipsen är per rum, du och kompisarna gissar VM-vinnaren och vem som går
-              vidare, och jämför sen. Skapa eller gå med i ett rum ovanför, så öppnar slottarna här.
-            </p>
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M7 4h10v4a5 5 0 0 1-10 0z" />
+                <path d="M7 5H4.5a1.5 1.5 0 0 0 0 5H7M17 5h2.5a1.5 1.5 0 0 1 0 5H17" />
+                <path d="M12 13v3M9 20h6M9.5 20a2.5 2.5 0 0 1 5 0" />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <p className="m-0 font-display text-sm font-semibold text-fg">
+                Gå med i ett rum för att tippa slutspelet
+              </p>
+              <p className="m-0 mt-1 text-sm text-fg-muted">
+                Bracket-tipsen är per rum, du och kompisarna gissar VM-vinnaren och vem som går
+                vidare, och jämför sen. Skapa eller gå med i ett rum ovanför, så öppnar slottarna
+                här.
+              </p>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {/* Fel-väg (fail loud). */}
-      {store.enabled && (status === 'error' || store.status === 'error') ? (
-        <p
-          role="alert"
-          data-bracket-predictions-error=""
-          className="mt-4 rounded-md border px-4 py-3 text-sm"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--color-danger) 45%, transparent)',
-            backgroundColor: 'color-mix(in srgb, var(--color-danger) 9%, transparent)',
-            color: 'var(--color-danger)',
-          }}
-        >
-          {error ?? store.error ?? 'Något gick fel när slutspelet skulle laddas.'}
-        </p>
-      ) : null}
+        {/* Fel-väg (fail loud). */}
+        {store.enabled && (status === 'error' || store.status === 'error') ? (
+          <p
+            role="alert"
+            data-bracket-predictions-error=""
+            className="mt-4 rounded-md border px-4 py-3 text-sm"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--color-danger) 45%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--color-danger) 9%, transparent)',
+              color: 'var(--color-danger)',
+            }}
+          >
+            {error ?? store.error ?? 'Något gick fel när slutspelet skulle laddas.'}
+          </p>
+        ) : null}
 
-      {/* Laddning. */}
-      {store.enabled && (status === 'loading' || store.status === 'loading') ? (
-        <p role="status" data-bracket-predictions-loading="" className="mt-4 text-sm text-fg-muted">
-          Laddar slutspelet att tippa…
-        </p>
-      ) : null}
+        {/* Laddning. */}
+        {store.enabled && (status === 'loading' || store.status === 'loading') ? (
+          <p
+            role="status"
+            data-bracket-predictions-loading=""
+            className="mt-4 text-sm text-fg-muted"
+          >
+            Laddar slutspelet att tippa…
+          </p>
+        ) : null}
 
-      {ready ? (
-        <div className="mt-5 flex flex-col gap-7">
-          {/* CHAMPION-VÄLJAREN (VM-vinnaren): HJÄLTE-momentet, överst, det största
+        {ready ? (
+          <div className="mt-5 flex flex-col gap-7">
+            {/* CHAMPION-VÄLJAREN (VM-vinnaren): HJÄLTE-momentet, överst, det största
               enskilda tipset. Alla 48 lag (KISS), låst vid turneringsstart. */}
-          <div data-bracket-predictions-champion="">
-            <BracketPredictionForm
-              slotId={champion.slotId}
-              label="VM-vinnare"
-              teams={champion.teams}
-              teamsKnown
-              current={myChampion ? myChampion.advancingTeamId : null}
-              locked={champion.locked}
-              deadlineIso={champion.deadlineIso}
-              now={evalNow}
-              variant="champion"
-              onSubmit={handleSave}
-            />
-          </div>
+            <div data-bracket-predictions-champion="">
+              <BracketPredictionForm
+                slotId={champion.slotId}
+                label="VM-vinnare"
+                teams={champion.teams}
+                teamsKnown
+                current={myChampion ? myChampion.advancingTeamId : null}
+                locked={champion.locked}
+                deadlineIso={champion.deadlineIso}
+                now={evalNow}
+                variant="champion"
+                onSubmit={handleSave}
+              />
+            </div>
 
-          {/* SLUTSPELS-SLOTSEN, rund-grupperade (sextondel -> final). Varje runda en
+            {/* SLUTSPELS-SLOTSEN, rund-grupperade (sextondel -> final). Varje runda en
               rubrik-marker (intensitet bygger mot finalen) + en responsiv kupong-grid.
               Öppna, låsta och okända-lag-slots alla synliga (med sina respektive lägen),
               så hela vägen till bucklan känns helt. */}
-          {predictable.rounds.map((round) => (
-            <section
-              key={round.stage}
-              data-bracket-predictions-round={round.stage}
-              aria-label={round.label}
-              className="flex flex-col gap-3"
-            >
-              <h3 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-fg-muted">
-                <span
-                  aria-hidden="true"
-                  data-round={round.stage}
-                  className="vm-tips-round-marker h-6 w-6"
-                >
-                  <RoundMarkerContent stage={round.stage} />
-                </span>
-                {round.label}
-              </h3>
-              <ol className="grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
-                {round.slots.map((slot) => {
-                  const mine = store.myBracketPredictions.get(slot.slotId) ?? null;
-                  return (
-                    <li key={slot.slotId}>
-                      <BracketPredictionForm
-                        slotId={slot.slotId}
-                        label={slotLabel(round.label, slot.slotId)}
-                        teams={slot.teams}
-                        teamsKnown={slot.teamsKnown}
-                        current={mine ? mine.advancingTeamId : null}
-                        locked={slot.locked}
-                        deadlineIso={slot.deadlineIso}
-                        now={evalNow}
-                        onSubmit={handleSave}
-                      />
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          ))}
-        </div>
-      ) : null}
+            {predictable.rounds.map((round) => (
+              <section
+                key={round.stage}
+                data-bracket-predictions-round={round.stage}
+                aria-label={round.label}
+                className="flex flex-col gap-3"
+              >
+                <h3 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-fg-muted">
+                  <span
+                    aria-hidden="true"
+                    data-round={round.stage}
+                    className="vm-tips-round-marker h-6 w-6"
+                  >
+                    <RoundMarkerContent stage={round.stage} />
+                  </span>
+                  {round.label}
+                </h3>
+                <ol className="grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3">
+                  {round.slots.map((slot) => {
+                    const mine = store.myBracketPredictions.get(slot.slotId) ?? null;
+                    return (
+                      <li key={slot.slotId}>
+                        <BracketPredictionForm
+                          slotId={slot.slotId}
+                          label={slotLabel(round.label, slot.slotId)}
+                          teams={slot.teams}
+                          teamsKnown={slot.teamsKnown}
+                          current={mine ? mine.advancingTeamId : null}
+                          locked={slot.locked}
+                          deadlineIso={slot.deadlineIso}
+                          now={evalNow}
+                          onSubmit={handleSave}
+                        />
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
+            ))}
+          </div>
+        ) : null}
+      </CollapsibleBody>
     </section>
   );
 }

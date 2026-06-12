@@ -212,3 +212,67 @@ export function windowMatches(
     anchorKey,
   };
 }
+
+/**
+ * Välj BARA DAGENS matcher (T68/#129, Daniels spec): tips-listan ska som default visa
+ * enbart matcherna som spelas IDAG (svensk kalenderdag), inte det bredare igår+framåt-
+ * fönstret som RESULTAT-vyn använder. Resten (gårdagens + framtida) fälls ut via
+ * expandera. Detta ERSÄTTER medvetet tips-listans tidigare fönster, så paritetsguarden
+ * mot resultatvyn uppdateras MEDVETET (de två vyerna har nu OLIKA default-fönster, det
+ * är hela poängen): resultatvyn behåller sitt igår+framåt-fönster (där poängen på
+ * gårdagens avgjorda matcher ska synas, T62), tips-vyn visar bara det man kan tippa NU
+ * (dagens, kommande matcher), inte gårdagens redan spelade.
+ *
+ * SAMMA shape som windowMatches (visible/hiddenCount/anchorKey) så tips-vyn kan byta
+ * fönster-funktion utan att röra resten av sin wiring (ExpandToggle + hidden-flaggorna).
+ *
+ * EDGE-FALL (testade):
+ *  - Tom indata -> tom visible, hiddenCount 0, anchorKey null.
+ *  - Turneringen EJ börjad (idag < premiären) -> ankra på PREMIÄRDAGEN och visa
+ *    premiärdagens matcher (annars vore default-vyn tom hela tiden före VM-start, en
+ *    onödigt tom port till tippningen). Samma premiär-fallback som windowMatches.
+ *  - Idag ÄR en speldag -> visa exakt den dagens matcher, dölj resten.
+ *  - Idag är en VILODAG mitt i turneringen (inga matcher idag, men turneringen pågår)
+ *    -> visible blir tom (det finns inget att tippa just idag), användaren fäller ut
+ *    för att nå kommande matcher. Medvetet: "bara dagens" är Daniels uttryckliga regel.
+ *    VM 2026:s gruppspel (den fas vi är i nu) spelar matcher varje dag, så detta fall
+ *    nås först i uppehållen mellan faserna, då listan ändå är kort.
+ *
+ * @param matches  Alla tippbara matcher (visnings-ordning bevaras i visible).
+ * @param now      "Nu" (injicerbart för test). Bara dess svenska kalenderdatum läses.
+ * @param timeZone Zonen dagar mäts i (default svensk tid, via localDateKey). Injicerbar.
+ */
+export function selectTodayMatches(
+  matches: readonly Match[],
+  now: Date | number = Date.now(),
+  timeZone?: string
+): ResultWindow {
+  if (matches.length === 0) {
+    return { visible: [], hiddenCount: 0, anchorKey: null };
+  }
+
+  const dayKeys = matches.map((m) => localDateKey(m.kickoff, timeZone));
+  // Premiärdagen = tidigaste svenska speldag (ISO-form, sträng-min = datum-min).
+  const premiereKey = dayKeys.reduce((min, key) => (key < min ? key : min), dayKeys[0]);
+  const todayKey = localDateKey(
+    new Date(typeof now === 'number' ? now : now.getTime()).toISOString(),
+    timeZone
+  );
+
+  // FÖRE turneringen -> visa premiärdagens matcher (annars tom port före VM-start).
+  // Annars -> exakt dagens matcher (inkl. tom om idag är vilodag, Daniels regel).
+  const anchorKey = todayKey < premiereKey ? premiereKey : todayKey;
+
+  const visible: Match[] = [];
+  for (let i = 0; i < matches.length; i += 1) {
+    if (dayKeys[i] === anchorKey) {
+      visible.push(matches[i]);
+    }
+  }
+
+  return {
+    visible,
+    hiddenCount: matches.length - visible.length,
+    anchorKey,
+  };
+}

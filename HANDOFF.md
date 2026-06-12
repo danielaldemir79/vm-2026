@@ -5,6 +5,73 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T68/#129 (komprimerbara sektioner) KLAR - PR #131 vantar pa merge
+
+**Branch:** `feature/T68-komprimering` @ HEAD `d4752cf`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/131 mot `develop` (Closes #129, state: OPEN)
+**Board:** Kort #129 satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekraftad).
+Batch-städning: kort #24/#64/#76/#121/#123 satta till Done (GraphQL-bekraftade).
+
+**Vad T68 levererade (Daniels 13-punkts UX-spec):**
+- `CollapsibleSection`-primitiv: fade+cue+ResizeObserver-gating, aria-expanded, fokus, mörkt/ljust.
+- Sju sektioner komprimerbara: Gruppspelet, Vad krävs, Slutspelsträdet, Simulering, Tippa matcherna, Tippa grupperna, Tippa slutspelet + Admin + Poäng/avslöjande.
+- Sektion 1 (Dagens matcher) + Sektion 6 (Rum) orörda.
+- Tips=bara idag default med MEDVETET omsvängd paritetsguard (ersätter T62-defaulten).
+- Alfabetisk mästar-lista med sv-locale-sortering.
+- Spara grupptips-knapp + osparade-ändringar-indikator (ingen auto-spar).
+
+**T36-retro (#64, PR #130 mergad, ingen journalistkorning):**
+TWA-utredning: assetlinks-stub (/.well-known/assetlinks.json), twa-guide.md med Daniels Play-konto-lista.
+Reviewer PASS + F1 dangling-pekare i README åtgärdad. #64 satt till Done.
+
+**Commits (T68):**
+- `2405fe1` - feat(ui): delad komprimerings-primitiv + sektioner överblickbara (#129)
+- `3f40029` - feat(tips): dagens-fönster, alfabetisk mästar-lista, Spara grupptips (#129)
+- `d4752cf` - feat(ui): premium-finish på komprimerings-faden + första-rad-glimt (#129)
+
+**Verifiering:** build EXIT 0, full svit EXIT 0 (1682 gröna/175 filer), lint/format rena.
+Reviewer PASS: alla 13 punkter callsite-verifierade.
+F1 pinnad: övre toggle ovillkorlig vid icke-klippt transient-läge - valfri polish.
+
+**Acceptanskriterier issue #129 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Alla sektioner enligt Daniels lista, dagens matcher + rum orörda
+- [x] AC2: Ett delat mönster (CollapsibleSection), a11y, mobil-först, mörkt/ljust
+- [x] AC3: Avbryt simulering-funktion synlig i sim-läget
+- [x] AC4: VM-mästar-listan alfabetisk (sv-locale)
+- [x] AC5: Spara grupptips + osparade-indikator
+- [x] AC6: FULL svit EXIT 0, build EXIT 0, reviewad (lokal panel, Copilot pausad)
+Tolknings-not: punkt 11 (Poäng/avslöjande) komprimerad med expanderat-direkt som dirigentens default - flippa om Daniel säger annat.
+
+**FORTSATTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR för T68/#129 (feature/T68-komprimering) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 131 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #129 manuellt: `gh issue close 129`.
+> Flytta kort #129 till Done på boarden.
+> Merga eventuellt kvarstående äldre öppna PR:er om sådana finns (kolla `gh pr list --state open`).
+>
+> Om PR för T68/#129 REDAN mergad:
+> T68 klar. Nästa task: **FIFA juni-ranking** - generera lag-profiler med uppdaterade rank-värden.
+> Kör `npm run gen:team-profiles` (eller motsvarande) och bekräfta att rankningsdatan för VM 2026
+> stämmer mot FIFA:s officiella juni-2026-ranking. Skapa issue för tasken om ingen finns.
+> Därefter: #25 (prestanda/E2E/a11y), #56 (modal-primitiv, rule-of-three x5-6 nu!),
+> #48 (+demo-chip-AA-utökningen), lean-städ (install-maskineri, RoomPanel-teardown-flaky,
+> migrations-versions-städ, T68-F1-polish).
+>
+> Bär framåt (alla tasks):
+> - Kommentar-pastar Förekomst 8: FLAGGAD för Daniel (se nedan) - vaktar på godkännande.
+> - **#56 (delad modal-primitiv):** rule-of-three passerad x5-6, kort i Ready.
+> - **#48 (demo-chip a11y):** 4+ vyer under AA 3.17:1 i ljust tema.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **"Behöver Daniel"-kö:** befordringar (kommentar-pastar 8), IMPROVEMENTS-kandidater,
+>   Play-kontot (TWA), release-gränsen, #39-F1, T48b, T16b-slot-ur-sim.
+> - **Daniels process-beslut:** Copilot-loopen PAUSAD, lokala granskningen är sista grinden.
+> - **Vakthund-rutinen:** varje väntan får deadline + eskalering.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T24/#24 (reaktioner) KLAR - PR vantar pa merge
 
 **Branch:** `feature/T24-reaktioner` @ HEAD `ef63455` (journalist-commit)

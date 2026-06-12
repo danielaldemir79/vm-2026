@@ -19,7 +19,7 @@ import { ExpandToggle } from '../../components/ExpandToggle';
 import { ScoreGuide } from '../scoring-guide';
 import { useTodayKey } from '../daily';
 import { localDateKey } from '../daily/group-matches-by-day';
-import { windowMatches } from '../results/result-window';
+import { selectTodayMatches } from '../results/result-window';
 import { usePredictionsStore } from './predictions-context';
 import { useJokerStore } from './joker-context';
 import { usePredictableData } from './use-predictable-matches';
@@ -124,12 +124,16 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
   // levande och kul. Låsta matcher räknas inte (de går inte att tippa längre).
   const openCount = useMemo(() => predictable.filter((p) => !p.locked).length, [predictable]);
 
-  // 3-DAGARS FÖNSTER + expandera (Daniels begäran, samma som resultatlistan #39/T27):
-  // hela VM:t är 104 matcher = en orimligt lång tips-lista att skrolla. Default visar
-  // bara matcherna inom de närmaste 3 svenska dagarna (från idag, eller premiärdagen
-  // om turneringen inte börjat), resten fälls ut på begäran. Vi ÅTERANVÄNDER samma rena
-  // urvalsfunktion som resultatvyn (windowMatches i results/result-window.ts) + den
-  // delade ExpandToggle:n, så fönster-regeln (svensk-dag, edge-fall) är EN sanning.
+  // DAGENS-FÖNSTER + expandera (Daniels spec T68/#129, MEDVETET smalare än resultatvyns):
+  // hela VM:t är 104 matcher = en orimligt lång tips-lista. Default visar nu BARA DAGENS
+  // matcher att tippa (eller premiärdagen om turneringen inte börjat), resten fälls ut på
+  // begäran. Detta ERSÄTTER tips-listans tidigare igår+framåt-fönster: tips handlar om vad
+  // man kan tippa NU (dagens kommande matcher), inte om gårdagens redan spelade. Resultat-
+  // /poängvyn BEHÅLLER sitt bredare fönster (windowMatches, där gårdagens avgjorda matchers
+  // poäng ska synas, T62), så paritetsguarden mot resultatvyn är MEDVETET uppdaterad: de
+  // två vyerna har nu OLIKA default-fönster (se predictions-results-window-parity.test).
+  // selectTodayMatches delar shape med windowMatches, så ExpandToggle + hidden-wiringen
+  // nedan är oförändrad.
   const [expanded, setExpanded] = useState(false);
 
   // DAG-MEDVETET "nu" för fönstret (samma PWA-fälla som resultatvyn, #39 C1): appen
@@ -158,12 +162,15 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
     () => selectPredictableMatches(matches).map((p) => p.match),
     [matches]
   );
-  // Fönstret räknas över match-listan i visnings-ordning (tidigast först). windowMatches
-  // bevarar indata-ordningen i `visible`, så fönster-delmängden ligger korrekt överst utan
-  // en egen omsortering. DAG-granularitet via `nowMs` (stabilt inom en dag): en minut-tick
-  // som inte korsar en dygnsgräns ger samma `nowMs` + samma listreferens -> ingen omräkning;
+  // Fönstret räknas över match-listan i visnings-ordning (tidigast först). selectTodayMatches
+  // bevarar indata-ordningen i `visible`, så dagens matcher ligger korrekt överst utan en
+  // egen omsortering. DAG-granularitet via `nowMs` (stabilt inom en dag): en minut-tick som
+  // inte korsar en dygnsgräns ger samma `nowMs` + samma listreferens -> ingen omräkning;
   // fönstret räknas bara om vid ny data eller ett faktiskt dagsbyte (glider över midnatt).
-  const windowed = useMemo(() => windowMatches(windowMatchList, nowMs), [windowMatchList, nowMs]);
+  const windowed = useMemo(
+    () => selectTodayMatches(windowMatchList, nowMs),
+    [windowMatchList, nowMs]
+  );
   // Vilka match-id som ligger i fönstret (snabb koll). ALLA tippbara matcher renderas
   // alltid; detta avgör bara vilka som DÖLJS när listan inte är utfälld (se nedan).
   const visibleIds = useMemo(() => new Set(windowed.visible.map((m) => m.id)), [windowed]);
