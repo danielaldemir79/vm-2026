@@ -20,14 +20,29 @@
 // koderna vidare som code; deriveTipsBracket översätter code -> Team.id internt
 // (en sanning för den översättningen), så hooken behöver inte känna till rymden.
 //
-// MÅSTE renderas inuti en <GroupPredictionsProvider> (useGroupPredictionsStore
-// fail-loud:ar annars), eftersom den läser mina tips ur storen.
+// TREORNA UR MATCH-TIPSEN (T64, #118): utöver grupp-tipsen läser hooken nu MINA
+// MATCH-tips (usePredictionsStore, samma per-rum-store som tips-vyn) och härleder de
+// 8 bästa treorna ur dem (derive-tips-thirds: simulerade tabeller -> FIFA Article 13
+// -> Annexe C). Är alla 12 grupper HELT tippade fylls treplats-slotsen ('tipped-
+// third'); annars förblir de öppna (gissa aldrig). GRUPP-tipsen äger fortsatt
+// 1:a/2:a (designbeslut, docs/decisions.md T64). Utan ett aktivt rum/match-tips är
+// match-tips-mapen tom -> öppna treor, precis som T51.
+//
+// MÅSTE renderas inuti en <GroupPredictionsProvider> OCH en <PredictionsProvider>
+// (useGroupPredictionsStore + usePredictionsStore fail-loud:ar annars): den läser
+// både mina grupp-tips och mina match-tips ur respektive store.
 
 import { useMemo } from 'react';
 import type { Team } from '../../domain/types';
 import { useGroupPredictionsStore } from '../group-predictions/group-predictions-context';
+import { usePredictionsStore } from '../predictions/predictions-context';
 import type { GroupPredictableData } from '../group-predictions/use-group-predictable-data';
 import { deriveTipsBracket, type GroupTipPick, type TipsBracketState } from './derive-tips-bracket';
+import {
+  deriveTipsThirdSeeding,
+  type MatchTipScore,
+  type TipsThirdSeeding,
+} from './derive-tips-thirds';
 
 /** Det hooken exponerar till den simulerade slutspels-vyn. */
 export interface TipsBracketData {
@@ -50,7 +65,8 @@ export interface TipsBracketData {
  */
 export function useTipsBracketData(predictableData: GroupPredictableData): TipsBracketData {
   const store = useGroupPredictionsStore();
-  const { status, teams } = predictableData;
+  const matchStore = usePredictionsStore();
+  const { status, groups, teams, matches } = predictableData;
 
   // Adaptera mina grupp-tips (groupId -> GroupPrediction, code-bärande) till
   // deriveTipsBracket-formen (groupId -> 1:a/2:a som code). Vi behåller koderna
@@ -66,6 +82,26 @@ export function useTipsBracketData(predictableData: GroupPredictableData): TipsB
     return picks;
   }, [store.myGroupPredictions]);
 
+  // Adaptera mina MATCH-tips (matchId -> Prediction, mål hemma/borta) till
+  // derive-tips-thirds-formen (matchId -> {homeGoals, awayGoals}). Samma form, så
+  // ingen översättning krävs vid seamen. Tom map utan aktivt rum/tips -> öppna treor.
+  const matchTipsByMatchId = useMemo<Map<string, MatchTipScore>>(() => {
+    const tips = new Map<string, MatchTipScore>();
+    for (const [matchId, pred] of matchStore.myPredictions) {
+      tips.set(matchId, { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals });
+    }
+    return tips;
+  }, [matchStore.myPredictions]);
+
+  // Härled de 8 bästa treorna UR match-tipsen (T64). Gata på 'ready' så vi inte
+  // räknar på halv-laddad turneringsdata. Tom/icke-komplett seedning -> öppna treor.
+  const thirdSeeding = useMemo<TipsThirdSeeding | undefined>(() => {
+    if (status !== 'ready') {
+      return undefined;
+    }
+    return deriveTipsThirdSeeding(groups, matches, matchTipsByMatchId);
+  }, [status, groups, matches, matchTipsByMatchId]);
+
   // Härled bilden reaktivt. Gata på att lag-datat är klart (status 'ready'), annars
   // är `teams` tomt och code -> id-uppslaget skulle ge tbd för allt (stale-skydd,
   // samma kontrakt som useBracketData/useGroupData).
@@ -73,8 +109,8 @@ export function useTipsBracketData(predictableData: GroupPredictableData): TipsB
     if (status !== 'ready') {
       return null;
     }
-    return deriveTipsBracket(picksByGroup, teams);
-  }, [status, picksByGroup, teams]);
+    return deriveTipsBracket(picksByGroup, teams, thirdSeeding);
+  }, [status, picksByGroup, teams, thirdSeeding]);
 
   return { bracket, teams, ready: status === 'ready' };
 }

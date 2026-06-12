@@ -13,11 +13,16 @@
 // LeaderboardProvider som topplistan, hoistad i App så den når hit) och hämtar inget
 // eget, så det blir EN poäng-källa utan dubbelhämtning. Den gatar sig själv tyst när
 // det inte finns en egen rad att visa.
+//
+// PROVIDERN ÄR HOISTAD (T64, #118): PredictionsProvider bor inte längre HÄR utan i App,
+// där den omsluter BÅDE denna sektion och grupp-tips-sektionen, så grupp-tips-vyns
+// simulerade slutspelsträd kan läsa SAMMA match-tips (treorna seedas ur dem) utan en
+// andra hämtning. Denna sektion KONSUMERAR alltså bara storen (usePredictionsStore via
+// vyerna), den skapar den inte. Samma mönster som LeaderboardProvider (T58).
 
 import type { ReactNode } from 'react';
 import { useRoomsStore } from '../rooms';
 import { TipsScoreSummary } from '../leaderboard';
-import { PredictionsProvider } from './PredictionsProvider';
 import { PredictionsView } from './PredictionsView';
 
 export function PredictionSection({ surface }: { surface: (children: ReactNode) => ReactNode }) {
@@ -26,9 +31,9 @@ export function PredictionSection({ surface }: { surface: (children: ReactNode) 
     return null;
   }
   return surface(
-    <PredictionsProvider>
+    <>
       <TipsScoreSummary />
       <PredictionsView />
-    </PredictionsProvider>
+    </>
   );
 }
