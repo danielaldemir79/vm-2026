@@ -21,6 +21,7 @@ import { createPortal } from 'react-dom';
 import { motion, useReducedMotion } from 'motion/react';
 import { springs, transitions } from '../../motion';
 import { useAppSettings } from './settings-context';
+import { GetStartedControl } from './GetStartedControl';
 
 /** Kugghjuls-ikon (dekorativ, aria-hidden, etiketten bär betydelsen). */
 function GearIcon() {
@@ -275,6 +276,13 @@ function SettingsDialog({
             </span>
           </button>
         </header>
+
+        {/* "Kom igång"-ytan (T54/#93): alltid nåbar EFTER onboardingen, här i
+            inställnings-portalen. Öppnar dialogen som förklarar båda vägarna
+            (använd direkt i webbläsaren ELLER lägg på hemskärmen) med rätt steg
+            för enheten. Ligger överst, det är den vanligaste "hur gör jag?"-frågan
+            från en ny vän. */}
+        <GetStartedControl variant="settings" />
 
         <div className="flex flex-col divide-y divide-border">{children}</div>
 
