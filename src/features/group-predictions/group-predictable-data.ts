@@ -3,11 +3,13 @@
 // är tunn ovanpå denna. Systerfil till predictable-matches.ts (T15).
 //
 // REGLER:
-//   * DEADLINE = GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 14/6 21:59Z).
-//     T53 (#95) förlängde grupp-tipsens deadline: de som inte hann före premiären får
-//     t.o.m. söndag 14/6 23:59 svensk tid. FÖRLÄNG, FÖRKORTA ALDRIG (GREATEST): sena
-//     grupper (G..L, första match 15-17 juni) behåller sitt SENARE egna ankare. Vi
-//     applicerar samma applyExtendedDeadline som RLS-helpern group_deadline_kickoff
+//   * DEADLINE = GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 21/6 21:59Z).
+//     T53 (#95) införde förlängningen, T67 (#123) flyttade den till söndag 21/6: de som
+//     inte hann före premiären får t.o.m. söndag 21/6 23:59 svensk tid. FÖRLÄNG, FÖRKORTA
+//     ALDRIG (GREATEST): en grupp med ankare EFTER 21/6 behåller sitt SENARE egna ankare
+//     (inget riktigt gruppankare gör det , alla g-X-1 ligger 11-17/6 , men regeln, inte
+//     datat, är garantin). Vi applicerar samma applyExtendedDeadline som RLS-helpern
+//     group_deadline_kickoff
 //     (greatest(g-X-1, pool_extended_deadline())), så lås + text är EN sanning, klient
 //     + DB. LÅST = den HÄRLEDDA deadlinen passerad (now >= deadline). Server-RLS
 //     upprätthåller låset; här härleder vi det BARA för VISNINGEN. Klockan injicerbar.
