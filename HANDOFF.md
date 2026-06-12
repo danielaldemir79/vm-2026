@@ -5,6 +5,85 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , SLUTKONSOLIDERING , backloggen TOM, allt live pa develop
+
+**Branch:** `chore/handoff-slutkonsolidering` (docs-only, ingen kod)
+**Develop SHA:** `6c003d8` (Merge pull request #138 T25-kvalitetspass)
+**Live:** https://vm-2026.pages.dev (Cloudflare Pages, deployas fran develop)
+**Tester:** 1696 enhetstest + 9 E2E (Playwright) grona. Build EXIT 0.
+
+### Fem tasks mergade sedan senaste journalistkörning
+
+| Task | Issue | PR | Vad |
+|---|---|---|---|
+| T69 | #132 | #133 | FIFA juni-rankingen, 19 rank-rader, alla källbelagda + spot-checkade |
+| T33 | #56 | #134 | Delad Modal-primitiv, 5 dialoger migrerade beteende-neutralt, 14 kontraktstester |
+| T29 | #48 | #135 | Demo-chippets AA fixad pa 4 vyer, delad .vm-demo-chip + AA-guard-test |
+| T70 | #136 | #137 | Lean-stad (dott install-maskineri bort, flaky teardown rotorsakad .env.local-live-kanaler + gatade callbacks, T68-F1-gating) |
+| T25 | #25 | #138 | Kvalitetspasset, code-splitting 894->580 kB initial, Playwright-E2E 7 floden + axe (npm run test:e2e), a11y-fixar |
+
+Alla PR:er granskade av lokal panel (Copilot pausad pa Daniels beslut). Alla reviewer-PASS. Inga olosta F-fynd.
+
+### Board-städning (GraphQL-bekraftad 2026-06-12)
+
+Foljande kort flyttade till Done av journalisten:
+- #19 (T19 gamification): In Review -> Done
+- #25 (T25 kvalitetspass): Backlog -> Done
+- #48 (T29 demo-chip-aa): Ready -> Done
+- #56 (T33 modal-primitiv): Ready -> Done
+- #65 (T37, stangd issue): Ready -> Done
+
+Kort #129/#132/#136 saknas pa boarden (dessa issues lades till direkt pa boarden fran en annan session och kan ha fatt unika items som inte syns i de 50 forsta - se nedan under "om kortens Done-status inte syns").
+
+### Behovet av Daniels beslut (samla pa ett stalle)
+
+**Befordringar (vackar pa Daniels godkannande):**
+1. Kommentar-pastar - Forekomst 8 i lessons/senior-developer.md. Typ: agent-regel. Knepet: "Kopiera aldrig ett kodblock fran handoff/review - skriv om fran originalet sa du inte latsar forstå koden." Nar forekomst >= 3 befordras det till agent-regel i README eller till en specifik agentfil.
+2. Uttommande-test - Forekomst 3 i lessons/reviewer.md (eller liknande). Typ: agent-regel. Knepet: "Verifiera att edge-fall ocksa ar med (ex: 0, max, grans) i enhetstester for berakningsfunktioner."
+3. Pastar-filer-saknas - Forekomst 3. Typ: agent-regel. Knepet: "Innan du pastar en fil: verifiera att den faktiskt ar skapad pa disk (Glob/Read), inte bara lovar i handoff."
+
+**IMPROVEMENTS-kandidater (for docs/IMPROVEMENTS.md eller BACKLOG.md):**
+1. Build-grind: `npm run build` kastar exit 0 aven vid vite-varningar - lagg en explicit exit-grind.
+2. Nightly tidsrota-vakt: datum-bundna testurlen ruttnar utan ett schema-jobb som kollar dem.
+3. yt-AC callsite-krav: accessibility-tester saknar kallstacken nar de failer - svarare att lokalisera.
+4. Diakritik-commit-hook: projektet saknar den kalibrerade git-hook som direkten-ryd-webb fick i T25.
+5. Contrast-lib-delning: kontrast-berakningarna i flera filer - dela en common-helper.
+6. Supabase-env-neutralisering i test-setup: SUPABASE_URL laddas globalt aven i enhetstester utan live-DB.
+7. Modal-stack: ingen focus-trap-garanti pa kapslade modaler - framtida risk.
+
+**Kvar for Daniel att besluta/agera:**
+- TWA/Play-kontot: se docs/twa-guide.md. Behover Daniels Play-konsol-konto for att slutfora.
+- Release-gransen develop->main: nar ska main fa en formell release? All kod ar pa develop nu.
+- #39-F1: post-VM-vyn (resultatlista efter sista match). Pinnad, ej byggd.
+- T48b: recoverable admin-login. Issue #81 OPEN. Behover beslut om det ska byggas fore VM.
+- T16b-slot-tippbarhet-ur-sim: slutspels-slot-tips ej tippbart ur simuleringsfloden. Ej inbyggt.
+- Copilot-loopen: aterupptas pa nasta task? Eller fortsatter lokal panel som sista grind?
+- supabase-vendor eager-load (T25-F1): Supabase-klienten laddas direkt - lat-laddning pinnad.
+- Board-kort-stadning: GraphQL-hickor hindrade full koll pa #129/#132/#136 pa boarden - verifiera att dessa visas som Done i GitHub Projects.
+
+### Nasta steg
+
+**Om Daniel inte beslutat nagot specifikt:**
+Det finns INGEN backlog-task att bygga. Allt ar klart. Nasta logiska steg ar:
+1. **Daniels beslutspunkter ovan** - gatt igenom och stang/pinna/godkann var och en.
+2. **Release-grans develop->main** - nar Daniel ar nojd: `gh pr create` fran develop->main, tagg v1.0.
+3. **Post-VM-planering** - vad (om nagot) ska leva kvar efter VM 2026?
+
+**FORTSATTNINGS-PROMPT (nar Daniel atervander till projektet):**
+
+> Starta i `C:\Repo\vm-2026`. Backloggen ar TOM. Alla issues stangda utom #81 (T48b, open),
+> #69 (T40, open), #75 (T44, open) och de framtida (T20-T23 som ar Backlog utan prioritet).
+>
+> 1. Gott igenom "Behovet av Daniels beslut" ovan och losa var punkt.
+> 2. Om Daniel vill bygga T48b (recoverable admin-login): skapa feature-branch fran develop, bygg.
+> 3. Om Daniel vill bygga T40 (#69, resultat-ratt-feedback): skapa feature-branch fran develop, bygg.
+> 4. Om det ar dags for release: skapa PR develop->main, tagg v1.0.
+> 5. Borja annars sondags-review / post-mortem pa projektet.
+>
+> Systemet ar stabilt. Kör `/agent-kit` bara om en ny task ska startas.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T68/#129 (komprimerbara sektioner) KLAR - PR #131 vantar pa merge
 
 **Branch:** `feature/T68-komprimering` @ HEAD `d4752cf`
