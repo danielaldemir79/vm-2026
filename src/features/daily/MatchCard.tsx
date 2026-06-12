@@ -205,7 +205,14 @@ export function MatchCard({
           <span
             aria-hidden="true"
             data-match-score=""
-            className="shrink-0 font-display text-lg font-bold tabular-nums leading-none"
+            // På ett FÄRDIGSPELAT kort är resultatet hjälten: man vill läsa facit
+            // DIREKT, inte kickoff-tiden (som är historisk när matchen är spelad).
+            // Därför bär resultatet samma tyngd som tiden (text-xl, font-display,
+            // bold, tabular-nums) i stället för en snäpp mindre (text-lg), så det
+            // blir kortets ankarpunkt jämte tiden i stället för att klämmas in i
+            // mitten av lag-raden. FÄRG-OBEROENDE (T7-pin): tyngd + storlek bär
+            // signalen, ingen accent/success-färg som i ljust tema är samma gröna.
+            className="shrink-0 font-display text-xl font-bold tabular-nums leading-none"
           >
             {score}
           </span>
