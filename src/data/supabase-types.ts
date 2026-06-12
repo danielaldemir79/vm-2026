@@ -198,6 +198,39 @@ export type Database = {
           },
         ];
       };
+      // T66 (#121): kommentarer i rummet (medlemmar skriver korta meddelanden).
+      room_comments: {
+        Row: {
+          body: string;
+          created_at: string;
+          id: string;
+          room_id: string;
+          user_id: string;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          id?: string;
+          room_id: string;
+          user_id?: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          id?: string;
+          room_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'room_comments_room_id_fkey';
+            columns: ['room_id'];
+            isOneToOne: false;
+            referencedRelation: 'rooms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       room_match_results: {
         Row: {
           away_goals: number;

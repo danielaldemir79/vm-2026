@@ -106,6 +106,12 @@ export interface RoomsSync {
    * inte behöver en NY koppling till hela rums-storen.
    */
   tipsRefreshNonce: number;
+  /**
+   * Den inloggade (anonyma) användarens id, eller null (utloggad / lokalt läge).
+   * Bärs på synk-seamen (T66, #121) så kommentar-lagret kan veta vilka kommentar-
+   * rader som är "mina" (visa radera-knapp) UTAN en ny koppling till hela rums-storen.
+   */
+  userId: string | null;
 }
 
 /** Inert rums-synk: inget aktivt rum, inga delade resultat, spar är en no-op. */
@@ -114,6 +120,7 @@ const INERT_ROOMS_SYNC: RoomsSync = {
   sharedResults: [],
   saveResult: async () => {},
   tipsRefreshNonce: 0,
+  userId: null,
 };
 
 /**
@@ -138,5 +145,6 @@ export function useRoomsSync(): RoomsSync {
     sharedResults: store.results,
     saveResult: store.saveResult,
     tipsRefreshNonce: store.tipsRefreshNonce,
+    userId: store.userId,
   };
 }
