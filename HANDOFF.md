@@ -5,6 +5,88 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T57/#98 (Levande dag) KLAR - PR #106 väntar på merge
+
+**Branch:** `feature/T57-levande-dag` @ HEAD `228520e`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/106 mot `develop` (Closes #98, state: OPEN)
+**Board:** issue #98 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #98 MANUELLT och flyttar kort #98 till Done EFTER merge.
+
+**Vad T57 levererade:**
+- Rotorsak: tick-driven vs mount-frusen - nedräknings-ytan uppdaterades via minut-tick men matchfokus och dag-nyckeln lästes mount-frusna ur separata Date.now()-anrop. Fix: dela SAMMA tick-kalla (useTodayKey), härledd pinnedKey ur tick, follow-läge återupptas vid bläddring tillbaka till idag.
+- Fokus: dag-vyn lyfter automatiskt tidigaste ospelade match (live = pågående = nästa), fallback vid hel spelad dag - ingen manual reload krävs.
+- Dag: dag-bläddraren följer verklig dag via useTodayKey + visibilitychange, bläddrar man tillbaka till idag nollställs pinnedKey och follow-läget återupptas (review-F1, mutationsverifierat).
+- Resultat: avgjorda matcher visar slutsiffror + ev. straffar direkt på korten i dag-listan, typ-säkert ur vävda matchdatan, a11y-namn bär resultatet.
+- Design: resultatet lyft till hjälte-tyngd på färdigspelade kort (live-verifierat 280/390px, båda teman).
+- 16 nya tester + 4 negativa kontroller. 4 oberoende reviewer-mutationer bekräftade att testerna vaktar fixarna.
+- Totalt 1356 pass + 4 kanda pre-existerande röda (#102, stash-bekräftade).
+
+**Commits:**
+- `8d1a329` - feat(daily): dagens-vyn lever, fokus följer nästa match + dag följer verklig dag + resultat i listan (#98)
+- `393b8b6` - style(daily): lyft matchresultatet till hjälte-tyngd på färdigspelade kort (#98)
+- `228520e` - fix(daily): nollställ pinnedKey vid navigering till idag (#98) - HEAD
+
+**Verifiering:** 1356 pass + 4 kända pre-existerande röda (#102, orelaterade, stash-bekräftade). Lint/format/build rent. Lokal panel: PASS (4 reviewer-mutationer bekräftade testerna). Copilot: R1 0 fynd, exit direkt.
+
+**Acceptanskriterier issue #98 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: slutspelad match -> nästa match lyfts automatiskt (useTodayKey + pinnedKey, commit 8d1a329)
+- [x] AC#2: dagen följer verklig dag utan reload (samma tick-källa som nedräkningen, commit 8d1a329)
+- [x] AC#3: resultat synliga på avgjorda matcher i dag-bläddraren (typ-säkert ur vävda matchdatan, commit 393b8b6 + 8d1a329)
+- [x] AC#4: inga reload-krav, tester på dag-/matchövergångar, grönt + reviewad (1356 pass, lokal panel PASS, 4 reviewer-mutationer bekräftade, commit 228520e)
+
+**PINNADE punkter (oförändrade, bärs framåt):**
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bärs framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready.
+- **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 handrullade dialoger). Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behöver Daniel"-kö (oförändrad):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **BEFORDRAN 3 (senior-developer-mönstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Förekomst 3 (nu 4 efter T53). Typ: agent-beteende -> senior-developers fil. Väntar Daniels godkännande.
+- **IMPROVEMENTS-kandidat:** reviewerns förslag - commit-msg-git-hook som scannar svenska diakritik-substitut. Pipeline-ändring = kräver Daniels godkännande. Notera för dirigenten att skriva i `C:/Repo/agent-kit/IMPROVEMENTS.md`.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge väntar.
+- **2 mosade temp-filer städade:** `board_items` + `proj2items` låg i repo-roten och städades bort av subagenter. Mönstret värt att se upp med i framtida tasks.
+- **editor-flippar-radslut (senior-developer lesson):** mönstret är nu adresserat på repo-nivå med .gitattributes + endOfLine lf.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #106 (T57/#98, feature/T57-levande-dag) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 106 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #98 manuellt (`gh issue close 98`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #98 till Done på boarden (nu i "In Review", projekt 2).
+> Merga även äldre öppna PR:er om de fortfarande är öppna: PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #106 REDAN mergad:
+> T57 klar. Nästa task i kön: **#99 (T58 poäng i tips-vyn + summering + käll-detalj - läs issuen + samordningsnoten med #69)**.
+> Därefter: #100 (T56 levande träd) -> #102 (T60 röda tester) -> #93 (T54) -> #18 -> #76 -> #19 -> #24 -> #64 -> D-resten.
+> OBS: alla brancher skapade FÖRE T41-merge kan behöva en engångs-renormalisering vid rebase/pull - förväntat, ofarligt.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3+), IMPROVEMENTS-kandidat (diakritik-commit-hook), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T41/#70 (EOL-normalisering) KLAR - PR #105 väntar på merge
 
 **Branch:** `feature/T41-eol-normalisering` @ HEAD `da4f540`
