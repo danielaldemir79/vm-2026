@@ -5,6 +5,69 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T63/#113 (ett-klicks-install) KLAR - PR #116 väntar på merge
+
+**Branch:** `feature/T63-ettklicks-install` @ HEAD `7bcc3f2`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/116 mot `develop` (Closes #113, state: OPEN)
+**Board:** AC bockas av i issue #113 (gjort av journalisten 2026-06-12). Boarden nåddes (item-add exit 0), men `item-list` paginerar troligen inte förbi 30 items, sa status "In Review" kan inte bekräftas via CLI. Dirigenten sätter "In Review" + stänger issue #113 manuellt EFTER merge.
+
+**Vad T63 levererade:**
+- `InstallBanner` (informationsrutan) ersatt av diskret `InstallButton`-pill med texten "Installera som app".
+- Tre ärliga klick-grenar i `resolveInstallButtonAction`: native install-prompt direkt (Android/desktop Chrome/Edge), iPhone -> GetStartedDialog iPhone-flik, ingen prompt tillgänglig -> guide (aldrig död knapp).
+- Helt dold i standalone (negativ kontroll i test: tom DOM även om beforeinstallprompt fyras).
+- En avvisad native-prompt faller till guiden, ingen spam-loop.
+- `.vm-install-pill` single-sourcat som delad token-klass (två call-sites, byte-identiska), commit `a58fcca`.
+- Review F2/F3 åtgärdade: ärlig retention-motivering (dismiss-maskineriet produktions-dött, pinnat), dåtids-kommentarer rättade, steg-citatet matchar nya pillen, commit `7bcc3f2`.
+- Copilot: R1 0 fynd, exit direkt (Daniels max-2-rundor-regel uppfylld).
+
+**Commits:**
+- `56a0157` - T63: ett-klicks-install via kompakt knapp överst (ersätter info-bannern) (#113)
+- `a58fcca` - T63 (#113): diskret install-pill, single-sourcad delad klass
+- `7bcc3f2` - T63: review F2/F3, ärlig retention-motivering + dåtids-kommentarer + steg-citatet matchar nya pillen (#113) - HEAD
+
+**Verifiering:** build EXIT 0, 1492+ gröna, 0 röda, lint/format rena. Lokal panel: PASS (F1 hover-drift-claim osäker, F2 dismiss-maskineri produktions-dött/pinnat, F3 dåtids-kommentarer hanterade). Copilot R1: 0 fynd, exit.
+
+**Daniels tempo-beslut (bär framåt):** max 2 Copilot-rundor per task, sedan merge och vidare.
+
+**Lean-städ-kandidat (pinnat):** `resolveInstallMode`/dismiss-maskineriet är produktions-dött. Kan städas i en framtida task.
+
+**Acceptanskriterier issue #113 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: ett klick ger native install-prompt pa Android/desktop när det gar
+- [x] AC#2: iOS far guiden (ärligt, ingen falsk autonomi-illusion)
+- [x] AC#3: fallback när prompten inte är tillgänglig - guide, aldrig död knapp
+- [x] AC#4: dold i standalone, tester per gren, grönt + reviewad
+
+**BEFORDRANS-FLAGGA (Förekomst 5):** kommentar-pastar-lessonen (dåtids-kommentarer i koden) har nu Förekomst 5 i lessons/reviewer.md (var 4 vid T62). Befordrans-caset är starkt. Väntar Daniels godkännande.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #116 (T63/#113, feature/T63-ettklicks-install) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 116 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #113 manuellt (`gh issue close 113`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #113 till Done pa boarden (nu i "In Review", projekt 2) - OBS: kortet kanske inte syns i item-list (pagineringsgräns 30), söka manuellt om nödvändigt.
+> Merga även äldre öppna PR:er om de fortfarande är öppna: PR #115 (T62/#111), PR #112 (T54/#93), PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #116 REDAN mergad:
+> T63 klar. Nästa task i kön: **#18 (realtid, Supabase Realtime: resultat/topplista/tips uppdateras live hos alla utan reload)** - läs issuen noggrant.
+> Därefter: #76 (T45 admin-statistik) -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready. Ny kandidat fran T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **Lean-städ-kandidat (T63):** resolveInstallMode/dismiss-maskineriet produktions-dött, pinnat för framtida task.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), befordran kommentar-pastar Förekomst 5 (reviewer.md, väntar godkännande), 3 äldre befordringar (Förekomst 3+/4), 5 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook + T58-callsite-krav), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T62/#111 (Gårdagens matcher i tips-fönstret) KLAR - PR #115 väntar på merge
 
 **Branch:** `feature/T62-tips-fonster-bakat` @ HEAD `f3a2147`
