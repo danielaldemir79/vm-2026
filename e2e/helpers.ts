@@ -75,7 +75,7 @@ export async function openApp(page: Page, options: OpenAppOptions = {}): Promise
   await page.getByRole('heading', { level: 1, name: 'VM 2026' }).waitFor();
 }
 
-// De sex huvud-sektionernas tillgängliga rubrik-namn (h2), i renderings-ordning.
+// De fyra kärn-sektionernas tillgängliga rubrik-namn (h2), i renderings-ordning.
 // Härledda ur de faktiska <h2 id="...-rubrik">-elementen i respektive vy. Används
 // av "appen laddar + sektioner renderas"-scenariot.
 export const SECTION_HEADINGS = [
