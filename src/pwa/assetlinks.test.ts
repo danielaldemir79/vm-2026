@@ -9,8 +9,7 @@ import assetlinksRaw from '../../public/.well-known/assetlinks.json?raw';
 //
 // assetlinks.json kopplar en framtida Trusted Web Activity (Android-app) till den
 // här sajten. Formatet får INTE gissas , det är en W3C/Google-specad struktur som
-// Android verifierar bokstavligt. Källor (se public/.well-known/README.md +
-// docs/decisions.md T36):
+// Android verifierar bokstavligt. Källor (se docs/decisions.md T36):
 //   - Chrome for Developers, "Android Concepts for Web Developers"
 //     (https://developer.chrome.com/docs/android/trusted-web-activity/android-for-web-devs):
 //     relation = "delegate_permission/common.handle_all_urls", namespace = "android_app".
