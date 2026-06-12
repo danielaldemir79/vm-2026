@@ -106,6 +106,13 @@ function addDays(dayKey: string, days: number): string {
  * av localDateKey); här gör vi bara ren datum-aritmetik på dem.
  */
 function windowDateKeys(startKey: string, endKey: string): Set<string> {
+  // FAIL-LOUD (copilot R1, PRINCIPLES §8): omvända nycklar ger INTE en oändlig
+  // loop (while-villkoret faller direkt) utan en TYST TOM mängd, vilket skulle
+  // dölja ALLA matcher utan spår. Det är ett programmeringsfel hos callern och
+  // ska smälla i dev/test, inte maskeras som en tom vy.
+  if (startKey > endKey) {
+    throw new Error(`windowDateKeys: startKey (${startKey}) ligger efter endKey (${endKey})`);
+  }
   const keys = new Set<string>();
   let cursor = new Date(`${startKey}T00:00:00.000Z`).getTime();
   const end = new Date(`${endKey}T00:00:00.000Z`).getTime();
