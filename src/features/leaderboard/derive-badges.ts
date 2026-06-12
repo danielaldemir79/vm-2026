@@ -24,8 +24,8 @@
 //    (numeriskt HÖGRE rank-tal) än motståndaren, OCH det laget faktiskt vann. Alltså:
 //    du prickade exakt resultat i en match där din tippade vinnare var underdog enligt
 //    FIFA-rankingen, och skrällen slog in. KÄLLA till rankingen (gissas ALDRIG): FIFA/
-//    Coca-Cola Men's World Ranking (aprilutgåvan 2026), committad i team-profiles-
-//    source.txt, exponerad som Team.fifaRanking (T10). Lägre tal = bättre lag, så
+//    Coca-Cola Men's World Ranking (juniutgåvan 2026-06-11, uppdaterad i T69), committad
+//    i team-profiles-source.txt, exponerad som Team.fifaRanking (T10). Lägre tal = bättre lag, så
 //    "tippad vinnare har högre rank-tal än förloraren" = en skräll. Ett oavgjort eller
 //    en match utan känd ranking på något lag ger ALDRIG märket (fail-safe, ingen gissning).
 //

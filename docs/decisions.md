@@ -5,6 +5,47 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T69 (#132): FIFA-ranking uppdaterad till juniutgåvan (2026-06-11)
+
+**Beslut (data-uppdatering, gissas ALDRIG):** `Team.fifaRanking` för alla 48 VM-lag uppdaterades
+från FIFA:s aprilutgåva (T10) till **juniutgåvan, OFFICIELLT publicerad 2026-06-11** (nästa officiella
+utgåva 2026-07-20, så juni är den senaste vid byggtillfället). Värdena ändrades BARA i gold-source
+(`src/data/wc2026/team-profiles-source.txt`) och `team-profiles.ts` REGENERERADES via
+`npm run gen:team-profiles` (ingen handredigering av den genererade filen). Källankrings-låset
+(`team-profiles-source.test.ts`: regenerera-och-diffa + mutationstest + 48/48-täckning) håller grönt.
+Stjärnspelare + kuriosa är OFÖRÄNDRADE sedan T10 (samma trupper offentliggjorda 2026-06-02); bara
+rank-fältet rörts (plus två kuriosa-justeringar som följer av rank-bytet, se nedan).
+
+**Källor (FIFA-ranking, hämtade 2026-06-12):** Den officiella tabellen på
+inside.fifa.com/fifa-world-ranking/men är JS-renderad (ingen tabell i server-HTML, gick INTE att
+parsa direkt), så positionerna togs ur återgivningar av SAMMA 11 juni-utgåva och korskollades:
+- Position 1-50: ESPN:s återgivning av juniutgåvan
+  (https://www.espn.com/soccer/story/_/id/46664763/fifa-mens-top-50-world-rankings), korskollad mot
+  Wikipedia (topp 20 med poäng, https://en.wikipedia.org/wiki/FIFA_Men's_World_Ranking) och
+  whereig.com (full tabell, https://www.whereig.com/football/fifa-world-rankings.html). ESPN och
+  whereig är IDENTISKA på 1-50.
+- Position 50-90 (de lägre rankade VM-lagen): whereig.com, korskollat mot oberoende sök-återgivning
+  av 11 juni-utgåvan. Samtliga sub-50 VM-lag (QAT 56, IRQ 57, RSA 60, KSA 61, JOR 63, BIH 64, CPV 67,
+  GHA 73, CUW 82, HAI 83, NZL 85) bekräftade av MINST TVÅ oberoende källor.
+
+**Den stora förändringen:** Argentina (regerande mästare) återtog 1:a-platsen (1877.27 p) före Spanien
+(1874.71) och Frankrike (1870.7); Frankrike föll från 1:a (april) till 3:a. Fortsatt den tightaste
+topp-3 i rankningens historia. Två kuriosa-rader justerades så de förblir SANNA mot den nya etttan:
+"FIFA:s etta inför 2026" flyttades från FRA-raden till ARG-raden (verifierbart faktum, inte gissning).
+
+**Ändrade rank-värden (19 av 48 lag, april -> juni):** ARG 3->1, FRA 1->3, MAR 8->7, NED 7->8,
+URU 17->16, SEN 14->15, MEX 15->14, USA 16->17, IRN 21->20, CIV 34->33, CZE 41->40, SCO 43->42,
+PAR 40->41, TUN 44->45, PAN 33->34, QAT 55->56, BIH 65->64, CPV 69->67, GHA 74->73. Övriga 29 lag
+oförändrade. Alla 48 positioner är fortsatt UNIKA (testets unik-rank-invariant håller).
+
+**Värde-låsta tester MEDVETET uppdaterade (med motivering):**
+- `team-profiles-source.test.ts` spot-check: bytt från "Frankrike #1" till "Argentina #1 + Frankrike
+  #3" (speglar den nya etttan). Mutationstestets kommentar uppdaterad (rank=1 är nu Argentina).
+- `TeamProfilePanel.test.tsx`: Frankrikes profil visar nu "#3" (var "#1").
+Inga ANDRA konsumenter låser de reella rank-värdena: skräll-badgen (T19) jämför rank RELATIONELLT
+(vinnare vs förlorare), inte mot absoluta tal, och dess egna test-fixtures är syntetiska (egna
+fifaRanking-värden, ej bundna till gold-source). Skräll-logiken förblir därför konsekvent.
+
 ## 2026-06-12 , T68 (#129): Komprimerbara sektioner, ETT delat mönster (CollapsibleSection)
 
 **Bakgrund:** sidan har vuxit till åtta tunga sektioner och blev en oöverskådlig vägg att skrolla.
@@ -277,8 +318,9 @@ OBSERVATION om redan-känd data, så det behöver ingen persistens. Joker KRÄVE
   det laget medlemmen tippade skulle VINNA hade SÄMRE FIFA-ranking (numeriskt HÖGRE rank-tal) än
   motståndaren, OCH det laget vann i ordinarie tid. Ett oavgjort eller en saknad ranking på något
   lag ger ALDRIG märket (fail-safe, ingen underdog-gissning). KÄLLA till rankingen (gissas ALDRIG):
-  FIFA/Coca-Cola Men's World Ranking, aprilutgåvan 2026, committad i `team-profiles-source.txt`
-  (URL:er + hämtdatum 2026-06-10), exponerad som `Team.fifaRanking` (T10). Lägre tal = bättre lag.
+  FIFA/Coca-Cola Men's World Ranking, juniutgåvan 2026 (publicerad 2026-06-11, uppdaterad i T69,
+  ersatte aprilutgåvan från T10), committad i `team-profiles-source.txt` (URL:er + hämtdatum),
+  exponerad som `Team.fifaRanking` (T10). Lägre tal = bättre lag.
   Vi kräver EXAKT-träff (inte bara rätt utfall) så märket är en bedrift, inte tur.
 - **"Perfekt omgång"** = en SVENSK kalenderdag (Europe/Stockholm) där medlemmen tippade MINST 2
   matcher som ALLA är avgjorda OCH ALLA gav poäng (> 0). "Omgång" = en dags matcher (samma tolkning

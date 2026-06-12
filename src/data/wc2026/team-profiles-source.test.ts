@@ -73,8 +73,8 @@ describe('Lag-profiler: MUTATIONSTEST (beviset att låset fångar ett bytt värd
   // räcker (samma som T4b:s kanal-mutation), ingen behörighets-bevarande swap krävs.
 
   it('en FIFA-ranking-mutation gör profilerna skilda från den committade (låset fångar felet)', () => {
-    // Byt Frankrikes "rank=1" till "rank=9". En transkriptions-/faktafel-klass på
-    // den mest gissningskänsliga datan (rankingen).
+    // Byt Argentinas "rank=1" till "rank=9" (Argentina är etta i juniutgåvan, T69).
+    // En transkriptions-/faktafel-klass på den mest gissningskänsliga datan (rankingen).
     const mutated = sourceText.replace('rank=1 |', 'rank=9 |');
     expect(mutated).not.toBe(sourceText); // mutationen tog effekt
     const regenerated = buildProfilesFile(mutated, teamRefs);
@@ -146,7 +146,7 @@ describe('Lag-profiler: värde-integritet (varje rad välformad)', () => {
 
   it('inga två lag delar FIFA-ranking (rankingen är en unik position)', () => {
     // En FIFA-position är unik per lag i en given utgåva; två lag på samma rank vore
-    // ett transkriptions-fel. (48 lag, alla med olika position i aprilutgåvan.)
+    // ett transkriptions-fel. (48 lag, alla med olika position i juniutgåvan, T69.)
     const ranks = profiles.map((p) => p.fifaRanking);
     expect(new Set(ranks).size).toBe(ranks.length);
   });
@@ -216,9 +216,14 @@ describe('Lag-profiler: invävning i Team (teams.ts bär profil-fälten, utom be
     }
   });
 
-  it('spot-check mot källan (Frankrike #1, debutanten Uzbekistan utan placerings-kuriosa)', () => {
+  it('spot-check mot källan (Argentina #1 i juniutgåvan, debutanten Uzbekistan #50)', () => {
+    // Juniutgåvan (T69): Argentina återtog 1:a-platsen (Frankrike föll till 3:a).
+    const argentina = WC2026_TEAMS.find((t) => t.code === 'ARG')!;
+    expect(argentina.fifaRanking).toBe(1);
+    expect(argentina.starPlayers).toContain('Lionel Messi');
+
     const france = WC2026_TEAMS.find((t) => t.code === 'FRA')!;
-    expect(france.fifaRanking).toBe(1);
+    expect(france.fifaRanking).toBe(3);
     expect(france.starPlayers).toContain('Kylian Mbappé');
 
     const uzbekistan = WC2026_TEAMS.find((t) => t.code === 'UZB')!;
