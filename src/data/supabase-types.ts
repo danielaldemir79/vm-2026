@@ -342,6 +342,40 @@ export type Database = {
           },
         ];
       };
+      // T24 (#24): emoji-reaktioner på matcher i rummet (en reaktion per användare+match).
+      room_reactions: {
+        Row: {
+          created_at: string;
+          emoji: string;
+          match_id: string;
+          room_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          emoji: string;
+          match_id: string;
+          room_id: string;
+          // user_id sätts av DB-default auth.uid() (RLS binder den), klienten utelämnar den.
+          user_id?: string;
+        };
+        Update: {
+          created_at?: string;
+          emoji?: string;
+          match_id?: string;
+          room_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'room_reactions_room_id_fkey';
+            columns: ['room_id'];
+            isOneToOne: false;
+            referencedRelation: 'rooms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       rooms: {
         Row: {
           code: string;

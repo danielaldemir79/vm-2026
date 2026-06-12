@@ -18,7 +18,7 @@ import { GoalCelebrationOverlay, ResultEntryGate, ResultsProvider } from './feat
 import { ScenarioView } from './features/scenarios';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
-import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
+import { RoomSection, RoomsProvider, ReactionsProvider, useRoomsStore } from './features/rooms';
 import { OfficialResultsProvider } from './features/official-results';
 import { PredictionSection, PredictionsProvider, JokerProvider } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
@@ -194,9 +194,17 @@ function AppShell() {
                 datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
                 SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA
                 + tillgängliga strukturen byggs här; design-frontend ger WOW-hero +
-                premium-matchkort + nedräknings-visual ovanpå. */}
+                premium-matchkort + nedräknings-visual ovanpå.
+
+                ReactionsProvider (T24, #24) omsluter BARA dagens-vyn (den enda ytan med
+                reaktions-rad i MVP, decisions.md T24): emoji-reaktioner på matchkorten,
+                per rum, live via Realtime. Vilande (enabled=false) utan Supabase/aktivt
+                rum, så fixtures-/lokalt läge är oförändrat och korten ser ut precis som
+                förr. Ligger innanför RoomsProvider (läser rooms-synk-seamen). */}
               <Slide direction="up">
-                <DailyMatchesView />
+                <ReactionsProvider>
+                  <DailyMatchesView />
+                </ReactionsProvider>
               </Slide>
 
               <Slide direction="up">

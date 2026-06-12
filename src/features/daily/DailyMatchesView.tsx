@@ -24,6 +24,7 @@ import { useDayTheme } from './use-day-theme';
 import { useTodayKey } from './use-today-key';
 import { localDateKey } from './group-matches-by-day';
 import { MatchCard } from './MatchCard';
+import { MatchReactions } from '../rooms';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
 import { stageLabel, teamDisplayName } from './match-display';
@@ -381,7 +382,17 @@ export function DailyMatchesView() {
                     transition={{ ...transitions.smooth, delay: Math.min(i * 0.04, 0.32) }}
                     className="h-full"
                   >
-                    <MatchCard match={match} teamsById={teamsById} />
+                    {/* Reaktions-raden (T24, #24) injiceras som fotrad i LIST-korten
+                        (matchkorten där snacket händer). MatchReactions självhider när
+                        reaktions-lagret är inaktivt (lokalt läge / inget aktivt rum), så
+                        ett kort utan rum ser ut precis som förr. Hero-kortet ovanför får
+                        ingen reaktions-rad: matchen visas ändå i listan här, så vi undviker
+                        två reaktions-ytor för samma match (KISS, decisions.md T24). */}
+                    <MatchCard
+                      match={match}
+                      teamsById={teamsById}
+                      footer={<MatchReactions matchId={match.id} />}
+                    />
                   </Slide>
                 </li>
               ))}

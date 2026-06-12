@@ -5,6 +5,111 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T24-visuellt (#24, design-frontend): reaktionsradens premium-finish, AA UPPMÄTT i båda teman
+
+**Beslut:** Den visuella finishen på reaktionsraden bor i `rooms.css` §9 (`.vm-reaction-*`), samma seam
+och samma fil som kommentarernas finish (§8, T66), INTE i `tokens.css`. **Varför:** reaktionsraden är en
+del av rums-feature:ns sociala lager och ska följa dess egen stil-fil. `rooms.css` importeras via
+`RoomPanel.tsx` (exporterad ur rooms-barreln, alltid i bundlen), och appen är EN sida (DailyMatchesView +
+RoomSection i samma `<main>`), så `.vm-reaction-*` gäller där MatchReactions renderas. Logik/data-hakar/
+aria rördes ALDRIG (seam-principen): finishen hänger bara på senior-devs `data-reactions-*` + `data-mine` +
+`aria-pressed`.
+
+**Känsla (taskens ord, "levande men inte stojigt", kvällsljus-familjen):**
+- **Vilo-bricka** (andras reaktion): en lätt, rund pill med en hårfin guld-värme i fonden
+  (`color-mix(--vm-gold 4%, surface)`, samma kvällsljus-detalj som `.vm-comment-input`), så raden känns som
+  en del av snacket, inte en grå knapp-rad.
+- **MIN bricka** (`data-mine`): markeringen är FÄRG-OBEROENDE, `aria-pressed` bär den för skärmläsare, och
+  visuellt bärs den av en accent-RING (kant, via Tailwinds `aria-pressed:border-accent`) + en lugn accent-
+  tint i ytan (`color-mix(--vm-accent 10%, surface)`). Tinten ensam räcker aldrig (form + ring + aria-pressed
+  bär signalen), men den lyfter "min" tydligt ur raden.
+- **Antalet** (count) är den enda TEXTEN på en bricka. Färgen är SINGLE-SOURCAD i CSS (vilo = fg-muted, min
+  = lyft till fg), inte en Tailwind text-utility i TSX, så count-tonen är EN sanning och inte en specificitets-
+  strid (lessons tailwind-utility-vs-handskriven-css). MIN count lyfts till full fg + font-semibold så den
+  läses starkt.
+- **Add-knappen** lämnas på senior-devs diskreta dashed-pill (KISS, ingen extra rums-regel som vore brus).
+- **Pickern** (utfälld 8-emoji-väljare): en lugn popover med en mjuk höjd (`--vm-shadow-raised`) + en hårfin
+  guld inre-högdager, så den läser som ett svävande lager. Vald emoji bär en accent-RING (`box-shadow inset`)
+  så "vald" syns som FORM, konsekvent med brickans ring.
+
+**RÖRELSE / REDUCED MOTION:** ingen brick-/pop-animation (taskens punkt 3: statisk är fin). Den enda rörelsen
+är de delade hover/fokus-övergångarna senior-dev satte (`transition-[...] duration-150`), nollade av den
+svepande reduced-motion-grinden i `index.css`. INGA rums-egna `@keyframes`, så inget extra att nolla.
+
+**KONTRAST (WCAG AA, UPPMÄTT per tema, sRGB-luminans, canvas-komposit VÄRSTA fall, `scripts/contrast-t24.mjs`,
+lessons aa-kontrast: mät VARJE tema separat, attribuera rätt, mät VÄRSTA fallet):** emojin själv är en
+färg-oberoende bild-glyf; bara ANTALET är text (solid-form-disciplin).
+- Vilo-brickans antal (fg-muted) på guld-4%-pill: **mörkt 6.99:1 / ljust 6.25:1**.
+- MIN brickas antal (lyft till fg) på accent-10%-pill: **mörkt 12.43:1 / ljust 15.61:1** (och OM det vore
+  fg-muted skulle det ändå hålla: mörkt 6.12:1 / ljust 5.69:1, marginal-koll).
+- "Reagera"-etiketten (fg-muted) på add-knappens surface-fond: **mörkt 7.50:1 / ljust 6.52:1**.
+- MIN brickas accent-kant (ren UI-dekor, bär ingen text): mörkt 9.68:1 / ljust 5.40:1 mot surface
+  (>= 3:1, UI-komponent-tröskeln). Alla text-ytor >= 4.5:1 (normal text). MIN över text-ytor: **mörkt 6.12:1
+  / ljust 5.69:1**.
+
+**MOBIL FÖRST (390/280):** raden är `flex flex-wrap items-center gap-1.5` (senior-dev), så brickorna RADBRYTER
+på smala skärmar utan horisontell scroll; pickern är `w-full flex-wrap`, så de 8 emojierna bryter snyggt på
+280px. Verifierat via build (`.vm-reaction-*` i byggd CSS) + den kompilerade cascade-ordningen (vilo-count
+fg-muted spec 0,2,0 < min-count fg spec 0,3,0, vinner korrekt).
+
+## 2026-06-12 , T24 (#24): emoji-reaktioner på matcher i rummet
+
+**Beslut:** Ny tabell `public.room_reactions` (room_id, user_id, match_id, emoji, created_at) för
+emoji-reaktioner på matcher per rum. Migration `20260612160000_t24_room_reactions_schema_rls_realtime.sql`,
+applicerad LIVE. ÄRLIG precision (review-F1): namn + INNEHÅLL är 1:1 (live-schemat verifierat kolumn för
+kolumn), men fil-versionen är en placeholder-stämpel, live-apply-versionen är `20260612134058` (samma
+MCP-nyans som T45/T19/T53/T67). Ett `db reset` replayar samma slutläge under filens stämpel.
+**Varför:** Snabbt, lekfullt social-lager ovanpå kommentarerna (T66): noll text, bara en knapp. Snacket
+runt matcherna är halva nöjet.
+
+**Beslut (MVP-yta, KISS): reaktioner sitter BARA på matchkorten i dagens-vyn, INTE på topplista-rader.**
+Issuen nämnde topplista-rader "om billigt". Vi valde matcherna som MVP: det är där snacket händer, och
+en reaktion på en topplista-RAD (en person) hade krävt en annan datamodell (reagera på user, inte match)
+och en ny yta att aggregera/visa i. Matcher räcker som MVP (issuens egen formulering), topplista-reaktioner
+kan läggas till senare utan att röra denna modell. Endast LIST-korten får raden (inte hero-kortet): hero:n
+är en dubblett av en match som ändå visas i listan, så vi undviker två reaktions-ytor för samma match.
+
+**Beslut (modell): EN reaktion per (rum, användare, match), PK (room_id, user_id, match_id).** En andra
+reaktion på samma match BYTER emojin (upsert mot PK:n, RLS UPDATE på egen rad), avmarkera = DELETE. Aggregatet
+(antal per emoji) räknas i KLIENTEN ur raderna (härledd state, ingen denormaliserad räknar-kolumn), i en ren
+modul `src/features/rooms/reaction-aggregate.ts`.
+
+**KURERAD EMOJI-LISTA (8 st, källhänvisad, gissas inte): `⚽ 🔥 😂 😭 🎉 👏 😱 🧊`.** Betydelser: ⚽ mål,
+🔥 het match, 😂 skratt, 😭 besvikelse, 🎉 fira, 👏 bra spelat, 😱 chock, 🧊 iskall. **Källa:** designval
+för denna app (inte en extern spec) , täcker fotbolls-känslorna runt en match (jubel/sorg/chock/humor) utan
+en oöverskådlig palett (KISS). Listan är CHECK-låst i DB (`room_reactions_emoji_allowed`) OCH speglad 1:1 i
+klientens `REACTION_EMOJIS` (`src/data/rooms/reactions-api.ts`), en sanning, två speglar. DB:n är sanningen:
+en emoji utanför listan nekas av CHECK:en (bevisat live). `match_id`-formatet återanvänder EXAKT den
+källåkrade constrainten från T14 KA-SA2 / room_jokers (`g-[A-L]-[1-6]` eller `M73..M104`), ingen ny tolkning.
+
+**RLS-modell (anon = authenticated i Supabase, RLS är ENDA skyddet, samma som room_comments):** SELECT bara
+rumsmedlem (`is_room_member`), INSERT bara medlem OCH `user_id = auth.uid()` (user_id sätts av DB-default,
+kan inte förfalskas), UPDATE bara egen rad (byta emoji), DELETE bara egen rad (avmarkera). INGEN deadline-/
+sekretess-gren (till skillnad från tips T15 / joker T19).
+
+**Beslut (sekretess): reaktioner är PUBLIKA inom rummet DIREKT, ingen före-avspark-döljning.** **Varför:** en
+reaktion avslöjar inget hemligt tips. Att trycka 🔥 på en match säger inget om VAD du tippade (utfall/exakt
+poäng) , den uttrycker en känsla om matchen, inte en gissning om resultatet. Därför finns inget att skydda
+före avspark, och modellen blir enklare än tips/joker (ingen now()-jämförelse, ingen sekretess-SELECT-gren).
+Detta är medvetet: reaktioner ligger i `supabase_realtime`-publikationen och syns live för alla medlemmar.
+
+**RLS BEVISAT LIVE:** (1) under bygget med simulerade sessioner (DO-block, set role authenticated +
+request.jwt.claims, isolerat test-rum, städat) , medlem reagerar/byter/avmarkerar, utomstående ser/skriver
+INGET, byter/raderar inte andras rad, emoji + match_id utanför reglerna nekas av CHECK. (2) Env-gatat
+integrationstest med RIKTIGA anon-sessioner mot produktion (`src/data/rooms/reactions-rls.integration.test.ts`,
+kördes grönt live, städar rummet + loggar ut sessionerna i afterAll). En mock kan inte bevisa RLS.
+
+**Realtid (T18-mönstret, signal-inte-data):** `room_reactions` i publikationen. En ny/bytt/raderad reaktion
+ger en postgres_changes-SIGNAL till rummets medlemmar (RLS släpper bara raderna till medlemmar). Klienten
+läser ALDRIG payloadens rad; tyst re-fetch genom RLS (egen kanal `vm2026-room-reactions`, egen nonce, samma
+T55/T61-mönster som kommentarer/tips). Inget flimmer vid en väns reaktion.
+
+**Beslut (tolerant hook):** `useReactionsStore` faller till en INERT store utan provider (samma mönster som
+`useRoomsSync`, T14 KA-F3, INTE den kastande `useCommentsStore`). **Varför:** reaktions-raden är en fotrad på
+matchkorten i dagens-vyn, och dagens-vyn renderas i många tester och i lokalt läge utan en ReactionsProvider.
+Reaktioner är ett additivt socialt lager: utan provider ska korten fungera precis som förr (ingen rad), så en
+inert store (enabled=false -> MatchReactions renderar null) är rätt, inte ett kast.
+
 ## 2026-06-12 , T19 (#19): gamification (streaks, märken, joker-match)
 
 **Beslut: streaks + märken HÄRLEDS rent ur befintlig data, INGEN ny DB-tabell.** Streak och
