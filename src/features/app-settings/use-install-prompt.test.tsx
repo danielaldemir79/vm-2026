@@ -111,4 +111,51 @@ describe('useInstallPrompt, beforeinstallprompt-flöde', () => {
     const { result } = renderHook(() => useInstallPrompt());
     expect(result.current.mode).toBe('ios-instructions');
   });
+
+  // T63 (#113): hooken exponerar nu också den kompakta knappens beslut (buttonAction)
+  // + isStandalone, härlett ur SAMMA event/plattform. Direkta kontrakt-tester här
+  // (InstallButton.test.tsx täcker end-to-end), särskilt den subtila regeln att
+  // `dismissed` INTE påverkar buttonAction (knappen är ingen avfärdbar banner).
+  it('buttonAction = native-prompt när ett event finns (T63)', () => {
+    const { result } = renderHook(() => useInstallPrompt());
+    expect(result.current.buttonAction).toBe('guide'); // ingen prompt än
+    fireBeforeInstallPrompt();
+    expect(result.current.buttonAction).toBe('native-prompt');
+  });
+
+  it('buttonAction = guide-ios på iOS (T63)', () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari'
+    );
+    const { result } = renderHook(() => useInstallPrompt());
+    expect(result.current.buttonAction).toBe('guide-ios');
+  });
+
+  it('buttonAction PÅVERKAS INTE av dismiss (knappen är ingen avfärdbar banner, T63)', () => {
+    // Avfärdande döljer den GAMLA bannern (mode -> hidden) men den kompakta knappen ska
+    // fortsatt fungera: en avvisad native-prompt faller till guiden, knappen försvinner inte.
+    window.localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+    const { result } = renderHook(() => useInstallPrompt());
+    expect(result.current.mode).toBe('hidden'); // gamla banner-läget döljs
+    expect(result.current.buttonAction).toBe('guide'); // men knappen lever (guide-fallback)
+  });
+
+  it('isStandalone + buttonAction=hidden i app-läge (standalone, T63)', () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('standalone'),
+          media: query,
+          onchange: null,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        }) as unknown as MediaQueryList
+    );
+    const { result } = renderHook(() => useInstallPrompt());
+    expect(result.current.isStandalone).toBe(true);
+    expect(result.current.buttonAction).toBe('hidden');
+  });
 });

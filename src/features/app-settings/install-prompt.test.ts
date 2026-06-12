@@ -3,6 +3,8 @@ import {
   detectIos,
   detectStandalone,
   resolveInstallMode,
+  resolveInstallButtonAction,
+  type InstallButtonContext,
   type InstallContext,
 } from './install-prompt';
 
@@ -13,6 +15,16 @@ function ctx(overrides: Partial<InstallContext> = {}): InstallContext {
     isIos: false,
     hasPromptEvent: false,
     dismissed: false,
+    ...overrides,
+  };
+}
+
+/** Bas-kontext för knapp-beslutet: ej installerad, ej iOS, inget event. */
+function btnCtx(overrides: Partial<InstallButtonContext> = {}): InstallButtonContext {
+  return {
+    isStandalone: false,
+    isIos: false,
+    hasPromptEvent: false,
     ...overrides,
   };
 }
@@ -43,6 +55,38 @@ describe('resolveInstallMode, vad installations-ytan ska visa', () => {
 
   it('prioriterar PROMPT över iOS-instruktion (en riktig knapp är bättre)', () => {
     expect(resolveInstallMode(ctx({ isIos: true, hasPromptEvent: true }))).toBe('prompt');
+  });
+});
+
+describe('resolveInstallButtonAction, den kompakta knappens tre klick-grenar (T63, #113)', () => {
+  it('NATIVE-PROMPT när ett beforeinstallprompt-event finns (ett klick = äkta prompt)', () => {
+    expect(resolveInstallButtonAction(btnCtx({ hasPromptEvent: true }))).toBe('native-prompt');
+  });
+
+  it('GUIDE-IOS på iOS utan event (Apple saknar install-API, öppna iPhone-fliken)', () => {
+    expect(resolveInstallButtonAction(btnCtx({ isIos: true }))).toBe('guide-ios');
+  });
+
+  it('GUIDE som fallback på icke-iOS UTAN event (aldrig en död knapp, #113-AC)', () => {
+    // Prompten ej tillgänglig (kriterier ej uppfyllda / nyligen avvisad): visa guiden
+    // i stället för att göra ingenting.
+    expect(resolveInstallButtonAction(btnCtx())).toBe('guide');
+  });
+
+  it('HIDDEN bara i standalone (Daniels skarpa krav: inget surr i app-läge)', () => {
+    // Standalone vinner över BÅDE event och iOS, knappen ska försvinna helt.
+    expect(resolveInstallButtonAction(btnCtx({ isStandalone: true, hasPromptEvent: true }))).toBe(
+      'hidden'
+    );
+    expect(resolveInstallButtonAction(btnCtx({ isStandalone: true, isIos: true }))).toBe('hidden');
+  });
+
+  it('prioriterar NATIVE-PROMPT över iOS-guiden (en riktig prompt slår en instruktion)', () => {
+    // Teoretiskt kantfall (iOS rapporterar normalt aldrig ett event); prioriteringen
+    // är ändå explicit testad så regeln är entydig.
+    expect(resolveInstallButtonAction(btnCtx({ isIos: true, hasPromptEvent: true }))).toBe(
+      'native-prompt'
+    );
   });
 });
 

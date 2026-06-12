@@ -8,7 +8,9 @@ import { INSTALL_DISMISSED_KEY } from './storage-keys';
 import {
   detectIos,
   detectStandalone,
+  resolveInstallButtonAction,
   resolveInstallMode,
+  type InstallButtonAction,
   type InstallUiMode,
 } from './install-prompt';
 import {
@@ -20,6 +22,19 @@ import {
 export interface InstallPromptApi {
   /** Vad install-ytan ska visa just nu (hidden/prompt/ios-instructions). */
   mode: InstallUiMode;
+  /**
+   * Vad den KOMPAKTA install-knappen (T63, #113) ska göra vid klick: native-prompt,
+   * öppna guiden på iPhone-fliken, öppna guiden (fallback), eller dölj knappen helt
+   * (bara standalone). Härlett ur SAMMA fångade event + plattform som `mode`, så de
+   * aldrig kan drifta isär.
+   */
+  buttonAction: InstallButtonAction;
+  /**
+   * true om appen körs installerat/standalone. Exponeras separat (utöver `mode`) så den
+   * kompakta knappen kan dölja HELA ytan i app-läge, skild från `mode === 'hidden'` som
+   * också gäller för avfärdad/ingen-väg (T63, #113: bara standalone döljer knappen).
+   */
+  isStandalone: boolean;
   /**
    * Visa webbläsarens native install-prompt (bara meningsfullt i läge 'prompt').
    * Efter ett val nollas event:et (det kan bara användas en gång).
@@ -65,12 +80,23 @@ export function useInstallPrompt(): InstallPromptApi {
     setDismissed(true);
   }, []);
 
+  const hasPromptEvent = promptEvent !== null;
+
   const mode = resolveInstallMode({
     isStandalone,
     isIos,
-    hasPromptEvent: promptEvent !== null,
+    hasPromptEvent,
     dismissed,
   });
 
-  return { mode, promptInstall, dismiss };
+  // Knapp-beslutet läser INTE `dismissed` (den kompakta knappen är ingen avfärdbar
+  // banner, den är en alltid-nåbar CTA), bara standalone/iOS/event, se
+  // resolveInstallButtonAction.
+  const buttonAction = resolveInstallButtonAction({
+    isStandalone,
+    isIos,
+    hasPromptEvent,
+  });
+
+  return { mode, buttonAction, isStandalone, promptInstall, dismiss };
 }

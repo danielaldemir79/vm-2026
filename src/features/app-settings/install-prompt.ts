@@ -79,6 +79,61 @@ export function resolveInstallMode(ctx: InstallContext): InstallUiMode {
 }
 
 /**
+ * Vad den KOMPAKTA install-knappen (T63, #113) ska göra när den klickas. Skild från
+ * resolveInstallMode (som styr den GAMLA info-bannern): knappen är en diskret CTA, inte
+ * en informationsruta, och fallbacken skiljer sig på TVÅ avgörande punkter:
+ *
+ *   - 'hidden':       BARA i standalone. Daniels skarpa krav (#113): i app-läge ska
+ *                     INGEN install-yta synas ("onödigt surr där då den redan är
+ *                     installerad"). Detta är den ENDA grenen som döljer knappen.
+ *   - 'native-prompt': ett beforeinstallprompt-event finns (Chrome/Android/desktop) ->
+ *                     ETT klick öppnar webbläsarens ÄKTA install-prompt direkt (T39:s
+ *                     mekanik). Så autonomt som plattformen tillåter.
+ *   - 'guide-ios':    iOS (iPhone/iPad) saknar programmatiskt install-API (Apple
+ *                     exponerar inget), så knappen öppnar kom-igång-guiden (T54) på
+ *                     iPhone-fliken med steg för steg. Ingen falsk autonomi-illusion.
+ *   - 'guide':        icke-iOS UTAN event (redan-installerad-i-annan-mening, kriterier
+ *                     ej uppfyllda, eller prompten nyligen avvisad) -> öppna guiden ändå.
+ *                     ALDRIG en död knapp (#113-AC): finns ingen native-väg just nu
+ *                     visar vi vägen i stället för att göra ingenting.
+ *
+ * VIKTIGT (skillnad mot resolveInstallMode): `dismissed` döljer INTE knappen. Den gamla
+ * bannern hade en "Inte nu"-knapp och respekterade avfärdandet permanent; den kompakta
+ * knappen har ingen sådan affordans, den är en alltid-nåbar liten CTA. Att en native-
+ * prompt avvisats betyder bara att vi faller till guiden ('guide'), inte att knappen
+ * försvinner. Därför läses `dismissed` inte här.
+ */
+export type InstallButtonAction = 'hidden' | 'native-prompt' | 'guide-ios' | 'guide';
+
+/** Indata till knapp-beslutet (rena flaggor, varje gren enhetstestas). */
+export interface InstallButtonContext {
+  /** true om appen körs installerat/standalone (då döljs knappen helt, #113). */
+  isStandalone: boolean;
+  /** true om plattformen är iOS (iPhone/iPad), guiden öppnas då på iPhone-fliken. */
+  isIos: boolean;
+  /** true om ett beforeinstallprompt-event fångats och kan visas (native-vägen). */
+  hasPromptEvent: boolean;
+}
+
+/**
+ * Avgör vad den kompakta install-knappen gör. Ren funktion (testas direkt på varje
+ * kombination), så regeln kan verifieras utan webbläsare. Se InstallButtonAction för
+ * varje grens motivering.
+ */
+export function resolveInstallButtonAction(ctx: InstallButtonContext): InstallButtonAction {
+  if (ctx.isStandalone) {
+    return 'hidden';
+  }
+  if (ctx.hasPromptEvent) {
+    return 'native-prompt';
+  }
+  if (ctx.isIos) {
+    return 'guide-ios';
+  }
+  return 'guide';
+}
+
+/**
  * Är appen redan installerad/körs i standalone-läge?
  *
  * TRE signaler kombineras (de tre standard-sätten att upptäcka installerat läge,
