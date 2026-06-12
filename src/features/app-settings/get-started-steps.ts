@@ -112,7 +112,9 @@ export const GET_STARTED_PATHS: readonly GetStartedPath[] = [
     platform: 'android',
     label: 'På Android',
     steps: [
-      { id: 'android-button', text: 'Tryck på knappen "Installera appen" här på sidan.' },
+      // Knapp-citatet matchar InstallBannerns FAKTISKA knapptext "Installera"
+      // (copilot R4: ett felciterat knappnamn gör att användaren inte hittar den).
+      { id: 'android-button', text: 'Tryck på knappen "Installera" här på sidan.' },
       {
         id: 'android-menu',
         text: 'Ser du ingen knapp? Tryck på de tre prickarna uppe i hörnet och välj "Installera app".',
