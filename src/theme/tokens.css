@@ -807,6 +807,63 @@ body {
   color: var(--vm-coupon-ink);
 }
 
+/* JOKER-TOGGELN på en ÖPPEN kupong (T19, #19): "din joker idag, dubbla poäng". Det
+   SPELIGA momentet, EN joker per omgång (svensk dag), så valet ska kännas som ett litet
+   firande. Tre tydliga lägen, alla via stabila data-attribut (struktur i PredictionForm,
+   ren känsla här):
+
+   - OVALD (default): en diskret guld-konturad pill. Senior-devs Tailwind ger guld-tint-
+     fond + guld-kant + text-fg; här bara en hårfin inre högdager så pillen får relief och
+     stjärn-konturen läses som en INBJUDAN ("gör mig till din joker"), inte ett tryck-läge.
+     Text = fg på en låg guld-tint över bg/surface (fg är appens högst kontrasterande ton,
+     håller AA i båda teman med marginal).
+   - VALD (data-joker-active): senior-devs klass-byte ger .vm-coupon-mine (SOLID guld-yta
+     med mörk ink, den färg-OBEROENDE AA-säkra solid-bricka-formen, --vm-coupon-ink på
+     --vm-gold = 10.90:1 mörkt / 5.03:1 ljust, samma proof som sparat-brickan). Här lägger
+     vi guld-LYSET ovanpå: en varm yttre guld-glow + inre högdager så stjärnan känns TÄND,
+     och en liten engångs-POP när den just valts (känns som ett "ja!"). Pop:en är ren
+     transform (skala), nollad vid reducerad rörelse (samma disciplin som champion-lyftet).
+   - LÅST/UPPTAGEN (disabled medan jokern sparas): senior-devs disabled:opacity-60 dämpar
+     hela pillen medan klicket flyger till servern; ingen egen regel behövs (opacity på en
+     hel interaktiv kontroll, inte på text, är tillåtet, inte text-dimningen lessons varnar
+     för). Den BINDANDE låst-markören efter avspark är .vm-coupon-mine via data-joker-locked
+     (lugn solid guld-bricka, ingen knapp), se kupong-markup. */
+.vm-joker-toggle {
+  /* Hårfin inre topp-högdager: ger den ovalda pillen relief utan att röra fonden/texten. */
+  box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 18%, transparent);
+}
+
+/* VALD: tänd den. Solid guld-yta + ink ärvs av .vm-coupon-mine (AA-proven); vi lägger en
+   varm guld-glow runt om + en starkare inre högdager så brickan känns upplyst, inte platt.
+   Ren dekor (box-shadow), bär ingen text, så ingen kontrast hänger på glow:en. */
+.vm-joker-toggle[data-joker-active] {
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.34),
+    0 4px 16px -6px color-mix(in srgb, var(--vm-gold) 70%, transparent);
+}
+
+/* POP vid val: en lugn engångs-skala när jokern just satts (data-joker-active dyker upp på
+   samma knapp-nod -> animationen körs en gång). Samma cubic-bezier + engångs-anda som
+   champion-lyftet (DRY). Nollas helt vid reducerad rörelse (gatad nedan), då är valet
+   statiskt , glow:en + den tända stjärnan bär ändå "vald"-beskedet utan rörelse. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-joker-toggle[data-joker-active] {
+    animation: vm-joker-pop 0.42s cubic-bezier(0.16, 1, 0.3, 1) 1;
+  }
+}
+
+@keyframes vm-joker-pop {
+  0% {
+    transform: scale(0.86);
+  }
+  55% {
+    transform: scale(1.07);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 /* POÄNG-BRICKAN på ett AVGJORT tips-kort (T58, #99): "+3 · Exakt resultat" m.fl. Den bär
    en FÄRG-OBEROENDE markör-glyf via ::before, samma form-familj som facit-avslöjandets
    markör (RevealView MARK_BY_TYPE): EXAKT = bock, UTFALL = halv-cirkel, MISS = kryss. Så
@@ -1735,6 +1792,74 @@ body {
   width: 0.375rem;
   border-radius: var(--radius-pill);
   background-color: color-mix(in srgb, var(--vm-gold) 70%, transparent);
+}
+
+/* MÄRKES-RADEN (T19, #19): de tjänade märkena under summeringen, små STOLTA brickor i
+   tips-världens guld-signatur , streak-flammor, "Kallade skrällen", "Perfekt omgång".
+   Det belönande lagret: man ska känna sig lite stolt över sina märken.
+
+   Varje märke är en SOLID guld-bricka med mörk ink (samma färg-OBEROENDE solid-bricka-
+   form som .vm-tips-summary-total / .vm-coupon-mine / .vm-reveal-actual ovan, ALDRIG
+   guld-som-text-på-tint). Texten (etiketten/siffran) är --vm-coupon-ink på SOLID --vm-gold
+   = den REDAN UPPMÄTTA paret 10.90:1 mörkt / 5.03:1 ljust (decisions.md T15/T58-visuellt),
+   ingen ny färgkombination införs, så ingen ny kontrast-mätning behövs , det här är exakt
+   samma bricka-form som redan bevisats AA i båda teman.
+
+   Varje märke bär en FÄRG-OBEROENDE glyf (flamma / blixt / stjärna) via .vm-badge-marker
+   ::before, vald per data-badge-id, samma form-via-CSS-mönster som .vm-tip-result-glyfen
+   (§10): glyfen ritas som pseudo-element-content och hamnar ALDRIG i textContent, så
+   etiketten ("3 i rad" / "Kallade skrällen" / "Perfekt omgång") förblir brickans
+   text-sanning för test + skärmläsare. Glyfen är dekor (markören är aria-hidden i markup,
+   förklaringen bärs av title + sr-only på li:t), så ingen läsbarhet hänger på den. */
+.vm-badge-row {
+  /* En hårfin guld-divider över raden (samma kupong-värme som käll-listans divider),
+     så märkena läses som ett eget, belönande band under detaljen utan en hård linje.
+     Bär ingen text (ren dekor). */
+  border-top: 1px solid color-mix(in srgb, var(--vm-gold) 22%, var(--color-border));
+  padding-top: 0.75rem;
+}
+
+.vm-badge {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  /* Mjuk inre högdager + en hårfin yttre guld-glow ger märket samma präglade, "stolta"
+     relief som medaljerna (.vm-pool-medal) och totalen, utan en bildasset. Ren dekor. */
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.32),
+    0 1px 3px rgb(0 0 0 / 0.2),
+    0 4px 14px -8px color-mix(in srgb, var(--vm-gold) 55%, transparent);
+}
+
+/* MÄRKES-MARKÖREN: en liten glyf per märke, ritad som pseudo-element-content (aldrig i
+   textContent). Streak + skräll bär en FÄRG-EMOJI (🔥 / ⚡, levande "flammor"/"blixt", de
+   ritas av systemets emoji-font i sin egen färg , de ÄRVER alltså INTE brickans ink, och
+   det är meningen: en liten färgklick på guld-brickan känns spelig). Perfekt-omgångs-
+   stjärnan (★) är däremot en MONOKROM text-glyf som ärver brickans mörka ink (--vm-coupon-
+   ink), så den läses som en präglad guldstjärna. line-height: 1 + en satt font-size håller
+   glyfen centrerad mot etiketten oavsett emoji/text. Markören är dekor (aria-hidden i
+   markup); förklaringen bärs av title + sr-only på li:t, så ingen läsbarhet hänger på den. */
+.vm-badge-marker::before {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  line-height: 1;
+}
+
+/* STREAK = en flamma (sviten "brinner"): flam-emojin känns levande och positiv för en
+   pågående svit ("håll den vid liv"). Färg-emoji (egen färg), dekor. */
+[data-badge='streak'] .vm-badge-marker::before {
+  content: '🔥';
+}
+
+/* KALLADE SKRÄLLEN = en blixt (en oväntad träff slog ner): high-voltage-emojin fångar
+   "skräll"-överraskningen. Färg-emoji (egen färg), dekor. */
+[data-badge='called-upset'] .vm-badge-marker::before {
+  content: '⚡';
+}
+
+/* PERFEKT OMGÅNG = en stjärna (en hel speldag prickad): den klassiska "guldstjärnan" för
+   en felfri dag. Monokrom text-glyf, ärver brickans mörka ink (präglad känsla). */
+[data-badge='perfect-round'] .vm-badge-marker::before {
+  content: '★';
 }
 
 /* =============================================================================
