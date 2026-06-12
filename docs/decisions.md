@@ -21,10 +21,18 @@ count, höjd-klipp för träd"):**
 - **HÖJD-KLIPP med gradient-fade valdes för ALLA sektioner**, inte render-subset. Varför: "första
   raden"/"toppen" är RESPONSIV (ett grid visar 1/2/3/4 kort per rad beroende på skärmbredd; ett träd
   har en topp-del oavsett kort-antal). En render-subset kan inte veta brytpunkten vid render-tid, så
-  ett höjd-klipp till ungefär en rad + fade är den ÄRLIGA "första raden synlig"-effekten oavsett
-  skärmbredd (mobil först). `collapsedMaxHeight` per sektion (grupper/vad krävs 13.5rem = en kort-rad,
-  träd 17rem, tips-sektionerna 15-16rem, admin 9rem, topplistan 14rem). Komprimerat innehåll DÖLJS
-  inte ur a11y-trädet (det syns visuellt + nås av skärmläsare), bara höjden klipps.
+  ett höjd-klipp till en första-rad + fade är den ÄRLIGA "första raden synlig"-effekten oavsett
+  skärmbredd (mobil först). `collapsedMaxHeight` per sektion (grupper/vad krävs 20rem = ett HELT
+  första-kort + en fade-veiled glimt av nästa rad så klippet aldrig skär mitt i ett kort, uppmätt kort
+  ~15.5rem; träd 17rem, tips-sektionerna 15-16rem, admin 9rem, topplistan 14rem). Komprimerat innehåll
+  DÖLJS inte ur a11y-trädet (det syns visuellt + nås av skärmläsare), bara höjden klipps.
+- **PREMIUM-FINISH (design-lager, `src/components/collapsible.css` + CollapsibleSection):** faden är en
+  EASED multi-stop-gradient (smälter in i bakytan, ingen hård kant); en token-färgad CHEVRON-cue vid
+  klipp-kanten gör "det finns mer" omisskännligt (aria-hidden, knappen bär a11y:n); faden + cue:n
+  renderas BARA när innehållet faktiskt klipps (ResizeObserver-mätning, gatad så jsdom behåller
+  fade-test-kontraktet); och en diskret max-height-transition vid UTFÄLLNING (ihopfällning momentan,
+  fokus flyttas ändå till toppen). Allt reduced-motion-gatat (WCAG 2.3.3). Senior-dev byggde den
+  funktionella basen; design-lagret gör finishen premium utan att röra logik/fönster/sortering/test-hakar.
 - **State överlever INTE reload** (KISS, dokumenterat): expanderat/komprimerat är lokal useState. En
   sidladdning återställer till det överblickbara default-läget, vilket är hela poängen.
 - **Tips-LISTAN (Tippa matcherna) komprimeras INTE via CollapsibleBody** utan via sitt EGNA fönster-

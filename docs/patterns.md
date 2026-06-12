@@ -979,8 +979,21 @@ både fönster-regeln och kontrollen. Källa: T27/#39 (resultatinmatning), gener
    oavsett kort-antal). En render-subset kan inte veta brytpunkten vid render-tid, så ett
    `max-height`-klipp + `overflow-hidden` + en `pointer-events-none` gradient-fade över underkanten är
    den ÄRLIGA "första raden synlig"-effekten oavsett skärmbredd (mobil först). `collapsedMaxHeight` per
-   sektion (en kort-rad-höjd för grid, lite mer för träd). Faden tonar mot sektionens bakyta (`fadeTo`,
-   `--color-surface` på en Panel, `--color-bg` på app-bakgrunden).
+   sektion: för grid:arna (grupper/scenarier) ett HELT första-kort + en fade-veiled glimt av nästa rad
+   (~20rem, uppmätt kort ~15.5rem), så klippet aldrig skär mitt i ett kort; för trädet ~17rem (runda-
+   rubriker + översta matchkorten). Faden tonar mot sektionens bakyta (`fadeTo`, `--color-surface` på
+   en Panel, `--color-bg` på app-bakgrunden).
+   - **PREMIUM-FINISH (design-lager, `src/components/collapsible.css`):** (a) faden är en EASED multi-
+     stop-gradient (gles i toppen, tät i botten) i stället för en linjär alfa-ramp, så den smälter in i
+     bakytan utan synlig "band"-kant. (b) En `::before/::after`-CHEVRON-cue (accent-tint-pill + maskad
+     accent-pil, token-färgad så den följer temat, ingen rå hex) vid klipp-kanten gör "det finns mer"
+     OMISSKÄNNLIGT, som komplement till den övre expandera-pillen (cue:n är `aria-hidden`, knappen bär
+     a11y:n). (c) Faden + cue:n renderas BARA när innehållet FAKTISKT klipps (ett `useLayoutEffect` +
+     `ResizeObserver` jämför `scrollHeight` mot taket, gatat på `clientHeight > 0` så jsdom behåller
+     default `isClipped=true` och fade-test-kontraktet); annars vore en nedåt-chevron ett falskt löfte.
+     (d) En diskret `max-height`-transition BARA vid utfällning (`[data-collapsed='false']`), så toppen
+     glider ut i stället för att snappa; ihopfällning är momentan (fokus flyttas ändå till toppen).
+     Allt reduced-motion-gatat (WCAG 2.3.3): cue:n blir statisk, transitionen momentan.
 4. **Komprimerat DÖLJER inte ur a11y-trädet.** `hidden`/`aria-hidden` används ALDRIG på kroppen, bara
    höjden klipps; allt innehåll syns visuellt + nås av skärmläsare/tangentbord. Expandera-knappen styr
    bara den VISUELLA klippningen, inte tillgängligheten. (Skiljer sig från tips-/resultatlistans

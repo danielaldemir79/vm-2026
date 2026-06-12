@@ -219,13 +219,15 @@ export function ScenarioView() {
       </header>
 
       {/* KOMPRIMERING (T68/#129): rubrik + beskrivning alltid synliga; här under
-          komprimeras grid:en så bara FÖRSTA RADEN grupper syns som default (höjd-klipp,
+          komprimeras grid:en så FÖRSTA RADEN grupper syns som default (höjd-klipp,
           responsivt antal per skärmbredd). Faden tonar mot app-bakgrunden (ingen
-          surface-Panel runt denna sektion). Samma kort-höjd-mått som gruppspelet. */}
+          surface-Panel runt denna sektion). ~20rem visar ett helt scenario-kort + en
+          fade-veiled glimt av nästa rad, samma kort-höjd-mått som gruppspelet, så
+          klippet inte skär mitt i ett kort. */}
       <CollapsibleBody
         name="scenarios"
         toggleLabels={{ expand: 'Visa alla grupper', collapse: 'Visa färre grupper' }}
-        collapsedMaxHeight="13.5rem"
+        collapsedMaxHeight="20rem"
         fadeTo="var(--color-bg)"
       >
         {status === 'loading' ? (

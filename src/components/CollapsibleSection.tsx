@@ -37,8 +37,20 @@
 // det överblickbara default-läget, vilket är hela poängen. Behöver en sektion starta
 // utfälld (avslöjandet, #129 punkt 11) styrs det per call-site via `startExpanded`.
 
-import { useId, useRef, useState, type ReactNode, type Ref } from 'react';
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { ExpandToggle } from './ExpandToggle';
+// PREMIUM-finishen (design-lager T68): eased gradient-fade, en "det finns mer"-cue
+// vid klipp-kanten och en diskret höjd-transition. Stylas ENBART via data-hakarna
+// nedan, så all semantik + alla tester står oförändrade.
+import './collapsible.css';
 
 export interface CollapsibleBodyProps {
   /**
@@ -88,6 +100,38 @@ export function CollapsibleBody({
   // sektionens topp i stället för kvar långt ner vid en kontroll som just försvann.
   const topToggleRef = useRef<HTMLButtonElement>(null);
 
+  // ÄRLIG fade: faden + "det finns mer"-cue:n ska bara synas när innehållet FAKTISKT
+  // klipps (scrollHeight > taket). Annars (kort innehåll, t.ex. ett tomt/laddnings-/
+  // utan-rum-tillstånd som ryms inom collapsedMaxHeight) vore en fade + nedåt-chevron
+  // ett FALSKT "mer nedanför"-löfte. Vi mäter kroppen och döljer faden om den inte
+  // svämmar över. Default = true (visa faden) tills vi mätt, så server/första paint
+  // inte blinkar, OCH så jsdom (där höjder är 0, ingen layout) behåller faden synlig
+  // (test-kontraktet: en fade finns i komprimerat läge). Mätningen uppdaterar bara
+  // när elementet har en RIKTIG höjd (clientHeight > 0), dvs i en riktig webbläsare.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [isClipped, setIsClipped] = useState(true);
+
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    // Mät om: i en riktig webbläsare har kroppen en höjd; jsdom ger 0 -> vi rör inte
+    // default (faden kvar). +1px tolerans mot sub-pixel-avrundning.
+    function measure() {
+      const node = bodyRef.current;
+      if (!node || node.clientHeight === 0) return;
+      setIsClipped(node.scrollHeight > node.clientHeight + 1);
+    }
+    measure();
+    // Innehållet är RESPONSIVT (grid byter kolumn-antal, träd-bredd ändras): mät om
+    // när kroppen ändrar storlek så faden följer med (t.ex. rotation, fönster-resize,
+    // när data landar och höjden växer). ResizeObserver finns i alla mål-webbläsare.
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+    // collapsedMaxHeight + expanded påverkar klippningen, så mät om när de ändras.
+  }, [collapsedMaxHeight, expanded]);
+
   function toggle() {
     setExpanded((prev) => {
       const next = !prev;
@@ -126,24 +170,35 @@ export function CollapsibleBody({
           klippningen, inte tillgängligheten). */}
       <div
         id={bodyId}
+        ref={bodyRef}
         data-collapsible-body=""
         data-collapsed={expanded ? 'false' : 'true'}
+        // KOMPRIMERAT: relative (för fadens absoluta position) + overflow-hidden (för
+        // höjd-klippet). UTFÄLLT: ingen overflow-hidden, så fokus-ringar/inre scroll-
+        // containrar (t.ex. slutspelsträdets sidled-scroll) aldrig klipps.
         className={expanded ? '' : 'relative overflow-hidden'}
-        style={expanded ? undefined : { maxHeight: collapsedMaxHeight }}
+        // KOMPRIMERAT: klipp till "toppen". UTFÄLLT: ett stort max-height-tak (inte
+        // `none`), så CSS kan ANIMERA max-height mjukt i stället för att snappa när
+        // sektionen fälls ut (reduced-motion gör övergången momentan, index.css). Taket
+        // (200rem) överstiger alltid det faktiska innehållet, så inget klipps utfällt.
+        // Lokal literal (ingen modul-konstant) så inget värde binds eagert.
+        style={expanded ? { maxHeight: '200rem' } : { maxHeight: collapsedMaxHeight }}
       >
         {children}
-        {/* Gradient-fade över underkanten i komprimerat läge: signalerar "det finns
-            mer nedanför" utan extra text. Ren dekoration (aria-hidden), pekar inte ut
+        {/* Gradient-fade över underkanten i komprimerat läge: smälter det klippta
+            innehållet ner i sektionens bakyta och bär en "det finns mer"-cue
+            (chevron) vid klipp-kanten. Ren dekoration (aria-hidden), pekar inte ut
             händelser (pointer-events-none) så den inte blockerar klick på innehållet
-            som råkar nå kanten. Tema-trogen via fadeTo (sektionens bakyta). */}
-        {expanded ? null : (
+            som råkar nå kanten. Tema-trogen via --vm-fade-to (sektionens bakyta);
+            den eased multi-stop-gradienten + cue:n bor i collapsible.css. */}
+        {!expanded && isClipped ? (
           <div
             aria-hidden="true"
             data-collapsible-fade=""
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-16"
-            style={{ background: `linear-gradient(to bottom, transparent, ${fadeTo})` }}
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+            style={{ '--vm-fade-to': fadeTo } as CSSProperties}
           />
-        )}
+        ) : null}
       </div>
 
       {/* NEDRE expandera/komprimera-kontroll: bara i UTFÄLLT läge (i komprimerat läge
