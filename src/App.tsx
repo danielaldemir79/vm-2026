@@ -353,7 +353,7 @@ function AppShell() {
           </Slide>
         </LeaderboardProvider>
 
-        <footer className="flex flex-col gap-2 border-t border-border pt-6 text-sm text-fg-muted">
+        <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
           {/* Footerns ledtext + appens SYNLIGA adress (T44, #75, Daniels feedback): appen
               sprids muntligt/genom att skrivas av, så adressen ska gå att LÄSA och säga
               högt, inte bara gömmas bakom en delningsknapp. Därför står vm-2026.pages.dev
@@ -373,84 +373,100 @@ function AppShell() {
             </a>
             .
           </p>
-          {/* Upphovs-signatur (T38, #67; länk T39, #68): Daniels stolta lilla avsändarrad i
-              "arena i kvällsljus"-estetiken. Ett "DA"-monogram-sigill (solid accent-bricka, mörk/
-              vit ink = den färg-oberoende solid-bricka-formen, AA i båda teman) + en hårfin
-              accent-tick som diskret separator, sen "Made by" dämpat (fg-muted, FULL
-              opacitet = AA-säkert mot fonden) och NAMNET i full fg/display-vikt så det
-              läses stolt, inte som en eftertanke. data-app-signature = stabil krok + testad
-              semantik. Monogrammet är aria-hidden (ren dekor), så skärmläsaren läser den rena
-              meningen. Kontrast mätt i scripts/contrast-t38.mjs (canvas-komposit mot FONDEN,
-              värsta basytan), värden i docs/decisions.md.
 
-              LÄNK (T39, #68): namnet är en länk till Daniels sajt (www.danielaldemir.com).
-              Den behåller stolthets-stilen (full fg + display-vikt) i vila, så raden ser ut
-              precis som förr; klickbarheten signaleras med en AFFORDANS som tänds vid
-              interaktion: en accent-färgad underline på hover OCH focus-visible (samma
-              "tänds-vid-interaktion"-mönster som lagnamns-knappen T10, men SOLID accent-streck
-              = "länk till annan sida", inte den prickade fg-muted "öppna-panel"-signalen). Vid
-              tangentbords-fokus tar dessutom :focus-visible-ringen (index.css, accent, WCAG
-              2.4.7) över som primär affordans. aria-label ger ett tydligt länknamn som även
-              säger att den öppnar en ny flik; target=_blank + rel=noopener noreferrer (säkerhet,
-              hindrar tabnabbing). Underline-färgen (accent) är ren dekor PÅ texten (texten själv
-              är full fg = 17:1+), så ingen ny text-kontrast tillkommer.
+          {/* UPPHOVS-KORTET (T38 signatur -> T44 runda 2, #75, Daniels feedback "footern ska
+              lyfta upp mig, få med hela min hemsida så man ser att man kan klicka dit"): den
+              tidigare LUGNA signaturraden var FÖR blygsam. Daniel vill att footern LYFTER honom
+              och att hela danielaldemir.com SYNS och ser uppenbart klickbar ut. Två medvetna
+              höjningar, byggda HELT av redan AA-bevisade mönster (ingen ny färgkombination,
+              alltså ingen ny kontrast-mätning):
 
-              T44 (#75, Daniels feedback): tidigare gömdes adressen (bara i title/aria-label).
-              T39:s val "bara namnet är länk, ingen synlig URL" är nu MEDVETET frångått på Daniels
-              begäran: adressen ska SYNAS bredvid namnet och vara tydligt klickbar, plus en kort
-              utvecklar-titel som promotar Daniel som byggare av appen. Två tillägg, hållna
-              diskreta (footern ska inte bli en reklampelare): (1) en SYNLIG "danielaldemir.com"-
-              länk efter namnet, separerad av en tunn punkt-divider, samma egen-flik + tabnabbing-
-              skydd som namn-länken; (2) en liten muted titel-rad ".NET-systemutvecklare" under
-              raden. Titel-texten + ev. fler promo-element (t.ex. en kontakt-rad) är Daniels val,
-              den lugnaste varianten är vald här. Namn-länkens kontrakt (href/target/rel) är
-              OFÖRÄNDRAT, så T39-testet håller. */}
-          <p
-            data-app-signature=""
-            className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs"
-            title="Made by Daniel Aldemir, danielaldemir.com"
-          >
-            <span aria-hidden="true" className="vm-signature-seal">
-              DA
-            </span>
-            <span aria-hidden="true" className="vm-signature-tick" />
-            <span className="text-fg-muted">
-              Made by{' '}
-              <a
-                href="https://www.danielaldemir.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
-                className="rounded-sm font-display font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
-              >
-                Daniel Aldemir
-              </a>
-            </span>
-            {/* SYNLIG adress bredvid namnet (T44-kärnan): en separat klickbar länk-text så
-                adressen kan läsas/skrivas av, inte bara namnet. Punkt-dividern (aria-hidden,
-                ren dekor) skiljer den lugnt från namnet. Visas utan https-prefix (renare
-                läsning), href bär hela URL:en. Egen affordans + samma tabnabbing-skydd. */}
-            <span aria-hidden="true" className="text-fg-muted/60">
-              ·
-            </span>
+              1. NAMNET som blickfång (inte en bisats): "DA"-sigillet (.vm-signature-seal,
+                 solid accent-bricka med accent-fg-ink = den färg-oberoende solid-bricka-formen,
+                 10.85:1 mörkt / 5.40:1 ljust, T38-mätt) bredvid namnet i full fg + display-vikt
+                 (--vm-fg, 17.04:1 mörkt / 16.25:1 ljust, T38-mätt) på en EGEN, framträdande rad,
+                 med "Byggd av" som en liten dämpad eyebrow (fg-muted, FULL opacitet = 8.39:1
+                 mörkt / 5.92:1 ljust, T38-mätt) ovanför. Titel-raden ".NET-systemutvecklare"
+                 (fg-muted, full opacitet, samma mätta par) står som stödtext direkt under, inte
+                 längre som en undanskuffad sista rad.
+
+              2. HEMSIDAN som en UPPENBART klickbar CTA-pill: danielaldemir.com återanvänder den
+                 delade .vm-install-pill-formen (tokens.css §22) , surface-tonad pill med kant,
+                 hover tänder en accent-kant + lyfter ytan, focus-visible ger den delade accent-
+                 ringen, plus en extern-länk-ikon (pil ut ur ruta). Pillen är appens ETABLERADE
+                 "tydligt klickbar"-affordans (samma som install-knappen), så det är omisskännligt
+                 att man kan klicka dit. Texten är fg på opak surface (README-mätt brödtext-par
+                 12.6:1 - 17.9:1 i BÅDA teman, sektion 0 i tokens.css), ikonen är accent-dekor
+                 (aria-hidden) , INGEN ny färgkombination införs, så T44-höjningen ärver de redan
+                 uppmätta AA-värdena utan ny mätning.
+
+              data-app-signature = stabil krok + testad semantik (T38-testet vaktar "Daniel
+              Aldemir" i signaturen). Namn-länkens kontrakt (href/target/rel mot
+              www.danielaldemir.com) är OFÖRÄNDRAT, så T39-testet håller. Hela kortet står på
+              sidans FOND (--vm-bg), inte en surface-yta, men pill-ytan är opak surface, så
+              pill-textens README-par gäller; eyebrow/namn/titel mättes mot fonden i T38. */}
+          <div data-app-signature="" className="flex flex-col gap-3">
+            {/* Avsändar-raden: sigill + "Byggd av" / namnet i två rader, namnet är blickfånget. */}
+            <div className="flex items-center gap-2.5">
+              <span aria-hidden="true" className="vm-signature-seal">
+                DA
+              </span>
+              <span className="flex flex-col leading-tight">
+                <span className="text-xs text-fg-muted">Byggd av</span>
+                <a
+                  href="https://www.danielaldemir.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
+                  className="rounded-sm font-display text-base font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                >
+                  Daniel Aldemir
+                </a>
+              </span>
+            </div>
+
+            {/* Titel-raden (T44, #75): promotar Daniel som utvecklaren, nu som stödtext under
+                namnet i stället för en undanskuffad sista rad. Full opacitet = AA-säkert. */}
+            <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
+
+            {/* HEMSIDE-CTA:n (T44 runda 2, #75-kärnan, "se att man kan klicka dit"): hela
+                danielaldemir.com som en uppenbart klickbar pill, den delade .vm-install-pill-
+                formen (DRY mot install-knappen, ingen ny färgkombination). Visas utan https-
+                prefix (renare läsning), href bär hela URL:en. Extern-länk-ikonen (pil ut ur
+                ruta) + pill-affordansen gör klickbarheten omisskännlig. Egen-flik + tabnabbing-
+                skydd, samma säkerhets-recept som resten av footern. */}
             <a
               href="https://www.danielaldemir.com"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Öppna danielaldemir.com i en ny flik"
-              className="rounded-sm text-fg-muted underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+              className="vm-install-pill self-start"
             >
               danielaldemir.com
+              {/* Extern-länk-ikon (pil ut ur ruta), dekorativ; texten bär adressen. */}
+              <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="vm-install-pill-icon"
+              >
+                <path d="M15 3h6v6" />
+                <path d="M10 14 21 3" />
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              </svg>
             </a>
-          </p>
-          {/* Utvecklar-titel (T44, #75): en kort, muted rad som promotar Daniel som byggaren,
-              inramad i samma diskreta signatur-familj. Hålls lågmäld (text-xs, fg-muted) så
-              footern är fortsatt avsändar-signatur, inte annons. Daniel godkänner slut-texten. */}
-          <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
+          </div>
+
           {/* Version-stämpel (T43, #74): diskret bygg-identifierare (kort commit-SHA
               + byggtid) så live-versionen kan verifieras mot develop-HEAD. Löser
               framtida "är det live?"-förvirring (debug-agentens förbättring). */}
-          <VersionStamp className="mt-1" />
+          <VersionStamp />
         </footer>
       </main>
 
