@@ -5,6 +5,91 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T56/#100 (Levande slutspelsträd) KLAR - PR #108 väntar på merge
+
+**Branch:** `feature/T56-levande-trad` @ HEAD `21d4e2a`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/108 mot `develop` (Closes #100, state: OPEN)
+**Board:** issue #100 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #100 MANUELLT och flyttar kort #100 till Done EFTER merge.
+
+**Vad T56 levererade:**
+- Rotorsak: mekanismen för preliminary-resolution existerade men slot:arna saknade konkreta preliminära VÄRDEN - isGroupStageComplete-grinden blockerade hela derive-bracket-flödet. Fix: preliminary-third-seeding delegerar nu till de källlåsta motorerna (rankThirdPlaces FIFA Article 13 + seedThirdPlaces Annexe C) - inga parallella seedningstabeller, inga gissningar.
+- derive-bracket: preliminary-resolution fyller slot:arna med nuvarande grupptoppar (1:or, 2:or, bästa treor via FIFA-seedning), commit 34b0fc4.
+- Live-integrations-test: vänder ett resultat och verifierar att en slot:en byter lag i DOM (end-to-end), commit 34b0fc4.
+- Arlig märkning: "Nuvarande ställning"-pill + per-slot "nu"-rad, tydlig skillnad mot facit, commit 3df58d1.
+- Design: prelim-pill ur T55:s AA-mätta recept, fixade samtidigt en gammal under-AA-pill i ljust tema, commit 3df58d1.
+- Review-F1 (build röd av nytt obligatoriskt typfält i 2 grann-testfiler): åtgärdad av dirigenten, commit f23b09e. Lärdom: npm run build-exit är auktoritativ - tsc -b och npm test kan ge EXIT 0 trots typfel i referens-projekt.
+- Copilot R1: punktseparator i user-facing under-rad, commit 21d4e2a.
+- 2 nya reviewer-lessons: senior-dev (delad-typ-obligatoriskt-fält), design (pastar-pre-existerande-utan-baslinjekoll).
+
+**Commits:**
+- `34b0fc4` - feat(bracket): preliminary-third-seeding via källlåsta motorer, derive-bracket preliminary-resolution, live-integration-test (#100)
+- `3df58d1` - design(bracket): prelim-pill ur T55-receptet, fixade gammal under-AA-pill (#100)
+- `f23b09e` - fix(bracket): preliminary-fältet i 2 test-litteraler, build EXIT 0 (#100)
+- `21d4e2a` - fix(bracket): punktseparator i user-facing under-rad (#100) - HEAD
+
+**Verifiering:** build EXIT 0, 1406+ pass + 4 kanda röda (#102, pre-existerande, orelaterade). Lint/format rent. Lokal panel: FAIL->åtgärdad->grön (F1). Copilot R1: 2 triviala åtgärdade, exit.
+
+**Acceptanskriterier issue #100 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: Trädet visar provisoriska positioner ur nuvarande tabeller direkt (preliminary-resolution + slot-tilldelning, commits 34b0fc4 + 3df58d1)
+- [x] AC#2: Uppdateras vid varje inmatat resultat (live-integrations-test vänder ett resultat och ser slot:en byta lag i DOM, commit 34b0fc4)
+- [x] AC#3: Ärligt märkt som preliminärt tills grupperna är klara ("Nuvarande ställning"-pill + per-slot "nu"-rad, commit 3df58d1)
+- [x] AC#4: FIFA-seedningen (Annexe C) används korrekt även i preliminärt läge - preliminary-vägen delegerar enbart till de källlåsta motorerna rankThirdPlaces + seedThirdPlaces, ingen gissad seedning (commit 34b0fc4)
+- [x] AC#5: Tester, grönt + reviewad (1406+ pass + 4 kanda röda #102, build EXIT 0, lint/format rent, lokal panel FAIL->åtgärdad->grön, Copilot R1 exit)
+
+**PINNADE punkter (oförändrade, bärs framåt):**
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stängt i T17, bärs framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platshållare tills #35 fyller med verifierad per-match-källa.
+- **FNV-hash:** 2 användningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 användningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-kö.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready. NY kandidat från T56: designagenten fixade en under-AA-pill men hittade 4+ vyer (BracketView/GroupStageView/DailyMatchesView/ScenarioView) med demo-chip UNDER AA (3.17:1) i ljust tema - recept finns, koppla till #48.
+- **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 handrullade dialoger). Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lägg till manualChunks om LCP-problem uppstår.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behöver Daniel"-kö (oförändrad + ny):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-mönstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Väntar Daniels godkännande.
+- **BEFORDRAN 2 (journalist-mönstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Väntar Daniels godkännande.
+- **BEFORDRAN 3 (senior-developer-mönstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Förekomst 4. Typ: agent-beteende -> senior-developers fil. Väntar Daniels godkännande.
+- **IMPROVEMENTS-kandidat (STARK, reviewerns, T56):** DoD-build-grinden ska pinnas till `npm run build`-EXIT (tsc -b kan EXIT 0 trots typfel i referens-projekt, npm test är typblint). 2:a gången typ/build-fel passerat grön testsvit. Pipeline-ändring = Daniels beslut.
+- **IMPROVEMENTS-kandidat (tidigare):** reviewerns förslag fran T58 - yt-formulerade AC kräver callsite + render-test i handoff (pipeline-ändring). Dirigenten noterar för `C:/Repo/agent-kit/IMPROVEMENTS.md`.
+- **IMPROVEMENTS-kandidat (commit-hook):** commit-msg-git-hook som scannar svenska diakritik-substitut. Pipeline-ändring = kräver Daniels godkännande.
+- **FIFA-juni-ranking:** aprilutgåvan 2026 används. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: ändra rank-värden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen väntar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge väntar.
+- **editor-flippar-radslut (senior-developer lesson):** mönstret är nu adresserat på repo-nivå med .gitattributes + endOfLine lf.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #108 (T56/#100, feature/T56-levande-trad) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 108 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #100 manuellt (`gh issue close 100`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #100 till Done på boarden (nu i "In Review", projekt 2).
+> Merga även äldre öppna PR:er om de fortfarande är öppna: PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #108 REDAN mergad:
+> T56 klar. Nästa task i kön: **#102 (T60 röda tester)**.
+> Därefter: #93 (T54 kom-igång) -> #18 -> #76 -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready. Ny kandidat från T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3+/4), 3 IMPROVEMENTS-kandidater (build-grind STARK + yt-AC + diakritik-commit-hook), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T58/#99 (Poäng i tips-vyn) KLAR - PR #107 väntar på merge
 
 **Branch:** `feature/T58-poang-i-tipsvyn` @ HEAD `5466dd1`

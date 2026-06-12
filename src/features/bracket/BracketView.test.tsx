@@ -71,7 +71,7 @@ describe('BracketView, rendering + a11y', () => {
   });
 });
 
-describe('BracketView, GRUPPSPEL PÅGÅR (fixtures: alla matcher scheduled)', () => {
+describe('BracketView, GRUPPSPEL PÅGÅR, PRELIMINÄRT levande läge (T56, fixtures: alla matcher scheduled)', () => {
   it('är INTE låst (ingen "Låst seedning"-markör) medan gruppspelet pågår', async () => {
     renderView(fixturesEnv());
     await waitFor(() => {
@@ -80,23 +80,37 @@ describe('BracketView, GRUPPSPEL PÅGÅR (fixtures: alla matcher scheduled)', ()
     expect(document.querySelector('[data-bracket-locked]')).toBeNull();
   });
 
-  it('visar grupp-positions-etiketter (möjliga lag), inte gissade lag', async () => {
+  it('visar ett ÄRLIGT "Nuvarande ställning"-märke + förklarar att det inte är klart', async () => {
     renderView(fixturesEnv());
     await screen.findByRole('region', { name: /Sextondelsfinaler/i });
-    // M73 = Runner-up A v Runner-up B. Positions-etiketterna ska synas.
-    expect(screen.getAllByText(/2:a grupp A/).length).toBeGreaterThan(0);
-    // En bästa-trea-slot bär sin eligibleGroups-etikett EXAKT (Article 12.6).
-    expect(screen.getAllByText(/3:a A\/B\/C\/D\/F/).length).toBeGreaterThan(0);
+    // Det preliminära märket (design-seam + synlig text) signalerar levande läge.
+    expect(document.querySelector('[data-bracket-preliminary]')).not.toBeNull();
+    expect(screen.getByText('Nuvarande ställning')).toBeInTheDocument();
+    // Den ärliga meningen: inte klart förrän grupperna är färdigspelade (samma anda
+    // som T51). "Inte klart" + "nuvarande ställning" ska finnas i intro-texten.
+    expect(screen.getByText(/Inte klart/i)).toBeInTheDocument();
+    expect(screen.getByText(/färdigspelade/i)).toBeInTheDocument();
   });
 
-  it('markerar obestämda slots med data-slot-resolution (design-seam)', async () => {
+  it('fyller slotarna PRELIMINÄRT med konkreta lag som rör sig (data-slot-resolution=preliminary)', async () => {
     renderView(fixturesEnv());
     await screen.findByRole('region', { name: /Sextondelsfinaler/i });
-    const possible = document.querySelectorAll('[data-slot-resolution="possible"]');
-    // Gruppvinnar-/tvåa-/bästa-trea-slots är "possible" under gruppspelet.
-    expect(possible.length).toBeGreaterThan(0);
-    // Ingen slot är "resolved" än (inga grupper klara).
+    // Under gruppspelet (T56) fylls grupp-/trea-slotarna preliminärt med nuvarande
+    // ledar-lag, inte bara positions-etiketter. Design-seamen markerar dem.
+    const preliminary = document.querySelectorAll('[data-slot-resolution="preliminary"]');
+    expect(preliminary.length).toBeGreaterThan(0);
+    // Ingen slot är "resolved" (skarpt facit) än, inga grupper är klara.
     expect(document.querySelectorAll('[data-slot-resolution="resolved"]')).toHaveLength(0);
+    // Varje preliminär slot bär sin position som ärlig under-etikett ("... , nu"),
+    // så ett preliminärt lag aldrig läses som facit (data-slot-preliminary-seam).
+    expect(document.querySelectorAll('[data-slot-preliminary]').length).toBeGreaterThan(0);
+  });
+
+  it('en preliminär trea bär ändå sin behörighets-etikett (Article 12.6) i under-raden', async () => {
+    renderView(fixturesEnv());
+    await screen.findByRole('region', { name: /Sextondelsfinaler/i });
+    // En bästa-trea-slot bär sin eligibleGroups-etikett EXAKT, även preliminärt seedad.
+    expect(screen.getAllByText(/3:a A\/B\/C\/D\/F/).length).toBeGreaterThan(0);
   });
 
   it('bär demo-data-märket i fixtures-läge', async () => {
