@@ -142,13 +142,14 @@ describe('App-skalet', () => {
     await waitForAppSettled();
   });
 
-  it('visar danielaldemir.com synligt bredvid namnet med tabnabbing-skydd (T44, #75)', async () => {
+  it('visar danielaldemir.com som egen synlig CTA-länk i signaturen med tabnabbing-skydd (T44, #75)', async () => {
     const { container } = renderApp();
 
-    // Daniels feedback (#75): adressen synlig BREDVID namnet, tydligt klickbar (förr låg
-    // den bara i title/aria-label). Vi vaktar den SYNLIGA "danielaldemir.com"-länken
-    // (skild från namn-länken, som har texten "Daniel Aldemir") inom signaturen, med rätt
-    // mål + tabnabbing-skydd.
+    // Daniels feedback (#75): adressen synlig och tydligt klickbar (förr låg den bara i
+    // title/aria-label). Sedan runda 2 renderas den som en egen CTA-pill-länk på egen rad
+    // UNDER namnet. Vi vaktar den SYNLIGA "danielaldemir.com"-länken (skild från
+    // namn-länken, som har texten "Daniel Aldemir") inom signaturen, med rätt mål +
+    // tabnabbing-skydd.
     const signature = container.querySelector('[data-app-signature]');
     expect(signature).not.toBeNull();
     const addressLink = Array.from(signature?.querySelectorAll('a') ?? []).find(
