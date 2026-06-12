@@ -147,6 +147,22 @@ function formatPointDelta(points: number): string {
 }
 
 /**
+ * Brick-formen per poäng-typ (form/vikt, inte bara färg, matchar avslöjandets markör-
+ * familj översatt till kupong-estetiken): EXAKT = den STOLTA solida guld-brickan
+ * (.vm-coupon-mine, samma som sparat-kvittot), UTFALL = en lugnare guld-tint-chip
+ * (delvis rätt = delvis varm), MISS = en NEUTRAL chip (surface-raised + kant, INGEN
+ * guld-tint, så en miss lånar inte den hoppfulla guld-tonen). Tre tydligt skilda former.
+ * Den FÄRG-OBEROENDE markör-glyfen (bock/halv-cirkel/kryss) ritas per typ via CSS
+ * ::before (.vm-tip-result, tokens.css §10), så formen, inte bara färgen, skiljer dem.
+ */
+const TIP_BADGE_CLASS_BY_TYPE: Record<MatchPointType, string> = {
+  exact: 'vm-coupon-mine',
+  outcome:
+    'border border-[color-mix(in_srgb,var(--vm-gold)_28%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_7%,var(--color-bg))] text-fg',
+  miss: 'border border-border bg-surface-raised text-fg-muted',
+};
+
+/**
  * Biljett-/kupong-ikonen (kupong-huvudets dekor-glyf): en liten perforerad biljett.
  * Ren dekoration (aria-hidden), den ger kupong-känslan utan att bära text.
  */
@@ -360,14 +376,15 @@ export function PredictionForm({
                   data-tip-result=""
                   data-tip-points={points.points}
                   data-tip-point-type={points.type}
-                  className={`inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none ${
-                    points.type === 'exact'
-                      ? 'vm-coupon-mine'
-                      : 'border border-[color-mix(in_srgb,var(--vm-gold)_28%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_7%,var(--color-bg))] text-fg'
-                  }`}
+                  className={`vm-tip-result inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none ${TIP_BADGE_CLASS_BY_TYPE[points.type]}`}
                 >
+                  {/* FÄRG-OBEROENDE markör-glyf (bock/halv-cirkel/kryss), samma form-familj
+                      som facit-avslöjandets markör. Ritas via CSS ::before per
+                      data-tip-point-type (.vm-tip-result, tokens.css §10), så glyfen är REN
+                      dekor som aldrig hamnar i textContent (poäng-talet förblir radens
+                      första tecken). VARFÖR-ordet bär betydelsen i text. */}
                   <span className="tabular-nums">{formatPointDelta(points.points)}</span>
-                  <span aria-hidden="true" className="text-fg-muted">
+                  <span aria-hidden="true" className="opacity-60">
                     ·
                   </span>
                   <span>{points.reason}</span>
