@@ -24,6 +24,7 @@ import { PredictionSection, PredictionsProvider, JokerProvider } from './feature
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
 import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
+import { FavoriteTeamProvider } from './features/favorite-team';
 import { AdminSection } from './features/admin';
 import {
   InstallButton,
@@ -68,7 +69,14 @@ export default function App() {
     // läser SAMMA globala facit. Vilande utan Supabase, precis som rums-lagret.
     <RoomsProvider>
       <OfficialResultsProvider>
-        <AppShell />
+        {/* FavoriteTeamProvider (T23, #23): det pinnade favoritlaget (localStorage,
+            per-enhet, ingen Supabase-yta). Omsluter hela appen så dagsvyn (lyfter
+            favoritlagets matcher) och favoritlags-väljaren delar samma favorit-store.
+            (Personliga statistiken läser LeaderboardStore, inte denna.) Vilande utan
+            effekt om inget lag är pinnat; helt oberoende av Supabase. */}
+        <FavoriteTeamProvider>
+          <AppShell />
+        </FavoriteTeamProvider>
       </OfficialResultsProvider>
     </RoomsProvider>
   );

@@ -5,6 +5,78 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T23 (#23) pinnat favoritlag + personlig statistik , PR #142 mot develop , KLAR
+
+**Branch:** `feature/T23-favoritlag-statistik` @ HEAD `c1ab7bb`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/142 mot `develop` (Closes #23, state: OPEN)
+**Live preview:** varje commit till branchen syns via Cloudflare PR-preview. Develop-main: vm-2026.pages.dev
+
+### Vad T23 levererade
+
+Favoritlag-pin (generisk, ej hardkodad Sverige) + personlig tips-statistik. localStorage-nyckeln
+`vm2026-favorite-team` bar lagkoden. `derivePersonalStats` delar poangberakningsvagen med score.ts
+(ingen parallell logik). `PersonalStatsSection` visar traffsakerhet, basta call, antal ratt utfall
+och exakta traff. `MatchCard` far en `favorite`-prop som lyfter ut favoritlagets matcher.
+
+**Leveranser:**
+
+- Senior-developer commit `31e9434`: localStorage-pin, `derivePersonalStats`, `PersonalStatsSection`,
+  `MatchCard` favorite-prop, 25+ tester (inklusive edge-fall: inga tips an).
+- Design-frontend commit `40fd972`: tokens.css §25, favorit-chip guld-pill, hero-accuracy-siffra,
+  basta-call-kort, form-sprak, contrast-t23.mjs, AA min 5.03:1.
+- Lokal reviewer: GODKAND UTAN FYND.
+- Copilot R1: 2 triviala fynd.
+- Dirigent-fix commit `c1ab7bb`: kommentar-precision i App.tsx + ISO-kickoff i testfixtur.
+
+**Verifiering (HEAD c1ab7bb):** build EXIT 0, npm test 1758 groena/55 skip/0 fail (184 filer),
+lint + format:check EXIT 0. Lokal panel PASS. Copilot R1: 2 triviala, atgardade i c1ab7bb.
+
+**Acceptanskriterier issue #23 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Pinna/andra favoritlag, paverkar relevanta vyer
+- [x] AC2: Personlig statistik beraknas korrekt fran tips-historik
+- [x] AC3: Tester for stats-berakning (edge-fall: inga tips an)
+- [x] AC4: Bygger groent, lint rent, reviewad (lokal panel + copilot-loop), inga olosta findings
+
+### Behoever-Daniel (uppdaterad lista)
+
+**Befordringar (vantar pa godkannande):**
+- Kommentar-pastar Forekomst 8: agent-regel for senior-developer.
+- Uttommande-test Forekomst 3: agent-regel for reviewer.
+- Pastar-filer-saknas Forekomst 4 (journalist): agent-regel for journalist.
+
+**Kvar att besluta/agera:**
+- Supabase e-postmall for inloggningsmejlet (kosmetisk): #81 stangdes 2026-06-12 pa Daniels order;
+  mallsteget ar enda resten av T48b (koden ar byggd och live: OTP-login, dold arrangors-ingang,
+  datamigrering).
+- RLS-testrum i Supabase (3 rum + 5 anonyma users, 2026-06-12 15:18): star kvar pa Daniels uttryckliga beslut.
+- TWA/Play-kontot: se docs/twa-guide.md.
+- Release-gransen develop->main: nar ska main fa en formell release?
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- Board-kort #129/#132/#136: verifiera att de visas som Done i GitHub Projects.
+- IMPROVEMENTS-kandidater (se slutkonsoliderings-blocket langre ner).
+- Supabase-vendor eager-load (T25-F1): pinnad.
+
+### Nasta steg
+
+**Daniels beordrade koe ar TOM.** T44 (#75), T4c (#35) och T23 (#23) ar klara (PR:er oppna, vantar merge).
+
+**Om PR #142 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 142 --merge --repo danielaldemir79/vm-2026`.
+Stang issue #23: `gh issue close 23`. Flytta kort #23 till Done pa boarden.
+Kolla om PR #141 (T4c) och PR #140 (T44) aven behover mergas i den ordningen.
+
+**Om PR #142 REDAN mergad:**
+T23 klar. All kod i Daniels beordrade koe ar nu live pa develop.
+Nasta logiska steg:
+1. Gatt igenom Behoever-Daniel-listan ovan.
+2. Release-grans develop->main nar Daniel ar nojd.
+3. Post-VM-planering.
+
+Kor `/agent-kit` bara om en ny task ska startas.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T4c (#35) arena/stad per match , PR #141 mot develop , KLAR
 
 **Branch:** `feature/T4c-arena-stad` @ HEAD `c0fb8dc`
