@@ -181,18 +181,7 @@ export function DailyMatchesView() {
           <h2 id="dagens-matcher-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
             Dagens matcher
           </h2>
-          {mode === 'fixtures' ? (
-            <span
-              className="rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--vm-gold) 45%, transparent)',
-                backgroundColor: 'color-mix(in srgb, var(--vm-gold) 12%, transparent)',
-                color: 'var(--vm-gold)',
-              }}
-            >
-              Demo-data
-            </span>
-          ) : null}
+          {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}
         </div>
         <p className="max-w-2xl text-sm text-fg-muted">
           Bläddra dag för dag genom mästerskapet. Tider visas i svensk tid med svensk TV-kanal.

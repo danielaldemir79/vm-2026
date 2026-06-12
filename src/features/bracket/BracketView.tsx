@@ -277,18 +277,7 @@ export function BracketView() {
           <h2 id="slutspel-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
             Slutspelsträdet
           </h2>
-          {mode === 'fixtures' ? (
-            <span
-              className="rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--vm-gold) 45%, transparent)',
-                backgroundColor: 'color-mix(in srgb, var(--vm-gold) 12%, transparent)',
-                color: 'var(--vm-gold)',
-              }}
-            >
-              Demo-data
-            </span>
-          ) : null}
+          {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}
           {/* "Låst"-märke när grupperna är klara: nu är slotarna riktiga lag. */}
           {bracket?.locked ? (
             <span
