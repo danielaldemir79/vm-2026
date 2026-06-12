@@ -106,6 +106,19 @@ GREATEST, ingen förkortad; champion = fasta tiden; M73 oförändrad) + ett hår
 anonym session i ett isolerat test-rum (grupp A + champion skriver nu igenom RLS, städat efteråt).
 Klient-spegel: `src/data/predictions/prediction-deadline.ts`. Se `docs/decisions.md` T53.
 
+**T67 (#123) , FLYTT av den förlängda tiden 14/6 -> SÖNDAG 21/6:** migrationen
+`t67_extended_deadline_to_21_june` ändrar `pool_extended_deadline()` till `2026-06-21T21:59:00Z`
+(Daniels beslut: deadlinen var för nära, flyttad till söndagen veckan efter så folk hinner haka på i
+helgen). T53:s GREATEST-modell är OFÖRÄNDRAD, bara konstanten byts (group_deadline_kickoff + champion-
+grenen CREATE OR REPLACE:as ändå identiskt, så migrationen är en komplett fresh-replaybar ögonblicks-
+bild). KONSEKVENS: alla 12 gruppers g-X-1 ligger 11-17/6 (FÖRE 21/6), så GREATEST ger nu ALLA grupper +
+champion 21/6 (med 14/6 behöll G..L sitt senare 15-17/6-ankare). Slot-grenen (M73..M104) + match-tipsen
+oförändrade. Applicerad via `apply_migration`; `list_migrations` visar `t67_extended_deadline_to_21_june`
+(live-version `20260612101851`, MCP-stämpel skiljer från filnamnets `20260612080000`, namn + SQL 1:1).
+Bevisat live (read-only): pool_extended_deadline = alla 12 gruppers deadline = champion = 21/6 21:59Z;
+M73 oförändrad (28/6); ett hypotetiskt ankare 25/6 behåller 25/6 (förkorta aldrig). Klient-spegel +
+beslut: `src/data/predictions/prediction-deadline.ts`, `docs/decisions.md` T67.
+
 **Migration-historik (T16, samma nyans som T15):** de fyra T16-migrationerna applicerades 1:1 från
 de committade filerna via `apply_migration` i samma ordning: `t16_group_predictions_schema`,
 `t16_group_predictions_rls`, `t16_bracket_predictions_schema`, `t16_bracket_predictions_rls` (samma

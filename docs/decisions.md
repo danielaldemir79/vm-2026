@@ -5,6 +5,46 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T67 (#123): flytta den FÖRLÄNGDA deadlinen från 14 juni till SÖNDAG 21 juni
+
+**Daniels beslut 2026-06-12 (källa, gissas inte):** "vald datum nu är för nära och kommer stressa
+alla som vill hoppa på i helgen. ta det till söndagen veckan efter." Den fasta förlängda deadlinen
+för GRUPPVINNAR-tips + CHAMPION-tips (införd i T53, #95) flyttas alltså från 14/6 till SÖNDAG 21/6, så
+vänner hinner haka på under helgen utan stress. Issue #123. T53:s MODELL är oförändrad , bara
+tidskonstanten byts; match-tips + bracket-SLOT-tips (M73..M104) behåller sina EGNA avsparks-lås (rörs INTE).
+
+**FAST TIDPUNKT:** 2026-06-21 23:59 svensk tid = `2026-06-21T21:59:00Z`. Sverige är på sommartid
+(CEST, UTC+2) i juni, så 23:59 lokal = 21:59 UTC. 21 juni 2026 är en söndag (verifierat).
+
+**KONSEKVENS av den nya tiden (FÖRLÄNG, FÖRKORTA ALDRIG / GREATEST, källverifierat live mot
+`match_kickoffs` 2026-06-12):** ALLA 12 gruppers FÖRSTA match (g-A-1..g-L-1) ligger 11-17 juni, alltså
+FÖRE 21/6. Med T53:s 14/6-tid behöll de sena grupperna G..L sitt SENARE ankare (15-17/6); med 21/6
+ligger även G..L:s ankare före deadlinen, så GREATEST ger nu ALLA 12 grupper + champion samma 21/6-tid.
+Ingen grupp förkortas , GREATEST kan aldrig dra ett ankare bakåt. Garantin bor i REGELN, inte i datat:
+en hypotetisk grupp med första match efter 21/6 hade fortfarande behållit sitt senare ankare (vaktat
+med ett syntetiskt sent ankare i selektor-testerna, så en framtida schema-ändring inte tyst bryter den).
+
+**EN SANNING, klient + DB:** DB: ny migration `20260612080000_t67_extended_deadline_to_21_june.sql`
+ändrar `pool_extended_deadline()` till den nya instanten (group_deadline_kickoff + champion-grenen av
+bracket_deadline_kickoff CREATE OR REPLACE:as ändå identiskt, så migrationen är en komplett fresh-
+replaybar ögonblicksbild, inte ett implicit beroende på T53:s ordning). Klient:
+`src/data/predictions/prediction-deadline.ts` (`POOL_EXTENDED_DEADLINE_ISO`). Text/lås härleds ur SAMMA
+ISO (formatDeadline/DeadlineNotice), ingen dubblerad tid.
+
+**Verifierat live mot produktion (kmzhyblzxangpxydufve) med read-only-frågor:** pool_extended_deadline
+= alla 12 gruppers deadline = champion = `2026-06-21 21:59:00+00`; sena grupper G-L (ankare 15-17/6 <
+21/6) ger via GREATEST 21/6; slot M73 OPÅVERKAD (`2026-06-28 19:00:00+00`); match-tips-kickoffs orörda;
+ett hypotetiskt ankare 25/6 behåller 25/6 (förkorta aldrig). FAIL-SAFE bevarad (explicit null-gren).
+Migrationen i `list_migrations` heter `t67_extended_deadline_to_21_june` (live-version `20260612101851`,
+MCP-genererad stämpel skiljer från filnamnets `20260612080000`, samma nyans som T15/T16/T53, namn + SQL 1:1).
+OBS precision (review-F1): "1:1" avser den EXEKVERBARA SQL:en; live-funktionens inline-kommentar
+applicerades på engelska (MCP-artefakt) medan committad fil bär svensk kommentar per konvention, nästa
+`db reset` återställer den svenska. Noll beteendepåverkan.
+
+**Källa:** Daniels task-direktiv T67 (#123) + live-verifierat spelschema (`match_kickoffs`) + T53-modellen.
+
+---
+
 ## 2026-06-12 , T65 (#119): "Föreslå ur mina matchtips"-knapp i grupp-tippningen (per grupp, förifyller, aldrig auto-spar)
 
 Daniels önskan: en knapp i grupp-tippningen som FÖRIFYLLER gruppens 1:a + 2:a ur de tippade

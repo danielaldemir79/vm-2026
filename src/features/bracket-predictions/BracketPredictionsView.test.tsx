@@ -175,16 +175,16 @@ describe('BracketPredictionsView', () => {
     expect(m73.querySelector('[data-bracket-prediction-lock]')).not.toBeNull();
   });
 
-  it('CHAMPION-LÅS (T53): ÖPPEN igen efter turneringsstart, fram till den förlängda söndagen', () => {
-    // 12/6 (efter turneringsstart 11/6 men FÖRE söndagen): champion ska vara ÖPPEN igen
+  it('CHAMPION-LÅS (T67): ÖPPEN igen efter turneringsstart, fram till den förlängda söndagen', () => {
+    // 12/6 (efter turneringsstart 11/6 men FÖRE söndagen 21/6): champion ska vara ÖPPEN igen
     // (reopen), inte låst , de som inte hann före premiären får tippa VM-vinnare t.o.m. söndag.
     renderView(store({}), new Date('2026-06-12T08:00:00.000Z'));
     const championOpen = document.querySelector('[data-slot-id="champion"]')!;
     expect(championOpen.querySelector('[data-bracket-prediction-lock]')).toBeNull();
   });
 
-  it('CHAMPION-LÅS (T53): LÅST efter den förlängda söndagen (14/6 21:59Z)', () => {
-    renderView(store({}), new Date('2026-06-15T08:00:00.000Z'));
+  it('CHAMPION-LÅS (T67): LÅST efter den förlängda söndagen (21/6 21:59Z)', () => {
+    renderView(store({}), new Date('2026-06-22T08:00:00.000Z'));
     const championLocked = document.querySelector('[data-slot-id="champion"]')!;
     expect(championLocked.querySelector('[data-bracket-prediction-lock]')).not.toBeNull();
   });
@@ -199,14 +199,14 @@ describe('BracketPredictionsView', () => {
     expect(m73Notice!.getAttribute('data-deadline-iso')).toBe('2026-07-01T16:00:00.000Z');
     expect(m73Notice).toHaveTextContent(/Låses/);
     expect(m73Notice).toHaveTextContent(/1 juli kl 18:00/);
-    // Champion: FÖRLÄNGD till söndag 14/6 23:59 svensk (21:59Z), g-A-1 (11/6) ligger före.
+    // Champion: FÖRLÄNGD till söndag 21/6 23:59 svensk (21:59Z), g-A-1 (11/6) ligger före (T67).
     const champNotice = document
       .querySelector('[data-slot-id="champion"]')!
       .querySelector('[data-deadline-notice]');
     expect(champNotice).not.toBeNull();
-    expect(champNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-14T21:59:00.000Z');
+    expect(champNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-21T21:59:00.000Z');
     expect(champNotice).toHaveTextContent(/Tippningen låses/);
-    expect(champNotice).toHaveTextContent(/söndag 14 juni kl 23:59/);
+    expect(champNotice).toHaveTextContent(/söndag 21 juni kl 23:59/);
   });
 
   it('AC#3: en LÅST slot visar ingen öppen deadline-rad (låst-etikett tar över)', () => {

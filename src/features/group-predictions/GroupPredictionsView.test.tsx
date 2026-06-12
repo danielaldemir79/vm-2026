@@ -38,8 +38,11 @@ const TEAMS: Team[] = [
 const GROUPS: Group[] = [
   { id: 'A', teamIds: ['mex', 'rsa'] },
   { id: 'B', teamIds: ['can', 'bih'] },
-  // Grupp G är en SEN grupp (g-G-1 = 15/6, EFTER fasta söndagstiden): T53 behåller dess
-  // senare ankare, så den är öppen längre än A/B. Används för per-grupp-lås-testet.
+  // Grupp G bär här ett SYNTETISKT sent ankare (g-G-1 = 23/6, EFTER den nya fasta
+  // söndagstiden 21/6): GREATEST behåller dess senare ankare (FÖRKORTA ALDRIG), så den
+  // är öppen längre än A/B. Vaktar förkorta-aldrig-grenen i vyn oberoende av det
+  // verkliga schemat (T67: alla riktiga gruppankare ligger 11-17/6, dvs FÖRE 21/6, så
+  // alla riktiga grupper landar på 21/6 , men regeln, inte datat, är garantin).
   { id: 'G', teamIds: ['sui', 'nor'] },
 ];
 
@@ -58,9 +61,9 @@ function gmatch(id: string, kickoff: string): Match {
 }
 
 const MATCHES: Match[] = [
-  gmatch('g-A-1', '2026-06-11T19:00:00.000Z'), // tidig -> T53 förlänger till 14/6 21:59Z
+  gmatch('g-A-1', '2026-06-11T19:00:00.000Z'), // tidig -> T67 förlänger till 21/6 21:59Z
   gmatch('g-B-1', '2026-06-12T19:00:00.000Z'), // tidig -> förlängs
-  gmatch('g-G-1', '2026-06-15T19:00:00.000Z'), // sen -> behåller eget ankare (15/6)
+  gmatch('g-G-1', '2026-06-23T19:00:00.000Z'), // SYNTETISKT sent -> behåller eget ankare (23/6)
 ];
 
 function store(partial: Partial<GroupPredictionsStore>): GroupPredictionsStore {
@@ -147,25 +150,26 @@ describe('GroupPredictionsView', () => {
     expect(screen.getByText(/3 grupper öppna att tippa/)).toBeInTheDocument();
   });
 
-  it('PER-GRUPP-LÅS (T53): tidig grupp A LÅST efter söndagen, sen grupp G ÖPPEN', () => {
-    // 15/6 08:00: A:s FÖRLÄNGDA deadline (14/6 21:59Z) passerad -> låst. G:s ankare
-    // (15/6 19:00) ej passerat -> öppen. Bevisar att G INTE drogs ner till söndagen.
-    renderView(store({}), new Date('2026-06-15T08:00:00Z'));
+  it('PER-GRUPP-LÅS (T67): tidig grupp A LÅST efter söndagen, sen grupp G ÖPPEN', () => {
+    // 22/6 08:00: A:s FÖRLÄNGDA deadline (21/6 21:59Z) passerad -> låst. G:s SYNTETISKT
+    // sena ankare (23/6 19:00) ej passerat -> öppen. Bevisar att G INTE drogs ner till
+    // söndagen (förkorta aldrig), oberoende av det verkliga schemat.
+    renderView(store({}), new Date('2026-06-22T08:00:00Z'));
     const aForm = document.querySelector('[data-group-id="A"]');
     expect(aForm?.querySelector('[data-group-prediction-lock]')).not.toBeNull();
     expect(screen.getByText(/1 grupp öppen att tippa/)).toBeInTheDocument();
   });
 
-  it('AC#3 DEADLINE (T53): öppen tidig grupp visar den FÖRLÄNGDA söndagen, låst grupp inte', () => {
+  it('AC#3 DEADLINE (T67): öppen tidig grupp visar den FÖRLÄNGDA söndagen, låst grupp inte', () => {
     // 13/6 (mellan g-A-1 och söndagen): grupp A är ÖPPEN igen och dess deadline-rad ska
-    // visa den FÖRLÄNGDA tiden (söndag 14/6 23:59 svensk = 21:59Z), inte den gamla 11/6.
+    // visa den FÖRLÄNGDA tiden (söndag 21/6 23:59 svensk = 21:59Z), inte den gamla 11/6.
     renderView(store({}), new Date('2026-06-13T08:00:00Z'));
     const aForm = document.querySelector('[data-group-id="A"]')!; // nu öppen (reopen)
     const aNotice = aForm.querySelector('[data-deadline-notice]');
     expect(aNotice).not.toBeNull();
-    expect(aNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-14T21:59:00.000Z');
+    expect(aNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-21T21:59:00.000Z');
     expect(aNotice).toHaveTextContent(/Tippningen låses/);
-    expect(aNotice).toHaveTextContent(/söndag 14 juni kl 23:59/);
+    expect(aNotice).toHaveTextContent(/söndag 21 juni kl 23:59/);
   });
 
   it('EN LADDNING: turneringsdatan laddas exakt en gång, den tips-härledda vyn får den injicerad', () => {
@@ -233,11 +237,11 @@ describe('GroupPredictionsView', () => {
   });
 
   it('FÖRSLAG: en LÅST grupp har ingen förslags-knapp', () => {
-    // 15/6 08:00: grupp A är låst (förlängda söndagen passerad). Även med ett komplett
+    // 22/6 08:00: grupp A är låst (förlängda söndagen 21/6 passerad). Även med ett komplett
     // match-tips på g-A-1 ska A:s formulär INTE ha någon förslags-knapp (låst).
     renderView(
       store({}),
-      new Date('2026-06-15T08:00:00Z'),
+      new Date('2026-06-22T08:00:00Z'),
       new Map([['g-A-1', pred('g-A-1', 2, 0)]])
     );
     const aForm = document.querySelector('[data-group-id="A"]')!;
