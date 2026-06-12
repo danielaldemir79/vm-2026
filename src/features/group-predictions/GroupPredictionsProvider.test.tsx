@@ -215,3 +215,117 @@ describe('GroupPredictionsProvider, T61 (#110): kopierings-invalidering hämtar 
     expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
   });
 });
+
+describe('GroupPredictionsProvider, T61 (#110/F1): save-vakten skiljer rum-byte från same-room re-fetch', () => {
+  // Copilot R1, F1: save-vakten delade förut loadTokenRef med fetch-vakten, så en copy-
+  // invalidering (nonce-bump) i SAMMA rum droppade ett pågående save. Fixen jämför mot
+  // RUMMET, inte mot load-token.
+
+  /** Sond med save (grupp A) + nonce-bump i SAMMA rum. */
+  function SaveProbe() {
+    const store = useGroupPredictionsStore();
+    const keys = [...store.myGroupPredictions.keys()].sort().join(',');
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="keys">{keys}</span>
+        <button
+          type="button"
+          onClick={() => {
+            store
+              .saveGroupPrediction({
+                groupId: 'A',
+                winnerTeamId: teamCode('MEX'),
+                runnerUpTeamId: teamCode('RSA'),
+              })
+              .catch(() => {});
+          }}
+        >
+          save
+        </button>
+      </div>
+    );
+  }
+
+  it('SAMME RUM: ett pågående save överlever en samtidig copy-invalidering (spegling SKER)', async () => {
+    api.listMyGroupPredictions
+      .mockResolvedValueOnce([]) // initial: tomt
+      .mockResolvedValueOnce([gp('B', 'CAN', 'BIH')]); // copy-re-fetch: ett inkopierat grupp-tips
+    const pendingSave = deferred<GroupPrediction>();
+    api.upsertMyGroupPrediction.mockReturnValue(pendingSave.promise);
+
+    function Harness() {
+      const [nonce, setNonce] = useState(0);
+      return (
+        <GroupPredictionsProvider
+          env={env}
+          client={fakeClient}
+          activeRoomId="r1"
+          tipsRefreshNonce={nonce}
+        >
+          <SaveProbe />
+          <button onClick={() => setNonce((n) => n + 1)}>bump</button>
+        </GroupPredictionsProvider>
+      );
+    }
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('keys')).toHaveTextContent('B'));
+
+    // Lös saven NU. Rummet bytte aldrig -> grupp A ska speglas in (inte droppas).
+    await act(async () => {
+      pendingSave.resolve(gp('A', 'MEX', 'RSA'));
+      await pendingSave.promise;
+    });
+    expect(screen.getByTestId('keys').textContent).toBe('A,B');
+  });
+
+  it('RUM-BYTE: ett pågående save droppas fortfarande korrekt när rummet byts under await', async () => {
+    api.listMyGroupPredictions.mockImplementation(
+      async (_client: VmSupabaseClient, roomId: string): Promise<GroupPrediction[]> => {
+        if (roomId === 'B') {
+          return [gp('H', 'BRA', 'POR')];
+        }
+        return [];
+      }
+    );
+    const pendingSave = deferred<GroupPrediction>();
+    api.upsertMyGroupPrediction.mockReturnValue(pendingSave.promise);
+
+    function Harness() {
+      const [roomId, setRoomId] = useState('A');
+      return (
+        <GroupPredictionsProvider env={env} client={fakeClient} activeRoomId={roomId}>
+          <SaveProbe />
+          <button onClick={() => setRoomId('B')}>to-B</button>
+        </GroupPredictionsProvider>
+      );
+    }
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    await act(async () => {
+      screen.getByText('to-B').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('keys')).toHaveTextContent('H'));
+
+    await act(async () => {
+      pendingSave.resolve(gp('A', 'MEX', 'RSA'));
+      await pendingSave.promise;
+    });
+    // B:s state är orörd: A:s grupp-tips droppades (rummet bytte).
+    expect(screen.getByTestId('keys').textContent).toBe('H');
+  });
+});
