@@ -5,6 +5,43 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T57 (#98): dagens match-vy lever, fokus följer nästa match + dag följer verklig dag + resultat i listan
+
+**Beslut (fokus, krav 1):** "Match of the day" (hero-kortets fokus) väljs nu som dagens tidigaste
+match som INTE är färdigspelad (`status !== 'finished'`), inte längre dagens tidigaste match oavsett
+status (`selectMatchOfTheDay`, countdown.ts). Är HELA dagen spelad faller fokus tillbaka på dagens
+tidigaste match (då med sitt resultat), så hero:t aldrig blir tomt.
+**Varför:** Daniels live-feedback (skärmdump): efter slutsignal stod "DAGENS MATCH" kvar på den
+avslutade matchen tills sidan laddades om, fast nedräkningen redan pekade mot nästa avspark.
+Asymmetrin var att nedräkningen är tick-driven (`computeCountdown(matches, nowMs)`) medan fokuset
+bara var mount/dag-frusen (tidigaste oavsett status). Genom att hoppa över färdiga matcher lyfter
+fokus nästa ospelade match automatiskt, drivet av SAMMA weave/tick (matchens status blir 'finished'
+när det officiella resultatet vävs in, T48), ingen ny polling. En live-match räknas som ospelad
+(bär inget resultat än) och kan vara fokus.
+
+**Beslut (dag följer verklig dag, krav 2):** Startdagen i dag-bläddraren härleds nu mot det
+DAG-MEDVETNA `nowMs` från `useTodayKey` (flyttar vid midnatt via minut-tick gatad på dygnsväxling +
+visibilitychange vid flik-väckning), inte mot det mount-frusna `now`. Användarens medvetna val
+PINNAS (`pinnedKey`): när hen bläddrat stannar dagen, den hoppar inte under hen vid midnatt; först
+när hen "följer" (inget pinnat) auto-flyttar bläddraren till aktuell dag.
+**Varför:** PWA:n lämnas öppen hela VM:t, så dagen måste flytta utan reload (samma anda som T27:s
+`useTodayKey` och T35:s tick). Det tidigare mount-frusna `now` plus en sync-back-effekt som
+permanent-pinnade den härledda nyckeln gjorde att bläddraren stod kvar på gårdagen tills reload. Den
+permanenta pinningen ersattes av en explicit `pinnedKey` (null = följ verklig dag), vilket gör
+auto-flytten korrekt OCH testbar utan att yanka en bläddrande användare.
+
+**Beslut (resultat i listan, krav 3):** Matchkortet visar nu RESULTATET för en färdigspelad match
+(ordinarie "hemma-borta", t.ex. "2-1", plus straffar separat i slutspel: "(4-3 på straffar)"), via
+rena formaterare (`formatScore`/`formatPenalties`/`isFinished`, match-display.ts). Resultatet är
+FÄRG-OBEROENDE (tyngd + `tabular-nums` i fg, inte accent/success som delar hue i ljust tema, T7-pin).
+**Varför:** Med 3-dagars-fönstret som gömmer den fulla matchlistan vill man kunna bläddra bakåt och
+se alla resultat direkt på korten. Datakällan var redan rätt: dag-vyn läser den VÄVDA matchdatan ur
+results-storen (officiella resultat driver den sedan T48), inte den statiska planen, men kortet
+renderade inte resultatet förrän nu. Straffarna visas SEPARAT så ett slutspels-resultat inte blir
+tvetydigt.
+
+---
+
 ## 2026-06-12 , T41 (#70): EOL-normalisering till LF (.gitattributes + Prettier)
 
 **Beslut:** Repot normaliseras till **LF** för alla textfiler via `.gitattributes`

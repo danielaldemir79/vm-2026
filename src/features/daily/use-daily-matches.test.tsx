@@ -2,6 +2,7 @@ import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
+import { useResultsStore } from '../results/results-context';
 import { initialDayIndex, useDailyMatches } from './use-daily-matches';
 import { groupMatchesByDay, type MatchDay } from './group-matches-by-day';
 import type { Match } from '../../domain/types';
@@ -29,6 +30,23 @@ function sched(id: string, kickoff: string): Match {
     result: null,
     status: 'scheduled',
   };
+}
+
+/** Som sched men FÄRDIGSPELAD (bär ett resultat), för fokus-flytt-testerna (T57). */
+function finishedMatch(id: string, kickoff: string): Match {
+  return { ...sched(id, kickoff), status: 'finished', result: { homeGoals: 1, awayGoals: 0 } };
+}
+
+/**
+ * En kombinerad hook: den dagliga vyns data PLUS storens lågnivå-setMatches, så
+ * ett test kan styra matchlistan deterministiskt (samma seam T18/tester använder)
+ * och observera hur den dagliga härledningen reagerar. `now` injiceras vidare så
+ * startdagen är deterministisk.
+ */
+function useDailyWithStore(now?: Date | number) {
+  const daily = useDailyMatches(now);
+  const { setMatches } = useResultsStore();
+  return { daily, setMatches };
 }
 
 // Tre på varandra följande svenska speldagar (för navigerings-testerna).
@@ -233,5 +251,120 @@ describe('useDailyMatches, live-nedräkning tickar via en timer (UI-tick skilt f
     if (first.kind === 'upcoming' && later.kind === 'upcoming') {
       expect(later.remaining.totalMs).toBeLessThan(first.remaining.totalMs);
     }
+  });
+});
+
+describe('useDailyMatches, fokus (matchOfTheDay) lyfter nästa match när den aktuella blir spelad (T57, krav 1)', () => {
+  it('matchOfTheDay flyttar från en avgjord match till nästa ospelade UTAN reload', async () => {
+    // Två matcher SAMMA svenska dag (11 juni): en tidig, en sen. "Idag" = 11 juni.
+    const today = new Date('2026-06-11T17:30:00.000Z'); // mellan en tänkt tidig och sen avspark
+    const tidig = sched('tidig', '2026-06-11T16:00:00.000Z');
+    const sen = sched('sen', '2026-06-11T19:00:00.000Z');
+
+    const { result } = renderHook(() => useDailyWithStore(today), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+
+    // Sätt vår tvådagars-dag som matchlista. Bägge ospelade -> fokus = den tidiga.
+    act(() => result.current.setMatches([tidig, sen]));
+    await waitFor(() => expect(result.current.daily.matchOfTheDay?.id).toBe('tidig'));
+
+    // Slutsignal: den tidiga matchen blir 'finished' (det den vävda facit-datan
+    // gör live). Fokus ska FLYTTA till nästa ospelade match, utan omladdning.
+    act(() => result.current.setMatches([finishedMatch('tidig', '2026-06-11T16:00:00.000Z'), sen]));
+    await waitFor(() => expect(result.current.daily.matchOfTheDay?.id).toBe('sen'));
+  });
+
+  it('när dagens SISTA match blivit spelad behåller hero den (med resultat), försvinner inte', async () => {
+    const today = new Date('2026-06-11T17:30:00.000Z');
+    const tidig = finishedMatch('tidig', '2026-06-11T16:00:00.000Z');
+    const sen = sched('sen', '2026-06-11T19:00:00.000Z');
+
+    const { result } = renderHook(() => useDailyWithStore(today), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+
+    act(() => result.current.setMatches([tidig, sen]));
+    await waitFor(() => expect(result.current.daily.matchOfTheDay?.id).toBe('sen'));
+
+    // Hela dagen spelad: fokus faller tillbaka på dagens tidigaste match (med
+    // resultat), hero blir inte tomt.
+    act(() => result.current.setMatches([tidig, finishedMatch('sen', '2026-06-11T19:00:00.000Z')]));
+    await waitFor(() => {
+      expect(result.current.daily.matchOfTheDay).not.toBeNull();
+      expect(result.current.daily.matchOfTheDay?.id).toBe('tidig');
+    });
+  });
+});
+
+describe('useDailyMatches, dag-bläddraren auto-flyttar till AKTUELL dag vid midnatt (T57, krav 2)', () => {
+  // Fejka BARA Date (inte alla timers), så waitFor:s interna polling (riktiga
+  // setTimeout) fortsätter fungera medan vi kontrollerar "vad är idag" (känd fälla
+  // `fejka-bara-Date-med-toFake-Date-nar-komponenten-seedar-async`, playbook). Dygns-
+  // växlingen triggas via visibilitychange (PWA-väcknings-vägen i useTodayKey, läser
+  // Date.now() direkt) i stället för minut-tick-intervallet, så testet är
+  // deterministiskt utan att driva tusentals fejkade sekund-tick.
+  beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }));
+  afterEach(() => vi.useRealTimers());
+
+  it('den valda dagen flyttar från igår till idag när dygnet växlar, utan reload', async () => {
+    // Start strax före svensk midnatt 11->12 juni (23:59 svensk = 21:59Z). "Idag"
+    // = 11 juni, så startdagen ska vara 11 juni.
+    vi.setSystemTime(new Date('2026-06-11T21:59:00.000Z'));
+    const { result } = renderHook(() => useDailyWithStore(), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+
+    // Sätt en matchlista som SPÄNNER 11-12 juni så bägge dagarna finns i listan.
+    act(() =>
+      result.current.setMatches([
+        sched('d1', '2026-06-11T17:00:00.000Z'),
+        sched('d2', '2026-06-12T17:00:00.000Z'),
+      ])
+    );
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-11'));
+
+    // Passera midnatt (svensk 00:01 den 12:e = 22:01Z) och fyra visibilitychange
+    // (appen blir synlig igen): useTodayKey räknar om dagen OMEDELBART. Bläddraren
+    // ska nu stå på 12 juni, utan att användaren navigerat och utan en omladdning.
+    act(() => {
+      vi.setSystemTime(new Date('2026-06-11T22:01:00.000Z'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-12'));
+  });
+
+  it('om användaren MEDVETET bläddrat till en dag stannar den kvar när dygnet växlar (hoppar inte under hen)', async () => {
+    vi.setSystemTime(new Date('2026-06-11T21:59:00.000Z'));
+    const { result } = renderHook(() => useDailyWithStore(), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+
+    act(() =>
+      result.current.setMatches([
+        sched('d1', '2026-06-11T17:00:00.000Z'),
+        sched('d2', '2026-06-12T17:00:00.000Z'),
+        sched('d3', '2026-06-13T17:00:00.000Z'),
+      ])
+    );
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-11'));
+
+    // Användaren bläddrar FRAMÅT till 13 juni (pinnar dagen).
+    act(() => result.current.daily.goToIndex(2));
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-13'));
+
+    // Dygnet 11->12 växlar: den PINNADE dagen (13 juni) ska INTE flytta, så
+    // användaren tappar inte sin plats i resultaten hen bläddrar i.
+    act(() => {
+      vi.setSystemTime(new Date('2026-06-11T22:01:00.000Z'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    // Ge eventuell omräkning en chans att slå igenom, bekräfta sedan oförändrat.
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+    expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-13');
   });
 });

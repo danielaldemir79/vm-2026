@@ -19,6 +19,7 @@ import type { Match } from '../../domain/types';
 import { useResultsStore } from '../results/results-context';
 import { groupMatchesByDay, localDateKey, type MatchDay } from './group-matches-by-day';
 import { computeCountdown, selectMatchOfTheDay, type CountdownState } from './countdown';
+import { useTodayKey } from './use-today-key';
 
 /** Laddningstillstånd, samma vokabulär som resten av appen. */
 export type LoadStatus = 'loading' | 'ready' | 'error';
@@ -97,44 +98,44 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
     [status, matches]
   );
 
-  // Vald dag som NYCKEL (inte index): index kan glida om dag-listan ändrar längd
-  // (en framtida realtidskälla). Nyckeln är stabil; vi slår upp index ur den.
-  // `null` = ingen användare har valt än (då gäller den HÄRLEDDA startdagen nedan).
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // DAG-MEDVETET "nu" (T57, #98): startdagen ska FÖLJA den verkliga dagen utan en
+  // omladdning. useTodayKey äger ett "nu" som FLYTTAR sig vid midnatt (minut-tick,
+  // gatad på dygnsväxling) och vid flik-väckning (visibilitychange, PWA-fälla),
+  // ÅTERANVÄNT här (ingen ny polling, DRY) i stället för det mount-frusna `now`.
+  // `now` injiceras fortfarande i test för en deterministisk första dag; i appen
+  // är default Date.now() och ticken tar över. nowMs är referens-stabilt inom en
+  // dag, så följande härledning räknas bara om vid ett FAKTISKT dygnsbyte.
+  const { nowMs: liveNowMs } = useTodayKey(now);
 
-  // EFFEKTIVT index, härlett SYNKRONT i render (inte via en effekt): är den lagrade
-  // nyckeln satt och finns kvar i dagarna används den, annars faller vi tillbaka på
-  // den härledda startdagen (initialDayIndex). VARFÖR synkront: en useEffect körs
-  // FÖRST efter första commit, så en effekt-initierad nyckel ger en render där
+  // Användarens MEDVETET valda dag (nyckel) eller null = "följ den verkliga dagen".
+  // Null låter startdags-härledningen (initialDayIndex mot liveNowMs) styra, så
+  // bläddraren auto-flyttar till AKTUELL dag vid midnatt. Navigering sätter en
+  // nyckel och PINNAR dagen (då vinner användarens val, dagen hoppar inte under
+  // hen). Nyckel (inte index) är stabil om dag-listan ändrar längd (realtidskälla).
+  const [pinnedKey, setPinnedKey] = useState<string | null>(null);
+
+  // EFFEKTIVT index, härlett SYNKRONT i render (inte via en effekt): finns en
+  // pinnad nyckel kvar i dagarna används den, annars den HÄRLEDDA aktuella dagen
+  // (initialDayIndex mot det dag-medvetna liveNowMs). VARFÖR synkront: en useEffect
+  // körs FÖRST efter första commit, så en effekt-initierad nyckel ger en render där
   // status==='ready' och days.length>0 men selectedDay===null -> vyn skulle
   // flicker-visa tom-dag-panelen fast matcher finns (Copilot R1, C1). Genom att
   // härleda i render finns den glipan aldrig: redan första ready-render har en dag.
+  // En pinnad nyckel som FALLER UR listan (t.ex. dag-listan krymper) ignoreras och
+  // härledningen tar över igen (findIndex ger -1 -> fallback).
   const selectedIndex = useMemo(() => {
     if (days.length === 0) {
       return -1;
     }
-    const storedIdx = selectedKey === null ? -1 : days.findIndex((d) => d.dateKey === selectedKey);
-    return storedIdx !== -1 ? storedIdx : initialDayIndex(days, now);
-    // `now` läses bara för den härledda startdagen (inte varje tick), och fryses
-    // i praktiken så fort användaren navigerat (då vinner selectedKey). Utanför
-    // deps med flit: vi vill inte räkna om startdagen varje sekund när tick-now
-    // ändras (startdagen ska inte hoppa under användaren).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, selectedKey]);
+    const pinnedIdx = pinnedKey === null ? -1 : days.findIndex((d) => d.dateKey === pinnedKey);
+    return pinnedIdx !== -1 ? pinnedIdx : initialDayIndex(days, liveNowMs);
+  }, [days, pinnedKey, liveNowMs]);
   const selectedDay = selectedIndex === -1 ? null : days[selectedIndex];
 
-  // Synka tillbaka den härledda startnyckeln till state EN gång, så navigeringen
-  // (goPrev/goNext via setSelectedKey) har en stabil bas och en list-ändring som
-  // gör nyckeln ogiltig nollställs (då tar härledningen över igen). Detta är en
-  // ren spegling av render-härledningen ovan, inte källan till vad vyn visar.
-  useEffect(() => {
-    const effectiveKey = selectedIndex === -1 ? null : days[selectedIndex].dateKey;
-    if (effectiveKey !== selectedKey) {
-      setSelectedKey(effectiveKey);
-    }
-  }, [days, selectedIndex, selectedKey]);
-
-  // Dagens framträdande match (ren, deterministisk regel).
+  // Dagens framträdande match (ren, deterministisk regel: tidigaste OSPELADE, T57).
+  // Beror på selectedDay, som får en ny referens när ett resultat vävs in (matches
+  // -> days -> selectedDay), så fokus räknas om och lyfter nästa match automatiskt
+  // när den aktuella blir 'finished' (ingen ny polling, samma weave/tick-drivning).
   const matchOfTheDay = useMemo(
     () => (selectedDay ? selectMatchOfTheDay(selectedDay.matches) : null),
     [selectedDay]
@@ -167,7 +168,9 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
       if (index < 0 || index >= days.length) {
         return; // utanför intervall: ignorera (knapparna är ändå disabled vid kant)
       }
-      setSelectedKey(days[index].dateKey);
+      // Användaren väljer en dag medvetet -> PINNA den (dagen ska inte hoppa under
+      // hen om midnatt passerar medan hen bläddrar bakåt i resultaten).
+      setPinnedKey(days[index].dateKey);
     },
     [days]
   );
