@@ -18,6 +18,7 @@
 // väg framåt), inte en grå rad. Stabila roller + data-attribut bevaras.
 
 import { useMemo } from 'react';
+import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupPredictionsStore } from './group-predictions-context';
 import { usePredictionsStore } from '../predictions/predictions-context';
 import { useGroupPredictableData } from './use-group-predictable-data';
@@ -137,123 +138,134 @@ export function GroupPredictionsView({
         </p>
       </header>
 
-      {/* UTAN aktivt rum (taskens punkt 3): grupp-tips är per rum. En INBJUDANDE
+      {/* KOMPRIMERING (T68/#129 punkt 8): sektionen är väldigt lång (12 grupp-kuponger +
+          simulerat slutspelsträd). Rubrik + beskrivning ovan ALLTID synliga; här under
+          komprimeras innehållet så bara TOPPEN (första kupong-raden) syns som default,
+          en tydlig expandera fäller ut allt. Faden tonar mot surface (sektionen ligger
+          på en Panel). ~15rem visar första kupong-radens topp. */}
+      <CollapsibleBody
+        name="group-predictions"
+        toggleLabels={{ expand: 'Visa alla grupp-tips', collapse: 'Visa färre' }}
+        collapsedMaxHeight="15rem"
+      >
+        {/* UTAN aktivt rum (taskens punkt 3): grupp-tips är per rum. En INBJUDANDE
           guld-tonad port med en kupong-ikon + tydlig väg framåt, inte en grå rad,
           den ska kännas som en inbjudan att vara med och tippa, inte ett fel. */}
-      {!store.enabled ? (
-        <div
-          data-group-predictions-no-room=""
-          className="mt-4 flex items-start gap-3 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_6%,var(--color-surface))] p-4 sm:p-5"
-        >
-          {/* Guld-tonad kupong-ikon i en rund bricka. Ikon-färgen är --color-warning
-              (AA-säker guld-text-ton), tinten är dekor. aria-hidden, rubriken bär text. */}
-          <span
-            aria-hidden="true"
-            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--vm-gold)_14%,transparent)] text-warning"
+        {!store.enabled ? (
+          <div
+            data-group-predictions-no-room=""
+            className="mt-4 flex items-start gap-3 rounded-card border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_6%,var(--color-surface))] p-4 sm:p-5"
           >
-            <svg
-              viewBox="0 0 16 16"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            {/* Guld-tonad kupong-ikon i en rund bricka. Ikon-färgen är --color-warning
+              (AA-säker guld-text-ton), tinten är dekor. aria-hidden, rubriken bär text. */}
+            <span
+              aria-hidden="true"
+              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-[color-mix(in_srgb,var(--vm-gold)_14%,transparent)] text-warning"
             >
-              <path d="M2 5.5A1 1 0 0 1 3 4.5h10a1 1 0 0 1 1 1v1a1.5 1.5 0 0 0 0 3v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1a1.5 1.5 0 0 0 0-3z" />
-              <path d="M10 4.75v6.5" strokeDasharray="1.4 1.4" />
-            </svg>
-          </span>
-          <div className="min-w-0">
-            <p className="m-0 font-display text-sm font-semibold text-fg">
-              Gå med i ett rum för att tippa grupperna
-            </p>
-            <p className="m-0 mt-1 text-sm text-fg-muted">
-              Grupp-tipsen är per rum, du och kompisarna gissar gruppvinnare och tvåor före
-              gruppspelet och jämför sen. Skapa eller gå med i ett rum ovanför, så öppnar kupongerna
-              här.
-            </p>
+              <svg
+                viewBox="0 0 16 16"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M2 5.5A1 1 0 0 1 3 4.5h10a1 1 0 0 1 1 1v1a1.5 1.5 0 0 0 0 3v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1a1.5 1.5 0 0 0 0-3z" />
+                <path d="M10 4.75v6.5" strokeDasharray="1.4 1.4" />
+              </svg>
+            </span>
+            <div className="min-w-0">
+              <p className="m-0 font-display text-sm font-semibold text-fg">
+                Gå med i ett rum för att tippa grupperna
+              </p>
+              <p className="m-0 mt-1 text-sm text-fg-muted">
+                Grupp-tipsen är per rum, du och kompisarna gissar gruppvinnare och tvåor före
+                gruppspelet och jämför sen. Skapa eller gå med i ett rum ovanför, så öppnar
+                kupongerna här.
+              </p>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {/* Fel-väg (fail loud). */}
-      {store.enabled && (status === 'error' || store.status === 'error') ? (
-        <p
-          role="alert"
-          data-group-predictions-error=""
-          className="mt-4 rounded-md border px-4 py-3 text-sm"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--color-danger) 45%, transparent)',
-            backgroundColor: 'color-mix(in srgb, var(--color-danger) 9%, transparent)',
-            color: 'var(--color-danger)',
-          }}
-        >
-          {error ?? store.error ?? 'Något gick fel när grupperna skulle laddas.'}
-        </p>
-      ) : null}
+        {/* Fel-väg (fail loud). */}
+        {store.enabled && (status === 'error' || store.status === 'error') ? (
+          <p
+            role="alert"
+            data-group-predictions-error=""
+            className="mt-4 rounded-md border px-4 py-3 text-sm"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--color-danger) 45%, transparent)',
+              backgroundColor: 'color-mix(in srgb, var(--color-danger) 9%, transparent)',
+              color: 'var(--color-danger)',
+            }}
+          >
+            {error ?? store.error ?? 'Något gick fel när grupperna skulle laddas.'}
+          </p>
+        ) : null}
 
-      {/* Laddning. */}
-      {store.enabled && (status === 'loading' || store.status === 'loading') ? (
-        <p role="status" data-group-predictions-loading="" className="mt-4 text-sm text-fg-muted">
-          Laddar grupper att tippa…
-        </p>
-      ) : null}
+        {/* Laddning. */}
+        {store.enabled && (status === 'loading' || store.status === 'loading') ? (
+          <p role="status" data-group-predictions-loading="" className="mt-4 text-sm text-fg-muted">
+            Laddar grupper att tippa…
+          </p>
+        ) : null}
 
-      {/* Grupp-listan: ett kort per grupp A..L, öppna + låsta synliga (med låst-etikett). */}
-      {ready ? (
-        <ol
-          data-group-predictions-list=""
-          className="mt-5 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          {predictableGroups.map(({ groupId, teams: groupTeams, locked, deadlineIso }) => {
-            const mine = store.myGroupPredictions.get(groupId) ?? null;
-            return (
-              <li key={groupId}>
-                <GroupPredictionForm
-                  groupId={groupId}
-                  teams={groupTeams}
-                  current={
-                    mine
-                      ? { winnerCode: mine.winnerTeamId, runnerUpCode: mine.runnerUpTeamId }
-                      : null
-                  }
-                  locked={locked}
-                  deadlineIso={deadlineIso}
-                  now={evalNow}
-                  // FÖRSLAGS-KNAPPEN (T65): bara för en ÖPPEN grupp (en låst grupp har
-                  // ingen knapp). null = gruppens matcher inte alla tippade (ärligt
-                  // inaktiverad). undefined = låst -> ingen knapp alls.
-                  suggestion={locked ? undefined : (suggestionByGroup.get(groupId) ?? null)}
-                  onSubmit={async (gid, winnerCode, runnerUpCode) => {
-                    // Brandning vid UI-gränsen: formulärets värden kommer från
-                    // <option value={t.code}> (versal FIFA-code). teamCode() validerar
-                    // och låser identiteten, så API:t garanterat får en code (C1+C2).
-                    await store.saveGroupPrediction({
-                      groupId: gid,
-                      winnerTeamId: teamCode(winnerCode),
-                      runnerUpTeamId: teamCode(runnerUpCode),
-                    });
-                  }}
-                />
-              </li>
-            );
-          })}
-        </ol>
-      ) : null}
+        {/* Grupp-listan: ett kort per grupp A..L, öppna + låsta synliga (med låst-etikett). */}
+        {ready ? (
+          <ol
+            data-group-predictions-list=""
+            className="mt-5 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-3"
+          >
+            {predictableGroups.map(({ groupId, teams: groupTeams, locked, deadlineIso }) => {
+              const mine = store.myGroupPredictions.get(groupId) ?? null;
+              return (
+                <li key={groupId}>
+                  <GroupPredictionForm
+                    groupId={groupId}
+                    teams={groupTeams}
+                    current={
+                      mine
+                        ? { winnerCode: mine.winnerTeamId, runnerUpCode: mine.runnerUpTeamId }
+                        : null
+                    }
+                    locked={locked}
+                    deadlineIso={deadlineIso}
+                    now={evalNow}
+                    // FÖRSLAGS-KNAPPEN (T65): bara för en ÖPPEN grupp (en låst grupp har
+                    // ingen knapp). null = gruppens matcher inte alla tippade (ärligt
+                    // inaktiverad). undefined = låst -> ingen knapp alls.
+                    suggestion={locked ? undefined : (suggestionByGroup.get(groupId) ?? null)}
+                    onSubmit={async (gid, winnerCode, runnerUpCode) => {
+                      // Brandning vid UI-gränsen: formulärets värden kommer från
+                      // <option value={t.code}> (versal FIFA-code). teamCode() validerar
+                      // och låser identiteten, så API:t garanterat får en code (C1+C2).
+                      await store.saveGroupPrediction({
+                        groupId: gid,
+                        winnerTeamId: teamCode(winnerCode),
+                        runnerUpTeamId: teamCode(runnerUpCode),
+                      });
+                    }}
+                  />
+                </li>
+              );
+            })}
+          </ol>
+        ) : null}
 
-      {/* SIMULERAD slutspelsbild ur tipsen (T51, #88, Daniels live-feedback): så
+        {/* SIMULERAD slutspelsbild ur tipsen (T51, #88, Daniels live-feedback): så
           snart grupp-tipsen är laddade ritar vi upp hur slutspelet skulle kunna se
           ut ur tippade ettor/tvåor (vilka som möts i sextondelen + vägen vidare).
           En ren härledd vy: den läser mina tips ur SAMMA store och skriver aldrig,
           så de riktiga resultaten/facit rörs inte. Tydligt märkt SIMULERING; de
           åtta bästa treorna lämnas öppna (gissas aldrig, FIFA-seedning ur riktiga
           resultat). Visar en uppmaning tills minst en grupp är tippad. */}
-      {ready ? (
-        <div data-tips-bracket-section="" className="mt-8">
-          <TipsBracketView predictableData={predictableData} />
-        </div>
-      ) : null}
+        {ready ? (
+          <div data-tips-bracket-section="" className="mt-8">
+            <TipsBracketView predictableData={predictableData} />
+          </div>
+        ) : null}
+      </CollapsibleBody>
     </section>
   );
 }

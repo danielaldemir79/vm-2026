@@ -19,6 +19,7 @@ import { useMemo } from 'react';
 import type { AdvancementStatus, GroupScenario, TeamScenario } from './scenario-engine';
 import type { Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
+import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupScenarios } from './use-group-scenarios';
 // Premium-visuella lagret (status-chips, arena-kort, väntande-tillstånd). Stylas
 // ENBART via seamens data-attribut + klass-hakar nedan, så senior-devs semantik +
@@ -217,54 +218,67 @@ export function ScenarioView() {
         </p>
       </header>
 
-      {status === 'loading' ? (
-        <p role="status" className="text-sm text-fg-muted">
-          Laddar scenarierna ...
-        </p>
-      ) : null}
-
-      {status === 'error' ? (
-        <Fade>
-          <p
-            role="alert"
-            className="flex items-start gap-3 rounded-card border px-4 py-3 text-sm"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--color-danger) 50%, transparent)',
-              backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
-              color: 'var(--color-danger)',
-            }}
-          >
-            <span aria-hidden="true" className="mt-0.5 text-base leading-none">
-              !
-            </span>
-            <span>Kunde inte ladda scenarierna: {error}</span>
+      {/* KOMPRIMERING (T68/#129): rubrik + beskrivning alltid synliga; här under
+          komprimeras grid:en så FÖRSTA RADEN grupper syns som default (höjd-klipp,
+          responsivt antal per skärmbredd). Faden tonar mot app-bakgrunden (ingen
+          surface-Panel runt denna sektion). ~20rem visar ett helt scenario-kort + en
+          fade-veiled glimt av nästa rad, samma kort-höjd-mått som gruppspelet, så
+          klippet inte skär mitt i ett kort. */}
+      <CollapsibleBody
+        name="scenarios"
+        toggleLabels={{ expand: 'Visa alla grupper', collapse: 'Visa färre grupper' }}
+        collapsedMaxHeight="20rem"
+        fadeTo="var(--color-bg)"
+      >
+        {status === 'loading' ? (
+          <p role="status" className="text-sm text-fg-muted">
+            Laddar scenarierna ...
           </p>
-        </Fade>
-      ) : null}
+        ) : null}
 
-      {status === 'ready' && scenarios.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
-          Inga grupper att visa än.
-        </p>
-      ) : null}
+        {status === 'error' ? (
+          <Fade>
+            <p
+              role="alert"
+              className="flex items-start gap-3 rounded-card border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--color-danger) 50%, transparent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-danger) 10%, transparent)',
+                color: 'var(--color-danger)',
+              }}
+            >
+              <span aria-hidden="true" className="mt-0.5 text-base leading-none">
+                !
+              </span>
+              <span>Kunde inte ladda scenarierna: {error}</span>
+            </p>
+          </Fade>
+        ) : null}
 
-      {status === 'ready' && scenarios.length > 0 ? (
-        // grid-cols-1 vid bas är AVGÖRANDE: utan en explicit single-kolumn flödar
-        // korten i en implicit `auto`-kolumn (= max-content av bredaste kortet), som
-        // på 280px (vikbar cover) blir bredare än viewporten och klipps av appens
-        // overflow-x-clip. minmax(0,1fr) (= grid-cols-1) låter kolumnen krympa till
-        // viewporten så villkorstext + chips ryms. Verifierat 280px: noll overflow.
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {scenarios.map((scenario, i) => (
-            <GroupScenarioCard
-              key={scenario.groupId}
-              scenario={scenario}
-              teamsById={teamsById}
-              index={i}
-            />
-          ))}
-        </div>
-      ) : null}
+        {status === 'ready' && scenarios.length === 0 ? (
+          <p className="rounded-card border border-border bg-surface px-4 py-8 text-center text-sm text-fg-muted">
+            Inga grupper att visa än.
+          </p>
+        ) : null}
+
+        {status === 'ready' && scenarios.length > 0 ? (
+          // grid-cols-1 vid bas är AVGÖRANDE: utan en explicit single-kolumn flödar
+          // korten i en implicit `auto`-kolumn (= max-content av bredaste kortet), som
+          // på 280px (vikbar cover) blir bredare än viewporten och klipps av appens
+          // overflow-x-clip. minmax(0,1fr) (= grid-cols-1) låter kolumnen krympa till
+          // viewporten så villkorstext + chips ryms. Verifierat 280px: noll overflow.
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {scenarios.map((scenario, i) => (
+              <GroupScenarioCard
+                key={scenario.groupId}
+                scenario={scenario}
+                teamsById={teamsById}
+                index={i}
+              />
+            ))}
+          </div>
+        ) : null}
+      </CollapsibleBody>
     </section>
   );
 }

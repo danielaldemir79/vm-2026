@@ -30,7 +30,7 @@ function renderForm(overrides: Partial<ComponentProps<typeof GroupPredictionForm
 describe('GroupPredictionForm', () => {
   it('VALIDERING: tomt val ger fel, inget save', () => {
     const { onSubmit } = renderForm();
-    fireEvent.click(screen.getByRole('button', { name: /Spara grupp-tips/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Spara grupptips/ }));
     expect(screen.getByRole('alert')).toHaveTextContent(/Välj både gruppvinnare/);
     expect(onSubmit).not.toHaveBeenCalled();
   });
@@ -39,7 +39,7 @@ describe('GroupPredictionForm', () => {
     const { onSubmit } = renderForm();
     fireEvent.change(screen.getByLabelText(/Gruppvinnare/), { target: { value: 'MEX' } });
     fireEvent.change(screen.getByLabelText(/Grupptvåa/), { target: { value: 'MEX' } });
-    fireEvent.click(screen.getByRole('button', { name: /Spara grupp-tips/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Spara grupptips/ }));
     expect(screen.getByRole('alert')).toHaveTextContent(/måste vara olika lag/);
     expect(onSubmit).not.toHaveBeenCalled();
   });
@@ -49,7 +49,7 @@ describe('GroupPredictionForm', () => {
     renderForm({ onSubmit });
     fireEvent.change(screen.getByLabelText(/Gruppvinnare/), { target: { value: 'MEX' } });
     fireEvent.change(screen.getByLabelText(/Grupptvåa/), { target: { value: 'RSA' } });
-    fireEvent.click(screen.getByRole('button', { name: /Spara grupp-tips/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Spara grupptips/ }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('A', 'MEX', 'RSA'));
     expect(await screen.findByText('Sparat')).toBeInTheDocument();
   });
@@ -59,7 +59,7 @@ describe('GroupPredictionForm', () => {
     renderForm({ onSubmit });
     fireEvent.change(screen.getByLabelText(/Gruppvinnare/), { target: { value: 'MEX' } });
     fireEvent.change(screen.getByLabelText(/Grupptvåa/), { target: { value: 'RSA' } });
-    fireEvent.click(screen.getByRole('button', { name: /Spara grupp-tips/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Spara grupptips/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/gruppen är låst/);
   });
 
@@ -70,7 +70,7 @@ describe('GroupPredictionForm', () => {
     });
     expect(screen.getByLabelText(/Gruppvinnare/)).toBeDisabled();
     expect(screen.getByLabelText(/Grupptvåa/)).toBeDisabled();
-    expect(screen.queryByRole('button', { name: /grupp-tips/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Spara grupptips/ })).toBeNull();
     expect(document.querySelector('[data-group-prediction-lock]')).not.toBeNull();
   });
 
@@ -78,8 +78,50 @@ describe('GroupPredictionForm', () => {
     renderForm({ current: { winnerCode: 'KOR', runnerUpCode: 'CZE' } });
     expect((screen.getByLabelText(/Gruppvinnare/) as HTMLSelectElement).value).toBe('KOR');
     expect((screen.getByLabelText(/Grupptvåa/) as HTMLSelectElement).value).toBe('CZE');
-    // "Ändra grupp-tips" när ett tips redan finns.
-    expect(screen.getByRole('button', { name: /Ändra grupp-tips/ })).toBeInTheDocument();
+    // Knappen heter ALLTID "Spara grupptips", aldrig "Ändra" (T68/#129 punkt 13).
+    expect(screen.getByRole('button', { name: 'Spara grupptips' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ändra/ })).toBeNull();
+  });
+
+  // ---- T68 (#129) punkt 13: osparade-ändringar-indikator ------------------------
+
+  it('OSPARAT: ett nytt val (utan sparat tips) visar "Osparade ändringar"', () => {
+    renderForm();
+    // Inga osparade ändringar i utgångsläget (inget valt, inget sparat).
+    expect(screen.queryByText(/Osparade ändringar/)).toBeNull();
+    // Gör ett val -> formuläret skiljer sig från sparat (inget) -> indikatorn dyker upp.
+    fireEvent.change(screen.getByLabelText(/Gruppvinnare/), { target: { value: 'MEX' } });
+    expect(screen.getByText(/Osparade ändringar/)).toBeInTheDocument();
+  });
+
+  it('OSPARAT: indikatorn försvinner efter Spara (formuläret == sparat)', async () => {
+    renderForm();
+    fireEvent.change(screen.getByLabelText(/Gruppvinnare/), { target: { value: 'MEX' } });
+    fireEvent.change(screen.getByLabelText(/Grupptvåa/), { target: { value: 'RSA' } });
+    expect(screen.getByText(/Osparade ändringar/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Spara grupptips/ }));
+    // Efter sparning: indikatorn borta, "Sparat"-kvittot framme.
+    await waitFor(() => expect(screen.queryByText(/Osparade ändringar/)).toBeNull());
+    expect(screen.getByText('Sparat')).toBeInTheDocument();
+  });
+
+  it('OSPARAT: en ÄNDRING av ett redan sparat tips visar indikatorn igen', () => {
+    renderForm({ current: { winnerCode: 'KOR', runnerUpCode: 'CZE' } });
+    // Seedat från sparat tips -> inget osparat.
+    expect(screen.queryByText(/Osparade ändringar/)).toBeNull();
+    // Ändra 1:an -> skiljer sig från sparat -> indikatorn dyker upp.
+    fireEvent.change(screen.getByLabelText(/Gruppvinnare/), { target: { value: 'MEX' } });
+    expect(screen.getByText(/Osparade ändringar/)).toBeInTheDocument();
+    // Ändra TILLBAKA till det sparade -> indikatorn försvinner (inget osparat kvar).
+    fireEvent.change(screen.getByLabelText(/Gruppvinnare/), { target: { value: 'KOR' } });
+    expect(screen.queryByText(/Osparade ändringar/)).toBeNull();
+  });
+
+  it('OSPARAT: ett förslag (förifyllnad) räknas som osparad ändring tills man Sparar', () => {
+    renderForm({ suggestion: { winnerCode: 'KOR', runnerUpCode: 'CZE' } });
+    fireEvent.click(screen.getByRole('button', { name: /Föreslå ur mina matchtips/ }));
+    // Förifyllnaden ändrade formuläret men sparade inte -> osparade ändringar.
+    expect(screen.getByText(/Osparade ändringar/)).toBeInTheDocument();
   });
 
   // ---- T65 (#119): "Föreslå ur mina matchtips"-knappen --------------------------
@@ -120,7 +162,7 @@ describe('GroupPredictionForm', () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     renderForm({ onSubmit, suggestion: { winnerCode: 'KOR', runnerUpCode: 'CZE' } });
     fireEvent.click(screen.getByRole('button', { name: /Föreslå ur mina matchtips/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Spara grupp-tips/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Spara grupptips/ }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('A', 'KOR', 'CZE'));
   });
 

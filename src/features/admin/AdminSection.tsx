@@ -10,6 +10,7 @@
 // samma helper RLS använder). Premium-design lämnas till T42b.
 
 import type { ReactNode } from 'react';
+import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useRoomsStore } from '../rooms';
 import { useOfficialResultsStore } from '../official-results';
 import { AdminLogin } from './AdminLogin';
@@ -28,9 +29,28 @@ export function AdminSection({ surface }: { surface: (children: ReactNode) => Re
     return null;
   }
 
-  // ADMIN: facit-inmatningen.
+  // ADMIN: facit-inmatningen, KOMPRIMERAD (T68/#129 punkt 10). Admin-verktygen
+  // (inmatning + ligastatistik) är långa och behövs inte alltid utfällda, så de
+  // komprimeras med en expandera-kontroll. En liten alltid-synlig rubrik håller ytan
+  // begriplig i komprimerat läge; faden tonar mot surface (admin ligger på en Panel).
   if (official.isAdmin === true) {
-    return surface(<AdminResultEntry />);
+    return surface(
+      <div data-admin="" className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h3 className="font-display text-lg font-semibold">Arrangörens verktyg</h3>
+          <p className="text-sm text-fg-muted">
+            Mata in officiella resultat och se ligastatistiken. Fäll ut när du behöver dem.
+          </p>
+        </div>
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa arrangörsverktygen', collapse: 'Visa färre' }}
+          collapsedMaxHeight="9rem"
+        >
+          <AdminResultEntry />
+        </CollapsibleBody>
+      </div>
+    );
   }
 
   // ICKE-ADMIN: BARA den lugna read-only-noten. Arrangörs-inloggningen är DOLD bakom

@@ -20,6 +20,7 @@
 // utan att skrolla, topplistan (full lista) KVAR längst ned, avslöjandet sist.
 
 import type { ReactNode } from 'react';
+import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useRoomsStore } from '../rooms';
 import { LeaderboardSummary } from './LeaderboardSummary';
 import { LeaderboardView } from './LeaderboardView';
@@ -30,11 +31,25 @@ export function LeaderboardSection({ surface }: { surface: (children: ReactNode)
   if (!rooms.enabled) {
     return null;
   }
+  // KOMPRIMERING (T68/#129 punkt 11): poäng-sammanfattningen (egen poäng + placering)
+  // hålls ALLTID synlig överst (man ska se sina egna poäng utan att fälla ut). Topplistan
+  // + tips-avslöjandet komprimeras med det delade mönstret, men startar UTFÄLLDA
+  // (startExpanded) , dirigentens tolkning av Daniels "expanderat direkt också": det är
+  // tävlingens final-yta man vill se, men man kan fälla ihop den för överblick. Flippa
+  // default-läget (startExpanded=false) om Daniel hellre vill ha den komprimerad direkt.
+  // Faden tonar mot surface (sektionen ligger på en Panel).
   return surface(
-    <>
+    <div className="flex flex-col gap-4">
       <LeaderboardSummary />
-      <LeaderboardView />
-      <RevealView />
-    </>
+      <CollapsibleBody
+        name="leaderboard"
+        toggleLabels={{ expand: 'Visa topplistan och avslöjandet', collapse: 'Fäll ihop' }}
+        collapsedMaxHeight="14rem"
+        startExpanded
+      >
+        <LeaderboardView />
+        <RevealView />
+      </CollapsibleBody>
+    </div>
   );
 }
