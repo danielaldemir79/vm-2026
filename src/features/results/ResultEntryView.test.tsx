@@ -80,7 +80,29 @@ describe('ResultEntryView, målfirande-seam', () => {
 // Integration: inmatningsvyn OCH gruppspelsvyn under SAMMA provider. En inmatning
 // i formuläret ska räkna om grupptabellen (en sanning, härledd state, hela vägen
 // genom UI:t, inte bara på hook-nivå).
+//
+// TIDS-ANKARE (T60, #102): testet sparar g-A-1 (premiärmatchen, svensk dag
+// 2026-06-11). ResultEntryView:s 3-dagars fönster (#39) DÖLJER (hidden, inte
+// filtrerar bort) matcher utanför fönstret, och Testing Librarys roll-/etikett-
+// queries hoppar över hidden-subträd. Med verklig väggklocka glider fönstret
+// förbi premiären så g-A-1:s <li> blir hidden och Spara-knappen blir oåtkomlig,
+// testet rödnade konsekvent från och med dagen tiden passerade premiären (det var
+// en TIDSKOPPLAD test-röta, ingen app-regression). Vi fryser klockan till
+// premiärdagen (samma mönster som #39/C1/T28-blocken nedan) så fönstret ankrar på
+// 11-13 juni och g-A-1 alltid är synlig, deterministiskt oavsett körningsdag.
 describe('ResultEntryView + GroupStageView, inmatning uppdaterar tabellen (en sanning)', () => {
+  beforeEach(() => {
+    // Faka BARA Date (inte setTimeout/microtasks), så providerns async-seedning och
+    // waitFor fortfarande kör på riktiga timers (annars fryser seed-flushen).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 2026-06-11 (premiärdagen): fönstret ankrar på 11 juni och spänner 11-13 juni,
+    // så g-A-1 (svensk dag 2026-06-11) ligger INOM fönstret och renderas synlig.
+    vi.setSystemTime(new Date('2026-06-11T08:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('att spara ett resultat för en fixtures-match ändrar gruppspelstabellen', async () => {
     render(
       <ResultsProvider env={fixturesEnv()}>
