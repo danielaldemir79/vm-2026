@@ -22,3 +22,11 @@ export {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
 } from './room-code';
+// T66 (#121): kommentarer i rummet (lista, skriv, radera egen).
+export {
+  listRoomComments,
+  addComment,
+  deleteMyComment,
+  COMMENT_MAX_LEN,
+  type RoomComment,
+} from './comments-api';

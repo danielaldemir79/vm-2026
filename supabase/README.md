@@ -16,6 +16,7 @@ Bara **delad, muterbar** state ligger i Supabase:
 | `match_kickoffs` (T15) | Referensdata: matchernas avsparkstider, deadline-låsets klocka. |
 | `group_predictions` (T16) | Pool-tips: gissad 1:a + 2:a per grupp (A till L). |
 | `bracket_predictions` (T16) | Slutspels-tips: vem går vidare per slot + VM-vinnaren. |
+| `room_comments` (T66) | Korta kommentarer per rum (medlemmar snackar match, live). |
 
 **Statisk turneringsdata (lag, grupper, spelschema) stannar i klient-bundlen.**
 Den är källåkrad och verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare,

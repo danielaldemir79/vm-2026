@@ -35,6 +35,8 @@ import { useRoomsStore } from './rooms-context';
 import { avatarHueFromId, initialsFromName } from './member-avatar';
 import { buildInviteText, copyText, shareInvite } from './share-room';
 import { CopyTipsControl } from './CopyTipsControl';
+import { CommentsProvider } from './CommentsProvider';
+import { RoomComments } from './RoomComments';
 import './rooms.css';
 
 // Delade fält-klasser, SAMMA premium-formspråk som resultatinmatningen (#39,
@@ -508,6 +510,14 @@ export function RoomPanel() {
                 Renderar sig själv bara när det finns ett annat rum att kopiera från
                 (annars null), så ingen tom ruta visas i ett ensamt rum. */}
             <CopyTipsControl />
+
+            {/* T66 (#121): kommentarer i rummet. Egen CommentsProvider scopad till det
+                aktiva rummet (läser activeRoomId + userId via rooms-synk-seamen), så
+                snacket runt matcherna lever live utan reload (Realtime, signal -> tyst
+                refetch). RoomComments renderar inget om lagret är inaktivt. */}
+            <CommentsProvider>
+              <RoomComments />
+            </CommentsProvider>
           </div>
         </div>
       )}
