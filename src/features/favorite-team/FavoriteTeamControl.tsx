@@ -16,6 +16,27 @@ import type { Team } from '../../domain/types';
 import { teamShortName } from '../../domain/team-name';
 import { TeamFlag } from '../daily/TeamFlag';
 
+// Appens etablerade FORM-språk (samma accent-tonade fokus-ring + hover-kant som
+// PredictionForm:s FIELD_BASE och resultatinmatningen, #39/T15): en tema-trogen
+// accent-fokus-ring (WCAG 2.4.7) + en mjuk accent-hover-kant. Accent = interaktions-
+// affordans (inte status, T7-pin), så favoritlags-väljaren känns som EN familj med
+// appens övriga inmatningar i stället för en avvikande egen-stil.
+const SELECT_FIELD =
+  'h-11 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-fg ' +
+  'shadow-[var(--vm-shadow-card)] transition-colors duration-150 outline-none ' +
+  'focus-visible:border-accent ' +
+  'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] ' +
+  'hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))]';
+
+// "Ta bort"-knappen: samma neutrala pill-knapp som appens diskreta sekundär-åtgärder
+// (surface-raised-hover + accent-fokus-ring), så den läser som en lugn snabb-väg, inte
+// en primär-knapp. Egen accent-fokus-ring matchar select:ens (samma WCAG 2.4.7-disciplin).
+const CLEAR_BUTTON =
+  'shrink-0 rounded-pill border border-border px-3 py-2 text-xs font-semibold text-fg-muted ' +
+  'transition-colors duration-150 outline-none ' +
+  'hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-border))] hover:bg-surface-raised hover:text-fg ' +
+  'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)]';
+
 export interface FavoriteTeamControlProps {
   /** Lag-listan (de 48 lagen) att välja bland. Sorteras alfabetiskt för visning. */
   teams: readonly Team[];
@@ -76,22 +97,27 @@ export function FavoriteTeamControl({
         {selected !== null ? (
           <TeamFlag code={selected.code} />
         ) : (
+          // Tom platshållar-disc: en streckad kontur + en konturad guld-stjärna (samma
+          // varma guld-TEXT-ton som favorit-chippet, --color-warning), så den inbjuder
+          // till att pinna ett lag ("☆ -> ★") och hör visuellt till favorit-identiteten.
           <span
             aria-hidden="true"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-pill border border-dashed border-border text-xs text-fg-muted"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-pill border border-dashed border-[color-mix(in_srgb,var(--vm-gold)_38%,var(--color-border))] text-xs text-warning"
           >
             ☆
           </span>
         )}
 
         {/* min-w-0 på rad + select så ett <select> kan krympa under sin längsta option
-            (intrinsisk min-content) i stället för att spränga kolumnen på smal skärm. */}
+            (intrinsisk min-content) i stället för att spränga kolumnen på smal skärm.
+            SELECT_FIELD ger appens etablerade form-språk (accent-fokus-ring + hover-kant,
+            samma som PredictionForm/resultatinmatningen). */}
         <select
           id={selectId}
           data-favorite-team-select=""
           value={favoriteTeamId ?? NONE_VALUE}
           onChange={(event) => handleChange(event.target.value)}
-          className="h-11 min-w-0 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-fg shadow-[var(--vm-shadow-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className={SELECT_FIELD}
         >
           <option value={NONE_VALUE}>Inget favoritlag</option>
           {sortedTeams.map((team) => (
@@ -109,7 +135,7 @@ export function FavoriteTeamControl({
             type="button"
             data-favorite-team-clear=""
             onClick={onClear}
-            className="shrink-0 rounded-pill border border-border px-3 py-2 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className={CLEAR_BUTTON}
           >
             Ta bort
           </button>
