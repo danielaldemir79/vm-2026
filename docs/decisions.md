@@ -15,18 +15,23 @@ muntligt / skriva av den.
 
 **Beslut (frångår T39:s "bara namnet är länk, ingen synlig URL"):** T39 valde MEDVETET att inte visa
 URL:en, för att hålla signaturen som en tät, balanserad enhet. Daniels nya feedback väger tyngre här,
-så det valet frångås uttryckligt. Tre tillägg, alla hållna diskreta (footern ska inte bli en reklampelare):
+så det valet frångås uttryckligt.
+
+**Runda 1 (senior-dev, 9bf727c):** lugn variant med inline-länk bredvid namnet + punkt-divider.
+**Runda 2 (Daniels live-feedback + design-frontend, a2a0b76):** "footern ska lyfta upp mig, få med
+hela min hemsida så man ser att man kan klicka dit" - hela strukturen skrevs om till shippad form:
 
 1. **Appens adress synlig i ledtexten** (`App.tsx` footer-`<p>`): "dela appen med vänner, **vm-2026.pages.dev**"
    som synlig, klickbar länk-text. Visas utan `https://`-prefix (renare att läsa/säga högt/skriva av),
    `href` bär hela URL:en (`https://vm-2026.pages.dev`, kanonisk app-URL per SPEC §3 / deploy.md). Detta
-   är "sprid-appen"-behovet och bor i ledtexten, SKILT från utvecklar-signaturen nedan.
-2. **Synlig `danielaldemir.com`-länk bredvid namnet** i signaturen: en SEPARAT klickbar länk efter
-   namn-länken, åtskild av en aria-hidden punkt-divider. Namn-länkens kontrakt (href/target/rel) är
-   OFÖRÄNDRAT, så T39:s tabnabbing-test håller orört. Den nya adress-länken bär samma säkerhets-recept
-   (`target=_blank` + `rel=noopener noreferrer`).
-3. **Utvecklar-titel** ".NET-systemutvecklare" som en lågmäld muted rad (text-xs, fg-muted) under
-   signaturen. Promotar Daniel som byggaren utan att skrika.
+   är "sprid-appen"-behovet och bor i ledtexten, SKILT från signatur-blocket nedan.
+2. **Sigill + "Byggd av" / "Daniel Aldemir" som blickfång** på en egen, framträdande rad: ett `.vm-signature-seal`
+   (solid accent-bricka med "DA"-initialerna) bredvid "Byggd av" + "Daniel Aldemir" i full fg + display-vikt.
+   Ingen punkt-divider - `danielaldemir.com` är en separat CTA-pill (se punkt 3). Namn-länkens kontrakt
+   (href/target/rel mot www.danielaldemir.com) oförändrat, T39:s tabnabbing-test håller.
+3. **`danielaldemir.com` som CTA-pill** (`.vm-install-pill`-återbruk, tokens.css §22): extern-länk-ikon,
+   hover-accent-kant, focus-visible-accent-ring - omisskännligt klickbar, samma affordans som install-knappen.
+4. **Utvecklar-titel** ".NET-systemutvecklare" som stödtext under blickfånget.
 
 **Val av promo-omfattning:** dirigenten föreslog även en "vill du ha en app byggd? hör av dig"-kontaktrad
 och en "byggd på 2 dagar med AI"-touch. Den LUGNASTE varianten valdes (titel + synliga adresser), eftersom
@@ -38,9 +43,9 @@ använder `rel="noopener noreferrer"` + `target="_blank"`. Vaktas av tester i `A
 target + rel-tokens för app-adressen OCH danielaldemir.com-länken), så en framtida refaktor inte tyst
 tappar skyddet eller den synliga adressen.
 
-**Verifiering:** build EXIT 0, full svit grön (1752 tester, +4 nya för T44), lint + format:check rent.
-Visuell finputs (kvällsljus-balans, AA-kontrast på de nya muted länkarna) ligger hos design-frontend om
-dirigenten bedömer att footern behöver det , funktionell + tillgänglig bas levereras här.
+**Verifiering (HEAD 267017b):** build EXIT 0, full svit grön (1699 tester, +3 nya T44-tester +
+1 omskrivet T38-test "Made by" -> "Byggd av", 53 skip, 0 fail), lint + format:check EXIT 0.
+Kontrast AA båda teman, min 5.40:1 (sigill ljust tema), verifierad via scripts + Playwright.
 
 ## 2026-06-12 , T25 (#25): code-splitting (manualChunks), E2E-svit (Playwright) + a11y-audit (axe)
 
