@@ -5,6 +5,78 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T4c (#35): arena + värdstad per match, källåkrad + korskollad
+
+**Bakgrund:** T4b:s källa (Daniels svenska TV-tablå) bar TID + svensk TV-kanal men INTE arena, så
+matches.ts hade en uttrycklig "ej verifierad"-platshållare (`VENUE_UNKNOWN`) per match, gissa-aldrig.
+T4c fyller arenan + värdstaden per match ur FIFA:s officiella spelschema (16 arenor i USA/Mexiko/Kanada),
+korskollad mot en andra oberoende källa. VM:et pågår LIVE (sedan 11 juni), så datakvalitet är allt.
+
+**Beslut (källåkrad, gissas ALDRIG, samma mönster som T4/T4b/T10):** En SEPARAT gold source
+(`src/data/wc2026/venue-source.txt`) bär en rad per match (`MATCH_ID | venue=Arena, Stad | match=etikett`),
+parsas av en ren parser (`venue-parser.ts`) och injiceras in i den GENERERADE matches.ts via matchtablå-
+generatorn (en ny `venueOf`-lookup i `buildMatches`/`buildMatchesFile`, samma idé som `groupOf`). Värde-låst
+mot källan i CI (`venue-source.test.ts`: regenerera-och-diffa + mutationstest + 104/16-integritet). Ingen
+arena bor handskriven i matches.ts; den är spårbar till källan och regenererbar (`npm run gen:matches`).
+
+**Join-nyckel: match-id (g-A-1 / M73), inte datum.** Match-id:t är härlett ur kickoff + lag/grupp av T4b:s
+generator och redan korskollat mot FIFA i `match-schedule-source.test.ts`. Att joina på det STABILA id:t (inte
+på datum, som skiljer svensk vs amerikansk lokal-dag för sena avspark) gör join:en entydig: en FIFA-match per
+repo-match, inga dubbletter/luckor. `buildVenueTable` fail-loud:ar vid varje drift (okänt id, dubblett, saknad
+match, fel antal, fel antal distinkta arenor).
+
+**KÄLLOR (hämtade 2026-06-12, gissas ALDRIG):**
+- PRIMÄR (auktoritativ), FIFA:s spelschema: 16-arenor-listan ur Wikipedia "2026 FIFA World Cup"; per-match
+  gruppspel ur Al Jazeera "World Cup 2026: Full match schedule"; per-match slutspel (matchnr 73-104 + exakt
+  kommun) ur Wikipedia "2026 FIFA World Cup knockout stage".
+- KORSKOLL (oberoende andra källa): MLSSoccer "FIFA World Cup 2026 schedule: Every game by city & stadium"
+  (grupperad per arena, korskollad match för match) + ESPN-spelschemat (för exakt KOMMUN) + Wikipedia per-grupp-
+  sidor. De SPELADE matcherna (11-12 juni) korskollade mot MATCHRAPPORTER (historiskt fakta): Mexiko-Sydafrika
+  @ Estadio Azteca, Sydkorea-Tjeckien @ Estadio Akron (Zapopan).
+- Oberoende JOIN-korskoll: AT&T Stadium har FLEST matcher (9), en publik FIFA-fakta, och vår fördelning ger
+  exakt 9 där (pinnat i testet). Summan 9+8+8+8+7+7+7+7+6+6+6+6+6+5+4+4 = 104.
+
+**AVVIKELSE MELLAN KÄLLOR (flaggad, INTE gissad), Belgien-Egypten (g-G-1, 15 juni):** Al Jazeera skrev
+"BC Place, Vancouver", men FYRA andra källor (Lumen Fields officiella event-sida, Seattle Sounders matchpreview,
+ESPN, MLSSoccer) säger Lumen Field, Seattle. **Vald: Lumen Field, Seattle** (4 källor mot 1, inkl. arenans egen
+event-sida). Al Jazeeras Vancouver bedöms vara ett enstaka fel. Pinnat i venue-source.test.ts.
+
+**Arenanamn + kommun (källhänvisat val, inte gissat):** FIFA använder sponsor-fria TURNERINGSNAMN
+("Mexico City Stadium", "Estadio Guadalajara", "Dallas Stadium" osv.), men de ETABLERADE arenanamnen (som
+matchrapporterna + `Match.venue`-exemplet i `domain/types.ts`, "MetLife Stadium, East Rutherford", använder)
+är de riktiga. Vi använder det ETABLERADE arenanamnet + den FAKTISKA kommunen, konsekvent. Hela 16-arenor-tabellen
+(kanonisk form i `KNOWN_VENUES`):
+
+| Arena (etablerat namn) | Värdstad (kommun) | FIFA-turneringsnamn |
+|---|---|---|
+| Estadio Azteca | Mexico City | Mexico City Stadium |
+| Estadio Akron | Zapopan | Estadio Guadalajara |
+| Estadio BBVA | Guadalupe | Estadio Monterrey |
+| BMO Field | Toronto | Toronto Stadium |
+| BC Place | Vancouver | BC Place Vancouver |
+| MetLife Stadium | East Rutherford | New York New Jersey Stadium |
+| AT&T Stadium | Arlington | Dallas Stadium |
+| SoFi Stadium | Inglewood | Los Angeles Stadium |
+| Arrowhead Stadium | Kansas City | Kansas City Stadium |
+| Levi's Stadium | Santa Clara | San Francisco Bay Area Stadium |
+| NRG Stadium | Houston | Houston Stadium |
+| Lincoln Financial Field | Philadelphia | Philadelphia Stadium |
+| Mercedes-Benz Stadium | Atlanta | Atlanta Stadium |
+| Lumen Field | Seattle | Seattle Stadium |
+| Hard Rock Stadium | Miami Gardens | Miami Stadium |
+| Gillette Stadium | Foxborough | Boston Stadium |
+
+(Arrowhead heter formellt "GEHA Field at Arrowhead Stadium"; vi använder det vedertagna korta "Arrowhead Stadium"
+som Wikipedia knockout-sidan. Estadio Akron vs "Estadio Guadalajara": matchrapporterna för den SPELADE g-A-2 +
+Wikipedia använder "Estadio Akron, Zapopan", så vi följer det.)
+
+**Platshållaren behålls som fallback (gissa-aldrig kvar):** `VENUE_UNKNOWN` finns kvar som det uttryckliga
+fallbacket för en match UTAN verifierad arena-rad (`buildMatches` utan `venueOf`). I praktiken har alla 104
+matcher en verifierad arena (drift-vakten kräver det), men fallbacket gör att en framtida tillagd, ännu-overifierad
+match inte tyst gissas. `isVenuePlaceholder` (match-display.ts) + UI:t döljer en eventuell platshållare som förr.
+
+---
+
 ## 2026-06-12 , T44 (#75): footer-promo, synlig adress + utvecklar-promotion
 
 **Bakgrund (Daniels feedback 2026-06-11, #75):** footer-signaturen (T38/T39) länkade danielaldemir.com
