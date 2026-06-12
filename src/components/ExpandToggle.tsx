@@ -38,6 +38,15 @@ export interface ExpandToggleProps {
    * stabila, egna krokar. Default 'results' = oförändrade attribut för resultatvyn.
    */
   name?: string;
+  /**
+   * Egna BINÄRA etiketter (T68/#129): sektions-komprimeringen klipper på HÖJD, inte
+   * på antal dolda element, så "N dolda"-etiketten passar inte. När `labels` ges
+   * används `labels.expand` (komprimerat) / `labels.collapse` (utfällt) i stället för
+   * den count-drivna etiketten, men ALL a11y-mekanik (aria-expanded/-controls,
+   * namnrymd, chevron, fokus) är identisk. Utelämnad = count-etiketten (resultat-/
+   * tips-listan, oförändrat).
+   */
+  labels?: { expand: string; collapse: string };
 }
 
 /**
@@ -54,7 +63,16 @@ export function ExpandToggle({
   buttonRef,
   position,
   name = 'results',
+  labels,
 }: ExpandToggleProps) {
+  // BINÄR sektions-etikett (T68) eller den count-drivna list-etiketten (resultat/tips).
+  const text = labels
+    ? expanded
+      ? labels.collapse
+      : labels.expand
+    : expanded
+      ? 'Visa färre'
+      : `Visa alla matcher (${hiddenCount} ${hiddenCount === 1 ? 'dold' : 'dolda'})`;
   return (
     <button
       ref={buttonRef}
@@ -68,11 +86,7 @@ export function ExpandToggle({
       }}
       className="group/toggle inline-flex items-center gap-2.5 self-center rounded-pill border border-[color-mix(in_srgb,var(--color-accent)_42%,var(--color-border))] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))] px-6 py-3 font-display text-sm font-semibold text-fg shadow-[var(--vm-shadow-card)] transition-[background-color,border-color,box-shadow] duration-200 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_60%,var(--color-border))] hover:bg-[color-mix(in_srgb,var(--color-accent)_20%,var(--color-surface))] hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
     >
-      <span>
-        {expanded
-          ? 'Visa färre'
-          : `Visa alla matcher (${hiddenCount} ${hiddenCount === 1 ? 'dold' : 'dolda'})`}
-      </span>
+      <span>{text}</span>
       {/* Chevron: pekar ner = "det finns mer", vänds upp i utfällt läge.
           aria-hidden (etiketten + aria-expanded bär betydelsen åt skärmläsare),
           ren affordans. Accent-färgad så den drar ögat utan extra text. */}
