@@ -98,7 +98,10 @@ export function MatchReactions({ matchId }: MatchReactionsProps) {
           className="vm-reaction-tally inline-flex items-center gap-1 rounded-pill border border-border px-2 py-0.5 text-sm leading-none transition-[border-color,background-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] aria-pressed:border-accent"
         >
           <span aria-hidden="true">{t.emoji}</span>
-          <span className="text-xs font-semibold tabular-nums text-fg-muted" data-reactions-count>
+          {/* Antalet är den enda TEXTEN på brickan. Färgen är single-sourcad i
+              rooms.css (vilo = fg-muted, min = lyft till fg), inte en text-utility
+              här, så count-tonen är EN sanning och inte en specificitets-strid. */}
+          <span className="text-xs font-semibold tabular-nums" data-reactions-count>
             {t.count}
           </span>
         </button>
