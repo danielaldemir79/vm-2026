@@ -107,6 +107,13 @@ export function GetStartedControl({ variant = 'settings' }: GetStartedControlPro
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        // Inline-variantens synliga text är bara "Visa hur" (kompakt i onboardingen).
+        // aria-label ger skärmläsaren hela sammanhanget, och BÖRJAR med den synliga
+        // texten (WCAG 2.5.3 Label in Name, copilot R4). Settings-varianten bär sin
+        // fulla text synligt och behöver ingen label.
+        aria-label={
+          inline ? 'Visa hur du installerar appen eller kör den i webbläsaren' : undefined
+        }
         data-get-started-open={variant}
         className={
           inline
