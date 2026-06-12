@@ -5,6 +5,85 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T60/#102 (Grön baslinje) KLAR - PR #109 väntar på merge
+
+**Branch:** `feature/T60-roda-tester` @ HEAD `1f92b84`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/109 mot `develop` (Closes #102, state: OPEN)
+**Board:** issue #102 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #102 MANUELLT och flyttar kort #102 till Done EFTER merge.
+
+**Vad T60 levererade:**
+- Rotorsak: tidskopplad test-röta. De 4 roda testerna renderade ResultEntryView mot fixtures utan frusen klocka. T39:s 3-dagars-fönster ankrar pa "idag" och doljer (hidden) matcher utanfor fonstret; RTL:s a11y-queries hoppar over hidden-subträd, sa Spara-knappen blev oatkomlig. Testerna skrevs nar premiären lag i framtiden (grona); dagen vagklockan passerade premiardatumet (2026-06-11) rodnade de tyst. Ingen app- eller seam-regression, DOM:en var korrekt.
+- Fix: fryser klockan till premiardagen (vi.useFakeTimers Date + setSystemTime 2026-06-11T08:00Z) i bada filerna, samma monster som befintliga T28-block i samma fil redan anvander. Inga .skip, ingen produktionskodandring, commit `1f92b84`.
+- Rotorsaken dokumenterad i docs/decisions.md, commit `1f92b84`.
+- Baslinje: 1410/0 pass, npm run build EXIT 0, lint + format rent.
+- Reviewer: PASS. Rotorsak empiriskt bekraftad mot result-window.ts. Lesson-kandidat avvisad som dubblett av befordrad playbook-regel. IMPROVEMENTS-kandidat: nightly CI med framtidsfrusen klocka som vakt mot tidsröta.
+- Copilot: R1 0 fynd, exit.
+
+**Commits:**
+- `1f92b84` - test(results): frys klockan i 4 tidskopplade baslinje-tester (#102) - HEAD
+
+**Verifiering:** 1410/0 pass, npm run build EXIT 0, lint + format rent. Lokal panel: PASS. Copilot R1: 0 fynd, exit.
+
+**Acceptanskriterier issue #102 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: rotorsaka och fixa testerna (tidskopplad test-röta, frusen klocka, commit 1f92b84)
+- [x] AC#2: develop grön baslinje (1410/0 pass, build EXIT 0, lint/format rent)
+- [x] AC#3: dokumentera rotorsaken (docs/decisions.md, commit 1f92b84)
+
+**PINNADE punkter (oforandrade, bärs framåt):**
+- **code-vs-id branded TeamCode-kontraktet:** strukturellt stangt i T17, bärs framåt som konvention.
+- **#35 (arena/stad):** `Match.venue` = platsharare tills #35 fyller med verifierad per-match-kalla.
+- **FNV-hash:** 2 anvandningar, konsolidera vid 3:e.
+- **Stegnings-dubblett (windowDateKeys vs enumerateDateKeys):** 2 anvandningar, extrahera vid 3:e.
+- **Post-turnerings-asymmetri (#39-F1):** efter 19 juli ger default-vyn tom lista. Produktbeslut pinnat till Daniels hemkomst-ko.
+- **#48 (demo-chip a11y):** pre-existerande demo-chip-kontrast i ljust tema. Kort i Ready. Ny kandidat fran T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+- **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 handrullade dialoger). Kort i Ready.
+- **KA-F4-notering:** bundle ca 717 kB - lagg till manualChunks om LCP-problem uppstar.
+- **SA3-notering:** UUID = kapabilitet, accepterat, dokumenterat.
+- **F2-kandidat (T50):** kortnamn i RevealView/bracket-summary-rubriker om Daniel vill.
+
+**"Behöver Daniel"-kö (oforandrad + ny):**
+- Push-notiser T22: kräver Apple/Google Developer-konton.
+- **BEFORDRAN 1 (reviewer-monstret):** `uttommande-test-vaktar-svagare-invariant` Förekomst 3. Typ: korsar agenter -> regel i `memory/README.md`. Vantar Daniels godkannande.
+- **BEFORDRAN 2 (journalist-monstret):** `pastar-att-filer-saknas-utan-att-lista-dem` Förekomst 3. Typ: agent-beteende -> journalistens fil. Vantar Daniels godkannande.
+- **BEFORDRAN 3 (senior-developer-monstret):** `kommentar-pastar-exklusiv-vag-som-koden-inte-uppratthaller` Förekomst 4. Typ: agent-beteende -> senior-developers fil. Vantar Daniels godkannande.
+- **IMPROVEMENTS-kandidat (STARK, reviewerns, T56):** DoD-build-grinden ska pinnas till `npm run build`-EXIT (tsc -b kan EXIT 0 trots typfel i referens-projekt, npm test ar typblint). 2:a gangen typ/build-fel passerat gron testsvit.
+- **IMPROVEMENTS-kandidat (reviewern, T60):** nightly CI-job med framtidsfrusen klocka (t.ex. fryser till VM-premiardatumet + ett ar) som vakt mot tidsrota. Haller baslinje-gron aven nar realtidsklockan passerar eventets fonstergrans.
+- **IMPROVEMENTS-kandidat (T58):** yt-formulerade AC kräver callsite + render-test i handoff (pipeline-andring). Dirigenten noterar for `C:/Repo/agent-kit/IMPROVEMENTS.md`.
+- **IMPROVEMENTS-kandidat (commit-hook):** commit-msg-git-hook som scannar svenska diakritik-substitut.
+- **FIFA-juni-ranking:** aprilutgavan 2026 anvands. Junirankingen publicerades 2026-06-11 - uppdatering om Daniel vill: andra rank-varden + `npm run gen:team-profiles`.
+- **Release-gränsen:** develop -> main + release-cleanup-skillen vantar Daniels go.
+- **#39-F1-produktbeslut (post-turnerings-vy):** efter 19 juli ger default-vy tom lista.
+- **T48b:** recoverable signInWithOtp (AC#3 utbruten), bygge vantar.
+- **editor-flippar-radslut (senior-developer lesson):** monstret ar nu adresserat pa repo-niva med .gitattributes + endOfLine lf.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #109 (T60/#102, feature/T60-roda-tester) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 109 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #102 manuellt (`gh issue close 102`) - auto-close funkar inte mot develop nar default-branch ar main.
+> Flytta kort #102 till Done pa boarden (nu i "In Review", projekt 2).
+> Merga aven aldra oppna PR:er om de fortfarande ar oppna: PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stang resp. issue och flytta till Done.
+>
+> Om PR #109 REDAN mergad:
+> T60 klar. Nästa task i kön: **#93 (T54 glasklar installationsguide)** - las issuen noggrant fore start.
+> Därefter: #18 (realtid) -> #76 (T45 admin-statistik) -> #19 -> #24 -> #64 -> D-resten (FIFA-juni-ranking, #25, #56, #48 + demo-chip-AA-utökning fran T56-review).
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshallare.
+> - **FNV-hash:** konsolidera vid 3:e anvandning.
+> - **Stegnings-dubblett:** extrahera vid 3:e anvandning.
+> - **#48 (demo-chip a11y):** kort i Ready. Ny kandidat fran T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3+/4), 4 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook), FIFA-juni-ranking, release-gransen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbaddning:** SKIPPAD, stangd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vagen till slutet (Daniel ger go for release-gransen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T56/#100 (Levande slutspelsträd) KLAR - PR #108 väntar på merge
 
 **Branch:** `feature/T56-levande-trad` @ HEAD `21d4e2a`
