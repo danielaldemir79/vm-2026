@@ -2,10 +2,11 @@
 // Konsumenter importerar lag/grupper/matcher härifrån.
 //
 // Matchplanen (WC2026_MATCHES, T4b/#31) är nu med: 72 gruppmatcher + 32
-// slutspelsmatcher (M73-M104) med avsparkstid (UTC) och svensk TV-kanal,
-// GENERERAD ur den committade svenska TV-tablån (tv-schedule-source.txt) och
-// värde-låst mot källan i CI. Arena/stad saknas ännu i källan (känd lucka,
-// venue = uttrycklig "ej verifierad"-platshållare, gissas aldrig), se matches.ts.
+// slutspelsmatcher (M73-M104) med avsparkstid (UTC), svensk TV-kanal och verifierad
+// arena/stad, GENERERAD ur den committade svenska TV-tablån (tv-schedule-source.txt,
+// tid + kanal) + arena-källan (venue-source.txt, arena + stad, T4c/#35) och värde-låst
+// mot källorna i CI. Arenan kommer ur FIFA:s spelschema (16 arenor), korskollad mot en
+// andra oberoende källa (gissas aldrig), se matches.ts + docs/decisions.md (T4c).
 
 // Lag-profiler (T10/#10): FIFA-ranking + stjärnspelare + kuriosa per lag, källånkrad
 // (genererad ur team-profiles-source.txt, värde-låst i CI). Vävs redan in i
