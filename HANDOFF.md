@@ -5,6 +5,74 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T54/#93 (Glasklar kom-igång) KLAR - PR #112 väntar på merge
+
+**Branch:** `feature/T54-kom-igang` @ HEAD `e7ca190`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/112 mot `develop` (Closes #93, state: OPEN)
+**Board:** issue #93 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #93 MANUELLT och flyttar kort #93 till Done EFTER merge.
+
+**Vad T54 levererade:**
+- Ny kom-igång-dialog: två val-kort (kör direkt pa webben / lägg pa hemskärmen), plattforms-flikar (iPhone/Android/dator) med numrerade steg, rätt flik förvald via enhets-detektering (återanvänd fran T39, ingen dubblett), commit `0cb9799`.
+- Play Skydd-lugnande text pa Android (ordagrant fran install-bannern), ärlig webb-läges-info (privat läge, rensa data, iPhone-webbens ca 7-dagars självrensning med källhänvisning mot WebKit), commit `0cb9799`.
+- Standalone-läge: firande "du kör appen, allt klart"-kort i stället för instruktioner - onödigt surr dolt, commit `0cb9799`.
+- Alltid nåbar: rad i inställnings-portalen + "Visa hur"-CTA i onboardingens install-steg (bada callsite + render-testade), 38 tester gröna, commit `0cb9799`.
+- Design: hero-band, val-kort, glyf-flikar, AA min 6.28 mörkl / 4.57 ljust (kompositmätt), commit `40c6dc3`.
+- Review-F1 åtgärdad: iOS-texten paстod föråldrad Safari-exklusivitet (sedan iOS 16.4 funkar Dela-menyn även i Chrome pa iPhone), nu Safari-rekommendation utan felaktig spärrkommentar, källor + verifieringsdatum dokumenterade, commit `2a5b9fe`. Ny lesson: `extern-plattforms-fakta` i reviewer-lessons.
+- Copilot R1: äkta fail-loud i getPathFor + sanna iOS-kommentarer + info-ton, commit `8d4496c`.
+- Copilot R2: giltig aria-controls + plattforms-keyad glyf + capture-Escape vid staplade modaler, commit `a3c4adf` (inte i byggets HEAD-kedja, integrerad i R3).
+- Copilot R3: WAI-ARIA tabs-tangentbord + Escape-regressionstest, commit `725c8e0`.
+- Copilot R4: knapp-citat matchar InstallBanner + aria-label pa "Visa hur", commit `e7ca190`.
+
+**Commits (kronologisk ordning):**
+- `0cb9799` - feat(app-settings): glasklar kom-igång-yta, installera ELLER använd direkt (#93)
+- `40c6dc3` - style(app-settings): premium-finish pa kom-igång-dialogen (#93)
+- `2a5b9fe` - T54: review-F1, iOS-texten rekommenderar Safari utan föråldrad exklusivitet (#93)
+- `8d4496c` - T54: copilot R1, äkta fail-loud i getPathFor + sanna iOS-kommentarer + info-ton (#93)
+- `a3c4adf` - T54: copilot R2, giltig aria-controls + plattforms-keyad glyf + capture-Escape vid staplade modaler (#93)
+- `725c8e0` - a11y(get-started): WAI-ARIA tabs-tangentbord + Escape-regressionstest (#93)
+- `e7ca190` - T54: copilot R4, knapp-citatet matchar InstallBanner + aria-label pa Visa hur (#93) - HEAD
+
+**Verifiering:** build EXIT 0, 154 app-settings-tester gröna, full svit 0 röda, lint/format rena. Lokal panel: FAIL->åtgärdad->grön (F1 föråldrad extern fakta), övriga linser PASS. Copilot: 4 rundor (4->3->2->2 triviala), exit.
+
+**Acceptanskriterier issue #93 (bockade av journalisten 2026-06-12):**
+- [x] Kom-igång-ytan visar rätt instruktioner för användarens plattform (Android/iOS/desktop) och nämner bada vägarna (webb + app)
+- [x] Alltid nåbar efter onboardingen (inte bara första gangen)
+- [x] Play Skydd-lugnande text pa Android, Safari-kravet tydligt pa iOS
+- [x] Webb-lägets risker ärligt men vänligt kommunicerade
+- [x] Responsiv + a11y + tester, grönt bygge/lint, reviewad
+
+**Daniels nya krav fran 2026-06-12 (bär framåt till T63):**
+- #113 (T63 ett-klicks-install): ytan överst = KOMPAKT knapp (ingen info-ruta), klick -> native-prompt (Android/desktop) eller kom-igång-dialogen (iOS/fallback), HELT dold i standalone.
+- Detaljerna i issuen: återanvänd install-prompt.ts (T39) + GetStartedDialog (T54), ingen dubblett.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #112 (T54/#93, feature/T54-kom-igang) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 112 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #93 manuellt (`gh issue close 93`) - auto-close funkar inte mot develop nar default-branch är main.
+> Flytta kort #93 till Done pa boarden (nu i "In Review", projekt 2).
+> Merga även äldre öppna PR:er om de fortfarande är öppna: PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #112 REDAN mergad:
+> T54 klar. Nästa task i kön: **#110 (T61 kopierade tips syns inte utan rum-byte)** - las issuen noggrant fore start (rotorsaks-hypotes: copyMyTips triggar ingen re-fetch i tips-vyernas providers).
+> Därefter: #111 (T62 nyss spelade matcher i tips-listans fönster) -> #113 (T63 ett-klicks-install, kompakt knapp, native-prompt eller guide, dold i standalone) -> #18 -> #76 -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshallare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready. Ny kandidat fran T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3+/4), 5 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook + T58-callsite-krav), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T60/#102 (Grön baslinje) KLAR - PR #109 väntar på merge
 
 **Branch:** `feature/T60-roda-tester` @ HEAD `1f92b84`
