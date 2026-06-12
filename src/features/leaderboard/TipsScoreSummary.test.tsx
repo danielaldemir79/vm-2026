@@ -30,6 +30,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     currentUserId: null,
     selfBreakdown: null,
     selfBadges: null,
+    selfStats: null,
     ...partial,
   };
 }

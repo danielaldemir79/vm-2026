@@ -15,6 +15,7 @@ import type { Team } from '../../domain/types';
 import type { LeaderboardEntry, ScoreBySource } from './aggregate-scores';
 import type { RevealedMatch } from './reveal';
 import type { MemberBadges } from './derive-badges';
+import type { PersonalStats } from './personal-stats';
 
 /** Laddningstillstånd (samma vokabulär som T15/T16:s stores). */
 export type LeaderboardStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -57,6 +58,14 @@ export interface LeaderboardStore {
    * (badge-raden), så märkena delar samma poäng-källa som allt annat (en hämtning).
    */
   selfBadges: MemberBadges | null;
+  /**
+   * AKTUELL användares PERSONLIGA STATISTIK (T23, #23): träffsäkerhet, exakta/utfall/
+   * miss-räkning, bästa call. null tills vi kan peka ut en egen medlem (samma gate som
+   * selfBreakdown/selfBadges). HÄRLEDD (derivePersonalStats) ur SAMMA score.ts-poängväg
+   * som topplistan + den delade matchlistan, ingen omräkning, ingen DB. Joker-medveten
+   * bästa call (storens egna joker-set). Konsumeras av tips-vyns summering.
+   */
+  selfStats: PersonalStats | null;
 }
 
 /**

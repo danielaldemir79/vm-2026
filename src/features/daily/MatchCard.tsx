@@ -66,6 +66,15 @@ export interface MatchCardProps {
    * reaktions-knapparna har sina egna etiketter och inte dubbel-läses i kort-labeln.
    */
   footer?: ReactNode;
+  /**
+   * Lyft kortet DISKRET som "en match med ditt favoritlag" (T23, #23). SKILT från
+   * `highlight` (som är "Dagens match"-hero:n): de kan sammanfalla (favoritlaget
+   * spelar dagens match) utan att kollidera, eftersom favoriten bara lägger en LÅGMÄLD
+   * markering (data-favorite + en liten stjärn-bricka + ett ord i a11y-namnet), inte en
+   * hero-behandling. Default false = ingen markering (kortet ser ut precis som förr).
+   * design-frontend finputsar den visuella markeringen ovanpå data-favorite-haken.
+   */
+  favorite?: boolean;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -127,6 +136,7 @@ export function MatchCard({
   highlight = false,
   highlightLabel = 'Dagens match',
   footer = null,
+  favorite = false,
 }: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
@@ -151,7 +161,10 @@ export function MatchCard({
   const channelPart = match.tvChannel ? `, ${match.tvChannel}` : '';
   const resultPart = penalties ? ` ${penalties}` : '';
   const matchupPart = finished ? `${home} ${score} ${away}${resultPart}` : `${home} mot ${away}`;
-  const label = `${time}, ${matchupPart}, ${stage}${channelPart}`;
+  // Favorit-suffix i a11y-namnet (T23): en skärmläsare hör att matchen rör ens
+  // favoritlag, samma besked som den synliga brickan ger seende.
+  const favoritePart = favorite ? ', med ditt favoritlag' : '';
+  const label = `${time}, ${matchupPart}, ${stage}${channelPart}${favoritePart}`;
 
   // FÄRG-OBEROENDE featured-stil (T7-pin): guld-ton i kant + upphöjd yta + en
   // mjuk gradient, allt via color-mix mot tokens (följer temat, ingen rå hex).
@@ -168,6 +181,7 @@ export function MatchCard({
       aria-label={label}
       data-match-card=""
       data-highlight={highlight ? '' : undefined}
+      data-favorite={favorite ? '' : undefined}
       data-stage={match.stage}
       className={`flex h-full flex-col gap-3 rounded-card border p-4 transition-shadow ${
         highlight
@@ -250,6 +264,22 @@ export function MatchCard({
           arena-/stadsnamn behöver en synlig "Arena"-etikett för att inte bli
           tvetydigt. Alla dt:er når ändå skärmläsare oavsett. */}
       <dl className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
+        {/* FAVORIT-BRICKAN (T23, #23): en DISKRET markering "ditt favoritlag spelar".
+            Lågmäld med flit (en liten kant-bricka + stjärna), så den inte tävlar med
+            hero-chippet (highlight). Identiteten bär dt:n (sr-only "Favoritlag") + det
+            synliga ordet; data-favorite-chip = design-/test-hak för finputsning. */}
+        {favorite ? (
+          <div className="flex items-center gap-1">
+            <dt className="sr-only">Favoritlag</dt>
+            <dd
+              data-favorite-chip=""
+              className="inline-flex items-center gap-1 rounded-pill border border-border px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
+            >
+              <span aria-hidden="true">★</span>
+              <span>Favorit</span>
+            </dd>
+          </div>
+        ) : null}
         {highlight ? (
           <div className="flex min-w-0 items-center gap-1">
             <dt className="sr-only">Utvald</dt>
