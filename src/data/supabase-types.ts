@@ -231,6 +231,44 @@ export type Database = {
           },
         ];
       };
+      room_jokers: {
+        Row: {
+          created_at: string;
+          joker_day: string;
+          match_id: string;
+          room_id: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          // joker_day skrivs ÖVER av before-triggern (room_jokers_set_day) ur den
+          // server-härledda match-dagen, så klienten skickar det aldrig. Genererat som
+          // obligatoriskt av Supabase, men API:t (room-joker-api.ts) utelämnar det.
+          joker_day: string;
+          match_id: string;
+          room_id: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          joker_day?: string;
+          match_id?: string;
+          room_id?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'room_jokers_room_id_fkey';
+            columns: ['room_id'];
+            isOneToOne: false;
+            referencedRelation: 'rooms';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       room_match_results: {
         Row: {
           away_goals: number;
@@ -399,6 +437,11 @@ export type Database = {
           room_name: string;
         }[];
       };
+      // T19 (#19): matchens avspark som SVENSK kalenderdag (joker-omgångens dag).
+      // Returns string | null (date som ISO-datum): ger NULL för en okänd match (samma
+      // fail-safe som match_kickoff). Triggern room_jokers_set_day fyller joker_day ur
+      // denna; klient-API:t kallar den inte direkt (server-härlett).
+      match_joker_day: { Args: { p_match_id: string }; Returns: string | null };
       // T15 (#15): slå upp en matchs avsparkstid (deadline-låsets klocka).
       // Returns string | null: RPC:n är ett rent `select k.kickoff ... where match_id = ...`
       // (migration 20260611120200_t15_predictions_rls.sql) och ger NULL för en okänd match.

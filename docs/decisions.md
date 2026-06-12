@@ -5,6 +5,67 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T19 (#19): gamification (streaks, märken, joker-match)
+
+**Beslut: streaks + märken HÄRLEDS rent ur befintlig data, INGEN ny DB-tabell.** Streak och
+de två märkena räknas fram ur exakt samma data topplistan redan har (en medlems match-tips +
+det härledda facit + lag-listan), via en ren modul `src/features/leaderboard/derive-badges.ts`,
+precis som tabeller/träd/poäng (SPEC §6 "härledd state", anti-bloat). Ett märke är en
+OBSERVATION om redan-känd data, så det behöver ingen persistens. Joker KRÄVER däremot en tabell
+(delas + poängsätts för alla, se nedan).
+
+**Reglerna (otvetydiga, källhänvisade, gissas inte):**
+- **Streak** = antal RAKA avgjorda match-tips (i AVSPARKS-ordning, kickoff) som gav poäng (> 0,
+  dvs minst rätt utfall). En miss (0p) bryter sviten. Rapporterar nuvarande (löpande svit) +
+  längsta. Källa: `score.ts` (scorePrediction > 0 = rätt utfall/exakt) + issue #19.
+- **"Kallade skrällen"** = minst EN exakt-träff (3p, `pointTypeOf === 'exact'`) på en match där
+  det laget medlemmen tippade skulle VINNA hade SÄMRE FIFA-ranking (numeriskt HÖGRE rank-tal) än
+  motståndaren, OCH det laget vann i ordinarie tid. Ett oavgjort eller en saknad ranking på något
+  lag ger ALDRIG märket (fail-safe, ingen underdog-gissning). KÄLLA till rankingen (gissas ALDRIG):
+  FIFA/Coca-Cola Men's World Ranking, aprilutgåvan 2026, committad i `team-profiles-source.txt`
+  (URL:er + hämtdatum 2026-06-10), exponerad som `Team.fifaRanking` (T10). Lägre tal = bättre lag.
+  Vi kräver EXAKT-träff (inte bara rätt utfall) så märket är en bedrift, inte tur.
+- **"Perfekt omgång"** = en SVENSK kalenderdag (Europe/Stockholm) där medlemmen tippade MINST 2
+  matcher som ALLA är avgjorda OCH ALLA gav poäng (> 0). "Omgång" = en dags matcher (samma tolkning
+  som joker-dagen, en sanning). Minst 2 så en ensam rätt-tippad match inte räknas som en hel omgång.
+  Källa: `localDateKey` (samma svensk-dag-regel som dagsvyn T7 + DB:ns `match_joker_day`) + score.ts.
+
+**Beslut: JOKER kräver persistens, ny tabell `room_jokers`.** En joker pekar ut EN match vars
+MATCH-tips-poäng DUBBLAS (×2, `JOKER_MULTIPLIER`, issue #19 "dubblar poängen") i topplistans
+aggregering (scoreMember-vägen, EN sanning, summan==delarna-invarianten består). Eftersom jokern
+delas + poängsätts för ALLA medlemmar måste den persisteras (inte härledas). Migrationer
+`20260612150000_t19_room_jokers_schema.sql` + `..._t19_room_jokers_rls.sql`, applicerade LIVE.
+OBS precision (review-F3): live-versionsstämplarna är MCP-genererade (`20260612123326`/`123346`)
+och skiljer från filnamnens, samma kända nyans som T15/T16/T53/T67; SQL-innehållet är verifierat
+funktionellt identiskt mot live, en fresh `db reset` replayar samma slutläge under andra stämplar.
+
+**Beslut: EN joker per användare och KALENDERDAG (svensk tid).** "Per omgång" tolkas som per
+svensk kalenderdag (den naturliga VM-omgången, en dags matcher). Regeln upprätthålls STRUKTURELLT
+av PK på `(room_id, user_id, joker_day)` + en `joker_day`-kolumn som en BEFORE-TRIGGER
+(`room_jokers_set_day`) skriver över ur `match_joker_day(match_id)` (matchens avspark i
+Europe/Stockholm som date). Klientens värde ignoreras helt (oförfalskbar omgång). En andra joker
+samma dag KROCKAR med PK:n (upsert byter jokern inom dagen i stället för att skapa två).
+**Varför trigger, inte GENERERAD kolumn:** en generated-kolumn kräver IMMUTABLE-uttryck, men
+"slå upp kickoff i en tabell + tidszons-konvertera" är STABLE, så Postgres avvisar det
+(`42P17: generation expression is not immutable`). En trigger får anropa en stable funktion.
+
+**Beslut: joker-låset + sekretessen = SAMMA RLS-mönster som tipset (T15).** En joker får bara
+sättas/ändras/tas bort FÖRE matchens avspark (deadline-lås, `now() < match_kickoff(match_id)`,
+SAMMA helper som predictions-RLS, en sanning), och andras joker-val är dolda före avspark
+(sekretess, strategisk info avslöjas när tipset gör). Bevisat SERVER-SIDE med riktiga roller +
+manipulerade kickoff-tider (DO-block): TILLÅTEN insert öppen match (server-härledd joker_day),
+EN-JOKER-PER-DAG (g-E-2 + g-F-2 båda 2026-06-15 -> andra NEKAD av PK, upsert byter), DEADLINE-LÅS
+(joker på låst match NEKAD), FÖRFALSKNING (Bob i Alices namn NEKAD), SEKRETESS (Bob ser 0 av
+Alices joker på öppen match), UTOMSTÅENDE (Carol läser 0, skriver NEKAD). Klient-RLS-test
+(room-joker-rls.integration.test.ts) täcker de delar som är bevisbara mot live (deadlines i framtiden).
+
+**Beslut: joker dubblar BARA match-poäng, inte grupp-/bracket-poäng.** Jokern pekar ut en MATCH,
+så bara den matchens scorePrediction dubblas. `exactHits` (tiebreak) räknas på OBERÄKNAT utfall
+(ett antal exakta tips, inte poäng). En joker på en miss ger 0 (0×2=0, ingen straff, ingen vinst).
+Streaks/märken är JOKER-OBEROENDE (en skräll är en bedrift oavsett om man satte joker på den).
+
+---
+
 ## 2026-06-12 , T45 (#76): admin-statistik (alla rum + medlemmar + vem tippar bäst)
 
 **Beslut:** Två SECURITY DEFINER-RPC:er (`admin_room_stats()` + `admin_revealed_predictions()`),

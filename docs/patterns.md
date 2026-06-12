@@ -9,6 +9,28 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### server-harledd-dag-via-before-trigger-for-en-per-omgang-PK (Supabase, VM 2026)
+
+**Recept (upprätthåll "EN rad per användare och kalenderdag" STRUKTURELLT, oförfalskbart):**
+
+1. **Problemet:** ett val ska vara unikt per användare och "omgång" (svensk kalenderdag), och dagen
+   måste härledas SERVER-SIDE ur en referens (en match-avspark), inte tas emot från klienten (som kan
+   ljuga om vilken dag valet gäller). Exempel: joker-matchen (T19), en per dag.
+2. **Materialisera dagen i en `date`-kolumn + PK på `(user_id, ..., dag)`.** PK:n ÄR regeln: en andra
+   rad samma dag krockar (upsert byter i stället för att skapa två).
+3. **Fyll dagen med en BEFORE INSERT/UPDATE-TRIGGER, inte en GENERERAD kolumn.** En generated-kolumn
+   kräver ett IMMUTABLE-uttryck, men "slå upp en tid i en tabell + tidszons-konvertera" är STABLE
+   (läser data, tidszons-beroende), så Postgres avvisar det (`42P17: generation expression is not
+   immutable`). En trigger får anropa en STABLE funktion: `new.dag := public.harled_dag(new.ref_id)`.
+   Klientens värde skrivs över (oförfalskbart), och en okänd ref (NULL dag) avvisas av NOT NULL (fail-safe).
+4. **Härled dagen i RÄTT tidszon.** `(kickoff at time zone 'Europe/Stockholm')::date` ger den svenska
+   kalenderdagen (samma zon som `localDateKey`/DISPLAY_TIMEZONE i klienten, en sanning, off-by-one-skydd).
+5. **Lås + sekretess = ÅTERANVÄND samma RLS-helpers som det relaterade tipset** (`match_kickoff`,
+   `is_room_member`), så "när låser/avslöjas det" är EN sanning som inte kan drifta.
+6. **BEVISA en-per-dag + lås med riktiga roller (DO-block) FÖRE klient-koden:** två refs SAMMA dag ->
+   andra NEKAD av PK (upsert byter, 1 rad); ett lås-test med manipulerad kickoff -> NEKAD efter avspark.
+   Källa: T19 (#19), `room_jokers` + `match_joker_day` + `room_jokers_set_day`-triggern.
+
 ### admin-aggregat-rpc-laser-over-rumsgranser-utan-att-lacka-hemliga-tips (Supabase, VM 2026)
 
 **Recept (en ROLL-gatad läsning ÖVER per-rum-RLS, som returnerar AGGREGAT/avslöjat , aldrig hemlig
