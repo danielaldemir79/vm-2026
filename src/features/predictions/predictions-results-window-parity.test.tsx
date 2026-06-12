@@ -107,47 +107,79 @@ const MATCHES: Match[] = [
 beforeEach(() => {
   predData.matches = MATCHES;
   predData.teams = TEAMS;
-  // Pinna klockan på premiärdagen: resultatvyns useTodayKey() läser Date.now(),
-  // tips-vyn får samma "nu" via now-propen. Så BÅDA ankrar på samma dag.
+  // Fake timers så resultatvyns useTodayKey() läser en PINNAD klocka (samma "nu"
+  // som tips-vyn får via now-propen, så BÅDA ankrar på samma dag). Varje test sätter
+  // sin egen systemtid (premiär resp. mitt i turneringen) via setSystemTime.
   vi.useFakeTimers();
-  vi.setSystemTime(PREMIERE);
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
+/**
+ * Mät de default-synliga match-id:na i BÅDA vyerna för en given matchuppsättning +
+ * pinnat "nu", och returnera dem för en likhets-assertion. Resultatvyn laddar
+ * matcher asynkront via DataSource, så vi flushar det redan-resolvade löftet inom
+ * act() (en mikro-task-tick, ingen riktig fördröjning) innan vi mäter.
+ */
+async function visibleInBothViews(
+  matches: Match[],
+  now: Date
+): Promise<{ res: string[]; pred: string[] }> {
+  // Tips-vyns data-hook är mockad mot predData; mata den SAMMA matcher som
+  // resultatvyns DataSource får, annars jämför vi äpplen och päron.
+  predData.matches = matches;
+  const res = render(
+    <ResultsProvider env={{} as ImportMetaEnv} dataSource={fixedDataSource(matches)}>
+      <ResultEntryView />
+    </ResultsProvider>
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(res.container.querySelectorAll('[data-match-id]')).toHaveLength(matches.length);
+  const resVisible = visibleMatchIds(res.container);
+
+  const pred = render(
+    <PredictionsStoreContext.Provider value={predictionsStore()}>
+      <PredictionsView now={now} />
+    </PredictionsStoreContext.Provider>
+  );
+  const predVisible = visibleMatchIds(pred.container);
+  return { res: resVisible, pred: predVisible };
+}
+
 describe('Fönster-paritet: tips-vyn och resultatvyn döljer SAMMA matcher', () => {
-  it('default-synliga matcher är identiska i båda vyerna (samma 3-dagars fönster)', async () => {
-    // Tips-vyn (mockad data-hook + aktiv-rum-store).
-    // Resultatvyn FÖRST (den laddar matcher asynkront via DataSource). Vi flushar
-    // det väntande löftet inom act() (fake timers + en mikro-task-tick) så React
-    // har commitat korten innan vi mäter, utan act-varning.
-    const res = render(
-      <ResultsProvider env={{} as ImportMetaEnv} dataSource={fixedDataSource(MATCHES)}>
-        <ResultEntryView />
-      </ResultsProvider>
-    );
-    await act(async () => {
-      // Låt det redan resolvade getMatches-löftet (mikro-tasks) köra klart; ingen
-      // riktig fördröjning behövs (källan resolvar synkront), bara en flush.
-      await Promise.resolve();
-    });
-    expect(res.container.querySelectorAll('[data-match-id]')).toHaveLength(MATCHES.length);
-    const resVisible = visibleMatchIds(res.container);
+  it('default-synliga matcher är identiska i båda vyerna (premiärfönstret)', async () => {
+    vi.setSystemTime(PREMIERE);
+    const { res, pred } = await visibleInBothViews(MATCHES, PREMIERE);
 
-    // Tips-vyn (mockad data-hook + aktiv-rum-store): renderar synkront med samma
-    // matcher och samma pinnade "nu".
-    const pred = render(
-      <PredictionsStoreContext.Provider value={predictionsStore()}>
-        <PredictionsView now={PREMIERE} />
-      </PredictionsStoreContext.Provider>
-    );
-    const predVisible = visibleMatchIds(pred.container);
-
-    // KÄRNAN: samma fönster -> samma synliga mängd. Och den ska vara fönstrets tre
+    // KÄRNAN: samma fönster -> samma synliga mängd. På premiärdagen golvas bakåt-
+    // spannet på premiären (inget före första matchen), så fönstret är de tre
     // (p0-p2), inte tomt och inte allt: ett ÄKTA fönster bevisar att BÅDA döljer.
-    expect(predVisible).toEqual(['p0', 'p1', 'p2']);
-    expect(resVisible).toEqual(predVisible);
+    expect(pred).toEqual(['p0', 'p1', 'p2']);
+    expect(res).toEqual(pred);
+  });
+
+  // T62: pariteten måste hålla även för det NYA bakåt-fönstret. Ankra mitt i
+  // turneringen (16 juni) med en match igår (15 juni). BÅDA vyerna ska ta med igår
+  // identiskt, annars driver de isär och en vy visar poäng som den andra gömmer.
+  it('bakåt-fönstret (igår) är identiskt i båda vyerna (T62)', async () => {
+    const MID = new Date('2026-06-16T10:00:00.000Z'); // 12:00 svensk, igår = 15 juni
+    const midMatches: Match[] = [
+      match('y', '2026-06-15T18:00:00.000Z'), // igår -> i BÅDAS fönster (T62)
+      match('t0', '2026-06-16T18:00:00.000Z'), // idag
+      match('t1', '2026-06-17T18:00:00.000Z'), // i morgon
+      match('far', '2026-06-20T18:00:00.000Z'), // utanför -> dolt i BÅDA
+    ];
+    vi.setSystemTime(MID);
+    const { res, pred } = await visibleInBothViews(midMatches, MID);
+
+    // Fönstret 15-18 juni: igår + idag + 2 fram. far (20 juni) döljs i BÅDA.
+    expect(pred).toEqual(['t0', 't1', 'y']); // visibleMatchIds sorterar, så ordningen är alfabetisk
+    expect(res).toEqual(pred);
+    // Explicit: gårdagens match är med i BÅDA (kärnan i T62, inte bara "lika").
+    expect(pred).toContain('y');
   });
 });

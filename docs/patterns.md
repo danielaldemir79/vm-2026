@@ -855,11 +855,17 @@ Två lager (RLS = skydd, ren tids-gate = sann visning) ger båda. Källa: T17 (`
 **Recept (en lång VM-lista (104 matcher) blir hanterbar utan att tappa state):**
 
 1. **Urvalet är en REN, delad funktion** (`features/results/result-window.ts`, `windowMatches(matches,
-   now)`): visar matcher inom de närmaste 3 SVENSKA kalenderdagarna (ankrat på idag, eller premiärdagen
-   om turneringen ej börjat), returnerar `{ visible, hiddenCount, anchorKey }`. Svensk-dag-regeln
-   (`localDateKey`, off-by-one-säker) + alla edge-fall (ej börjad, slutet < 3 dagar, vilodag i fönstret,
-   allt inom fönstret) är EN sanning, uttömmande testad fristående. ÅTERANVÄND den rakt av för varje ny
-   lista, skriv inget eget datum-urval.
+   now)`): visar matcher i fönstret `igår + idag + de 2 följande SVENSKA kalenderdagarna` (ankrat på
+   idag minus `LOOKBACK_DAYS`, golvat på premiärdagen om turneringen ej börjat), returnerar
+   `{ visible, hiddenCount, anchorKey }`. Svensk-dag-regeln (`localDateKey`, off-by-one-säker) + alla
+   edge-fall (ej börjad, slutet, vilodag i fönstret, allt inom fönstret, gårdagens match med) är EN
+   sanning, uttömmande testad fristående. ÅTERANVÄND den rakt av för varje ny lista, skriv inget eget
+   datum-urval. BAKÅT-SPANNET (T62/#111): det FASTA `LOOKBACK_DAYS = 1` (igår) tar alltid med de nyss
+   spelade matcherna, så avgjorda matcher med poäng (T58) syns kvar dagen efter i stället för att glida
+   ut ur ett rent framåtblickande fönster. Medveten avgränsning: en vilodags-gårdag betyder att
+   förrgårs match inte syns i default (nås via expandera), valt fram för "senaste spel-dag oavsett hur
+   långt bort" eftersom ett fast spann aldrig drar in en gammal match och inte gissar schemats
+   vilo-luckor. Båda fönster-konsumenterna (resultat + tips) ärver bakåt-spannet, så pariteten består.
 2. **DÖLJ, filtrera inte bort** de matcher som ligger utanför fönstret. Rendera ALLA kort alltid och sätt
    `hidden` på de utanför fönstrets `<li>` (display:none + ur a11y-trädet), så React-instansen lever
    kvar. VARFÖR: ett kort med osparad lokal `useState` (ett halvskrivet resultat/tips) tappar inmatningen
