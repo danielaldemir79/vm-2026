@@ -53,6 +53,14 @@ describe('GetStartedControl, varianter', () => {
   it('återställer fokus till triggern när dialogen stängs (a11y)', async () => {
     render(<GetStartedControl variant="settings" />);
     const trigger = screen.getByRole('button', { name: /Kom igång/i });
+    // Fokusera triggern INNAN klick: den delade <Modal> (T33) minns det element som var
+    // fokuserat vid öppning (document.activeElement) och återför fokus dit vid stängning,
+    // den a11y-korrekta universella regeln. I en RIKTIG webbläsare flyttar ett klick på en
+    // <button> fokus dit, men jsdom:s fireEvent.click gör INTE det, så vi fokuserar
+    // explicit för att spegla browser-beteendet (samma grepp som TeamProfile-/Onboarding-
+    // testerna). Tidigare fångade GetStartedControl triggern via en ref oavsett fokus;
+    // <Modal>:s document.activeElement-fångst är mer generell (rätt opener i alla fall).
+    trigger.focus();
     fireEvent.click(trigger);
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Stäng kom igång' }));
