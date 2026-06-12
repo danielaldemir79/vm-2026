@@ -39,6 +39,20 @@ vi.mock('../../data/official', () => ({
   }),
 }));
 
+// REALTID (T18, #18): mocka realtids-seamen så vi kan FÅNGA den onChange provider:n
+// registrerar och fyra en simulerad postgres_changes-händelse manuellt, utan en riktig
+// kanal. Vi sparar senaste options så testet kan trigga onChange och se att facit
+// re-fetchas (samma tysta väg som fokus/online).
+const realtime = vi.hoisted(() => ({
+  lastOptions: null as { enabled: boolean; onChange: () => void } | null,
+  unsubscribe: vi.fn(),
+}));
+vi.mock('../../data/realtime', () => ({
+  useRealtimeSubscription: (opts: { enabled: boolean; onChange: () => void }) => {
+    realtime.lastOptions = opts;
+  },
+}));
+
 const fakeClient = {} as VmSupabaseClient;
 // Live-gaten: env måste se konfigurerad ut OCH liveReady=true (injiceras).
 const liveEnv = {
@@ -51,6 +65,7 @@ beforeEach(() => {
   apiState.isAdmin = false;
   apiState.listError = null;
   apiState.saveError = null;
+  realtime.lastOptions = null;
   vi.clearAllMocks();
 });
 
@@ -221,6 +236,52 @@ describe('OfficialResultsProvider', () => {
     await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('0'));
     expect(screen.getByTestId('error').textContent).toBe('');
     expect(screen.getByTestId('status').textContent).toBe('ready');
+  });
+
+  // REALTID (T18, #18): en facit-händelse från en ANNAN klient (admin matade in ett
+  // resultat någon annanstans) ska köra den TYSTA re-fetchen, så denna klients facit
+  // uppdateras live utan reload.
+  it('en Realtime-facit-händelse re-fetchar facit (live-uppdatering utan reload)', async () => {
+    apiState.isAdmin = false;
+    apiState.results = [];
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(screen.getByTestId('count').textContent).toBe('0');
+
+    // Provider:n registrerade en realtids-prenumeration (enabled i live-läge).
+    expect(realtime.lastOptions).not.toBeNull();
+    expect(realtime.lastOptions!.enabled).toBe(true);
+
+    // Simulera att en ANNAN klient matade in ett resultat: servern har nu en rad.
+    apiState.results = [
+      {
+        matchId: 'g-A-1',
+        homeGoals: 2,
+        awayGoals: 0,
+        penalties: null,
+        status: 'finished',
+        updatedBy: 'admin',
+        updatedAt: 't2',
+      },
+    ];
+    // Fyra realtids-händelsen -> provider:n kör sin tysta refresh.
+    await act(async () => {
+      realtime.lastOptions!.onChange();
+    });
+    await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('1'));
+    // Tyst: ingen 'loading'-flicker, status förblev ready hela tiden.
+    expect(screen.getByTestId('status').textContent).toBe('ready');
+  });
+
+  it('realtids-prenumerationen är vilande utan live (enabled false)', async () => {
+    render(
+      <OfficialResultsProvider env={{} as ImportMetaEnv} liveReady={false}>
+        <Probe />
+      </OfficialResultsProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(realtime.lastOptions).not.toBeNull();
+    expect(realtime.lastOptions!.enabled).toBe(false);
   });
 
   it('inaktivt utan Supabase-env: enabled false, status ready, isAdmin false', async () => {
