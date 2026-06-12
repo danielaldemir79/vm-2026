@@ -284,3 +284,108 @@
 .vm-rooms-copy-result[data-result-tone='negative'] .vm-rooms-copy-result-glyph {
   color: var(--color-danger);
 }
+
+/* -----------------------------------------------------------------------------
+   8. KOMMENTARER (T66, #121). [design-frontend premium-finish]
+
+   Snack-ytan där rummets medlemmar pratar match LIVE (Daniels klass använder den
+   flitigt under matcherna). Premium-finishen lägger en CHATT-känsla ovanpå senior-
+   devs semantik + data-hakar (data-comments-*), UTAN att röra logiken (samma seam
+   som resten av rums-UI:t):
+     - egna meddelanden får en diskret accent-tonad bubbla + högerställning,
+     - andras får den lugna surface-bubblan, namnet tydligt,
+     - tät men läsbar rytm på mobil (många meddelanden),
+     - en lugn, centrerad tom-state,
+     - en räknare som blir varm nära gränsen, danger över (ren förstärkning).
+
+   KONTRAST-VAKT (WCAG AA, UPPMÄTT mot tokens per tema, sRGB-luminans, lessons
+   aa-kontrast: mät VARJE tema, attribuera rätt). ALL läsbar text står på en OPAK
+   yta (surface, eller accent-8%-tint ÖVER surface = fortfarande nästan-opak):
+     - brödtext (fg) på egen-bubbla (accent 8% / surface): mörkt 13.04:1, ljust 16.00:1.
+     - namn/tid (fg-muted) på egen-bubbla: mörkt 6.42:1, ljust 5.83:1.
+     - brödtext på annans bubbla (surface): mörkt 15.24:1, ljust 17.91:1.
+     - räknare NEAR (--color-warning som text på surface): mörkt 10.09:1, ljust 5.92:1
+       (ljust warning = #8a5a05, en AA-mätt djup amber, INTE rå --vm-gold-på-ljus-fällan).
+     - räknare OVER (--color-danger som text på surface): mörkt 6.32:1, ljust 5.52:1.
+     - radera-hover-text (danger 72% / fg) på hover-ytan: mörkt 6.76:1, ljust 6.86:1.
+   Alla >= 4.5:1 (normal-text-tröskeln). Avatar-ink ärver .vm-rooms-avatar (redan
+   klampad per hue över alla 360 hue:er, mätt i sektion 4). Färg-oberoende: namnet +
+   "(du)" + radera-aria-label bär all betydelse, tonerna är bara förstärkning.
+   -------------------------------------------------------------------------- */
+
+/* Bubblan: default = annans, den lugna surface-ytan med en mjuk kant. Den HUGGER
+   innehållet (inte flex-1) upp till en max-bredd, så ett kort "Heja!" blir en liten
+   bubbla och en lång kommentar bryter snyggt. max-width håller långa rader läsbara
+   (mätbar radlängd) även på en bred skärm, och ger chatt-asymmetrin (mina vänster/
+   andras höger) något att läsa mot. */
+.vm-comment-bubble {
+  max-width: min(100%, 32rem);
+  background-color: var(--color-surface);
+}
+
+/* EGNA meddelanden (data-comments-mine på li): högerställd rad (chatt-konvention,
+   "mina till höger") + en diskret accent-tonad bubbla med en aning starkare kant,
+   så jag känner igen mina i flödet utan att det skriker. row-reverse packar raden
+   mot höger OCH flyttar avataren (monogrammet) till MIN sida. En egen-bubbla får en
+   blygsam min-bredd så rubrik-raden (namn + tid + Radera) aldrig trängs ihop. */
+.vm-comment[data-comments-mine='true'] {
+  flex-direction: row-reverse;
+}
+
+.vm-comment[data-comments-mine='true'] .vm-comment-bubble {
+  min-width: min(100%, 13rem);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+/* En liten asymmetri i hörn-radien ger bubblorna "svans"-känsla mot sin avatar
+   (annans nere-vänster, egen nere-höger), en lugn chatt-detalj. */
+.vm-comment[data-comments-mine='false'] .vm-comment-bubble {
+  border-top-left-radius: var(--radius-sm);
+}
+
+.vm-comment[data-comments-mine='true'] .vm-comment-bubble {
+  border-top-right-radius: var(--radius-sm);
+}
+
+/* Radera-knappen på egen rad: en TYST knapp (ingen röd skrik-knapp). Den är liten,
+   dämpad (fg-muted, FULL opacitet så etiketten håller AA i vila, INTE en låg-opak
+   text som faller under tröskeln) och sitter i bubblans rubrik-rad, ALDRIG bredvid
+   Skicka, så ingen olycks-radering (taskens punkt 3). På hover/fokus vaknar den till
+   en danger-ton + en mjuk danger-tint, så avsikten "radera" blir tydlig först när man
+   faktiskt siktar på den. Tonen + bg är förstärkning, etiketten "Radera" + aria-label
+   bär betydelsen (färg-oberoende). Inget opacitets-trick (det sänkte kontrasten till
+   ~2.3-3.0:1 i vila, under AA, lessons aa-kontrast: mät, lita inte på att det "ser
+   diskret ut nog"). */
+
+/* Skriv-fältet: vilar på den varma kvällsljus-ytan (en hårfin guld-skiftning över
+   surface) så raden känns som en del av snacket, samma kvällsljus-detalj som
+   formulären (sektion 6) men subtilare. Texten är fg (full kontrast på en nästan-
+   opak yta). */
+.vm-comment-input {
+  background-color: color-mix(in srgb, var(--vm-gold) 4%, var(--color-surface));
+}
+
+/* Tom-state: en lugn, centrerad inbjudan. Ytan är en knappt skönjbar surface-tint
+   så den läser som en "väntar på snack"-platta, inte en hård tom ruta. Glyfen
+   sitter i en mjuk accent-bricka (dekor, aria-hidden). */
+.vm-comment-empty {
+  background-color: color-mix(in srgb, var(--color-fg) 3%, var(--color-surface));
+}
+
+.vm-comment-empty-glyph {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+}
+
+/* TECKENRÄKNAREN, tre toner (taskens punkt 2). Default = dämpad (fg-muted, satt i
+   TSX). NEAR (>= 90% av gränsen) = en varm warning-ton; OVER (> gränsen) = danger.
+   Båda är AA-mätta som text på surface (se kontrast-vakten ovan). Siffran bär
+   betydelsen, tonen är bara förstärkning (färg-oberoende). font-medium (TSX) ger
+   den lite mer närvaro när den vaknar. */
+.vm-comment-count[data-count-tone='near'] {
+  color: var(--color-warning);
+}
+
+.vm-comment-count[data-count-tone='over'] {
+  color: var(--color-danger);
+}
