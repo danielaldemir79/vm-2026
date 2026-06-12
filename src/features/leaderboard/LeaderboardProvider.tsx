@@ -35,6 +35,7 @@ import { useLeaderboardData } from './use-leaderboard-data';
 import { derivePoolFacit } from './derive-facit';
 import { buildLeaderboard, scoreMemberBreakdown, type MemberPredictions } from './aggregate-scores';
 import { deriveMemberBadges } from './derive-badges';
+import { derivePersonalStats } from './personal-stats';
 import { buildMatchReveal } from './reveal';
 import {
   LeaderboardStoreContext,
@@ -306,6 +307,22 @@ export function LeaderboardProvider({
     return deriveMemberBadges(mine.matchPredictions, data.matches, data.teams);
   }, [rooms.userId, predictionsByUser, data.matches, data.teams]);
 
+  // AKTUELL användares PERSONLIGA STATISTIK (T23, #23): träffsäkerhet + exakt/utfall/
+  // miss-räkning + bästa call, härledd ur SAMMA score.ts-poängväg som topplistan över
+  // den delade matchlistan (derivePersonalStats), ingen omräkning, ingen DB. Samma gate
+  // som selfBreakdown/selfBadges (identitet OCH egen rad finns). JOKER-MEDVETEN bästa
+  // call: vi matar medlemmens egna joker-set (samma set scoreMember dubblar poäng mot).
+  const selfStats = useMemo(() => {
+    if (rooms.userId === null) {
+      return null;
+    }
+    const mine = predictionsByUser.get(rooms.userId);
+    if (mine === undefined) {
+      return null;
+    }
+    return derivePersonalStats(mine.matchPredictions, data.matches, mine.jokerMatchIds);
+  }, [rooms.userId, predictionsByUser, data.matches]);
+
   const store: LeaderboardStore = useMemo(
     () => ({
       enabled,
@@ -321,6 +338,8 @@ export function LeaderboardProvider({
       selfBreakdown,
       // T19 (#19): aktuell användares streak + märken, härledda ur samma data.
       selfBadges,
+      // T23 (#23): aktuell användares personliga statistik, härledd ur samma data.
+      selfStats,
     }),
     [
       enabled,
@@ -333,6 +352,7 @@ export function LeaderboardProvider({
       rooms.userId,
       selfBreakdown,
       selfBadges,
+      selfStats,
     ]
   );
 

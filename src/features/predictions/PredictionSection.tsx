@@ -22,7 +22,7 @@
 
 import type { ReactNode } from 'react';
 import { useRoomsStore } from '../rooms';
-import { TipsScoreSummary } from '../leaderboard';
+import { TipsScoreSummary, PersonalStatsSection } from '../leaderboard';
 import { PredictionsView } from './PredictionsView';
 
 export function PredictionSection({ surface }: { surface: (children: ReactNode) => ReactNode }) {
@@ -30,9 +30,14 @@ export function PredictionSection({ surface }: { surface: (children: ReactNode) 
   if (!rooms.enabled) {
     return null;
   }
+  // PersonalStatsSection (T23, #23) ligger DIREKT under poäng-summeringen: båda LÄSER
+  // den delade leaderboard-storen (samma hämtning) och GATAR sig själva tyst när det
+  // inte finns en egen rad/statistik att visa, så ordningen är "din ställning -> hur du
+  // tippar -> kupongerna".
   return surface(
     <>
       <TipsScoreSummary />
+      <PersonalStatsSection />
       <PredictionsView />
     </>
   );

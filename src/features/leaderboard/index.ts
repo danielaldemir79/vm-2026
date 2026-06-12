@@ -7,6 +7,7 @@ export { LeaderboardSummary } from './LeaderboardSummary';
 export { LeaderboardView } from './LeaderboardView';
 export { RevealView } from './RevealView';
 export { TipsScoreSummary } from './TipsScoreSummary';
+export { PersonalStatsSection } from './PersonalStatsSection';
 export {
   useLeaderboardStore,
   LeaderboardStoreContext,
@@ -40,6 +41,10 @@ export {
   type PendingMatchPick,
 } from './reveal';
 export { deriveSelfSummary, type SelfSummary } from './self-summary';
+
+// T23 (#23): personlig statistik (träffsäkerhet, exakt/utfall/miss, bästa call),
+// HÄRLEDD ur samma score.ts-poängväg som topplistan (ingen omräkning, ingen DB).
+export { derivePersonalStats, type PersonalStats, type BestCall } from './personal-stats';
 
 // T19 (#19): gamification, streaks + märken HÄRLEDDA ur tips + facit (ingen DB).
 export {
