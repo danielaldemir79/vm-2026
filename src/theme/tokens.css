@@ -2042,3 +2042,152 @@ body {
   flex-shrink: 0;
   color: var(--color-accent);
 }
+
+/* =============================================================================
+   23. ARRANGÖRENS KONTROLLPANEL, admin-statistik premium-finish (T45, issue #76).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET (taskens kärna): det här är Daniels EGNA kontrollpanel, den enda yta i
+   appen bara arrangören ser. Funktion före fluff, men den ska kännas som appens
+   PREMIUM-familj, inte en grå admin-tabell. Tre lager bär känslan:
+
+   A) ÖVERSIKTS-KORTEN (Rum totalt / Tippare totalt): de två liga-talen som STOLTA
+      stat-kort, en grön arena-glow i fonden (mästerskaps-identiteten) och själva
+      talet som en SOLID guld-bricka med mörk ink (den färg-oberoende solid-bricka-
+      formen, samma som tips-summeringens total, DRY). Ögats första anhalt: "så stor
+      är ligan".
+
+   B) GLOBAL TOPPLISTA ("vem tippar bäst, hela ligan"): samma PODIUM-estetik som
+      rummens topplista (T17). Topp-3 bär riktiga pallplats-MEDALJER (1:a guld, 2:a
+      silver, 3:a brons) via .vm-pool-medal (DRY mot T16/T17, ingen ny medalj), ledar-
+      raden får topplistans varma guld-glow (.vm-board-row[data-leader]-receptet, en
+      sanning) så ÖGAT dras till 1:an direkt. Listan kan bli lång (alla rum × alla
+      medlemmar) -> max-höjd + scroll (KISS, ingen expanderbar mekanik som inte behövs).
+
+   C) RUM-KORTEN: varje rum som ett lugnt, tätt kort, en hårfin guld-hörn-glow (samma
+      kupong-/facit-värme som .vm-reveal-card) + rum-namn + en kod-CHIP + engagemangs-
+      PILLAR (medlemmar / matchtips / grupptips / slutspelstips som diskreta surface-
+      raised-pillar, lätt-skanbara i stället för en löptext-rad) + en mini-topplista.
+      Mini-listan kan också bli lång -> max-höjd + scroll, samma KISS-grepp.
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall + guld-på-tint-fällan, mätt med
+   scripts/contrast-t45.mjs, canvas-komposit VÄRSTA fall, BÅDA teman): ALL läsbar text
+   står på OPAKA surface/surface-raised-ytor eller en LÅG-alfa tint som mätts som
+   canvas-komposit. Stat-talen + medalj-siffrorna står som mörk ink på en SOLID token-
+   yta (färg-oberoende solid-bricka-form, ALDRIG ljus guld/silver/brons-text på tint).
+   Ledar-radens poäng använder den AA-säkra guld-TEXT-tonen (--color-warning), aldrig
+   rå --vm-gold. Glow-/kant-lagren bär ALDRIG text. Uppmätt MIN över alla nya text-
+   ytor: mörkt 6.12:1 / ljust 4.87:1 (alla >= 4.5, normal text). Värden i decisions.md
+   (T45-visuellt).
+
+   RÖRELSE (lessons reduced-motion): inga egna animationer som rör layout/transform.
+   Endast lugna FÄRG-övergångar på hover (samma som appens övriga kort), och
+   prefers-reduced-motion skyddar transform/position, inte färg, så detta bryter ingen
+   reduced-motion-grind. Korten lyfter inte/rör sig inte; det här är ett verktyg, inte
+   en scen.
+   -------------------------------------------------------------------------- */
+
+/* ÖVERSIKTS-KORTET: en grön arena-glow i fonden (turneringens pitch-grön, samma RGB-
+   glow-token som hero-syskonen) ovanpå surface, plus en hårfin grön inset-topplist.
+   Glow-alfan hålls LÅG (text står ändå på opak surface, men en låg alfa håller AA-
+   marginalen bekväm i canvas-komposit-mätningen, fg-muted-etikett 6.12:1 mörkt /
+   5.69:1 ljust på glow-PEAKEN). box-shadow bär topplisten (ingen layout, ingen CLS). */
+.vm-admin-stat-card {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(
+    120% 100% at 0% 0%,
+    rgb(var(--vm-glow-accent) / 0.1),
+    transparent 60%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* STAT-TALET som en STOLT solid guld-bricka med mörk ink (den färg-oberoende solid-
+   bricka-formen, AA-proven --vm-coupon-ink på --vm-gold = 10.90:1 mörkt / 5.03:1
+   ljust, DRY mot .vm-tips-summary-total / .vm-coupon-mine / .vm-reveal-actual). Mjuk
+   inre högdager ger samma präglade känsla som medaljerna. */
+.vm-admin-stat-value {
+  display: inline-flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.32),
+    0 1px 3px rgb(0 0 0 / 0.2);
+}
+
+/* RUM-KORTET: en hårfin guld-hörn-glow i fonden (samma kupong-/facit-värme som
+   .vm-reveal-card, guld 6% alfa) ovanpå surface, plus en hårfin guld inset-topplist.
+   Glow-alfan är LÅG (rum-namn fg 13.50:1 mörkt / 16.75:1 ljust, engagemang fg-muted
+   6.65:1 / 6.10:1 på glow-PEAKEN). Bär ingen text på glow:en själv. */
+.vm-admin-room-card {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(
+    120% 90% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 6%, transparent),
+    transparent 60%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 24%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-admin-room-card {
+    transition: box-shadow 0.3s ease;
+  }
+}
+
+.vm-admin-room-card:hover {
+  box-shadow:
+    var(--vm-shadow-raised),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 36%, transparent);
+}
+
+/* KOD-CHIPPET + ENGAGEMANGS-PILLARNA: små, lugna surface-raised-pillar med en hårfin
+   kant. Diskreta skan-bara fakta i stället för en löptext-rad. Text = fg/fg-muted på
+   opak surface-raised (kod-text fg 12.66:1 mörkt / 17.91:1 ljust, pill-etikett fg-muted
+   6.23:1 / 6.52:1). Ren yt-form, bär sin egen text. */
+.vm-admin-pill {
+  display: inline-flex;
+  align-items: baseline;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  /* Tal + etikett skiljs av ett RIKTIGT mellanslags-tecken i markup (inte flex-gap),
+     så pillens textContent läser naturligt ("10 matchtips"); white-space: pre-wrap så
+     det ledande mellanslaget bevaras vid radbrytning i pillen. */
+  white-space: pre-wrap;
+}
+
+/* KOD-CHIPPETS kod-text: monospace-känsla via tabular-nums + lite tracking, så rum-
+   koden (gemener, ^[a-z0-9]{4,}$) läses som en KOD, inte ett ord. Bär full fg-kontrast. */
+.vm-admin-code {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* SCROLL-CONTAINERN (global topplista + rum-kortens mini-listor): en max-höjd + intern
+   scroll håller en lång lista tät utan att svälla sidan (KISS, ingen expanderbar
+   mekanik). En hårfin topp-/botten-fade SKULLE kunna antyda mer innehåll, men vi håller
+   det enkelt: en synlig, lugn scrollbar räcker, och listan är ändå sorterad (bäst först)
+   så det viktigaste alltid syns utan att scrolla. overscroll-behavior: contain hindrar
+   att en uttömd inre scroll "läcker" till sidans scroll (lugnare på touch/mobil). */
+.vm-admin-scroll {
+  max-height: 22rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* RUM-KORTETS mini-topplista är kortare av naturen (ett rums medlemmar), så den får en
+   lägre max-höjd. Samma scroll-disciplin. */
+.vm-admin-scroll--room {
+  max-height: 14rem;
+}

@@ -5,6 +5,62 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T45/#76 (admin-statistik) KLAR - PR #126 vantar pa merge
+
+**Branch:** `feature/T45-admin-statistik` @ HEAD `2e0b72f`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/126 mot `develop` (Closes #76, state: OPEN)
+**Board:** kort #76 tillagt och satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekraftat). Kort #121 satts till Done (PVTI bekraftat).
+
+**Vad T45 levererade:**
+- 2 SECURITY DEFINER-RPC:er (`get_admin_room_stats`, `get_admin_leaderboard`) gatade pa `is_app_admin()`, live-applicerade 1:1 mot Supabase via MCP.
+- Sekretess via SAMMA deadline-helpers som tips-RLS, poang via befintliga `buildLeaderboard`. Ingen ny logik, ingeneting dubbelt.
+- RLS-integrationstest med riktiga sessioner: anon nekas, icke-admin nekas, admin far data. Bevis i testerna.
+- Paragraf 23 i SPEC: arrangörens kontrollpanel, podium-vy, AA 6.12/4.87 uppmatt via `contrast-t45.mjs`.
+- Del 2 av issuen (vanliga ser bara facit utan sim) var redan levererad i T48, verifierat att scope ar uppfyllt.
+
+**Commits (T45):**
+- `c2cdb66` - T45 (#76): admin-statistik, alla rum + medlemmar + vem tippar bast
+- `2e0b72f` - T45-visuellt (#76): premium-finish pa arrangörens kontrollpanel - HEAD
+
+**Verifiering:** build EXIT 0, 1605 grona, lint/format rena. Lokal reviewer PASS.
+- F1 (null-typ vs generator-signatur): accepterad + dokumenterad i decisions.md. Handskrivna null-typer ar mer lättlasta an generator-output i detta sammanhang.
+- F2 (act-varningar i tester): kosmetisk, inga funktionella fel.
+
+**Acceptanskriterier issue #76 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Admin ser alla rum + medlemmar + statistik (vem tippar bast), RLS-sakrad via SECURITY DEFINER
+- [x] AC2: Vanliga medlemmar utan sim: bara facit + 3-dagars matchlista + expandera, ingen inmatning
+- [x] AC3: Vanliga medlemmar i sim: inmatning tillaten (hypotetiskt, isolerat)
+- [x] AC4: Admin facit-inmatning (T42). Tydligt budskap per läge
+- [x] AC5: Inga secrets, RLS-bevisad, tester, gront/lint/reviewad, inga oloста findings
+
+**FORTSATTNINGS-PROMPT (autonom ko):**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #126 (T45/#76, feature/T45-admin-statistik) ANNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 126 --merge --repo danielaldemir79/vm-2026`.
+> Stang issue #76 manuellt: `gh issue close 76`.
+> Flytta kort #76 till Done pa boarden (nu "In Review", projekt 2, item PVTI_lAHODcT4Cc4BaIWPzgvaAzY).
+> Merga aven aldre oppna PR:er om de fortfarande ar oppna: PR #125 (T66/#121), PR #122 (T65/#119), PR #120 (T64/#118), PR #116 (T63/#113), PR #115 (T62/#111), PR #114 (T61/#110), PR #117 (T18/#18), PR #112 (T54/#93), PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stang resp. issue och flytta till Done.
+>
+> Om PR #126 REDAN mergad:
+> T45 klar. Nasta task i kon: **#19 (T19 gamification: streaks/marken/joker)** - las issuen noggrant, KISS-MVP, inga gold-plating. Darefter: #24 -> #64 -> D-resten.
+>
+> Bar framat (alla tasks):
+> - **#35 (arena/stad):** venue = platshallar.
+> - **FNV-hash:** konsolidera vid 3:e anvandning.
+> - **Stegnings-dubblett:** extrahera vid 3:e anvandning.
+> - **#48 (demo-chip a11y):** 4+ vyer under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4+ dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **T45-F1-regenererings-not:** null-typer i admin-RPC-svar ar handskrivna (accepterat), REGENERERA INTE automatiskt - las decisions.md fore nagon RPC-typandring.
+> - **"Behover Daniel"-ko:** push-notiser (T22), befordran kommentar-pastar Forekomst 6 (reviewer.md, vantar godkannande), 3 aldre befordringar (Forekomst 3+/4), 5 IMPROVEMENTS-kandidater, FIFA-juni-ranking, release-granssen, #39-F1-produktbeslut, T48b.
+> - **Daniels process-beslut:** Copilot-loopen PAUSAD, lokala granskningen ar sista grinden.
+> - **Vakthund-rutinen (2026-06-12):** varje vantan far deadline + eskalering, nasta steg dispatchas i samma tur.
+> - **T26 DR-webb-inbaddning:** SKIPPAD, stangd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vagen till slutet.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T66/#121 (kommentarer i rummet) KLAR - PR #125 väntar pa merge
 
 **Branch:** `feature/T66-kommentarer` @ HEAD `7510789`
