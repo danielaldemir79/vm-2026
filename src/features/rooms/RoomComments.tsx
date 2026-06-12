@@ -25,21 +25,30 @@ import { avatarHueFromId, initialsFromName } from './member-avatar';
 
 // Fält-stil i SAMMA premium-formspråk som RoomPanel-fälten (FIELD_BASE där): stark,
 // tema-trogen fokus-ring (WCAG 2.4.7) + mjuk hover. En sanning för formkänslan.
+// Den vilar nu på den varma kvällsljus-ytan (.vm-comment-input i rooms.css) så
+// skriv-raden känns som en del av snacket, inte en främmande bg-bg-platta.
 const FIELD_BASE =
-  'mt-1 w-full rounded-md border border-border bg-bg px-3 py-2.5 text-fg ' +
-  'transition-colors duration-150 outline-none placeholder:text-fg-muted/70 ' +
+  'vm-comment-input mt-0 w-full rounded-card border border-border px-3.5 py-3 text-fg ' +
+  'transition-[border-color,box-shadow] duration-150 outline-none placeholder:text-fg-muted/70 ' +
   'focus-visible:border-accent ' +
   'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] ' +
   'hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))]';
 
+// Skicka-knappen: fylld accent med en liten pappersflygplans-glyf, samma lyft-recept
+// som BTN_PRIMARY i RoomPanel (#39). Inbjudande, men ärlig i sitt disabled-läge.
 const BTN_SEND =
-  'inline-flex h-10 items-center justify-center rounded-pill bg-accent px-5 ' +
+  'inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-pill bg-accent px-5 ' +
   'font-display text-sm font-semibold text-accent-fg shadow-sm ' +
   'transition-[transform,box-shadow,filter] duration-150 outline-none ' +
   'hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] ' +
   'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] ' +
   'focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] ' +
   'active:translate-y-px active:brightness-95 disabled:opacity-60 disabled:hover:brightness-100';
+
+// Hur nära gränsen räknaren börjar varna (visuell förstärkning, ren design). Under
+// tröskeln är den tyst dämpad; nära gränsen blir den varm (warning), över gränsen
+// blir den danger. Logiken (canSend/tooLong) är oförändrad, detta styr bara tonen.
+const COUNT_WARN_AT = Math.floor(COMMENT_MAX_LEN * 0.9);
 
 /** En läsbar lokal tid ur en ISO-tidsstämpel (sv-SE, kort). Fail-safe: rå sträng vid skräp. */
 function formatTime(iso: string): string {
@@ -84,6 +93,9 @@ export function RoomComments() {
   const trimmed = draft.trim();
   const tooLong = trimmed.length > COMMENT_MAX_LEN;
   const canSend = trimmed.length > 0 && !tooLong && !busy;
+  // Räknarens TON (ren förstärkning): tyst tills man närmar sig gränsen, sedan varm,
+  // sedan danger. Bär inte själv betydelsen (siffran gör det), så färg-oberoende.
+  const countTone = tooLong ? 'over' : trimmed.length >= COUNT_WARN_AT ? 'near' : 'calm';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -142,13 +154,25 @@ export function RoomComments() {
 
       {/* Lista: ÄLDST överst, nyast nederst (chatt-konvention). aria-live="polite" så
           en ny kommentar (även en väns, via realtid) läses upp diskret. Tom-läge får
-          en vänlig hint i stället för en tom yta. */}
+          en lugn, centrerad hint i stället för en tom yta. */}
       {comments.comments.length === 0 ? (
-        <p className="mb-4 text-sm text-fg-muted" data-comments-empty>
-          Inga kommentarer än. Skriv det första meddelandet till gänget!
-        </p>
+        <div className="vm-comment-empty mb-4 flex flex-col items-center gap-2 rounded-card border border-border px-4 py-7 text-center">
+          <span
+            aria-hidden="true"
+            className="vm-comment-empty-glyph flex h-9 w-9 items-center justify-center rounded-pill text-base leading-none"
+          >
+            💬
+          </span>
+          <p className="text-sm text-fg-muted" data-comments-empty>
+            Inga kommentarer än. Skriv det första meddelandet till gänget!
+          </p>
+        </div>
       ) : (
-        <ul className="mb-4 flex flex-col gap-3" data-comments-list aria-live="polite">
+        <ul
+          className="vm-comment-list mb-4 flex flex-col gap-3.5"
+          data-comments-list
+          aria-live="polite"
+        >
           {comments.comments.map((c) => {
             const isMine = c.userId === comments.userId;
             const name = nameByUser.get(c.userId) ?? 'Tidigare medlem';
@@ -158,16 +182,21 @@ export function RoomComments() {
                 key={c.id}
                 data-comments-item
                 data-comments-mine={isMine}
-                className="flex items-start gap-2.5 rounded-card border border-border bg-surface p-3"
+                className="vm-comment flex items-start gap-2.5"
               >
                 <span
                   aria-hidden="true"
-                  className="vm-rooms-avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-pill font-display text-xs font-bold leading-none"
+                  className="vm-rooms-avatar vm-comment-avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-pill font-display text-xs font-bold leading-none"
                   style={{ '--vm-avatar-hue': hue } as React.CSSProperties}
                 >
                   {initialsFromName(name)}
                 </span>
-                <div className="min-w-0 flex-1">
+                {/* Bubblan: egna meddelanden får en diskret accent-tonad yta (CSS via
+                    data-comments-mine), andras den lugna surface-ytan. Bubblan hugger
+                    innehållet upp till en max-bredd (CSS), så mina hamnar till höger och
+                    andras till vänster = chatt-rytm. Färg-oberoende: "(du)" + namnet
+                    bär ändå avsändaren. */}
+                <div className="vm-comment-bubble min-w-0 rounded-card border border-border px-3.5 py-2.5">
                   <p className="flex flex-wrap items-baseline gap-x-2 text-xs">
                     <span className="font-semibold text-fg" data-comments-author>
                       {name}
@@ -176,26 +205,26 @@ export function RoomComments() {
                     <time className="text-fg-muted" dateTime={c.createdAt}>
                       {formatTime(c.createdAt)}
                     </time>
+                    {isMine && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(c.id)}
+                        data-comments-delete
+                        aria-label="Radera min kommentar"
+                        className="vm-comment-delete ml-auto shrink-0 rounded-pill px-2 py-0.5 text-xs font-medium text-fg-muted transition-[color,background-color] duration-150 outline-none hover:bg-[color-mix(in_srgb,var(--color-danger)_12%,transparent)] hover:text-[color-mix(in_srgb,var(--color-danger)_72%,var(--color-fg))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
+                      >
+                        Radera
+                      </button>
+                    )}
                   </p>
                   {/* Texten som ren React-text-nod = HTML-escapad (säker rendering). */}
                   <p
-                    className="mt-0.5 whitespace-pre-wrap break-words text-sm text-fg"
+                    className="mt-1 whitespace-pre-wrap break-words text-sm text-fg"
                     data-comments-body
                   >
                     {c.body}
                   </p>
                 </div>
-                {isMine && (
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete(c.id)}
-                    data-comments-delete
-                    aria-label="Radera min kommentar"
-                    className="shrink-0 rounded-pill border border-border px-2.5 py-1 text-xs font-medium text-fg-muted transition-colors duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-danger)_45%,var(--color-border))] hover:text-fg focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
-                  >
-                    Radera
-                  </button>
-                )}
               </li>
             );
           })}
@@ -219,15 +248,21 @@ export function RoomComments() {
           />
         </label>
         <div className="flex items-center justify-between gap-3">
-          {/* Teckenräknare: diskret, blir varnande nära gränsen. aria-live så SR hör den. */}
+          {/* Teckenräknare: tyst dämpad tills man närmar sig gränsen (warm), danger
+              över. data-count-tone styr bara FÄRGEN (CSS); siffran bär betydelsen
+              (färg-oberoende). aria-live så SR hör den när den ändras. */}
           <span
             data-comments-count
+            data-count-tone={countTone}
             aria-live="polite"
-            className="text-xs tabular-nums text-fg-muted"
+            className="vm-comment-count text-xs font-medium tabular-nums text-fg-muted"
           >
             {trimmed.length}/{COMMENT_MAX_LEN}
           </span>
           <button type="submit" disabled={!canSend} className={BTN_SEND} data-comments-send>
+            <span aria-hidden="true" className="text-sm leading-none">
+              ➤
+            </span>
             Skicka
           </button>
         </div>
