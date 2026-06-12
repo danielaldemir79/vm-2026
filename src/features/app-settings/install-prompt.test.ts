@@ -2,22 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   detectIos,
   detectStandalone,
-  resolveInstallMode,
   resolveInstallButtonAction,
   type InstallButtonContext,
-  type InstallContext,
 } from './install-prompt';
-
-/** Bas-kontext: ej installerad, ej iOS, inget event, ej avfärdad. */
-function ctx(overrides: Partial<InstallContext> = {}): InstallContext {
-  return {
-    isStandalone: false,
-    isIos: false,
-    hasPromptEvent: false,
-    dismissed: false,
-    ...overrides,
-  };
-}
 
 /** Bas-kontext för knapp-beslutet: ej installerad, ej iOS, inget event. */
 function btnCtx(overrides: Partial<InstallButtonContext> = {}): InstallButtonContext {
@@ -28,35 +15,6 @@ function btnCtx(overrides: Partial<InstallButtonContext> = {}): InstallButtonCon
     ...overrides,
   };
 }
-
-describe('resolveInstallMode, vad installations-ytan ska visa', () => {
-  it('visar PROMPT (egen knapp) när ett beforeinstallprompt-event finns', () => {
-    expect(resolveInstallMode(ctx({ hasPromptEvent: true }))).toBe('prompt');
-  });
-
-  it('visar iOS-INSTRUKTION på iOS utan event (enda vägen där)', () => {
-    expect(resolveInstallMode(ctx({ isIos: true }))).toBe('ios-instructions');
-  });
-
-  it('döljer allt när appen redan körs i standalone-läge (installerad)', () => {
-    // Standalone vinner även om ett event eller iOS också gäller.
-    expect(resolveInstallMode(ctx({ isStandalone: true, hasPromptEvent: true }))).toBe('hidden');
-    expect(resolveInstallMode(ctx({ isStandalone: true, isIos: true }))).toBe('hidden');
-  });
-
-  it('döljer allt när användaren avfärdat bannern (respekteras, även med event)', () => {
-    expect(resolveInstallMode(ctx({ dismissed: true, hasPromptEvent: true }))).toBe('hidden');
-    expect(resolveInstallMode(ctx({ dismissed: true, isIos: true }))).toBe('hidden');
-  });
-
-  it('döljer på en icke-iOS-webbläsare UTAN event (ingen ärlig install-väg än)', () => {
-    expect(resolveInstallMode(ctx())).toBe('hidden');
-  });
-
-  it('prioriterar PROMPT över iOS-instruktion (en riktig knapp är bättre)', () => {
-    expect(resolveInstallMode(ctx({ isIos: true, hasPromptEvent: true }))).toBe('prompt');
-  });
-});
 
 describe('resolveInstallButtonAction, den kompakta knappens tre klick-grenar (T63, #113)', () => {
   it('NATIVE-PROMPT när ett beforeinstallprompt-event finns (ett klick = äkta prompt)', () => {

@@ -782,11 +782,14 @@ kvar (gömd hjälp-yta).
 förena med att låta bannern ligga kvar. Därför tas `InstallBanner.tsx` (+ test) bort från huvudytan och
 ERSÄTTS av en ny `InstallButton`: en diskret, surface-tonad "Installera som app"-pill. Den utförliga
 guiden (samma som inställnings-portalens "Kom igång") når man bakom ETT klick. `InstallBanner`-komponenten
-raderades (den renderades ingenstans efter bytet, dead UI). Kvar i `install-prompt.ts`: detektorerna +
-`ANDROID_PLAY_PROTECT_NOTE` (de ÅTERANVÄNDS faktiskt av guiden T54) samt `resolveInstallMode`/`dismiss`-
-maskineriet, som efter T63 saknar produktions-konsument och behålls enbart som testad reserv för en
-eventuell framtida banner-väg (review-F2: ärlig motivering, inte "återanvänds av guiden"). Kandidat för
-en framtida lean-städning.
+raderades (den renderades ingenstans efter bytet, dead UI). Kvar i `install-prompt.ts`: detektorerna
+(`detectStandalone`/`detectIos`/`detectAndroid`) + `ANDROID_PLAY_PROTECT_NOTE` (de ÅTERANVÄNDS faktiskt
+av guiden T54) + `resolveInstallButtonAction`/`buttonAction`-vägen (knappen). `resolveInstallMode`/
+`InstallUiMode`/`dismiss`/`dismissed`/`INSTALL_DISMISSED_KEY`-maskineriet saknade produktions-konsument
+efter T63 (review-F2 flaggade att det var dött, inte "återanvänds av guiden") och **togs bort i T70 (#136,
+lean-städ)** tillsammans med sina tester, så install-ytan inte längre bär en otestad-reserv-skuld. (Den
+ursprungliga "behålls som testad reserv"-motiveringen blev alltså inte långlivad: koden var dött, och en
+dött-men-testat kod-block är fortfarande dött kod, T70 städade det.)
 
 **Regeln (tre klick-grenar, ren funktion `resolveInstallButtonAction`, `install-prompt.ts`):** härledd ur
 de REDAN källhänvisade T39/T54-detektorerna (gissas inte), bara en UI-vägsregel ovanpå:
@@ -800,11 +803,12 @@ de REDAN källhänvisade T39/T54-detektorerna (gissas inte), bara en UI-vägsreg
   ALDRIG en död knapp (#113-AC): finns ingen native-väg just nu visar vi vägen i stället för ingenting.
 - `hidden`: BARA i standalone -> rendera ingenting (Daniels skarpa krav, inget surr i app-läge).
 
-**Subtilitet (medveten skillnad mot `resolveInstallMode`):** `resolveInstallButtonAction` läser INTE
-`dismissed`. Den gamla bannern hade "Inte nu" och respekterade ett permanent avfärdande; den kompakta
-knappen har ingen sådan affordans, den är en alltid-nåbar CTA. En avvisad native-prompt faller till
-`guide`, knappen försvinner inte. (Annars vore knappen en "död yta" efter ett oavsiktligt avvisande,
-tvärtemot #113-AC.) Standalone är den enda gömnings-grenen.
+**Subtilitet (medveten skillnad mot den gamla, nu borttagna banner-regeln):** `resolveInstallButtonAction`
+har aldrig läst något avfärdande-tillstånd. Den gamla bannern (`resolveInstallMode`, borttagen i T70) hade
+"Inte nu" och respekterade ett permanent avfärdande; den kompakta knappen har ingen sådan affordans, den
+är en alltid-nåbar CTA. En avvisad native-prompt faller till `guide`, knappen försvinner inte. (Annars vore
+knappen en "död yta" efter ett oavsiktligt avvisande, tvärtemot #113-AC.) Standalone är den enda
+gömnings-grenen.
 
 **Återanvändning (ingen dubblett):** native-vägen = `useInstallPrompt`/`install-prompt-capture` (T39);
 guide-vägen = `GetStartedControl`/`GetStartedDialog` (T54) via en ny `'install'`-variant + en ny valfri
@@ -1938,9 +1942,10 @@ https://web.dev/articles/customize-install). Live-verifierat i Chrome mot byggd 
 TRE standard-signalerna (web.dev "Detecting PWA standalone mode",
 https://web.dev/learn/pwa/detection): (1) `matchMedia('(display-mode: standalone)')`, (2) iOS
 `navigator.standalone === true` (icke-standard, MDN), (3) `document.referrer.startsWith('android-app://')`
-(TWA / Android-app-wrapper). I standalone returnerar `resolveInstallMode` 'hidden', så VARKEN Chrome-
-knappen, iOS-instruktionen ELLER Play Protect-noten visas. Källhänvisat inline i `install-prompt.ts`
-och `install-prompt-capture.ts`.
+(TWA / Android-app-wrapper). I standalone returnerade dåvarande `resolveInstallMode` 'hidden'
+(funktionen togs bort i T70; den levande ekvivalenten är `resolveInstallButtonAction` -> 'hidden'),
+så VARKEN install-ytan, iOS-instruktionen ELLER Play Protect-noten visas. Källhänvisat inline i
+`install-prompt.ts` och `install-prompt-capture.ts`.
 
 **Findings:** Onboarding-touren (T13) renderar en full-skärms overlay (z-50) vid första besök som
 ligger ÖVER install-bannern, så en FÖRSTA-gångs-användare kan inte klicka install-knappen förrän
