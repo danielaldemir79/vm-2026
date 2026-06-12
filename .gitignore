@@ -10,6 +10,11 @@ build/
 dev-dist/
 coverage/
 
+# Playwright E2E (T25): rapport + artefakter (spår/skärmdumpar) + cachade browsers
+playwright-report/
+test-results/
+.playwright/
+
 # Env och hemligheter
 .env
 .env.local

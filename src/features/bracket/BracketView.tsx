@@ -387,10 +387,19 @@ export function BracketView() {
             </p>
             {/* overflow-x-auto (seam): trädet scrollas i sidled på smala skärmar i
               stället för att klämmas ihop (rundorna har fast bredd). Detta är den
-              responsiva grunden; vm-bracket-scroll lägger kant-maskeringen ovanpå. */}
+              responsiva grunden; vm-bracket-scroll lägger kant-maskeringen ovanpå.
+
+              A11y (T25, axe scrollable-region-focusable): en scrollbar yta MÅSTE nås
+              med tangentbordet, annars kan en tangentbords-användare inte se det som
+              ligger utanför vyporten. När slottarna är tomma (gruppspel ej klart) finns
+              inga fokuserbara barn att tabba till, så själva ytan får tabIndex={0} +
+              ett role="group" med ett tydligt namn, så piltangenterna kan scrolla den. */}
             <div
               data-bracket-scroll=""
-              className="vm-bracket-scroll -mx-1 overflow-x-auto px-1 pb-2"
+              role="group"
+              aria-label="Slutspelsträdet, bläddra i sidled"
+              tabIndex={0}
+              className="vm-bracket-scroll -mx-1 overflow-x-auto px-1 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
             >
               <div className="flex min-w-max gap-5">
                 {rounds.map((round) => (
