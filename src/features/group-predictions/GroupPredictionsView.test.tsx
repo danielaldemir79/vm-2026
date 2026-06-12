@@ -5,7 +5,8 @@ import {
   GroupPredictionsStoreContext,
   type GroupPredictionsStore,
 } from './group-predictions-context';
-import type { GroupPrediction } from '../../data/predictions';
+import { PredictionsStoreContext, type PredictionsStore } from '../predictions/predictions-context';
+import type { GroupPrediction, Prediction } from '../../data/predictions';
 import type { Group, Match, Team } from '../../domain/types';
 import { teamCode } from '../../domain/team-code';
 
@@ -74,11 +75,34 @@ function store(partial: Partial<GroupPredictionsStore>): GroupPredictionsStore {
   };
 }
 
-function renderView(s: GroupPredictionsStore, now: Date) {
+/**
+ * En match-tips-store (T64): den tips-härledda slutspelsbilden läser nu MINA
+ * match-tips ur PredictionsStore för att seeda treorna. Default = inga tips (treorna
+ * står öppna), så de befintliga grupp-tips-läges-testerna är oförändrade. Tester som
+ * vill seeda treorna kan injicera myPredictions.
+ */
+function matchStore(myPredictions: ReadonlyMap<string, Prediction> = new Map()): PredictionsStore {
+  return {
+    enabled: true,
+    status: 'ready',
+    error: null,
+    activeRoomId: 'r1',
+    myPredictions,
+    savePrediction: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function renderView(
+  s: GroupPredictionsStore,
+  now: Date,
+  predictions?: ReadonlyMap<string, Prediction>
+) {
   return render(
-    <GroupPredictionsStoreContext.Provider value={s}>
-      <GroupPredictionsView now={now} />
-    </GroupPredictionsStoreContext.Provider>
+    <PredictionsStoreContext.Provider value={matchStore(predictions)}>
+      <GroupPredictionsStoreContext.Provider value={s}>
+        <GroupPredictionsView now={now} />
+      </GroupPredictionsStoreContext.Provider>
+    </PredictionsStoreContext.Provider>
   );
 }
 

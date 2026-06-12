@@ -38,12 +38,17 @@ function indexTeams(teams: readonly Team[]): Map<string, Team> {
 
 /**
  * Visnings-texten för en slot:
- *   - 'tipped': det tippade lagets namn (i id-rymden, slås upp i lag-listan).
+ *   - 'tipped' (grupp-tips 1:a/2:a) ELLER 'tipped-third' (en trea härledd ur
+ *     match-tipsen, T64): det placerade lagets namn (i id-rymden, slås upp i
+ *     lag-listan).
  *   - 'open-third'/'tbd': positions-/struktur-etiketten ("3:a A/B/C/D/F",
  *     "Vinnare M73", "1:a grupp A"), så man ser VAR laget kommer ifrån.
  */
 function slotText(slot: TipsSlotState, teamsById: ReadonlyMap<string, Team>): string {
-  if (slot.resolution === 'tipped' && slot.teamId !== null) {
+  if (
+    (slot.resolution === 'tipped' || slot.resolution === 'tipped-third') &&
+    slot.teamId !== null
+  ) {
     return teamDisplayName(slot.teamId, teamsById);
   }
   return slot.label;
@@ -64,7 +69,8 @@ function TipsSlotRow({
   teamsById: ReadonlyMap<string, Team>;
 }) {
   const text = slotText(slot, teamsById);
-  const isTipped = slot.resolution === 'tipped';
+  // Ett placerat lag (grupp-tippad 1:a/2:a ELLER en trea härledd ur match-tipsen, T64).
+  const hasTeam = slot.resolution === 'tipped' || slot.resolution === 'tipped-third';
   return (
     <li
       data-bracket-slot=""
@@ -73,19 +79,29 @@ function TipsSlotRow({
     >
       <span className="min-w-0 truncate text-[0.8125rem] leading-tight" title={text}>
         <span
-          className={`vm-bracket-slot-name ${isTipped ? 'font-semibold text-fg' : 'text-fg-muted'}`}
+          className={`vm-bracket-slot-name ${hasTeam ? 'font-semibold text-fg' : 'text-fg-muted'}`}
         >
           {text}
         </span>
       </span>
       {/* En öppen bästa-trea-plats märks tydligt som "öppen" (avgörs av riktiga
-          resultat), så det aldrig läses som ett gissat lag. */}
+          resultat), så den aldrig läses som ett gissat lag. En trea som HÄRLETTS ur
+          match-tipsen (T64) bär i stället en lågmäld "3:a"-markör, så man ser att
+          laget är en simulerad trea (ur tipsen), inte en grupp-tippad 1:a/2:a. */}
       {slot.resolution === 'open-third' ? (
         <span
           data-tips-open-third=""
           className="vm-tips-open-badge shrink-0 rounded-pill border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
         >
           Öppen
+        </span>
+      ) : slot.resolution === 'tipped-third' ? (
+        <span
+          data-tips-third=""
+          title="Simulerad trea ur dina matchtips (FIFA-seedning)"
+          className="vm-tips-third-badge shrink-0 rounded-pill border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
+        >
+          3:a
         </span>
       ) : null}
     </li>
@@ -386,10 +402,11 @@ function Header({ tippedGroupCount }: { tippedGroupCount: number }) {
         ) : null}
       </div>
       <p className="max-w-2xl text-sm text-fg-muted">
-        En simulering ur dina grupp-tips, inte riktiga resultat. Vi placerar dina tippade ettor och
-        tvåor i sextondelsfinalen så du ser vilka som möts. De åtta bästa treorna avgörs av de
-        verkliga resultaten (FIFA-seedning), så de platserna står öppna. Vem som sen går vidare mot
-        finalen beror på matcherna, det visas som strukturen (Vinnare M73 och så vidare).
+        En simulering ur dina tips, inte riktiga resultat. Vi placerar dina tippade ettor och tvåor
+        i sextondelsfinalen så du ser vilka som möts. De åtta bästa treorna räknas fram ur dina
+        tippade matchresultat (FIFA-seedning) så snart du tippat alla gruppmatcher, innan dess står
+        de platserna öppna. Vem som sen går vidare mot finalen beror på matcherna, det visas som
+        strukturen (Vinnare M73 och så vidare).
       </p>
     </header>
   );
