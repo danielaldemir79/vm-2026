@@ -5,6 +5,43 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T44 (#75): footer-promo, synlig adress + utvecklar-promotion
+
+**Bakgrund (Daniels feedback 2026-06-11, #75):** footer-signaturen (T38/T39) länkade danielaldemir.com
+men URL:en var GÖMD (bara i `title`/`aria-label`), namnet var enda klickbara målet. Daniel vill (1)
+adressen SYNLIG bredvid namnet, tydligt klickbar, och (2) tydligare promotion av honom som utvecklare.
+Dirigentens dispatch lade till: appens egen adress (vm-2026.pages.dev) SYNLIG så folk kan sprida den
+muntligt / skriva av den.
+
+**Beslut (frångår T39:s "bara namnet är länk, ingen synlig URL"):** T39 valde MEDVETET att inte visa
+URL:en, för att hålla signaturen som en tät, balanserad enhet. Daniels nya feedback väger tyngre här,
+så det valet frångås uttryckligt. Tre tillägg, alla hållna diskreta (footern ska inte bli en reklampelare):
+
+1. **Appens adress synlig i ledtexten** (`App.tsx` footer-`<p>`): "dela appen med vänner, **vm-2026.pages.dev**"
+   som synlig, klickbar länk-text. Visas utan `https://`-prefix (renare att läsa/säga högt/skriva av),
+   `href` bär hela URL:en (`https://vm-2026.pages.dev`, kanonisk app-URL per SPEC §3 / deploy.md). Detta
+   är "sprid-appen"-behovet och bor i ledtexten, SKILT från utvecklar-signaturen nedan.
+2. **Synlig `danielaldemir.com`-länk bredvid namnet** i signaturen: en SEPARAT klickbar länk efter
+   namn-länken, åtskild av en aria-hidden punkt-divider. Namn-länkens kontrakt (href/target/rel) är
+   OFÖRÄNDRAT, så T39:s tabnabbing-test håller orört. Den nya adress-länken bär samma säkerhets-recept
+   (`target=_blank` + `rel=noopener noreferrer`).
+3. **Utvecklar-titel** ".NET-systemutvecklare" som en lågmäld muted rad (text-xs, fg-muted) under
+   signaturen. Promotar Daniel som byggaren utan att skrika.
+
+**Val av promo-omfattning:** dirigenten föreslog även en "vill du ha en app byggd? hör av dig"-kontaktrad
+och en "byggd på 2 dagar med AI"-touch. Den LUGNASTE varianten valdes (titel + synliga adresser), eftersom
+briefen säger "smakfullt, aldrig skrikigt, ingen reklampelare". Slut-texten + ev. fler element är Daniels
+val (AC: "Daniel godkänner den slutliga promo-texten").
+
+**Säkerhet (tabnabbing, hela footern):** alla tre externa länkar (app-adress, namn, danielaldemir.com)
+använder `rel="noopener noreferrer"` + `target="_blank"`. Vaktas av tester i `App.test.tsx` (rätt href +
+target + rel-tokens för app-adressen OCH danielaldemir.com-länken), så en framtida refaktor inte tyst
+tappar skyddet eller den synliga adressen.
+
+**Verifiering:** build EXIT 0, full svit grön (1752 tester, +4 nya för T44), lint + format:check rent.
+Visuell finputs (kvällsljus-balans, AA-kontrast på de nya muted länkarna) ligger hos design-frontend om
+dirigenten bedömer att footern behöver det , funktionell + tillgänglig bas levereras här.
+
 ## 2026-06-12 , T25 (#25): code-splitting (manualChunks), E2E-svit (Playwright) + a11y-audit (axe)
 
 ### Del 1: prestanda , vendor-split (manualChunks)
