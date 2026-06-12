@@ -44,7 +44,7 @@ grupp en nuvarande trea (t.ex. en grupp som inte spelat) lämnas bästa-trea-slo
 
 **ÄRLIG MÄRKNING (samma anda som T51):** ett preliminärt träd märks tydligt, header-pillen "Nuvarande
 ställning" + intro-meningen "Inte klart förrän grupperna är färdigspelade", och varje preliminär slot
-bär en under-rad med sin position ("1:a grupp E , nu") + aria-label "..., nuvarande ställning (inte
+bär en under-rad med sin position ("1:a grupp E · nu") + aria-label "..., nuvarande ställning (inte
 klart)". `BracketState.preliminary` (true bara under gruppspel med minst ett preliminärt lag) driver
 märkningen. `locked` och `preliminary` är ömsesidigt uteslutande.
 

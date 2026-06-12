@@ -149,7 +149,7 @@ export function SlotRow({
             className="vm-bracket-slot-prelim min-w-0 truncate text-[0.625rem] font-medium uppercase tracking-wide text-fg-muted"
             aria-label={`${slot.label}, nuvarande ställning (inte klart)`}
           >
-            {slot.label} , nu
+            {slot.label} · nu
           </span>
         ) : null}
       </span>
