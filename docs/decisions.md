@@ -5,6 +5,78 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T23 (#23): pinnat favoritlag + personlig statistik
+
+**Bakgrund:** SPEC §10 + §6 förutser ett GENERISKT (lagagnostiskt, inte hårdkodat Sverige) pinnat
+favoritlag per användare + personlig statistik (träffsäkerhet, bästa call). Domänmodellen hade redan
+stubbarna `User.favoriteTeamId` (Team.id) + `PlayerStats` (accuracy/exactHits/bestCall).
+
+**Beslut (lagring): favoritlaget persistas i localStorage (per-enhet), INTE Supabase.**
+**Varför:** Ett favoritlag är en ren PER-ENHETS-PREFERENS (som tema, haptik, ljud, aktivt rum), inte
+delad data , ingen annan behöver se mitt favoritlag. En Supabase-tabell hade krävt en migration + en ny
+RLS-yta för noll delnings-värde (YAGNI + lägsta attackyta, PRINCIPLES §0/§3/§7). Vi följer därför
+safe-storage-mönstret med `vm2026-`-prefixet (nyckel `vm2026-favorite-team`), robust mot blockerad/privat
+storage (ingen krasch, persistensen hoppas bara över). Lagrar Team.ID (gemen intern nyckel, samma rymd som
+`favoriteTeamId` i domänmodellen + match.homeTeamId/awayTeamId), inte code, så jämförelsen mot matcherna är
+i rätt identitets-rymd. Ett okänt/inaktuellt id ignoreras tyst (resolveFavoriteTeam, fail-safe, inget spöklag).
+
+**Beslut (påverkan på vyer): "notiser" tolkas som VISUELL LYFTNING (acceptanskriteriet nämner att lyfta
+favoritlagets matcher; appen har inga push-notiser i MVP).** Favoritlagets matcher får en DISKRET markering
+(`data-favorite` + en liten stjärn-bricka + ett ord i matchkortets a11y-namn) i dagsvyn, SKILT från
+"Dagens match"-hero:n (`highlight`), så de två kan sammanfalla utan att kollidera. Lågmäld med flit, så live-
+appens layout inte regredierar.
+
+**Beslut (statistik-definitioner, gissas inte): härledd ur SAMMA score.ts-poängväg som topplistan + märkena
+(EN poäng-källa, HARD, samma anda som T58/#99 + T19). Ingen ny poäng-beräkning som kan drifta.** Bedöms BARA
+på AVGJORDA matcher (status 'finished'), samma poäng-/avslöjande-modell som topplistan. Exakta formler
+(`derivePersonalStats`, src/features/leaderboard/personal-stats.ts):
+- **Träffsäkerhet (accuracy)** = (exakta + rätt-utfall) / antal AVGJORDA tippade matcher, ett tal 0-1.
+  0 avgjorda tips => null (ingen falsk 0 %, samma fail-safe som deriveSelfSummary). KÄLLA: score.ts
+  (scorePrediction > 0 = rätt utfall/exakt).
+- **Exakta / Rätt utfall / Miss** = antal avgjorda tips per poäng-TYP (`pointTypeOf`, samma exakt/utfall/
+  miss-beslut som scorePrediction). Räknas på det OBOOSTADE utfallet: en joker ändrar poäng-TYNGD, inte HUR
+  MÅNGA exakta medlemmen prickat (samma val som topplistans `exactHits`).
+- **Bästa call** = det ENSKILDA avgjorda tips som gav HÖGST poäng, JOKER-MEDVETET (joker dubblar, samma
+  `JOKER_MULTIPLIER` som scoreMember), så en dubblad exakt (6p) slår en oboostad exakt (3p). Bara tips med
+  poäng > 0 kan vara bästa call. Vid lika poäng vinner TIDIGASTE kickoff (stabil, deterministisk tiebreak).
+
+EDGE-fall (alla rena, testade i personal-stats.test.ts): inga tips / inga avgjorda matcher / allt miss ger
+tom statistik (accuracy null eller 0, bestCall null), så den börjar tom och fylls löpande när matcher avgörs.
+
+**T23-visuellt (design-frontend, premium-finish ovanpå senior-devs bas): HIERARKI-disciplin, ingen tävlar.**
+Designvärdena bor i `src/theme/tokens.css` §25 (`.vm-favorite-chip` + `.vm-personal-stats` + syskon). Tre delar:
+- **Favorit-chippet (matchkortet):** en DISKRET markering som ligger på SAMMA kort som hero-kortets SOLIDA
+  guld-"Dagens match"-bricka och kan SAMMANFALLA med den. Därför med flit en LUGNARE form: en UTLINJERAD
+  guld-pill (låg guld-tint + guld-kant + en guld-stjärna), INTE en solid guld-yta. Solid guld = "dagens
+  hjälte" (en per dag); utlinjerad guld = "ditt lag, var det än spelar". Så de två kan stå bredvid varandra
+  utan att slåss om blicken (acceptanskriteriet: får inte krocka visuellt med `data-highlight`).
+- **Statistik-panelen:** ett SYSKON till poäng-summeringen (TipsScoreSummary, §20) som ligger DIREKT OVANFÖR
+  den. Summeringen är "din STÄLLNING" (total + placering, den stolta solida guld-totalen). Statistiken är
+  "din SPELSTIL". Den får DÄRFÖR inte härma totalens solida guld-bricka (två guld-block hade tävlat). I
+  stället: samma kvällsljus-familj (surface + svag guld-glow), men en LUGNARE glow (7% vs summeringens 8%)
+  + en NEUTRAL inset-topplist (inte guld). Träffsäkerheten (viktigaste talet) lyfts varmt med en guld-TINT-
+  bricka + guld-TEXT-etikett (inte en solid guld-yta); övriga tre nyckeltal är lugna neutrala surface-raised-
+  rutor. Bästa call-kortet bär en låg guld-glow (det stolta ögonblicket); joker-markören återbrukar den
+  SOLIDA guld-bricka-formen (DRY mot `.vm-coupon-mine`).
+- **Favoritlags-väljaren:** appens etablerade form-språk (accent-fokus-ring + accent-hover-kant, samma
+  `FIELD_BASE`-disciplin som PredictionForm/resultatinmatningen), så den känns som EN familj med övriga
+  inmatningar i stället för en avvikande egen-stil.
+
+**WCAG AA (mätt med `scripts/contrast-t23.mjs`, canvas-komposit VÄRSTA fall, BÅDA teman, MÖRKT / LJUST):**
+All guld bär text som ANTINGEN full `fg` på en låg guld-tint ELLER den AA-säkra guld-TEXT-tonen
+(`--color-warning`, djup amber i ljust tema), ALDRIG rå `--vm-gold` som text på tint (den kända fällan).
+- Favorit-chip text (fg) på guld-10%-tint: **12.40 / 16.04**. Stjärnan (warning guld-text): **8.21 / 5.31**.
+- Panel-eyebrow (warning guld-text) på guld-7%-glow: **8.80 / 5.48**. Rubrik (fg): **13.29 / 16.58**.
+- Hero-stat-tal (fg) på guld-8%-tint: **10.63 / 16.46**. Hero-stat-etikett (warning): **7.04 / 5.44**.
+- Övriga stat-brickor på opak surface-raised: tal (fg) **12.66 / 17.91**, etikett (fg-muted) **6.23 / 6.52**.
+- Bästa call på guld-6%-glow: rubrik (fg) **11.12 / 16.75**, kontext (fg-muted) **5.48 / 6.10**.
+- Joker-markör (coupon-ink på SOLID guld, ÅTERBRUK, ingen ny kombination): **10.90 / 5.03**.
+
+MIN över alla nya text-ytor: **5.48:1 mörkt / 5.03:1 ljust** (alla >= 4.5, normal text). Glow-/kant-/tint-
+lagren under tröskeln bär ALDRIG text. Tomt-läge + gating oförändrade funktionellt (alla T23-tester gröna).
+
+---
+
 ## 2026-06-12 , T4c (#35): arena + värdstad per match, källåkrad + korskollad
 
 **Bakgrund:** T4b:s källa (Daniels svenska TV-tablå) bar TID + svensk TV-kanal men INTE arena, så

@@ -25,6 +25,7 @@ import { useTodayKey } from './use-today-key';
 import { localDateKey } from './group-matches-by-day';
 import { MatchCard } from './MatchCard';
 import { MatchReactions } from '../rooms';
+import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favorite-team';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
 import { stageLabel, teamDisplayName } from './match-display';
@@ -158,6 +159,11 @@ export function DailyMatchesView() {
   // se use-today-key). Driver hero-etiketten "Dagens match" vs matchens datum (#54).
   const { todayKey } = useTodayKey();
 
+  // PINNAT FAVORITLAG (T23, #23): lyft favoritlagets matcher DISKRET i listan (+ hero:n
+  // om dagens match rör laget). Tolerant hook (ingen provider -> null), så vyn fungerar
+  // oförändrat utan favoritlags-providern. Markeringen är ren visning, ingen data-yta.
+  const { favoriteTeamId } = useFavoriteTeam();
+
   // Dynamiskt DAGS-TEMA (T8): härled en subtil, deterministisk accent-hue ur den
   // valda dagens lag och lägg den som en CSS-variabel + stabilt data-attribut på
   // hero:ns dekor-yta. Påverkar BARA dekorativa ytor (design-frontend väver in
@@ -186,6 +192,15 @@ export function DailyMatchesView() {
         <p className="max-w-2xl text-sm text-fg-muted">
           Bläddra dag för dag genom mästerskapet. Tider visas i svensk tid med svensk TV-kanal.
         </p>
+
+        {/* FAVORITLAGS-VÄLJAREN (T23, #23): pinna ett lag så dess matcher lyfts diskret i
+            listan. Visas först när lagen laddats (annars en tom väljare). Egen liten yta
+            under rubriken, lågmäld; design-frontend finputsar utseendet. */}
+        {teams.length > 0 ? (
+          <div className="mt-1 max-w-md rounded-card border border-border bg-surface p-4 shadow-[var(--vm-shadow-card)]">
+            <FavoriteTeamPicker teams={teams} />
+          </div>
+        ) : null}
       </header>
 
       {status === 'loading' ? (
@@ -283,6 +298,11 @@ export function DailyMatchesView() {
                             teamsById={teamsById}
                             highlight
                             highlightLabel={heroLabel}
+                            favorite={matchHasFavorite(
+                              favoriteTeamId,
+                              matchOfTheDay.homeTeamId,
+                              matchOfTheDay.awayTeamId
+                            )}
                           />
                         </div>
                       );
@@ -381,6 +401,11 @@ export function DailyMatchesView() {
                       match={match}
                       teamsById={teamsById}
                       footer={<MatchReactions matchId={match.id} />}
+                      favorite={matchHasFavorite(
+                        favoriteTeamId,
+                        match.homeTeamId,
+                        match.awayTeamId
+                      )}
                     />
                   </Slide>
                 </li>

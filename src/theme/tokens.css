@@ -2358,3 +2358,115 @@ body {
     inset 0 1px 0 0 rgb(255 255 255 / 0.3),
     0 2px 8px -3px color-mix(in srgb, var(--vm-gold) 60%, transparent);
 }
+
+/* =============================================================================
+   25. PINNAT FAVORITLAG + PERSONLIG STATISTIK (T23, issue #23).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   TVÅ ytor i samma kvällsljus-/guld-familj som tips-världen (§10/§20), men med en
+   medveten HIERARKI-disciplin så ingen tävlar med den den ska stödja:
+
+   A. FAVORIT-CHIPPET (.vm-favorite-chip, matchkortet i dagsvyn): den DISKRETA
+      markeringen "ditt favoritlag spelar". Den ligger på SAMMA kort som hero-kortets
+      SOLIDA guld-"Dagens match"-bricka, och de två kan SAMMANFALLA (favoritlaget spelar
+      dagens match). Därför är favorit-chippet med FLIT en LUGNARE form: en UTLINJERAD
+      guld-pill (låg guld-tint + guld-kant + en liten guld-stjärna), INTE en solid guld-
+      yta. Solid guld = "dagens hjälte" (en per dag); utlinjerad guld = "ditt lag, var
+      det än spelar" (lågmäld, kan stå bredvid hero-brickan utan att slåss om blicken).
+
+   B. STATISTIK-PANELEN (.vm-personal-stats): ett SYSKON till poäng-summeringen (§20),
+      som ligger DIREKT OVANFÖR den i tips-vyn. Summeringen är "din STÄLLNING" (total +
+      placering, den STOLTA solida guld-totalen, ögats första anhalt). Statistiken är
+      "din SPELSTIL" (hur du tippar över tid). Den får DÄRFÖR inte härma totalens solida
+      guld-bricka, då skulle två guld-block tävla. I stället: samma surface + svag guld-
+      hörn-glow (kvällsljus-värmen binder dem till samma familj), men en LUGNARE guld-
+      glow (7% vs summeringens 8%) och INGEN solid guld-total. Det viktigaste talet
+      (träffsäkerhet) lyfts med en VARM guld-tintad bricka + guld-TEXT-etikett, inte en
+      solid guld-yta. Så panelen läses som "stödjer summeringen", inte "konkurrerar".
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-text-på-tint + ...-per-tema, mätt med
+   scripts/contrast-t23.mjs, canvas-komposit VÄRSTA fall, BÅDA teman): ALL guld bär text
+   som ANTINGEN full fg på en låg guld-tint, ELLER den AA-säkra guld-TEXT-tonen
+   (--color-warning, mörk amber i ljust tema), ALDRIG rå --vm-gold som text på tint (den
+   kända fällan). Joker-markören återbrukar den SOLIDA guld-bricka-formen (--vm-coupon-ink
+   på SOLID --vm-gold, redan mätt 10.90/5.03, ingen ny kombination). Uppmätta MIN över
+   alla nya text-ytor: mörkt 5.48:1 / ljust 5.03:1 (alla >= 4.5, normal text). Glow-/
+   kant-/tint-lagren under tröskeln bär ALDRIG text. Värden i decisions.md (T23-visuellt).
+   -------------------------------------------------------------------------- */
+
+/* A. FAVORIT-CHIPPET: en UTLINJERAD guld-pill (låg guld-tint-fond + guld-kant), den
+   LUGNA motsatsen till hero-kortets SOLIDA guld-bricka. Texten ("Favorit") är full fg
+   (appens högst kontrasterande ton, AA med marginal på den låga tinten i båda teman),
+   guld-tinten + guld-kanten bär den varma "ditt lag"-signalen utan att skrika. Mätt:
+   fg på guld-10%-tint = 12.40:1 mörkt / 16.04:1 ljust. */
+.vm-favorite-chip {
+  background-color: color-mix(in srgb, var(--vm-gold) 10%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vm-gold) 38%, var(--color-border));
+}
+
+/* Favorit-stjärnan: den AA-säkra guld-TEXT-tonen (--color-warning: ljus #f3c14e i mörkt,
+   djup amber #8a5a05 i ljust), ALDRIG rå --vm-gold (faller under AA som text på den ljusa
+   tinten, lessons). Mätt: warning på guld-10%-tint = 8.21:1 mörkt / 5.31:1 ljust. */
+.vm-favorite-chip-star {
+  color: var(--color-warning);
+}
+
+/* B. STATISTIK-PANELEN: surface med en SVAG guld-hörn-glow (samma kvällsljus-signatur
+   som .vm-coupon-card §10 / .vm-tips-score-summary §20), men en LUGNARE glow (7% vs
+   summeringens 8%) + en NEUTRAL inset-topplist (border-tonen, INTE guld), så panelen
+   läser som "din spelstil" UNDER "din ställning" (summeringens guld-topplist), inte som
+   en andra guld-hero som tävlar. Mätt: panel-text på guld-7%-glow = fg 13.29/16.58,
+   eyebrow (warning) 8.80/5.48. */
+.vm-personal-stats {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(
+    120% 110% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 7%, transparent),
+    transparent 60%
+  );
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 var(--color-border);
+}
+
+/* HERO-STAT-BRICKAN (träffsäkerhet): det VIKTIGASTE nyckeltalet lyfts varmast, en guld-
+   tintad surface-raised-bricka med en guld-kant + guld-TEXT-etikett, så ögat landar på
+   "hur ofta prickar JAG rätt". Medvetet en TINT (inte en solid guld-yta): en solid guld-
+   bricka här skulle eka summeringens total och stjäla dess roll. Mätt: tal (fg) på guld-
+   8%-tint = 10.63/16.46, etikett (warning guld-text) 7.04/5.44. */
+.vm-stat-accuracy {
+  background-color: color-mix(in srgb, var(--vm-gold) 8%, var(--color-surface-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vm-gold) 30%, var(--color-border));
+}
+
+/* Hero-stat-etiketten: den AA-säkra guld-TEXT-tonen (samma disciplin som eyebrow:n),
+   ALDRIG rå --vm-gold. Signalerar "detta är nyckeltalet" varmt utan att sänka läsbarheten. */
+.vm-stat-accuracy-label {
+  color: var(--color-warning);
+}
+
+/* BÄSTA CALL-KORTET: "det stolta ögonblicket", en surface-raised-bricka med en LÅG guld-
+   hörn-glow + en hårfin guld inset-topplist (kvällsljus-värmen ekar, samma recept som
+   kupong-/facit-syskonen, dämpat). Bär bara matchup + kontext, ingen solid guld-yta.
+   Mätt: rubrik (fg) 11.12/16.75, kontext (fg-muted) 5.48/6.10 på guld-6%-glow. */
+.vm-best-call {
+  background-color: var(--color-surface-raised);
+  background-image: radial-gradient(
+    120% 90% at 100% 0%,
+    color-mix(in srgb, var(--vm-gold) 6%, transparent),
+    transparent 60%
+  );
+  box-shadow: inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 24%, transparent);
+}
+
+/* JOKER-MARKÖREN på bästa call: återbrukar den SOLIDA guld-bricka-formen (--vm-coupon-ink
+   på SOLID --vm-gold), den färg-OBEROENDE AA-säkra formen (redan mätt 10.90:1 mörkt /
+   5.03:1 ljust, DRY mot .vm-coupon-mine / .vm-tips-summary-total / .vm-badge, ingen ny
+   kombination). En joker är ett spelmoment värt en liten stolt guld-bricka, samma som
+   när jokern syns i kupongen/summeringen. */
+.vm-best-call-joker {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.32);
+}
