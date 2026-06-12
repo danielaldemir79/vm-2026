@@ -31,7 +31,7 @@ function nowOn(dateYmd: string): Date {
   return new Date(`${dateYmd}T09:00:00.000Z`);
 }
 
-describe('windowMatches, default-fönstret (3 svenska dagar)', () => {
+describe('windowMatches, default-fönstret (igår + 3 framåtblickande svenska dagar, T62)', () => {
   it('WINDOW_DAYS är 3 (idag + två följande dagar), den FRAMÅTBLICKANDE fönsterbredden', () => {
     expect(WINDOW_DAYS).toBe(3);
   });
