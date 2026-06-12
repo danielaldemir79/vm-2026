@@ -25,6 +25,9 @@ export {
   stageLabel,
   teamDisplayName,
   isVenuePlaceholder,
+  isFinished,
+  formatScore,
+  formatPenalties,
   UNKNOWN_TEAM_LABEL,
 } from './match-display';
 export { hashCode, hueFromCode, huesFor } from './team-hue';

@@ -120,22 +120,14 @@ export function computeCountdown(
 }
 
 /**
- * Välj dagens framträdande match ("Match of the day") bland en dags matcher.
- *
- * DETERMINISTISK regel (dokumenterad så valet aldrig är godtyckligt): den
- * TIDIGASTE matchen på dagen (lägst kickoff). Vid exakt samma avsparkstid bryts
- * lika med matchens id (stabil, lexikografisk), så valet är entydigt och
- * oberoende av inkommande ordning. Returnerar null för en tom dag.
- *
- * VARFÖR tidigast (och inte t.ex. högst rankad): rankning kräver lag-profil-data
- * (FIFA-ranking) som är lag-profil-tasken (T10, out of scope här), och för
- * slutspel är lagen ännu okända (homeTeamId/awayTeamId null). "Dagens första
- * avspark" är data vi HAR för alla matcher och en naturlig hero för en dagsvy.
- * Regeln kan skärpas i T10 när rankning finns, då på ett dokumenterat sätt.
+ * Den TIDIGASTE matchen i en lista (lägst kickoff), med matchens id som stabil,
+ * lexikografisk tie-break vid exakt samma avsparkstid. Ren hjälpare så både
+ * "dagens fokus-match" och dess all-spelade-fallback delar EXAKT samma ordnings-
+ * regel (ingen risk att de driver isär). Returnerar null för en tom lista.
  */
-export function selectMatchOfTheDay(dayMatches: readonly Match[]): Match | null {
+function earliestMatch(matches: readonly Match[]): Match | null {
   let best: Match | null = null;
-  for (const match of dayMatches) {
+  for (const match of matches) {
     if (best === null) {
       best = match;
       continue;
@@ -146,4 +138,36 @@ export function selectMatchOfTheDay(dayMatches: readonly Match[]): Match | null 
     }
   }
   return best;
+}
+
+/**
+ * Välj dagens framträdande match ("Match of the day", hero-kortets fokus) bland
+ * en dags matcher.
+ *
+ * DETERMINISTISK regel (dokumenterad så valet aldrig är godtyckligt): den
+ * tidigaste matchen på dagen som INTE redan är färdigspelad (status !==
+ * 'finished'), med matchens id som lexikografisk tie-break vid samma avsparkstid.
+ * Är HELA dagen färdigspelad faller vi tillbaka på dagens tidigaste match (så ett
+ * fullständigt spelat dygn fortfarande har ett hero-kort, nu med sitt resultat).
+ * Returnerar null för en tom dag.
+ *
+ * VARFÖR "tidigaste ICKE-färdiga" (T57, #98): tidigare valdes alltid dagens
+ * tidigaste match oavsett status, så när en match blåstes av stod "Dagens match"
+ * kvar på den avslutade matchen tills sidan laddades om, fast nedräkningen redan
+ * pekade mot nästa avspark (Daniels live-feedback). Genom att hoppa över färdiga
+ * matcher lyfter fokus automatiskt nästa ospelade match på dagen, drivet av samma
+ * minut-/sekund-tick som nedräkningen (ingen ny polling): matchens status blir
+ * 'finished' när det officiella resultatet vävs in (T48), och vyn räknar om.
+ *
+ * VARFÖR tidigast (och inte t.ex. högst rankad): rankning kräver lag-profil-data
+ * (FIFA-ranking) som är lag-profil-tasken (T10, out of scope här), och för
+ * slutspel är lagen ännu okända (homeTeamId/awayTeamId null). "Dagens första
+ * ospelade avspark" är data vi HAR för alla matcher och en naturlig hero.
+ */
+export function selectMatchOfTheDay(dayMatches: readonly Match[]): Match | null {
+  const notFinished = dayMatches.filter((m) => m.status !== 'finished');
+  // Finns minst en ospelad match: fokusera dess tidigaste. Annars (hela dagen
+  // spelad) faller vi tillbaka på dagens tidigaste match, så hero:t inte
+  // försvinner på ett färdigspelat dygn (det visar då matchen MED resultat).
+  return earliestMatch(notFinished.length > 0 ? notFinished : dayMatches);
 }
