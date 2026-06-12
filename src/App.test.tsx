@@ -118,6 +118,55 @@ describe('App-skalet', () => {
     expect(rel).toContain('noreferrer');
     await waitForAppSettled();
   });
+
+  it('visar appens adress vm-2026.pages.dev synligt och klickbart i footern (T44, #75)', async () => {
+    const { container } = renderApp();
+
+    // Daniels feedback (#75): adressen ska SYNAS så folk kan skriva av den / säga den
+    // högt, inte bara gömmas bakom en delningsknapp. Vi vaktar att den synliga LÄNK-
+    // TEXTEN finns (inte bara href:en) och pekar på rätt URL med tabnabbing-skydd, så
+    // en framtida refaktor inte tyst tappar den synliga adressen eller säkerhets-rel:en.
+    const addressLink = Array.from(container.querySelectorAll('footer a')).find(
+      (a) => a.textContent?.trim() === 'vm-2026.pages.dev'
+    ) as HTMLAnchorElement | undefined;
+    expect(addressLink).toBeDefined();
+    expect(addressLink).toHaveAttribute('href', 'https://vm-2026.pages.dev');
+    expect(addressLink).toHaveAttribute('target', '_blank');
+    const rel = (addressLink?.getAttribute('rel') ?? '').split(/\s+/);
+    expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
+    await waitForAppSettled();
+  });
+
+  it('visar danielaldemir.com synligt bredvid namnet med tabnabbing-skydd (T44, #75)', async () => {
+    const { container } = renderApp();
+
+    // Daniels feedback (#75): adressen synlig BREDVID namnet, tydligt klickbar (förr låg
+    // den bara i title/aria-label). Vi vaktar den SYNLIGA "danielaldemir.com"-länken
+    // (skild från namn-länken, som har texten "Daniel Aldemir") inom signaturen, med rätt
+    // mål + tabnabbing-skydd.
+    const signature = container.querySelector('[data-app-signature]');
+    expect(signature).not.toBeNull();
+    const addressLink = Array.from(signature?.querySelectorAll('a') ?? []).find(
+      (a) => a.textContent?.trim() === 'danielaldemir.com'
+    ) as HTMLAnchorElement | undefined;
+    expect(addressLink).toBeDefined();
+    expect(addressLink).toHaveAttribute('href', 'https://www.danielaldemir.com');
+    expect(addressLink).toHaveAttribute('target', '_blank');
+    const rel = (addressLink?.getAttribute('rel') ?? '').split(/\s+/);
+    expect(rel).toContain('noopener');
+    expect(rel).toContain('noreferrer');
+    await waitForAppSettled();
+  });
+
+  it('promotar Daniel som utvecklare med en titel-rad i footern (T44, #75)', async () => {
+    renderApp();
+
+    // Daniels feedback (#75): tydligare promotion av Daniel som utvecklare. Den lugna
+    // titel-raden ska nå DOM:en, så promotion-elementet inte tyst försvinner i en refaktor.
+    expect(screen.getByText('.NET-systemutvecklare')).toBeInTheDocument();
+    await waitForAppSettled();
+  });
 });
 
 // Den kompakta install-knappen (T63, #113) gatas bakom onboarding-touren (T39/#68, F1):

@@ -354,8 +354,24 @@ function AppShell() {
         </LeaderboardProvider>
 
         <footer className="flex flex-col gap-2 border-t border-border pt-6 text-sm text-fg-muted">
+          {/* Footerns ledtext + appens SYNLIGA adress (T44, #75, Daniels feedback): appen
+              sprids muntligt/genom att skrivas av, så adressen ska gå att LÄSA och säga
+              högt, inte bara gömmas bakom en delningsknapp. Därför står vm-2026.pages.dev
+              som synlig, klickbar länk-text (utan https-prefixet, det läses/sägs renare),
+              medan href bär hela URL:en. Egen-flik + tabnabbing-skydd (noopener noreferrer)
+              precis som signatur-länken (T39), samma säkerhets-recept i hela footern. */}
           <p>
-            VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med en länk.
+            VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med vänner,{' '}
+            <a
+              href="https://vm-2026.pages.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Öppna appens adress vm-2026.pages.dev i en ny flik"
+              className="rounded-sm font-medium text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+            >
+              vm-2026.pages.dev
+            </a>
+            .
           </p>
           {/* Upphovs-signatur (T38, #67; länk T39, #68): Daniels stolta lilla avsändarrad i
               "arena i kvällsljus"-estetiken. Ett "DA"-monogram-sigill (solid accent-bricka, mörk/
@@ -367,7 +383,7 @@ function AppShell() {
               meningen. Kontrast mätt i scripts/contrast-t38.mjs (canvas-komposit mot FONDEN,
               värsta basytan), värden i docs/decisions.md.
 
-              LÄNK (T39, #68): namnet är nu en länk till Daniels sajt (www.danielaldemir.com).
+              LÄNK (T39, #68): namnet är en länk till Daniels sajt (www.danielaldemir.com).
               Den behåller stolthets-stilen (full fg + display-vikt) i vila, så raden ser ut
               precis som förr; klickbarheten signaleras med en AFFORDANS som tänds vid
               interaktion: en accent-färgad underline på hover OCH focus-visible (samma
@@ -377,11 +393,22 @@ function AppShell() {
               2.4.7) över som primär affordans. aria-label ger ett tydligt länknamn som även
               säger att den öppnar en ny flik; target=_blank + rel=noopener noreferrer (säkerhet,
               hindrar tabnabbing). Underline-färgen (accent) är ren dekor PÅ texten (texten själv
-              är full fg = 17:1+), så ingen ny text-kontrast tillkommer. */}
+              är full fg = 17:1+), så ingen ny text-kontrast tillkommer.
+
+              T44 (#75, Daniels feedback): tidigare gömdes adressen (bara i title/aria-label).
+              T39:s val "bara namnet är länk, ingen synlig URL" är nu MEDVETET frångått på Daniels
+              begäran: adressen ska SYNAS bredvid namnet och vara tydligt klickbar, plus en kort
+              utvecklar-titel som promotar Daniel som byggare av appen. Två tillägg, hållna
+              diskreta (footern ska inte bli en reklampelare): (1) en SYNLIG "danielaldemir.com"-
+              länk efter namnet, separerad av en tunn punkt-divider, samma egen-flik + tabnabbing-
+              skydd som namn-länken; (2) en liten muted titel-rad ".NET-systemutvecklare" under
+              raden. Titel-texten + ev. fler promo-element (t.ex. en kontakt-rad) är Daniels val,
+              den lugnaste varianten är vald här. Namn-länkens kontrakt (href/target/rel) är
+              OFÖRÄNDRAT, så T39-testet håller. */}
           <p
             data-app-signature=""
-            className="mt-1 flex items-center gap-2.5 text-xs"
-            title="Made by Daniel Aldemir, www.danielaldemir.com"
+            className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs"
+            title="Made by Daniel Aldemir, danielaldemir.com"
           >
             <span aria-hidden="true" className="vm-signature-seal">
               DA
@@ -399,7 +426,27 @@ function AppShell() {
                 Daniel Aldemir
               </a>
             </span>
+            {/* SYNLIG adress bredvid namnet (T44-kärnan): en separat klickbar länk-text så
+                adressen kan läsas/skrivas av, inte bara namnet. Punkt-dividern (aria-hidden,
+                ren dekor) skiljer den lugnt från namnet. Visas utan https-prefix (renare
+                läsning), href bär hela URL:en. Egen affordans + samma tabnabbing-skydd. */}
+            <span aria-hidden="true" className="text-fg-muted/60">
+              ·
+            </span>
+            <a
+              href="https://www.danielaldemir.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Öppna danielaldemir.com i en ny flik"
+              className="rounded-sm text-fg-muted underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+            >
+              danielaldemir.com
+            </a>
           </p>
+          {/* Utvecklar-titel (T44, #75): en kort, muted rad som promotar Daniel som byggaren,
+              inramad i samma diskreta signatur-familj. Hålls lågmäld (text-xs, fg-muted) så
+              footern är fortsatt avsändar-signatur, inte annons. Daniel godkänner slut-texten. */}
+          <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
           {/* Version-stämpel (T43, #74): diskret bygg-identifierare (kort commit-SHA
               + byggtid) så live-versionen kan verifieras mot develop-HEAD. Löser
               framtida "är det live?"-förvirring (debug-agentens förbättring). */}
