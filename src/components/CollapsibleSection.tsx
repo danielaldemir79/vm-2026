@@ -146,21 +146,32 @@ export function CollapsibleBody({
 
   return (
     <div data-collapsible="" className="flex flex-col gap-4">
-      {/* ÖVRE expandera/komprimera-kontroll: ALLTID nåbar utan att skrolla igenom en
-          utfälld sektion, och fokus-MÅLET vid ihopfällning (toggle). Hela sidan delar
-          EN kontroll-komponent (ExpandToggle), med binära sektions-etiketter (labels). */}
-      <div className="flex">
-        <ExpandToggle
-          name={name}
-          expanded={expanded}
-          hiddenCount={0}
-          labels={toggleLabels}
-          controls={bodyId}
-          onToggle={toggle}
-          position="top"
-          buttonRef={topToggleRef}
-        />
-      </div>
+      {/* ÖVRE expandera/komprimera-kontroll: nåbar utan att skrolla igenom en utfälld
+          sektion, och fokus-MÅLET vid ihopfällning (toggle). Hela sidan delar EN
+          kontroll-komponent (ExpandToggle), med binära sektions-etiketter (labels).
+
+          GATAD PÅ SAMMA isClipped SOM FADEN (T68-F1, #136): i KOMPRIMERAT läge visas den
+          övre toggeln bara när innehållet FAKTISKT klipps (scrollHeight > taket). Ryms
+          allt inom collapsedMaxHeight (kort innehåll: ett tomt/laddnings-/utan-rum-
+          tillstånd) finns inget att "Visa alla" till, så en expandera-knapp vore ett
+          lika falskt löfte som faden, och vi döljer båda av samma mätning. I UTFÄLLT
+          läge visas den ALLTID (då MÅSTE man kunna fälla ihop), oavsett mätningen.
+          jsdom-kontrakt: isClipped startar true och stannar true utan layout
+          (clientHeight=0), så befintliga tester ser toggeln precis som förr. */}
+      {expanded || isClipped ? (
+        <div className="flex">
+          <ExpandToggle
+            name={name}
+            expanded={expanded}
+            hiddenCount={0}
+            labels={toggleLabels}
+            controls={bodyId}
+            onToggle={toggle}
+            position="top"
+            buttonRef={topToggleRef}
+          />
+        </div>
+      ) : null}
 
       {/* KROPPEN: komprimerad = höjd-klipp + gradient-fade ("toppen" syns), utfälld =
           full höjd. `hidden` används ALDRIG (innehållet ska synas komprimerat, inte
