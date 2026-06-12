@@ -5,6 +5,62 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T24 (#24): emoji-reaktioner på matcher i rummet
+
+**Beslut:** Ny tabell `public.room_reactions` (room_id, user_id, match_id, emoji, created_at) för
+emoji-reaktioner på matcher per rum. Migration `20260612160000_t24_room_reactions_schema_rls_realtime.sql`,
+applicerad LIVE och committad 1:1 (samma version + namn + innehåll = fresh-replaybar, repo == live-historik).
+**Varför:** Snabbt, lekfullt social-lager ovanpå kommentarerna (T66): noll text, bara en knapp. Snacket
+runt matcherna är halva nöjet.
+
+**Beslut (MVP-yta, KISS): reaktioner sitter BARA på matchkorten i dagens-vyn, INTE på topplista-rader.**
+Issuen nämnde topplista-rader "om billigt". Vi valde matcherna som MVP: det är där snacket händer, och
+en reaktion på en topplista-RAD (en person) hade krävt en annan datamodell (reagera på user, inte match)
+och en ny yta att aggregera/visa i. Matcher räcker som MVP (issuens egen formulering), topplista-reaktioner
+kan läggas till senare utan att röra denna modell. Endast LIST-korten får raden (inte hero-kortet): hero:n
+är en dubblett av en match som ändå visas i listan, så vi undviker två reaktions-ytor för samma match.
+
+**Beslut (modell): EN reaktion per (rum, användare, match), PK (room_id, user_id, match_id).** En andra
+reaktion på samma match BYTER emojin (upsert mot PK:n, RLS UPDATE på egen rad), avmarkera = DELETE. Aggregatet
+(antal per emoji) räknas i KLIENTEN ur raderna (härledd state, ingen denormaliserad räknar-kolumn), i en ren
+modul `src/features/rooms/reaction-aggregate.ts`.
+
+**KURERAD EMOJI-LISTA (8 st, källhänvisad, gissas inte): `⚽ 🔥 😂 😭 🎉 👏 😱 🧊`.** Betydelser: ⚽ mål,
+🔥 het match, 😂 skratt, 😭 besvikelse, 🎉 fira, 👏 bra spelat, 😱 chock, 🧊 iskall. **Källa:** designval
+för denna app (inte en extern spec) , täcker fotbolls-känslorna runt en match (jubel/sorg/chock/humor) utan
+en oöverskådlig palett (KISS). Listan är CHECK-låst i DB (`room_reactions_emoji_allowed`) OCH speglad 1:1 i
+klientens `REACTION_EMOJIS` (`src/data/rooms/reactions-api.ts`), en sanning, två speglar. DB:n är sanningen:
+en emoji utanför listan nekas av CHECK:en (bevisat live). `match_id`-formatet återanvänder EXAKT den
+källåkrade constrainten från T14 KA-SA2 / room_jokers (`g-[A-L]-[1-6]` eller `M73..M104`), ingen ny tolkning.
+
+**RLS-modell (anon = authenticated i Supabase, RLS är ENDA skyddet, samma som room_comments):** SELECT bara
+rumsmedlem (`is_room_member`), INSERT bara medlem OCH `user_id = auth.uid()` (user_id sätts av DB-default,
+kan inte förfalskas), UPDATE bara egen rad (byta emoji), DELETE bara egen rad (avmarkera). INGEN deadline-/
+sekretess-gren (till skillnad från tips T15 / joker T19).
+
+**Beslut (sekretess): reaktioner är PUBLIKA inom rummet DIREKT, ingen före-avspark-döljning.** **Varför:** en
+reaktion avslöjar inget hemligt tips. Att trycka 🔥 på en match säger inget om VAD du tippade (utfall/exakt
+poäng) , den uttrycker en känsla om matchen, inte en gissning om resultatet. Därför finns inget att skydda
+före avspark, och modellen blir enklare än tips/joker (ingen now()-jämförelse, ingen sekretess-SELECT-gren).
+Detta är medvetet: reaktioner ligger i `supabase_realtime`-publikationen och syns live för alla medlemmar.
+
+**RLS BEVISAT LIVE:** (1) under bygget med simulerade sessioner (DO-block, set role authenticated +
+request.jwt.claims, isolerat test-rum, städat) , medlem reagerar/byter/avmarkerar, utomstående ser/skriver
+INGET, byter/raderar inte andras rad, emoji + match_id utanför reglerna nekas av CHECK. (2) Env-gatat
+integrationstest med RIKTIGA anon-sessioner mot produktion (`src/data/rooms/reactions-rls.integration.test.ts`,
+kördes grönt live, städar rummet + loggar ut sessionerna i afterAll). En mock kan inte bevisa RLS.
+
+**Realtid (T18-mönstret, signal-inte-data):** `room_reactions` i publikationen. En ny/bytt/raderad reaktion
+ger en postgres_changes-SIGNAL till rummets medlemmar (RLS släpper bara raderna till medlemmar). Klienten
+läser ALDRIG payloadens rad; tyst re-fetch genom RLS (egen kanal `vm2026-room-reactions`, egen nonce, samma
+T55/T61-mönster som kommentarer/tips). Inget flimmer vid en väns reaktion.
+
+**Beslut (tolerant hook):** `useReactionsStore` faller till en INERT store utan provider (samma mönster som
+`useRoomsSync`, T14 KA-F3, INTE den kastande `useCommentsStore`). **Varför:** reaktions-raden är en fotrad på
+matchkorten i dagens-vyn, och dagens-vyn renderas i många tester och i lokalt läge utan en ReactionsProvider.
+Reaktioner är ett additivt socialt lager: utan provider ska korten fungera precis som förr (ingen rad), så en
+inert store (enabled=false -> MatchReactions renderar null) är rätt, inte ett kast.
+
 ## 2026-06-12 , T19 (#19): gamification (streaks, märken, joker-match)
 
 **Beslut: streaks + märken HÄRLEDS rent ur befintlig data, INGEN ny DB-tabell.** Streak och

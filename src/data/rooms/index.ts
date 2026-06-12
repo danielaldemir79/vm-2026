@@ -30,3 +30,13 @@ export {
   COMMENT_MAX_LEN,
   type RoomComment,
 } from './comments-api';
+// T24 (#24): emoji-reaktioner på matcher i rummet (lista, sätt/byt, ta bort egen).
+export {
+  listRoomReactions,
+  upsertMyReaction,
+  removeMyReaction,
+  isReactionEmoji,
+  REACTION_EMOJIS,
+  type RoomReaction,
+  type ReactionEmoji,
+} from './reactions-api';
