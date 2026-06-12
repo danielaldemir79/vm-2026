@@ -178,15 +178,17 @@ export function GroupStageView() {
       </header>
 
       {/* KOMPRIMERING (T68/#129): rubrik + beskrivning ovan ALLTID synliga, här under
-          komprimeras grid:en så bara FÖRSTA RADEN grupper syns som default (responsivt
+          komprimeras grid:en så FÖRSTA RADEN grupper syns HEL som default (responsivt
           antal: höjd-klipp visar en kort-rad oavsett hur många kort som ryms per rad på
           skärmbredden). Faden tonar mot app-bakgrunden (--color-bg), denna sektion
-          ligger inte på en surface-Panel. ~13.5rem ~= en grupp-korts-höjd (header + 4
-          lag-rader). Tomma/laddnings-/fel-tillstånd är korta, faden stör dem inte. */}
+          ligger inte på en surface-Panel. ~20rem = ett HELT grupp-kort (header + 4
+          lag-rader, uppmätt ~15.5rem) + lite av nästa rad som faden veil:ar, så klippet
+          aldrig skär mitt i ett kort. Tomma/laddnings-/fel-tillstånd är korta, faden
+          stör dem inte. */}
       <CollapsibleBody
         name="groups"
         toggleLabels={{ expand: 'Visa alla 12 grupper', collapse: 'Visa färre grupper' }}
-        collapsedMaxHeight="13.5rem"
+        collapsedMaxHeight="20rem"
         fadeTo="var(--color-bg)"
       >
         {status === 'loading' ? (

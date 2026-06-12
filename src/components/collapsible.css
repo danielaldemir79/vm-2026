@@ -1,0 +1,120 @@
+/* PREMIUM-FINISH för den delade komprimerings-primitiven (T68, #129, design-lager).
+ *
+ * Senior-dev byggde den funktionella basen (höjd-klipp + en enkel linjär fade +
+ * delad ExpandToggle). Detta lager gör komprimeringen PREMIUM utan att röra logik,
+ * fönster, sortering eller test-hakar:
+ *   - en MJUK, eased fade som smälter in i bakgrunden (ingen hård kant),
+ *   - en OMISSKÄNNLIG "det finns mer"-affordans vid klipp-kanten (chevron-cue),
+ *   - en diskret höjd-transition mellan komprimerat och utfällt,
+ *   - allt tema-medvetet (fadeTo styr bakytan) och reduced-motion-gatat.
+ *
+ * Stylas ENBART via senior-devs befintliga data-hakar (data-collapsible,
+ * -body, -fade, data-collapsed) + nya rena klass-hakar, så all semantik + alla
+ * tester står oförändrade.
+ */
+
+/* KROPPEN: en diskret höjd-transition vid UTFÄLLNING, så toppen inte SNAPPAR fram
+ * utan glider mjukt ut. max-height animeras (inte height) eftersom det utfällda
+ * läget har auto-höjd; vi transitionar mot ett stort tak så den klippta -> fulla
+ * resan blir mjuk.
+ *
+ * VARFÖR bara vid utfällning (data-collapsed='false'), inte vid ihopfällning: en
+ * max-height-transition från ett HÖGT tak (200rem) ner till klipp-höjden ger en
+ * "fördröjd snap" (taket faller länge osynligt ovanför innehållet innan klippet
+ * syns). Ihopfällningen flyttar dessutom fokus till sektionens topp direkt, så ett
+ * MOMENTANT klipp där är renare än en fördröjd. Utfällningen däremot tjänar på den
+ * mjuka avtäckningen. Reduced-motion nollar transition-duration globalt (index.css),
+ * så även utfällningen blir momentan men korrekt för WCAG 2.3.3. */
+[data-collapsible-body][data-collapsed='false'] {
+  transition: max-height 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* GRADIENT-FADE: smälter det klippta innehållet ner i sektionens bakyta.
+ *
+ * VARFÖR eased multi-stop i stället för `linear-gradient(transparent, fadeTo)`:
+ * en ren linjär alfa-ramp läses av ögat som ett BAND med en synlig övre kant
+ * (där faden "börjar"), vilket ser ut som en hård linje över innehållet. En
+ * ease-out-kurva (gles i toppen, tät i botten) ger en ÄKTA mjuk övergång utan
+ * skarp start. `--vm-fade-to` sätts inline per sektion (sektionens bakyta), så
+ * faden är tema- OCH yt-medveten. De understa ~35% är nästan helt täckande så
+ * den klippta raden tonar bort lugnt mot bakytan. */
+[data-collapsible-fade] {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--vm-fade-to) 0%, transparent) 0%,
+    color-mix(in srgb, var(--vm-fade-to) 12%, transparent) 28%,
+    color-mix(in srgb, var(--vm-fade-to) 38%, transparent) 50%,
+    color-mix(in srgb, var(--vm-fade-to) 72%, transparent) 70%,
+    color-mix(in srgb, var(--vm-fade-to) 94%, transparent) 87%,
+    var(--vm-fade-to) 100%
+  );
+}
+
+/* "DET FINNS MER"-CUE vid klipp-kanten: en liten accent-pillerknopp med en
+ * chevron-ner, centrerad längst ner i faden. Den GÖR klipp-kanten inbjudande
+ * ("det finns mer nedanför") utan extra text, och kompletterar den ÖVRE
+ * expandera-pillen (som bär den tillgängliga semantiken). REN DEKORATION:
+ * faden + cue:n är aria-hidden + pointer-events-none, så den interaktiva
+ * kontrollen förblir den riktiga knappen (tangentbord/skärmläsare nås av den),
+ * inte denna glyf. Sitter en bit upp från botten så den vilar PÅ den mjukaste
+ * delen av faden, inte mot sektionens nästa kant. */
+[data-collapsible-fade]::after {
+  content: '';
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  width: 2.25rem;
+  height: 1.25rem;
+  transform: translateX(-50%);
+  border-radius: var(--radius-pill);
+  /* Accent-tint + kant: samma affordans-språk som ExpandToggle-pillen, så cue:n
+     och knappen läses som SAMMA inbjudan. Allt token-drivet (följer temat). */
+  background-color: color-mix(in srgb, var(--color-accent) 16%, var(--vm-fade-to));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-border));
+  box-shadow: var(--vm-shadow-card);
+  /* Lugn "andnings"-rörelse så cue:n drar ögat (SPEC §7-ton), aldrig stökig. */
+  animation: vm-collapse-cue 2.4s ease-in-out infinite;
+}
+
+/* Chevron-glyfen i cue:n: ritad som en MASK (inte en data-URI med hårdkodad
+ * färg), så själva pilen färgas av --color-accent och följer temat automatiskt
+ * (ingen rå hex, ingen per-tema-bild att hålla i synk). Masken är samma chevron-
+ * ner som ExpandToggle, så affordansen är konsekvent över hela sidan. */
+[data-collapsible-fade]::before {
+  content: '';
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  width: 0.875rem;
+  height: 1.25rem;
+  transform: translateX(-50%);
+  background-color: var(--color-accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat center / 0.875rem 0.875rem;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")
+    no-repeat center / 0.875rem 0.875rem;
+  /* Följer samma andnings-rörelse som pillret under den, så glyf + platta rör
+     sig som en enhet. z-index så chevron ligger ÖVER ::after-plattan. */
+  z-index: 1;
+  animation: vm-collapse-cue 2.4s ease-in-out infinite;
+}
+
+@keyframes vm-collapse-cue {
+  0%,
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) translateY(0.1875rem);
+  }
+}
+
+/* WCAG 2.3.3: den som bett om minskad rörelse får en HELT statisk cue (den bär
+ * ändå sitt budskap via formen + chevron-glyfen + den övre expandera-pillen). */
+@media (prefers-reduced-motion: reduce) {
+  [data-collapsible-fade]::before,
+  [data-collapsible-fade]::after {
+    animation: none !important;
+    transform: translateX(-50%) !important;
+  }
+}
