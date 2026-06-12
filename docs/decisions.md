@@ -5,6 +5,59 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T61 (#110): kopierade tips syns DIREKT i målrummet (invaliderings-räknare)
+
+**Symptom (Daniels rapport 2026-06-12):** "när man kopierar tips från en grupp till annan så måste man
+lämna gruppen och gå in i den igen för att se tipsen. verkar som sidan inte uppdaterar när man är där."
+
+**Rotorsak (bekräftad mot kod):** `copyMyTips` (RoomsProvider, T52) skrev nya tips-rader i målrummet via
+`copyMyPredictions` (upsertMy*-API:erna) men returnerade bara en `CopyReport`, den rörde inget React-state
+i tips-vyernas providers. De fyra läsande providerna (`PredictionsProvider` match-tips, `GroupPredictions
+Provider`, `BracketPredictionsProvider`, `LeaderboardProvider` topplista/avslöjande) hämtar sina rader i en
+effekt med deps `[supabase, activeRoomId]` (Leaderboard även `lockedMatchCount`). Eftersom kopieringen sker
+IN i det redan-aktiva rummet ändras varken `supabase` eller `activeRoomId`, så ingen re-fetch triggas. Datan
+var stale tills man bytte rum (vilket bumpar `activeRoomId` -> ny epok -> re-fetch), exakt det Daniel såg.
+
+**Fix (samma seam-anda som T55:s `lockedMatchCount`):** en monoton invaliderings-räknare `tipsRefreshNonce`
+i rooms-storen. `copyMyTips` bumpar den BARA efter en LYCKAD kopiering (`report.total.copied > 0`), och de
+fyra providerna har talet i sina fetch-deps. Talet bärs på den befintliga `RoomsSync`-seamen (samma seam som
+tips-providers redan läser `activeRoomId` ur, och som results-lagret använder), så ingen NY koppling till
+hela rums-storen uppfinns; Leaderboard läser det ur `useRoomsStore` som den redan gör. **Räknare, inte
+boolean:** en flagga hade fastnat "på" och tappat en ANDRA kopierings signal mot samma rum, ett monotont
+tal ger en ny invalidering varje gång (mutationsbevisat: två copy i rad -> nonce 1 -> 2).
+
+**TYST re-fetch (T55-mönstret, ingen flimmer):** providerna fick samma `loadedRoomIdRef`-vakt som
+Leaderboard redan hade (T55): en re-fetch i SAMMA rum (kopierings-invalidering) behåller `ready` + befintlig
+data under hämtningen och visar ALDRIG `loading`, bara INITIAL/rumsbyte blankar. En misslyckad tyst re-fetch
+behåller datan + `ready` och loggar `console.warn` (`[VM2026]`-konventionen), den blankar aldrig vyn för en
+transient miss; en initial/rumsbyte-miss går till `error` som förut (fail loud, PRINCIPLES §8).
+
+**Val vid 0 kopierade:** ingen bump (allt låst/redan-tippat eller källan tom -> ingen rad ändrades i målet
+-> ingen re-fetch behövs, sparar ett nätanrop). En FAILad kopiering (`copied 0, failed > 0`) bumpar inte
+heller (inget landade att hämta; engine:n sväljer per-item-skrivfel och kastar inte, så detta utfall når
+success-grenen, men nonce-villkoret `copied > 0` hindrar en onödig re-fetch). En DELVIS kopiering
+(`copied > 0` med några låsta/failade) bumpar, eftersom minst ett tips faktiskt landade i målet.
+
+**INGEN polling, INGEN ny dubbelhämtning i vila** (samma princip som T55/T18-gränsen): talet är stabilt
+mellan kopieringar, så effekten kör om PRECIS vid en lyckad copy, inte annars. Bevisat med render-tester per
+provider (fetch-anrop: 1 initial + 1 efter copy; flimmer-bevis via TrackingProbe att `loading` aldrig syns)
+och mutationsverifierat: tas bumpen bort röd:ar signal-testet i RoomsProvider, tas `tipsRefreshNonce` ur en
+providers deps röd:ar dess re-fetch-test OCH ESLint `exhaustive-deps` fångar den oanvända variabeln.
+
+**Copilot R1 (#110, F1) , save-vakten separerad från fetch-vakten:** den första versionen lät de tre
+tips-providernas (`PredictionsProvider`, `GroupPredictionsProvider`, `BracketPredictionsProvider`)
+`loadTokenRef` dubbel-tjäna som BÅDE fetch-cancellation OCH stale-save-vakt. När `tipsRefreshNonce` kom in
+i load-effektens deps bumpas token nu även vid en kopierings-invalidering i SAMMA rum, så ett PÅGÅENDE save
+kunde felaktigt klassas som föråldrat och droppas (den optimistiska speglingen uteblev). Fix: save-vakten
+jämför nu mot RUMMET, inte mot load-token, en egen `activeRoomIdRef` (senaste aktiva rummet) jämförd mot
+`saveRoomId` (rummet saven startade i). Den invalideras BARA av ett äkta rum-byte, det save faktiskt ska
+skyddas mot, inte av en tyst re-fetch i samma rum. `loadTokenRef` behåller sin riktiga, enda roll: droppa
+föråldrade FETCH-svar. SAMMA fix i alla tre (sister-filerna hålls självständiga enligt repots etablerade
+konvention, vakten är tre rader, en cross-feature-helper hade brutit mönstret för lite vinst, PRINCIPLES
+§0/§3/§4). Tester per provider: ett pågående save överlever en samtidig copy-invalidering i samma rum
+(spegling sker), och droppas fortfarande korrekt vid RUM-BYTE. Mutationsverifierat: jämförs save-vakten
+åter mot `loadTokenRef` röd:ar same-room-överlevnads-testet.
+
 ## 2026-06-12 , T54 (#93): glasklar kom-igång-yta (installera ELLER använd direkt)
 
 **Bakgrund (Daniels live-feedback 2026-06-11):** "många lyckas inte förstå hur de ska installera det

@@ -74,6 +74,11 @@ export function RoomsProvider({
   const [activeRoom, setActiveRoom] = useState<RoomSummary | null>(null);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [results, setResults] = useState<RoomMatchResult[]>([]);
+  // INVALIDERINGS-RÄKNARE för tips-vyerna (T61, #110). copyMyTips bumpar den efter en
+  // LYCKAD kopiering; tips-providers har den i sina fetch-deps och hämtar då om. Ett
+  // monotont tal (inte en boolean): varje lyckad kopiering är en NY invalidering, även
+  // två i rad mot samma rum, så en andra kopiering inte tappas av att talet redan var "på".
+  const [tipsRefreshNonce, setTipsRefreshNonce] = useState(0);
 
   // Den aktiva klienten: injicerad (test) eller den riktiga singletonen. Memoiserad
   // så identiteten är stabil (effekt-deps). Bara skapad när rummen är aktiva.
@@ -322,9 +327,22 @@ export function RoomsProvider({
       }
       // Lås-klassificeraren körs på källans nycklar EFTER att engine:n läst dem (en
       // läsning). now = nuet (server-RLS är ändå sanningen; detta rapporterar bara ärligt).
-      return copyMyPredictions(supabase, sourceRoomId, room.id, (source) =>
+      const report = await copyMyPredictions(supabase, sourceRoomId, room.id, (source) =>
         deriveCopyLocks(source, KICKOFF_BY_MATCH_ID, new Date())
       );
+      // T61 (#110), rotorsak: engine:n skrev nya tips-rader i målrummet via upsertMy*,
+      // men tips-vyernas providers läser bara vid mount/rum-byte och fick aldrig veta
+      // att kopieringen skrev något, så tipsen syntes inte förrän man lämnade och gick
+      // in i rummet igen. Bumpa invaliderings-räknaren BARA när minst ETT tips faktiskt
+      // kopierades; talet ligger i tips-providernas fetch-deps och utlöser då en tyst
+      // re-fetch. Kopierades inget (allt låst/redan tippat, eller källan tom) ändras inga
+      // rader i målet, så ingen re-fetch behövs, vi hoppar bumpen och sparar ett nätanrop.
+      // En FAILad kopiering (report.total.copied === 0, failed > 0) bumpar inte heller:
+      // inget landade i målet att hämta, och CopyTipsControl visar redan felet ärligt.
+      if (report.total.copied > 0) {
+        setTipsRefreshNonce((n) => n + 1);
+      }
+      return report;
     },
     [supabase]
   );
@@ -339,6 +357,7 @@ export function RoomsProvider({
       activeRoom,
       members,
       results,
+      tipsRefreshNonce,
       createRoom,
       joinRoom,
       selectRoom,
@@ -356,6 +375,7 @@ export function RoomsProvider({
       activeRoom,
       members,
       results,
+      tipsRefreshNonce,
       createRoom,
       joinRoom,
       selectRoom,
