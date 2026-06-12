@@ -38,6 +38,25 @@ export { useOnboarding } from './use-onboarding';
 export type { OnboardingApi } from './use-onboarding';
 export { OnboardingDialog } from './OnboardingDialog';
 
+// Kom-igång-ytan (T54/#93): glasklar "installera ELLER använd direkt"-yta. Triggern
+// monteras i inställnings-portalen (alltid nåbar) + i onboardingens install-steg.
+export { GetStartedControl } from './GetStartedControl';
+export { GetStartedDialog } from './GetStartedDialog';
+export {
+  GET_STARTED_PATHS,
+  WEB_MODE_FACTS,
+  IOS_SAFARI_REQUIREMENT,
+  resolveDefaultPlatform,
+  resolveGetStartedState,
+  getPathFor,
+} from './get-started-steps';
+export type {
+  GetStartedPlatform,
+  GetStartedPath,
+  GetStartedStep,
+  GetStartedState,
+} from './get-started-steps';
+
 // Online/offline-status (hook + indikator).
 export { useOnlineStatus } from './use-online-status';
 export { OnlineStatusIndicator } from './OnlineStatusIndicator';
