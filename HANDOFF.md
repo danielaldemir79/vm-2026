@@ -5,6 +5,68 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T64/#118 (treor ur matchtipsen) KLAR - PR #120 väntar på merge
+
+**Branch:** `feature/T64-treor-ur-matchtips` @ HEAD `7d76887`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/120 mot `develop` (Closes #118, state: OPEN)
+**Board:** kort #118 tillagd och satt till "In Review" av journalisten 2026-06-12 (item-edit exit 0, bekraftat).
+
+**Journalist-not for T18 (saknad journalist-körning):**
+T18 (Supabase Realtime, PR #117) mergades 2026-06-12 utan journalist-körning pga Copilot-hänget (2 förfrågningar, 0 svar) och Daniels tempo. Commit: `fa8b780` (merge-commit), implementation: `fce547e`. Hög-risk-review: PASS utan fynd. Issue #18 stängs av dirigenten manuellt i merge-steget. Daniels process-beslut: Copilot-loopen PAUSAD tills vidare, lokala granskningen är sista grinden.
+
+**Vad T64 levererade:**
+- Ny motor `src/features/tips-bracket/derive-tips-thirds.ts`: bygger syntetiska färdigspelade gruppmatcher ur tippade matchresultat -> `deriveGroupTables` -> `preliminaryThirdSeeding`. Ateranvander de kallacksta `rankThirdPlaces` (FIFA Article 13) och `seedThirdPlaces` (Annexe C) fran T4/T56, ingen parallell seedning.
+- Aerlighets-grans (gissa aldrig): treorna seedas BARA nar VARJE grupp har ALLA sina gruppmatcher tippade. `computeStandings` ger en rank-3-rad aven for otippade grupper (alfabetisk fallback), sa enbart "en rank-3-rad per grupp" hade seedat en gissning. Antalet gruppmatcher per grupp harleds ur matchplanen, inte hardkodat.
+- `deriveTipsBracket` utokad med valfritt 3:e argument (tips-seedningen) och ny resolution `tipped-third` for Annexe C-slottar. Grupp-tipsen ager fortsatt 1:a/2:a (last designbeslut, dokumenterat i docs/decisions.md).
+- `useTipsBracketData` kopplad mot `usePredictionsStore` (match-tipsen).
+- `PredictionsProvider` hoistad i `App.tsx` sa bade match- och grupp-tips-sektionen nar samma data utan dubbelhamtning (samma monster som LeaderboardProvider, T58).
+- UI: seedad trea visas med lagnamn + lagmald "3:a"-markor; `bracket.css` fick `tipped-third`-tillstand (farg-oberoende form-signal).
+- 1533 tester grona, build EXIT 0, lint/format rena.
+- Lokal reviewer PASS 6/6 linser med 6 egna probes (delegation byte-identisk mot skarp motor, noll-tips-fallan bevisad stangd).
+- F2-avgransning aerlighet: T16b-slot-tippbarhet ur simulering = eget framtida server-side-beslut, utanfor T64-scope.
+
+**Commits:**
+- `7d76887` - T64 (#118): seeda de 8 bästa treorna i simuleringsträdet ur match-tipsen - HEAD
+
+**Verifiering:** build EXIT 0, 1533 grona, 0 röda, lint/format rena. Lokal reviewer PASS 6/6.
+
+**Acceptanskriterier issue #118 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Komplett tippade gruppmatcher -> alla 8 treor seedade i tips-trädet enligt Annexe C
+- [x] AC2: Ofullständiga tips -> berörda treplats-slots ärligt öppna (bevisad med tre probes)
+- [x] AC3: Käll-prioriteten grupp-tips vs matchtips-härledning dokumenterad + testad (grupp-tipsen äger 1:a/2:a, beslut i decisions.md, test bekräftar)
+- [~] AC4: Slutspels-slot-tipsen DELVIS: sextondelsbilden komplett ur tipsen (T64 scope levererat), T16b-slot-tippbarhet ur simulering = eget framtida server-side-beslut (utanför T64, ärligt dokumenterat)
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #120 (T64/#118, feature/T64-treor-ur-matchtips) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 120 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #118 manuellt (`gh issue close 118`) - auto-close funkar inte mot develop nar default-branch ar main.
+> Flytta kort #118 till Done pa boarden (nu i "In Review", projekt 2).
+> Merga aven aldre öppna PR:er om de fortfarande ar öppna: PR #116 (T63/#113), PR #115 (T62/#111), PR #114 (T61/#110), PR #117 (T18/#18 - kan redan vara mergad), PR #112 (T54/#93), PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #120 REDAN mergad:
+> T64 klar. Nästa task i kön: **#119 (T65 föreslå-knappen, delar T64:s härledning)** - läs issuen noggrant.
+> Därefter: #76 (T45 admin-statistik) -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready. Ny kandidat fran T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **Lean-städ-kandidat (T63):** resolveInstallMode/dismiss-maskineriet produktions-dött, pinnat för framtida task.
+> - **T16b-pin:** slot-tippbarhet ur simulering = eget framtida server-side-beslut.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), befordran kommentar-pastar Förekomst 5 (reviewer.md, vantar godkannande), 3 aldre befordringar (Förekomst 3+/4), 5 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook + T58-callsite-krav), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **Daniels process-beslut:** Copilot-loopen PAUSAD, lokala granskningen ar sista grinden. Aterstarts nar lanseringstressen ar over.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T63/#113 (ett-klicks-install) KLAR - PR #116 väntar på merge
 
 **Branch:** `feature/T63-ettklicks-install` @ HEAD `7bcc3f2`

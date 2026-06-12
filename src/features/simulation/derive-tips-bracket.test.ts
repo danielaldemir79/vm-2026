@@ -14,10 +14,11 @@
 // inte mot en parallell hårdkodning.
 
 import { describe, expect, it } from 'vitest';
-import type { Team } from '../../domain/types';
+import type { GroupId, Team } from '../../domain/types';
 import { GROUP_IDS } from '../../domain/types';
 import { WC2026_TEAM_BASES, teamId } from '../../data/wc2026/team-refs';
 import { deriveTipsBracket, type GroupTipPick } from './derive-tips-bracket';
+import type { TipsThirdSeeding } from './derive-tips-thirds';
 
 /** Bas-lagen räcker för denna rena funktion (den läser bara id/code). */
 const TEAMS: readonly Team[] = WC2026_TEAM_BASES.map((b) => ({
@@ -129,6 +130,90 @@ describe('deriveTipsBracket, bästa-trea-slots gissas ALDRIG', () => {
     for (const slot of thirdSlots) {
       expect(slot.teamId).toBeNull();
     }
+  });
+});
+
+describe('deriveTipsBracket, treorna ur match-tipsen (T64) när seedningen är komplett', () => {
+  // En komplett tips-seedning: seedar 8 grupper i COLUMN_MATCH_IDS-ordning, med ett
+  // konkret trea-lag-id per grupp. Den FORMEN är vad derive-tips-thirds producerar;
+  // här testar vi att deriveTipsBracket PLACERAR dem rätt (placeringen är T64:s ansvar).
+  const COLUMN_MATCH_IDS = ['M79', 'M85', 'M81', 'M74', 'M82', 'M77', 'M87', 'M80'];
+  const seededGroups: GroupId[] = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+
+  function completeSeeding(): TipsThirdSeeding {
+    const seedingByMatchId = new Map<string, GroupId>();
+    const thirdTeamIdByGroup = new Map<GroupId, string>();
+    COLUMN_MATCH_IDS.forEach((matchId, i) => {
+      const group = seededGroups[i];
+      seedingByMatchId.set(matchId, group);
+      // Använd gruppens lottnings-position-3-lag som "trea" (deterministiskt känt id).
+      const groupTeams = TEAMS.filter((t) => t.group === group);
+      thirdTeamIdByGroup.set(group, groupTeams[2].id);
+    });
+    return { seedingByMatchId, thirdTeamIdByGroup, complete: true };
+  }
+
+  it('placerar varje tippad trea i SIN Annexe C-slot (tipped-third, teamId satt)', () => {
+    const seeding = completeSeeding();
+    const state = deriveTipsBracket(fullTips(), TEAMS, seeding);
+    seeding.seedingByMatchId.forEach((group, matchId) => {
+      const match = matchOf(state, matchId);
+      const thirdSlot = [match.home, match.away].find((s) => s.resolution === 'tipped-third');
+      expect(thirdSlot, `${matchId} ska ha en tipped-third-slot`).toBeDefined();
+      expect(thirdSlot!.teamId).toBe(seeding.thirdTeamIdByGroup.get(group));
+      // Behörighets-etiketten står kvar (man ser VAR trean kommer ifrån).
+      expect(thirdSlot!.label).toMatch(/^3:a [A-L/]+$/);
+    });
+  });
+
+  it('alla 8 bästa-trea-slots är tipped-third (ingen open-third kvar) vid komplett seedning', () => {
+    const state = deriveTipsBracket(fullTips(), TEAMS, completeSeeding());
+    const slots = state.matches.flatMap((m) => [m.home, m.away]);
+    expect(slots.filter((s) => s.resolution === 'tipped-third').length).toBe(8);
+    expect(slots.filter((s) => s.resolution === 'open-third').length).toBe(0);
+  });
+
+  it('GRUPP-tipsen äger fortfarande 1:a/2:a, treorna rör BARA bästa-trea-slotsen', () => {
+    // Designbeslut (T64): match-tips-härledningen fyller ENBART treplats-slotsen.
+    const state = deriveTipsBracket(fullTips(), TEAMS, completeSeeding());
+    // 1:a grupp A -> M79-home (Winner A) är fortfarande den TIPPADE 1:an, inte en trea.
+    const m79Home = matchOf(state, 'M79').home;
+    expect(m79Home.resolution).toBe('tipped');
+    // M79-away är bästa trean (Article 12.6) -> nu tipped-third.
+    expect(matchOf(state, 'M79').away.resolution).toBe('tipped-third');
+  });
+
+  it('en INKOMPLETT seedning (complete false) lämnar alla treplats-slots ÖPPNA', () => {
+    // Ofullständiga match-tips: derive-tips-thirds gav complete:false + tom map.
+    const incomplete: TipsThirdSeeding = {
+      seedingByMatchId: new Map(),
+      thirdTeamIdByGroup: new Map(),
+      complete: false,
+    };
+    const state = deriveTipsBracket(fullTips(), TEAMS, incomplete);
+    const slots = state.matches.flatMap((m) => [m.home, m.away]);
+    expect(slots.filter((s) => s.resolution === 'open-third').length).toBe(8);
+    expect(slots.filter((s) => s.resolution === 'tipped-third').length).toBe(0);
+  });
+
+  it('utan seedning-argument (bakåtkompatibelt) är treorna öppna precis som T51', () => {
+    const state = deriveTipsBracket(fullTips(), TEAMS);
+    const slots = state.matches.flatMap((m) => [m.home, m.away]);
+    expect(slots.filter((s) => s.resolution === 'open-third').length).toBe(8);
+    expect(slots.filter((s) => s.resolution === 'tipped-third').length).toBe(0);
+  });
+
+  it('placerar ALDRIG en trea om dess seedade grupp saknar ett känt trea-lag-id', () => {
+    // Defensivt: en seedning som pekar ut en grupp utan trea-lag-id ska lämna slotten
+    // öppen, inte placera undefined (ingen obekräftad identitet).
+    const seeding: TipsThirdSeeding = {
+      seedingByMatchId: new Map<string, GroupId>([['M79', 'A']]),
+      thirdTeamIdByGroup: new Map(), // tom: inget id för A
+      complete: true,
+    };
+    const state = deriveTipsBracket(fullTips(), TEAMS, seeding);
+    expect(matchOf(state, 'M79').away.resolution).toBe('open-third');
+    expect(matchOf(state, 'M79').away.teamId).toBeNull();
   });
 });
 

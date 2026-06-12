@@ -5,6 +5,64 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T64 (#118): de 8 bästa treorna i simuleringsträdet seedas ur MATCH-tipsen (annars öppna)
+
+Daniels feedback: "gällande slutspelsträdet i simuleringsläge, utifrån sina tippade resultat i
+gruppspelet borde man få fram de 8 bästa 3orna. Då kan man tippa hela vägen, nu behöver man vänta."
+T51:s "Slutspelet ur dina tips" lämnade treplats-slotsen ÖPPNA (grupp-tipsen bär bara 1:a/2:a). T64
+fyller dem ur användarens TIPPADE MATCHRESULTAT.
+
+**Beslut 1 (KÄLLLÅST FIFA-REGEL, gissas ALDRIG): treorna härleds via exakt samma motorkedja som
+facit-trädet, bara med tippade resultat som indata.** Kedjan: bygg syntetiska färdigspelade
+gruppmatcher ur match-tipsen -> `deriveGroupTables` (`computeStandings`, FIFA Article 13:s tiebreak)
+-> `preliminaryThirdSeeding` (T56), som i sin tur anropar `rankThirdPlaces` (FIFA Article 13, "the
+eight best-ranked teams among those finishing third") + `seedThirdPlaces` (FIFA Annexe C, 495
+källlåsta kombinationer). INGEN parallell tabellräkning, rankning eller Annexe C (PRINCIPLES §4).
+Enda skillnaden mot den skarpa vägen är INDATA (tips i stället för facit), inte HUR.
+**Källa:** Regulations for the FIFA World Cup 26 (May 2026), Article 13 (sid. 26-28) + Annexe C (sid.
+80-97), committat i `fifa-knockout-rules-source.txt` / `third-place-table.ts`. Ny modul:
+`src/features/simulation/derive-tips-thirds.ts`. Resultatet matas till `deriveTipsBracket` (3:e
+argumentet) som placerar varje seedad trea i sin Annexe C-slot (ny resolution `'tipped-third'`).
+
+**Beslut 2 (LÅST käll-prioritet): grupp-tipsen äger 1:a/2:a-slotsen, match-tipsen ENBART
+treplats-slotsen.** När grupp-tips och matchtips-härledd tabell pekar olika om en grupps 1:a/2:a
+vinner GRUPP-tipsen den sloten (oförändrat T51-beteende). Match-tips-härledningen rör ALDRIG
+1:a/2:a-slotsen, bara de 8 bästa-trea-slotsen. Varför: 1:a/2:a är ett uttryckligt, direkt grupp-tips
+(det Daniel valde i kupongen); treorna går inte att uttrycka i grupp-tipset alls och MÅSTE därför
+härledas ur en annan källa (match-tipsen). Att låta match-tipsen även skriva om 1:a/2:a vore att
+överrösta ett direkt val med ett härlett, mindre ärligt.
+
+**Beslut 3 (ÄRLIG GRÄNS, gissa ALDRIG, ALLT-eller-INGET): treorna seedas BARA när VARJE grupp har
+ALLA sina gruppmatcher tippade.** `preliminaryThirdSeeding`:s egen gräns ("alla 12 grupper har en
+rank-3-rad") räcker INTE här: `computeStandings` ger en rank-3-rad även för en grupp där INGA matcher
+tippats (stabil alfabetisk teamId-fallback, probe-bevisat: 0 tippade matcher -> ändå rank-3-rad).
+Skulle vi seeda på enbart "en rank-3-rad per grupp" placerade vi treor ur otippade, alfabetiskt
+rangordnade grupper, en gissning presenterad som facit (precis det #88 förbjuder). Annexe
+C-seedningen behöver dessutom hela 8-bästa-mängden (en kollisionsfri tabell-rad), så delvis tippat
+kan inte ärligt ge NÅGON av de 8 treorna. Därför: alla 12 grupper helt tippade -> alla 8 treor
+seedade; någon gruppmatch otippad -> ALLA treplats-slots öppna (`'open-third'`, precis som T51).
+Antalet gruppmatcher per grupp HÄRLEDS ur matchplanen (inte hårdkodat 6), så gränsen följer datan.
+
+**Beslut 4 (wiring): PredictionsProvider hoistad i App.** Den simulerade slutspels-vyn (under
+grupp-tips-kupongerna) läser nu MINA match-tips (`usePredictionsStore`) utöver mina grupp-tips. För
+att nå match-tips-storen utan en andra hämtning hoistades `PredictionsProvider` från
+`PredictionSection` upp till App, där den omsluter BÅDE match-tips-sektionen och grupp-tips-sektionen
+(samma mönster som `LeaderboardProvider`, T58). `PredictionSection` konsumerar nu storen i stället
+för att skapa den. Utan aktivt rum/match-tips är seedningen tom -> öppna treor (oförändrat fixtures-
+läge). Märkning kvar: vyn är fortsatt TYDLIGT en SIMULERING (facit orört), en tips-seedad trea bär en
+lågmäld "3:a"-markör så den skiljs från en grupp-tippad 1:a/2:a.
+
+**OBS slutspels-slot-tipsen (T16b, bracket-predictions):** AC "slot-tipsen blir tippbara hela vägen
+när trädet är fyllt" gäller en ANNAN yta. Den ytan (`selectPredictableBracket` /
+`useBracketPredictableData`) härleder sina slots ur det RIKTIGA trädet (`deriveBracket` på facit) och
+gatar tippbarhet på `resolution === 'resolved'` (gruppspel FÄRDIGSPELAT), inte på tips-trädet. Att
+göra slot-tipsen tippbara ur en SIMULERAD bild kräver server-sidan (RLS validerar/poängsätter mot
+RIKTIGA resultat, deadline = slottens egen avspark), så det är ett eget, större beslut utanför denna
+task. Levererat här: hela sextondelsbilden UR TIPSEN i simuleringsvyn (ettor/tvåor + de 8 bästa
+treorna). Se T64 HANDOFF Findings.
+
+---
+
 ## 2026-06-12 , T18 (#18): Supabase Realtime , prenumeration som SIGNAL -> befintlig tyst re-fetch (ingen rad-merge), sekretess via begränsad publikation + RLS-refetch
 
 **Mål (issue #18):** appen ska leva utan reload, ett inmatat officiellt resultat ska synas direkt

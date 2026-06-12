@@ -16,16 +16,22 @@
 // rent härledd vy, de riktiga resultaten/facit rörs inte (AC i #88).
 //
 // ============================================================================
-// HARD, GISSA ALDRIG TREORNA (FIFA Annexe C):
+// TREORNA UR MATCH-TIPSEN (T64, #118), annars ÖPPNA (gissa aldrig):
 //   Sextondelsfinalerna kräver också de 8 BÄSTA TREORNA, seedade enligt FIFA:s
-//   Annexe C-tabell utifrån VILKA grupper treorna kom från. Grupp-tipsen bär
-//   bara 1:a + 2:a per grupp, INTE treor. Vi har alltså ingen ärlig grund för
-//   att seeda en trea. Därför lämnas varje bästa-trea-slot ÖPPEN (resolution
-//   'open-third'): den visar sin behörighets-etikett ("3:a A/B/C/D/F") men
-//   placerar ALDRIG ett gissat lag. Att gissa en trea och visa den som seedad
-//   vore precis det facit-sken issue #88 förbjuder. Källa för treornas roll +
-//   varför de inte kan härledas ur tipsen: docs/decisions.md (T51) + den
-//   källhänvisade seed-third-places.ts/Annexe C.
+//   Annexe C-tabell utifrån VILKA grupper treorna kom från. GRUPP-tipsen bär bara
+//   1:a + 2:a per grupp, INTE treor, så ur dem kan en trea aldrig härledas. MEN
+//   MATCH-tipsen (tippade matchresultat) bär hela bilden: T64 räknar simulerade
+//   tabeller ur dem (derive-tips-thirds.ts), härleder treorna och seedar dem via
+//   exakt den källlåsta motorn (rankThirdPlaces/Article 13 + seedThirdPlaces/Annexe
+//   C). Är ett sådant tips-seedat trea-set givet (3:e argumentet) placeras varje
+//   tippad trea i sin Annexe C-slot (resolution 'tipped-third'). Saknas det (inga
+//   match-tips, eller OFULLSTÄNDIGT tippat: någon gruppmatch otippad) lämnas varje
+//   bästa-trea-slot ÖPPEN (resolution 'open-third') med sin behörighets-etikett
+//   ("3:a A/B/C/D/F"), ALDRIG ett gissat lag, precis som T51 gjorde. Designbeslut
+//   (LÅST, docs/decisions.md T64): GRUPP-tipsen äger 1:a/2:a-slotsen som förut,
+//   match-tips-härledningen används ENBART för treplats-slotsen. Källa för treornas
+//   roll + seedningen: FIFA Article 12.6 (bracket-structure.ts) + Annexe C
+//   (third-place-table.ts) + docs/decisions.md (T51, T56, T64).
 //
 // VARFÖR PROPAGERINGEN STANNAR VID SEXTONDELEN:
 //   Tipsen säger vilka LAG som möts i sextondelsfinalen, men INTE vem som VINNER
@@ -39,6 +45,7 @@
 import type { GroupId, Team } from '../../domain/types';
 import { GROUP_IDS } from '../../domain/types';
 import { buildBracket, type BracketNode } from '../../domain/bracket/build-bracket';
+import type { TipsThirdSeeding } from './derive-tips-thirds';
 
 // De kanoniska grupp-id:na (A..L) som ett Set för O(1)-validering av nycklar i
 // picksByGroup. EN sanning (domain/types GROUP_IDS), aldrig hårdkodad här: en
@@ -55,8 +62,14 @@ const VALID_GROUP_IDS: ReadonlySet<string> = new Set(GROUP_IDS);
 export type TipsSlotResolution =
   // Laget kommer ur ett grupp-TIPS (tippad 1:a eller 2:a) och är placerat.
   | 'tipped'
-  // En bästa-trea-plats: lämnas ÖPPEN (gissas aldrig), bär bara sin
-  // behörighets-etikett ("3:a A/B/C/D/F"). Avgörs av riktiga resultat (Annexe C).
+  // En bästa-trea-plats vars trea HÄRLETTS ur match-tipsen (T64, #118): tabellerna
+  // räknades ur de tippade matchresultaten, treorna rankades (FIFA Article 13) och
+  // seedades (Annexe C). Laget är placerat (teamId satt). Bara när ALLA grupper är
+  // helt tippade (annars 'open-third', gissa aldrig).
+  | 'tipped-third'
+  // En bästa-trea-plats utan ett tips-seedat lag: lämnas ÖPPEN (gissas aldrig), bär
+  // bara sin behörighets-etikett ("3:a A/B/C/D/F"). Inträffar när match-tipsen
+  // saknas eller är ofullständiga (någon gruppmatch otippad).
   | 'open-third'
   // En senare runda (åttondel och framåt): laget kan inte härledas ur tipsen
   // (vem som vinner en match är inget grupp-tips säger). Visas strukturellt.
@@ -82,7 +95,10 @@ export interface TipsSlotState {
   resolution: TipsSlotResolution;
   /** Människo-läsbar positions-etikett (alltid satt), t.ex. "1:a grupp A". */
   label: string;
-  /** Tippat lag (Team.id), satt ENBART vid 'tipped', annars null. */
+  /**
+   * Placerat lag (Team.id), satt vid 'tipped' (grupp-tips) ELLER 'tipped-third'
+   * (en trea härledd ur match-tipsen, T64). null för 'open-third'/'tbd'.
+   */
   teamId: string | null;
 }
 
@@ -172,27 +188,43 @@ function teamIdByCode(teams: readonly Team[]): Map<string, string> {
 /**
  * Härled den simulerade slutspelsbilden ur grupp-tipsen.
  *
- * @param picksByGroup Mina grupp-tips per grupp (groupId "A".."L" -> 1:a/2:a som
- *                     code). En grupp utan (komplett) tips ger 'tbd'-slots för
- *                     den gruppens positioner, ingen gissning.
- * @param teams        Alla lag (för att översätta tippad CODE -> Team.id, så
- *                     slot.teamId är i samma rymd som UI:t väntar).
- * @returns            Hela trädet i officiell match-ordning (M73 -> M104) med
- *                     varje slots tips-tillstånd, + hur många grupper som tippats.
+ * @param picksByGroup  Mina grupp-tips per grupp (groupId "A".."L" -> 1:a/2:a som
+ *                      code). En grupp utan (komplett) tips ger 'tbd'-slots för
+ *                      den gruppens positioner, ingen gissning.
+ * @param teams         Alla lag (för att översätta tippad CODE -> Team.id, så
+ *                      slot.teamId är i samma rymd som UI:t väntar).
+ * @param thirdSeeding  (valfri, T64) De 8 bästa treorna seedade UR match-tipsen
+ *                      (derive-tips-thirds.ts: tippade tabeller -> Article 13 ->
+ *                      Annexe C). Är den `complete` placeras varje tippad trea i sin
+ *                      Annexe C-slot ('tipped-third'). Utelämnad eller icke-complete
+ *                      (ofullständiga match-tips) -> alla treplats-slots öppna
+ *                      ('open-third'), gissa aldrig. GRUPP-tipsen äger 1:a/2:a
+ *                      oförändrat (designbeslut, docs/decisions.md T64).
+ * @returns             Hela trädet i officiell match-ordning (M73 -> M104) med
+ *                      varje slots tips-tillstånd, + hur många grupper som tippats.
  *
  * INVARIANTER (vaktas av testerna):
  *   - En tippad 1:a/2:a hamnar i EXAKT den slot bracket-strukturen säger för dess
- *     grupp-position (M79-home = 1:a grupp A osv).
- *   - Varje bästa-trea-slot förblir 'open-third' (teamId null) OAVSETT tips.
+ *     grupp-position (M79-home = 1:a grupp A osv), OAVSETT match-tipsen.
+ *   - En bästa-trea-slot är 'tipped-third' (lag placerat) NÄR thirdSeeding är
+ *     complete och seedar den gruppen dit, annars 'open-third' (teamId null), aldrig
+ *     en gissad trea.
  *   - Åttondel och framåt är 'tbd' (teamId null): tipsen ger ingen match-vinnare.
- *   - Funktionen muterar inte `teams`/`picksByGroup`.
+ *   - Funktionen muterar inte `teams`/`picksByGroup`/`thirdSeeding`.
  */
 export function deriveTipsBracket(
   picksByGroup: ReadonlyMap<string, GroupTipPick>,
-  teams: readonly Team[]
+  teams: readonly Team[],
+  thirdSeeding?: TipsThirdSeeding
 ): TipsBracketState {
   const nodes = buildBracket();
   const idByCode = teamIdByCode(teams);
+
+  // Tips-seedade treor (T64): bara när hela match-tipset finns och seedningen är
+  // komplett. Annars en tom seedning -> alla treplats-slots öppna (gissa aldrig).
+  // En map matchId -> trea-lag-id (Team.id) för O(1)-uppslag per slot. Saknas
+  // thirdSeeding (eller är den icke-complete) blir mapen tom.
+  const tippedThirdByMatchId = buildTippedThirdByMatchId(thirdSeeding);
 
   // Räkna FULLSTÄNDIGA grupp-tips (både 1:a och 2:a satta) över BARA giltiga
   // grupp-id (A..L). Ett tips med tom sträng på någon sida räknas inte som
@@ -242,18 +274,41 @@ export function deriveTipsBracket(
     matchStates.push({
       matchId,
       stage: pair.home!.stage,
-      home: buildTipsSlotState(pair.home!, tippedTeamId),
-      away: buildTipsSlotState(pair.away!, tippedTeamId),
+      home: buildTipsSlotState(pair.home!, tippedTeamId, tippedThirdByMatchId),
+      away: buildTipsSlotState(pair.away!, tippedTeamId, tippedThirdByMatchId),
     });
   }
 
   return { matches: matchStates, tippedGroupCount };
 }
 
+/**
+ * Bygg ett matchId -> trea-lag-id-uppslag ur den tips-seedade tre-bilden (T64). Tom
+ * map när ingen seedning gavs ELLER när den inte är `complete` (ofullständiga
+ * match-tips): då förblir alla treplats-slots öppna (gissa aldrig). Bara en seedad
+ * grupp med ett känt trea-lag-id placeras (annars öppen, ingen obekräftad placering).
+ */
+function buildTippedThirdByMatchId(
+  thirdSeeding: TipsThirdSeeding | undefined
+): Map<string, string> {
+  const byMatchId = new Map<string, string>();
+  if (!thirdSeeding || !thirdSeeding.complete) {
+    return byMatchId;
+  }
+  for (const [matchId, group] of thirdSeeding.seedingByMatchId) {
+    const teamId = thirdSeeding.thirdTeamIdByGroup.get(group);
+    if (teamId !== undefined) {
+      byMatchId.set(matchId, teamId);
+    }
+  }
+  return byMatchId;
+}
+
 /** Bygg en slots tips-tillstånd ur dess källa. */
 function buildTipsSlotState(
   node: BracketNode,
-  tippedTeamId: (group: GroupId, rank: 1 | 2) => string | null
+  tippedTeamId: (group: GroupId, rank: 1 | 2) => string | null,
+  tippedThirdByMatchId: ReadonlyMap<string, string>
 ): TipsSlotState {
   const base = {
     id: node.id,
@@ -285,14 +340,26 @@ function buildTipsSlotState(
         teamId,
       };
     }
-    case 'best-third':
-      // HARD: aldrig en gissad trea. Öppen platshållare, bär behörighets-etiketten.
+    case 'best-third': {
+      // T64: är trean SEEDAD ur match-tipsen (alla grupper helt tippade -> Article 13
+      // + Annexe C gav ett lag till just denna match) placerar vi den ('tipped-third').
+      // Annars HARD: aldrig en gissad trea, öppen platshållare med behörighets-etikett.
+      const tippedThirdTeamId = tippedThirdByMatchId.get(node.matchId) ?? null;
+      if (tippedThirdTeamId !== null) {
+        return {
+          ...base,
+          resolution: 'tipped-third',
+          label: bestThirdLabel(source.eligibleGroups),
+          teamId: tippedThirdTeamId,
+        };
+      }
       return {
         ...base,
         resolution: 'open-third',
         label: bestThirdLabel(source.eligibleGroups),
         teamId: null,
       };
+    }
     case 'match-winner':
       // Åttondel och framåt: tipsen ger ingen match-vinnare. Strukturell etikett.
       return {

@@ -15,6 +15,7 @@ import { render, screen, within } from '@testing-library/react';
 import type { Team } from '../../domain/types';
 import { WC2026_TEAM_BASES } from '../../data/wc2026/team-refs';
 import { deriveTipsBracket, type GroupTipPick } from './derive-tips-bracket';
+import type { TipsThirdSeeding } from './derive-tips-thirds';
 import { TipsBracketView } from './TipsBracketView';
 import type { TipsBracketData } from './use-tips-bracket-data';
 
@@ -26,8 +27,11 @@ const TEAMS: Team[] = WC2026_TEAM_BASES.map((b) => ({
 }));
 
 /** Bygg injicerbar vy-data ur ett tips (samma motor som produktion). */
-function dataFrom(picks: Map<string, GroupTipPick>): TipsBracketData {
-  return { bracket: deriveTipsBracket(picks, TEAMS), teams: TEAMS, ready: true };
+function dataFrom(
+  picks: Map<string, GroupTipPick>,
+  thirdSeeding?: TipsThirdSeeding
+): TipsBracketData {
+  return { bracket: deriveTipsBracket(picks, TEAMS, thirdSeeding), teams: TEAMS, ready: true };
 }
 
 describe('TipsBracketView, tomt läge', () => {
@@ -126,6 +130,48 @@ describe('TipsBracketView, treorna gissas aldrig', () => {
     render(<TipsBracketView data={dataFrom(picks)} />);
     const openThirds = document.querySelectorAll('[data-tips-slot-resolution="open-third"]');
     expect(openThirds.length).toBe(8);
+  });
+});
+
+describe('TipsBracketView, treorna fyllda ur match-tipsen (T64)', () => {
+  // En komplett tips-seedning: grupp C:s trea seedas till M74 (Annexe C-kolumn 1E).
+  // Vi använder grupp C:s lottnings-position-3-lag som "trea" (känt id ur lag-listan).
+  function seedingForM74(group: string): TipsThirdSeeding {
+    const groupTeams = TEAMS.filter((t) => t.group === group);
+    const thirdId = groupTeams[2].id;
+    return {
+      seedingByMatchId: new Map([['M74', group as never]]),
+      thirdTeamIdByGroup: new Map([[group as never, thirdId]]),
+      complete: true,
+    };
+  }
+
+  it('visar det tips-seedade lagets NAMN i bästa-trea-sloten (inte "Öppen")', () => {
+    const picks = new Map<string, GroupTipPick>([
+      ['A', { winnerCode: 'MEX', runnerUpCode: 'RSA' }],
+    ]);
+    // Grupp C:s position-3-lag (känt namn ur lag-listan) seedas till M74.
+    const cThird = TEAMS.filter((t) => t.group === 'C')[2];
+    render(<TipsBracketView data={dataFrom(picks, seedingForM74('C'))} />);
+
+    const m74 = document.querySelector('[data-bracket-match="M74"]') as HTMLElement;
+    const thirdSlot = m74.querySelector('[data-tips-slot-resolution="tipped-third"]');
+    expect(thirdSlot).not.toBeNull();
+    // Lagnamnet syns, och den lågmälda "3:a"-markören (simulerad trea), inte "Öppen".
+    expect(within(thirdSlot as HTMLElement).getByText(cThird.name)).toBeInTheDocument();
+    expect((thirdSlot as HTMLElement).querySelector('[data-tips-third]')).not.toBeNull();
+    expect((thirdSlot as HTMLElement).querySelector('[data-tips-open-third]')).toBeNull();
+  });
+
+  it('utan seedning (ofullständiga match-tips) står samma trea-slot ÖPPEN', () => {
+    // Kontroll: utan thirdSeeding är M74:s trea fortfarande öppen (T51-beteendet).
+    const picks = new Map<string, GroupTipPick>([
+      ['A', { winnerCode: 'MEX', runnerUpCode: 'RSA' }],
+    ]);
+    render(<TipsBracketView data={dataFrom(picks)} />);
+    const m74 = document.querySelector('[data-bracket-match="M74"]') as HTMLElement;
+    expect(m74.querySelector('[data-tips-slot-resolution="open-third"]')).not.toBeNull();
+    expect(m74.querySelector('[data-tips-slot-resolution="tipped-third"]')).toBeNull();
   });
 });
 
