@@ -68,8 +68,9 @@ describe('TeamProfilePanel, öppnas och visar källånkrad profil', () => {
     const dialog = await screen.findByRole('dialog');
     // Dialogen är märkt av lagnamns-rubriken (aria-labelledby).
     expect(dialog).toHaveAccessibleName(/Frankrike/);
-    // FIFA-ranking #1 (källånkrad, Frankrike etta i aprilutgåvan 2026).
-    expect(within(dialog).getByText('#1')).toBeInTheDocument();
+    // FIFA-ranking #3 (källånkrad, Frankrike trea i juniutgåvan 2026, T69;
+    // Argentina återtog 1:a-platsen, se docs/decisions.md T69).
+    expect(within(dialog).getByText('#3')).toBeInTheDocument();
     // En källbelagd stjärnspelare (Mbappé) + en kuriosa-rad.
     expect(within(dialog).getByText('Kylian Mbappé')).toBeInTheDocument();
     expect(within(dialog).getByText(/VM-slutspel|VM-titlar/)).toBeInTheDocument();

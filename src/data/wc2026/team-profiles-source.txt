@@ -7,18 +7,24 @@ att profildatan kan REGENERERAS och diffas mot källan i CI
 mot källorna nedan. Samma mönster som tv-schedule-source.txt (T4b) och
 annexe-c-source.txt (T4).
 
-KÄLLOR (gissas ALDRIG), hämtade 2026-06-10:
+KÄLLOR (gissas ALDRIG). FIFA-rankingen uppdaterad till JUNIUTGÅVAN (hämtad 2026-06-12);
+stjärnspelare + kuriosa oförändrade sedan 2026-06-10 (se B/C):
 
 A. FIFA-RANKING (rank=): FIFA/Coca-Cola Men's World Ranking, OFFICIELL utgåva
-   publicerad 1 april 2026 (nästa officiella utgåva 11 juni 2026, så aprilutgåvan
-   är den senaste vid byggtillfället). Position 1-50 verifierade mot ESPN:s
-   återgivning av aprilutgåvan
+   publicerad 11 juni 2026 (nästa officiella utgåva 20 juli 2026, så juniutgåvan är
+   den senaste vid byggtillfället; den föregående aprilutgåvan användes T10 men är nu
+   ersatt, se docs/decisions.md T69). Den officiella tabellen på
+   inside.fifa.com/fifa-world-ranking/men är JS-renderad (ingen tabell i server-HTML),
+   så positionerna är hämtade ur återgivningar av samma 11 juni-utgåva och korskollade:
+   Position 1-50 mot ESPN:s återgivning av juniutgåvan
    (https://www.espn.com/soccer/story/_/id/46664763/fifa-mens-top-50-world-rankings),
-   korskollad mot Wikipedia (topp 20, https://en.wikipedia.org/wiki/FIFA_Men's_World_Ranking)
+   korskollad mot Wikipedia (topp 20 med poäng, https://en.wikipedia.org/wiki/FIFA_Men's_World_Ranking)
    och whereig.com (full tabell, https://www.whereig.com/football/fifa-world-rankings.html).
-   Position 50-90 verifierade mot whereig.com och korskollade mot ESPN (där tabellerna
-   överlappar) + per-lag-sök (t.ex. Uzbekistan #50 bekräftat av kun.uz 2026-04-01).
-   France 1:a med 1877.32 poäng (den tightaste topp-3 i rankningens historia).
+   Position 50-90 verifierade mot whereig.com och korskollade mot oberoende sök-återgivning
+   av 11 juni-utgåvan (samtliga sub-50 VM-lag bekräftade av minst två oberoende källor).
+   Argentina återtog 1:a-platsen (1877.27 p) före Spanien (1874.71) och Frankrike (1870.7),
+   fortsatt den tightaste topp-3 i rankningens historia. (Frankrike föll från 1:a till 3:a
+   sedan aprilutgåvan, den mest synliga förflyttningen bland VM-lagen.)
 
 B. STJÄRNSPELARE (star=): VM 2026:s slutgiltiga 26-mannatrupper, inlämnade till
    FIFA 1 juni 2026 och offentliggjorda 2 juni 2026. Spelarna är BEKRÄFTAT med i
@@ -57,45 +63,45 @@ högt om ett lag saknas, är dubblerat eller har okänd kod.
 
 PROFILES
 # Grupp A
-MEX | rank=15 | star=Raúl Jiménez; Santiago Giménez | kuriosa=17 tidigare VM-slutspel. Bäst: kvartsfinal (senast 1986, på hemmaplan). Värdnation 2026.
+MEX | rank=14 | star=Raúl Jiménez; Santiago Giménez | kuriosa=17 tidigare VM-slutspel. Bäst: kvartsfinal (senast 1986, på hemmaplan). Värdnation 2026.
 RSA | rank=60 | star=Evidence Makgopa; Lyle Foster | kuriosa=3 tidigare VM-slutspel. Bäst: gruppspel (värdnation 2010).
 KOR | rank=25 | star=Son Heung-min; Lee Jae-sung | kuriosa=11 tidigare VM-slutspel. Bäst: fjärdeplats (2002, på hemmaplan).
-CZE | rank=41 | star=Patrik Schick; Tomáš Souček | kuriosa=9 tidigare VM-slutspel (inkl. Tjeckoslovakien). Bäst: VM-final (silver 1934 och 1962).
+CZE | rank=40 | star=Patrik Schick; Tomáš Souček | kuriosa=9 tidigare VM-slutspel (inkl. Tjeckoslovakien). Bäst: VM-final (silver 1934 och 1962).
 
 # Grupp B
 CAN | rank=30 | star=Alphonso Davies; Jonathan David | kuriosa=2 tidigare VM-slutspel. Bäst: gruppspel. Värdnation 2026.
-BIH | rank=65 | star=Edin Džeko | kuriosa=1 tidigare VM-slutspel (2014). Bäst: gruppspel.
-QAT | rank=55 | star=Akram Afif; Almoez Ali | kuriosa=1 tidigare VM-slutspel (värdnation 2022). Bäst: gruppspel.
+BIH | rank=64 | star=Edin Džeko | kuriosa=1 tidigare VM-slutspel (2014). Bäst: gruppspel.
+QAT | rank=56 | star=Akram Afif; Almoez Ali | kuriosa=1 tidigare VM-slutspel (värdnation 2022). Bäst: gruppspel.
 SUI | rank=19 | star=Granit Xhaka; Breel Embolo | kuriosa=12 tidigare VM-slutspel. Bäst: kvartsfinal (1934, 1938, 1954).
 
 # Grupp C
 BRA | rank=6 | star=Neymar; Vinícius Júnior | kuriosa=Enda landet med i alla 22 VM-slutspel. Bäst: 5 VM-titlar (1958, 1962, 1970, 1994, 2002), flest av alla.
-MAR | rank=8 | star=Achraf Hakimi; Sofyan Amrabat | kuriosa=6 tidigare VM-slutspel. Bäst: fjärdeplats (2022), första afrikanska/arabiska semifinallag.
+MAR | rank=7 | star=Achraf Hakimi; Sofyan Amrabat | kuriosa=6 tidigare VM-slutspel. Bäst: fjärdeplats (2022), första afrikanska/arabiska semifinallag.
 HAI | rank=83 | star=Wilson Isidor; Jean-Ricner Bellegarde | kuriosa=1 tidigare VM-slutspel (1974). Bäst: gruppspel.
-SCO | rank=43 | star=Andy Robertson; Scott McTominay | kuriosa=8 tidigare VM-slutspel. Bäst: gruppspel (aldrig avancerat).
+SCO | rank=42 | star=Andy Robertson; Scott McTominay | kuriosa=8 tidigare VM-slutspel. Bäst: gruppspel (aldrig avancerat).
 
 # Grupp D
-USA | rank=16 | star=Christian Pulisic | kuriosa=11 tidigare VM-slutspel. Bäst: tredjeplats (1930). Värdnation 2026.
-PAR | rank=40 | star=Miguel Almirón | kuriosa=8 tidigare VM-slutspel. Bäst: kvartsfinal (2010).
+USA | rank=17 | star=Christian Pulisic | kuriosa=11 tidigare VM-slutspel. Bäst: tredjeplats (1930). Värdnation 2026.
+PAR | rank=41 | star=Miguel Almirón | kuriosa=8 tidigare VM-slutspel. Bäst: kvartsfinal (2010).
 AUS | rank=27 | star=Jackson Irvine; Mathew Leckie | kuriosa=6 tidigare VM-slutspel. Bäst: åttondelsfinal (2006, 2022).
 TUR | rank=22 | star=Hakan Çalhanoğlu | kuriosa=2 tidigare VM-slutspel. Bäst: tredjeplats (2002).
 
 # Grupp E
 GER | rank=10 | star=Florian Wirtz; Jamal Musiala | kuriosa=20 tidigare VM-slutspel. Bäst: 4 VM-titlar (1954, 1974, 1990, 2014).
 CUW | rank=82 | star=Tahith Chong | kuriosa=VM-debut 2026, minsta nation (i invånarantal) någonsin i ett VM-slutspel.
-CIV | rank=34 | star=Franck Kessié; Nicolas Pépé | kuriosa=3 tidigare VM-slutspel. Bäst: gruppspel.
+CIV | rank=33 | star=Franck Kessié; Nicolas Pépé | kuriosa=3 tidigare VM-slutspel. Bäst: gruppspel.
 ECU | rank=23 | star=Moisés Caicedo | kuriosa=4 tidigare VM-slutspel. Bäst: åttondelsfinal (2006).
 
 # Grupp F
-NED | rank=7 | star=Virgil van Dijk; Frenkie de Jong | kuriosa=11 tidigare VM-slutspel. Bäst: VM-final tre gånger (silver 1974, 1978, 2010).
+NED | rank=8 | star=Virgil van Dijk; Frenkie de Jong | kuriosa=11 tidigare VM-slutspel. Bäst: VM-final tre gånger (silver 1974, 1978, 2010).
 JPN | rank=18 | star=Takefusa Kubo; Wataru Endō | kuriosa=7 tidigare VM-slutspel. Bäst: åttondelsfinal (2002, 2010, 2018, 2022).
 SWE | rank=38 | star=Alexander Isak; Viktor Gyökeres | kuriosa=12 tidigare VM-slutspel. Bäst: VM-final (silver 1958, på hemmaplan).
-TUN | rank=44 | star=Hannibal Mejbri | kuriosa=6 tidigare VM-slutspel. Bäst: gruppspel.
+TUN | rank=45 | star=Hannibal Mejbri | kuriosa=6 tidigare VM-slutspel. Bäst: gruppspel.
 
 # Grupp G
 BEL | rank=9 | star=Kevin De Bruyne; Romelu Lukaku | kuriosa=14 tidigare VM-slutspel. Bäst: tredjeplats (2018).
 EGY | rank=29 | star=Mohamed Salah; Omar Marmoush | kuriosa=3 tidigare VM-slutspel. Bäst: gruppspel. Första afrikanska VM-laget (1934).
-IRN | rank=21 | star=Alireza Jahanbakhsh | kuriosa=6 tidigare VM-slutspel. Bäst: gruppspel.
+IRN | rank=20 | star=Alireza Jahanbakhsh | kuriosa=6 tidigare VM-slutspel. Bäst: gruppspel.
 NZL | rank=85 | star=Chris Wood | kuriosa=2 tidigare VM-slutspel. Bäst: gruppspel (obesegrade 2010, tre kryss).
 
 # Grupp H
@@ -104,18 +110,18 @@ NZL | rank=85 | star=Chris Wood | kuriosa=2 tidigare VM-slutspel. Bäst: gruppsp
 # Sydafrika är inte dess hemkontinent). Källa: Wikipedia "2010 FIFA World Cup Final" + "Spain national
 # football team" (web-verifierad 2026-06-10). Se docs/decisions.md (T10 F1).
 ESP | rank=2 | star=Lamine Yamal; Rodri | kuriosa=16 tidigare VM-slutspel. Bäst: VM-guld (2010), första VM-titeln vunnen av ett europeiskt lag utanför Europa.
-CPV | rank=69 | star=Jovane Cabral; Garry Rodrigues | kuriosa=VM-debut 2026. En av de minsta nationerna någonsin i ett VM-slutspel.
+CPV | rank=67 | star=Jovane Cabral; Garry Rodrigues | kuriosa=VM-debut 2026. En av de minsta nationerna någonsin i ett VM-slutspel.
 KSA | rank=61 | star=Salem Al-Dawsari | kuriosa=6 tidigare VM-slutspel. Bäst: åttondelsfinal (1994). Slog Argentina i premiären 2022.
-URU | rank=17 | star=Federico Valverde; Darwin Núñez | kuriosa=14 tidigare VM-slutspel. Bäst: 2 VM-titlar (1930 som värd, 1950).
+URU | rank=16 | star=Federico Valverde; Darwin Núñez | kuriosa=14 tidigare VM-slutspel. Bäst: 2 VM-titlar (1930 som värd, 1950).
 
 # Grupp I
-FRA | rank=1 | star=Kylian Mbappé; N'Golo Kanté | kuriosa=16 tidigare VM-slutspel. Bäst: 2 VM-titlar (1998 som värd, 2018). FIFA:s etta inför 2026.
-SEN | rank=14 | star=Sadio Mané; Idrissa Gana Gueye | kuriosa=3 tidigare VM-slutspel. Bäst: kvartsfinal (2002, i debuten).
+FRA | rank=3 | star=Kylian Mbappé; N'Golo Kanté | kuriosa=16 tidigare VM-slutspel. Bäst: 2 VM-titlar (1998 som värd, 2018).
+SEN | rank=15 | star=Sadio Mané; Idrissa Gana Gueye | kuriosa=3 tidigare VM-slutspel. Bäst: kvartsfinal (2002, i debuten).
 IRQ | rank=57 | star=Zidane Iqbal | kuriosa=1 tidigare VM-slutspel (1986). Bäst: gruppspel.
 NOR | rank=31 | star=Erling Haaland; Martin Ødegaard | kuriosa=3 tidigare VM-slutspel. Bäst: åttondelsfinal (1998). Första VM sedan 1998.
 
 # Grupp J
-ARG | rank=3 | star=Lionel Messi; Enzo Fernández | kuriosa=18 tidigare VM-slutspel. Bäst: 3 VM-titlar (1978 som värd, 1986, 2022). Regerande mästare.
+ARG | rank=1 | star=Lionel Messi; Enzo Fernández | kuriosa=18 tidigare VM-slutspel. Bäst: 3 VM-titlar (1978 som värd, 1986, 2022). Regerande mästare och FIFA:s etta inför 2026.
 ALG | rank=28 | star=Riyad Mahrez | kuriosa=4 tidigare VM-slutspel. Bäst: åttondelsfinal (2014).
 AUT | rank=24 | star=David Alaba; Christoph Baumgartner | kuriosa=7 tidigare VM-slutspel. Bäst: tredjeplats (1954).
 JOR | rank=63 | star=Mousa Al-Taamari | kuriosa=VM-debut 2026.
@@ -129,5 +135,5 @@ COL | rank=13 | star=James Rodríguez; Luis Díaz | kuriosa=6 tidigare VM-slutsp
 # Grupp L
 ENG | rank=4 | star=Harry Kane; Jude Bellingham | kuriosa=16 tidigare VM-slutspel. Bäst: VM-guld (1966, på hemmaplan).
 CRO | rank=11 | star=Luka Modrić; Mateo Kovačić | kuriosa=6 tidigare VM-slutspel. Bäst: VM-final (silver 2018) och brons (2022).
-GHA | rank=74 | star=Thomas Partey; Jordan Ayew | kuriosa=4 tidigare VM-slutspel. Bäst: kvartsfinal (2010).
-PAN | rank=33 | star=Aníbal Godoy | kuriosa=1 tidigare VM-slutspel (2018). Bäst: gruppspel.
+GHA | rank=73 | star=Thomas Partey; Jordan Ayew | kuriosa=4 tidigare VM-slutspel. Bäst: kvartsfinal (2010).
+PAN | rank=34 | star=Aníbal Godoy | kuriosa=1 tidigare VM-slutspel (2018). Bäst: gruppspel.
