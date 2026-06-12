@@ -442,15 +442,16 @@ function PlatformGlyph({ platform }: { platform: GetStartedPlatform }) {
 function PlatformSteps({ activePlatform }: { activePlatform: GetStartedPlatform }) {
   const path = getPathFor(activePlatform);
   // getPathFor är total över GetStartedPlatform-unionen (varje plattform finns i
-  // GET_STARTED_PATHS), men TypeScript vet inte det, så vi fail-loud:ar hellre än
-  // renderar en tom yta om datan och unionen någonsin drifter isär (PRINCIPLES §8).
+  // GET_STARTED_PATHS), men TypeScript vet inte det. FAIL-LOUD på riktigt (copilot
+  // R1 + PRINCIPLES §8): driftar datan och unionen isär ska det smälla i dev/test,
+  // inte tyst rendera en tom yta.
   if (path === undefined) {
-    return null;
+    throw new Error(`Kom-igång-väg saknas för plattformen "${activePlatform}" (datadrift)`);
   }
-  // iOS-noten är ett HÅRT krav (Safari krävs) => varnande ton; Android-noten är
-  // LUGNANDE (Play Skydd är ofarligt) => info-ton. Tonen styrs av plattformen så
-  // texten (datan) kan vara ton-neutral. Båda är vänliga, ingen är skrämmande.
-  const noteTone = activePlatform === 'ios' ? 'warning' : 'info';
+  // Båda noterna är numera VÄNLIG bra-att-veta-info: Android = Play Skydd-lugnande,
+  // iOS = Safari-rekommendation (review-F1: inget hårt krav längre). Info-ton för
+  // båda, ingen varnande ton behövs.
+  const noteTone = 'info' as const;
   return (
     <div
       role="tabpanel"
@@ -484,9 +485,11 @@ function PlatformSteps({ activePlatform }: { activePlatform: GetStartedPlatform 
 }
 
 /**
- * Plattforms-noten under stegen: en vänlig info-/varnings-ruta med en liten glyf, så
- * Play Skydd-lugnandet (info-ton, sköld) och iOS-Safari-kravet (warning-ton, info-i)
- * känns hjälpsamma, inte läskiga. Tinten + glyfen är ren dekor; texten bär betydelsen.
+ * Plattforms-noten under stegen: en vänlig info-ruta med en liten glyf, så
+ * Play Skydd-lugnandet (sköld) och iOS-Safari-rekommendationen (info-i, review-F1:
+ * inget hårt krav) känns hjälpsamma, inte läskiga. Warning-tonen finns kvar i
+ * typ-unionen för framtida bruk men används inte av någon nuvarande not.
+ * Tinten + glyfen är ren dekor; texten bär betydelsen.
  */
 function PlatformNote({
   tone,
