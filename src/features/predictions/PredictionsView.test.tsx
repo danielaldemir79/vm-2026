@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import type { ReactNode } from 'react';
 import { PredictionsView } from './PredictionsView';
 import { PredictionsStoreContext, type PredictionsStore } from './predictions-context';
+import { JokerStoreContext, type JokerStore } from './joker-context';
 import type { Prediction } from '../../data/predictions';
 import type { Match, Team } from '../../domain/types';
 
@@ -65,11 +66,27 @@ function store(partial: Partial<PredictionsStore>): PredictionsStore {
   };
 }
 
-function renderView(s: PredictionsStore, now: Date, children?: ReactNode) {
+/** Default-joker-store (T19): inaktiv, så ingen joker-knapp visas om inget injiceras. */
+function jokerStore(partial: Partial<JokerStore> = {}): JokerStore {
+  return {
+    enabled: false,
+    status: 'idle',
+    error: null,
+    activeRoomId: null,
+    myJokers: new Map(),
+    setJoker: vi.fn().mockResolvedValue(undefined),
+    clearJoker: vi.fn().mockResolvedValue(undefined),
+    ...partial,
+  };
+}
+
+function renderView(s: PredictionsStore, now: Date, children?: ReactNode, js?: JokerStore) {
   return render(
     <PredictionsStoreContext.Provider value={s}>
-      <PredictionsView now={now} />
-      {children}
+      <JokerStoreContext.Provider value={js ?? jokerStore()}>
+        <PredictionsView now={now} />
+        {children}
+      </JokerStoreContext.Provider>
     </PredictionsStoreContext.Provider>
   );
 }
@@ -534,5 +551,38 @@ describe('PredictionsView, bakåt-fönstret visar gårdagens poäng (T62/#111)',
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // ---- JOKER-WIRING genom vyn (T19, #19) -------------------------------------
+
+  it('joker-läge aktivt: en öppen kupong får en joker-toggle som anropar setJoker', async () => {
+    dataState.matches = [match('g-A-1', '2026-06-16T18:00:00.000Z')]; // öppen (efter NOW)
+    const js = jokerStore({ enabled: true, status: 'ready', activeRoomId: 'r1' });
+    renderView(store({}), NOW, undefined, js);
+    const toggle = await screen.findByRole('button', { name: /Gör till din joker/ });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(js.setJoker).toHaveBeenCalledWith('g-A-1'));
+  });
+
+  it('joker-läge aktivt: en match som ÄR min joker visar "din joker idag" + clear-vägen', async () => {
+    dataState.matches = [match('g-A-1', '2026-06-16T18:00:00.000Z')];
+    const js = jokerStore({
+      enabled: true,
+      status: 'ready',
+      activeRoomId: 'r1',
+      myJokers: new Map([
+        ['g-A-1', { matchId: 'g-A-1', userId: 'me', jokerDay: '2026-06-16', updatedAt: 't' }],
+      ]),
+    });
+    renderView(store({}), NOW, undefined, js);
+    const toggle = await screen.findByRole('button', { name: /Din joker idag/ });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(js.clearJoker).toHaveBeenCalledWith('g-A-1'));
+  });
+
+  it('joker-läge INAKTIVT (default): ingen joker-knapp på kupongen', async () => {
+    dataState.matches = [match('g-A-1', '2026-06-16T18:00:00.000Z')];
+    renderView(store({}), NOW); // default jokerStore: enabled=false
+    expect(screen.queryByRole('button', { name: /joker/i })).not.toBeInTheDocument();
   });
 });
