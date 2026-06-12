@@ -87,12 +87,20 @@ export function PredictionsProvider({
     return getSupabaseClient(env);
   }, [client, liveConfigured, env]);
 
-  // EPOCH-vakt (samma mönster som RoomsProvider.loadRoomData, KA-F2): ett snabbt
-  // rumsbyte får aldrig låta ett föråldrat svar skriva över ett nyare rums tips.
-  // Bumpas vid varje rumsbyte av load-effekten och konsulteras av BÅDE laddningen
-  // och savePrediction (C14: en optimistisk save som löser efter ett rumsbyte
-  // tillhör fel rum och måste droppas, inte skrivas i nya rummets map).
+  // FETCH-VAKT (samma mönster som RoomsProvider.loadRoomData, KA-F2): ett föråldrat
+  // LADDNINGS-svar får aldrig skriva över ett nyare. Bumpas vid VARJE effekt-körning
+  // (rumsbyte OCH tyst kopierings-re-fetch), så bara det SENASTE fetch-svaret vinner.
+  // Används BARA av laddningen, inte av savePrediction (se activeRoomIdRef nedan).
   const loadTokenRef = useRef(0);
+
+  // SAVE-VAKT (T61 #110, F1): det enda en optimistisk save behöver skyddas mot är ett
+  // RUM-BYTE under await:en (då tillhör svaret fel rum). Den får INTE droppas av en tyst
+  // kopierings-re-fetch i SAMMA rum (det gjorde den förut, när save delade loadTokenRef
+  // som nu bumpas även av nonce-invalidering -> pågående save tappades, ingen spegling).
+  // Därför en EGEN vakt bunden enbart till activeRoomId: en ref med det SENASTE aktiva
+  // rummet, jämförd mot rummet saven startade i. Ändras bara vid äkta rum-byte.
+  const activeRoomIdRef = useRef<string | null>(activeRoomId);
+  activeRoomIdRef.current = activeRoomId;
 
   // Vilket rum den NU laddade datan tillhör (null = ingen data än). Skiljer en SYNLIG
   // laddning (initial / rumsbyte: datan saknas eller hör till fel rum -> visa 'loading')
@@ -179,20 +187,22 @@ export function PredictionsProvider({
       if (activeRoomId === null) {
         throw new Error('[VM2026] Spara tips misslyckades: inget aktivt rum att spara tipset i.');
       }
-      // STALE-REQUEST-VAKT (C14): boka in vilken laddnings-epok (= vilket aktivt
-      // rum) detta save tillhör. Samma loadTokenRef som load-effekten bumpar vid
-      // varje rumsbyte, så vi återanvänder seamen i stället för att uppfinna en ny.
+      // STALE-SAVE-VAKT (C14 + T61 #110/F1): boka in vilket RUM detta save tillhör.
       // myPredictions är bara keyad på matchId, så utan vakten kan ett save startat i
-      // rum A (vän byter till rum B under await) skriva A:s svar i B:s tips-map.
-      const saveToken = loadTokenRef.current;
+      // rum A (vän byter till rum B under await) skriva A:s svar i B:s tips-map. Vi
+      // jämför mot RUMMET (inte en delad load-token): en tyst kopierings-re-fetch i
+      // SAMMA rum bumpar load-token men ändrar inte rummet, och måste därför INTE
+      // klassa detta save som föråldrat (det var T61-buggen: spegling uteblev).
+      const saveRoomId = activeRoomId;
       // Kastar vid fel (UI fångar), inkl. RLS-avslag om matchen är låst (fail loud).
       const saved = await upsertMyPrediction(supabase, activeRoomId, input);
-      // Bytte det aktiva rummet under await? Då har load-effekten redan bumpat token
-      // och laddat det NYA rummets tips. A:s optimistiska uppdatering DROPPAS tyst
-      // (den tillhör ett inaktuellt rum), exakt som load-effektens epoch-vakt gör.
-      // RLS har ändå persisterat tipset i rätt rum (room_id i upserten), så inget
-      // tappas på servern, bara den lokala spegeln av ett rum vi inte längre tittar på.
-      if (saveToken !== loadTokenRef.current) {
+      // Bytte det AKTIVA rummet under await? Då tillhör A:s optimistiska uppdatering ett
+      // inaktuellt rum och DROPPAS tyst (load-effekten har redan laddat nya rummets tips),
+      // exakt som load-effektens fetch-vakt gör. En tyst re-fetch i SAMMA rum (samma
+      // saveRoomId) passerar dock, så spegling sker. RLS har ändå persisterat tipset i
+      // rätt rum (room_id i upserten), så inget tappas på servern, bara den lokala
+      // spegeln av ett rum vi inte längre tittar på.
+      if (saveRoomId !== activeRoomIdRef.current) {
         return;
       }
       // Optimistiskt: spegla in det sparade tipset i den lokala mappen direkt.

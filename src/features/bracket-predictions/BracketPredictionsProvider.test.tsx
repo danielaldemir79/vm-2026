@@ -275,3 +275,113 @@ describe('BracketPredictionsProvider, T61 (#110): kopierings-invalidering hämta
     expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
   });
 });
+
+describe('BracketPredictionsProvider, T61 (#110/F1): save-vakten skiljer rum-byte från same-room re-fetch', () => {
+  // Copilot R1, F1: save-vakten delade förut loadTokenRef med fetch-vakten, så en copy-
+  // invalidering (nonce-bump) i SAMMA rum droppade ett pågående save. Fixen jämför mot
+  // RUMMET, inte mot load-token.
+
+  /** Sond med save (slot M73) + nonce-bump i SAMMA rum. */
+  function SaveProbe() {
+    const store = useBracketPredictionsStore();
+    const keys = [...store.myBracketPredictions.keys()].sort().join(',');
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="keys">{keys}</span>
+        <button
+          type="button"
+          onClick={() => {
+            store
+              .saveBracketPrediction({ slotId: 'M73', advancingTeamId: teamCode('BRA') })
+              .catch(() => {});
+          }}
+        >
+          save
+        </button>
+      </div>
+    );
+  }
+
+  it('SAMME RUM: ett pågående save överlever en samtidig copy-invalidering (spegling SKER)', async () => {
+    api.listMyBracketPredictions
+      .mockResolvedValueOnce([]) // initial: tomt
+      .mockResolvedValueOnce([bp('M80', 'FRA')]); // copy-re-fetch: ett inkopierat bracket-tips
+    const pendingSave = deferred<BracketPrediction>();
+    api.upsertMyBracketPrediction.mockReturnValue(pendingSave.promise);
+
+    function Harness() {
+      const [nonce, setNonce] = useState(0);
+      return (
+        <BracketPredictionsProvider
+          env={env}
+          client={fakeClient}
+          activeRoomId="r1"
+          tipsRefreshNonce={nonce}
+        >
+          <SaveProbe />
+          <button onClick={() => setNonce((n) => n + 1)}>bump</button>
+        </BracketPredictionsProvider>
+      );
+    }
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('keys')).toHaveTextContent('M80'));
+
+    // Lös saven NU. Rummet bytte aldrig -> slot M73 ska speglas in (inte droppas).
+    await act(async () => {
+      pendingSave.resolve(bp('M73', 'BRA'));
+      await pendingSave.promise;
+    });
+    expect(screen.getByTestId('keys').textContent).toBe('M73,M80');
+  });
+
+  it('RUM-BYTE: ett pågående save droppas fortfarande korrekt när rummet byts under await', async () => {
+    api.listMyBracketPredictions.mockImplementation(
+      async (_client: VmSupabaseClient, roomId: string): Promise<BracketPrediction[]> => {
+        if (roomId === 'B') {
+          return [bp('M88', 'ESP')];
+        }
+        return [];
+      }
+    );
+    const pendingSave = deferred<BracketPrediction>();
+    api.upsertMyBracketPrediction.mockReturnValue(pendingSave.promise);
+
+    function Harness() {
+      const [roomId, setRoomId] = useState('A');
+      return (
+        <BracketPredictionsProvider env={env} client={fakeClient} activeRoomId={roomId}>
+          <SaveProbe />
+          <button onClick={() => setRoomId('B')}>to-B</button>
+        </BracketPredictionsProvider>
+      );
+    }
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    await act(async () => {
+      screen.getByText('to-B').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('keys')).toHaveTextContent('M88'));
+
+    await act(async () => {
+      pendingSave.resolve(bp('M73', 'BRA'));
+      await pendingSave.promise;
+    });
+    // B:s state är orörd: A:s slot droppades (rummet bytte).
+    expect(screen.getByTestId('keys').textContent).toBe('M88');
+  });
+});

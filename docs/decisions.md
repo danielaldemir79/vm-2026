@@ -44,6 +44,22 @@ provider (fetch-anrop: 1 initial + 1 efter copy; flimmer-bevis via TrackingProbe
 och mutationsverifierat: tas bumpen bort röd:ar signal-testet i RoomsProvider, tas `tipsRefreshNonce` ur en
 providers deps röd:ar dess re-fetch-test OCH ESLint `exhaustive-deps` fångar den oanvända variabeln.
 
+**Copilot R1 (#110, F1) , save-vakten separerad från fetch-vakten:** den första versionen lät de tre
+tips-providernas (`PredictionsProvider`, `GroupPredictionsProvider`, `BracketPredictionsProvider`)
+`loadTokenRef` dubbel-tjäna som BÅDE fetch-cancellation OCH stale-save-vakt. När `tipsRefreshNonce` kom in
+i load-effektens deps bumpas token nu även vid en kopierings-invalidering i SAMMA rum, så ett PÅGÅENDE save
+kunde felaktigt klassas som föråldrat och droppas (den optimistiska speglingen uteblev). Fix: save-vakten
+jämför nu mot RUMMET, inte mot load-token, en egen `activeRoomIdRef` (senaste aktiva rummet) jämförd mot
+`saveRoomId` (rummet saven startade i). Den invalideras BARA av ett äkta rum-byte, det save faktiskt ska
+skyddas mot, inte av en tyst re-fetch i samma rum. `loadTokenRef` behåller sin riktiga, enda roll: droppa
+föråldrade FETCH-svar. SAMMA fix i alla tre (sister-filerna hålls självständiga enligt repots etablerade
+konvention, vakten är tre rader, en cross-feature-helper hade brutit mönstret för lite vinst, PRINCIPLES
+§0/§3/§4). Tester per provider: ett pågående save överlever en samtidig copy-invalidering i samma rum
+(spegling sker), och droppas fortfarande korrekt vid RUM-BYTE. Mutationsverifierat: jämförs save-vakten
+åter mot `loadTokenRef` röd:ar same-room-överlevnads-testet.
+
+## 2026-06-12 , T54 (#93): glasklar kom-igång-yta (installera ELLER använd direkt)
+
 **Bakgrund (Daniels live-feedback 2026-06-11):** "många lyckas inte förstå hur de ska installera det
 som en app eller att de kan använda sidan direkt". Install-bannern (T13/T39) är diskret och kan
 avfärdas; onboardingens install-steg (T39) var ren info utan väg (T39/#68 F1). Det fattades en

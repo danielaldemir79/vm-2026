@@ -383,3 +383,134 @@ describe('PredictionsProvider, T61 (#110): kopierings-invalidering hämtar om ti
     }
   });
 });
+
+describe('PredictionsProvider, T61 (#110/F1): save-vakten skiljer rum-byte från same-room re-fetch', () => {
+  // Copilot R1, F1: save-vakten delade förut loadTokenRef med fetch-vakten. Sedan
+  // tipsRefreshNonce kom in i load-deps bumpas token även av en kopierings-invalidering
+  // i SAMMA rum, så ett PÅGÅENDE save klassades felaktigt som föråldrat och DROPPADES
+  // (spegling uteblev). Fixen: save-vakten jämför mot RUMMET, inte mot load-token.
+
+  /** Sond med både save (g-A-1) och nonce-bump i SAMMA rum. */
+  function Probe2() {
+    const store = usePredictionsStore();
+    const keys = [...store.myPredictions.keys()].sort().join(',');
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="keys">{keys}</span>
+        <button
+          onClick={() =>
+            store.savePrediction({ matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 }).catch(() => {})
+          }
+        >
+          save
+        </button>
+      </div>
+    );
+  }
+
+  it('SAMME RUM: ett pågående save överlever en samtidig copy-invalidering (spegling SKER)', async () => {
+    // Rummet är tomt initialt. En copy-invalidering (nonce-bump) sker MEDAN ett save är
+    // i flykt; re-fetchen ger ett INKOPIERAT tips (g-B-2). Saven (g-A-1) ska ändå speglas
+    // in efteråt: rummet bytte ALDRIG, så save-vakten får inte droppa den.
+    api.listMyPredictions
+      .mockResolvedValueOnce([]) // initial: tomt
+      .mockResolvedValueOnce([
+        { matchId: 'g-B-2', userId: 'me', homeGoals: 0, awayGoals: 0, updatedAt: 'tcopy' },
+      ]); // copy-re-fetch: ett inkopierat tips
+    const pendingSave = deferred<Prediction>();
+    api.upsertMyPrediction.mockReturnValue(pendingSave.promise);
+
+    function Harness() {
+      const [nonce, setNonce] = useState(0);
+      return (
+        <PredictionsProvider
+          env={env}
+          liveReady
+          client={fakeClient}
+          activeRoomId="r1"
+          tipsRefreshNonce={nonce}
+        >
+          <Probe2 />
+          <button onClick={() => setNonce((n) => n + 1)}>bump</button>
+        </PredictionsProvider>
+      );
+    }
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+
+    // Starta saven (upserten hänger på vårt deferred-löfte).
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    // Copy-invalidering i SAMMA rum medan saven är i flykt -> tyst re-fetch.
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('keys').textContent).toBe('g-B-2'));
+
+    // Lös saven NU. Rummet bytte aldrig -> g-A-1 ska speglas in (inte droppas).
+    await act(async () => {
+      pendingSave.resolve({
+        matchId: 'g-A-1',
+        userId: 'me',
+        homeGoals: 2,
+        awayGoals: 1,
+        updatedAt: 'tsave',
+      });
+      await pendingSave.promise;
+    });
+    // BÅDA finns: det inkopierade (g-B-2) OCH det optimistiskt sparade (g-A-1).
+    expect(screen.getByTestId('keys').textContent).toBe('g-A-1,g-B-2');
+  });
+
+  it('RUM-BYTE: ett pågående save droppas fortfarande korrekt när rummet byts under await', async () => {
+    // Regressions-skydd: same-room-fixen får inte försvaga rum-byte-vakten. Save i rum A,
+    // byt till B under await, lös A:s save -> A:s g-A-1 får ALDRIG landa i B:s map.
+    api.listMyPredictions.mockImplementation(
+      async (_client: VmSupabaseClient, roomId: string): Promise<Prediction[]> => {
+        if (roomId === 'B') {
+          return [{ matchId: 'g-B-9', userId: 'me', homeGoals: 0, awayGoals: 0, updatedAt: 'tB' }];
+        }
+        return [];
+      }
+    );
+    const pendingSave = deferred<Prediction>();
+    api.upsertMyPrediction.mockReturnValue(pendingSave.promise);
+
+    function Harness() {
+      const [roomId, setRoomId] = useState('A');
+      return (
+        <PredictionsProvider env={env} liveReady client={fakeClient} activeRoomId={roomId}>
+          <Probe2 />
+          <button onClick={() => setRoomId('B')}>to-B</button>
+        </PredictionsProvider>
+      );
+    }
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+
+    await act(async () => {
+      screen.getByText('save').click();
+    });
+    await act(async () => {
+      screen.getByText('to-B').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('keys').textContent).toBe('g-B-9'));
+
+    await act(async () => {
+      pendingSave.resolve({
+        matchId: 'g-A-1',
+        userId: 'me',
+        homeGoals: 2,
+        awayGoals: 1,
+        updatedAt: 'tA',
+      });
+      await pendingSave.promise;
+    });
+    // B:s state är orörd: A:s g-A-1 droppades (rummet bytte).
+    expect(screen.getByTestId('keys').textContent).toBe('g-B-9');
+  });
+});
