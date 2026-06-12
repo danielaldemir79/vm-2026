@@ -5,6 +5,66 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T24/#24 (reaktioner) KLAR - PR vantar pa merge
+
+**Branch:** `feature/T24-reaktioner` @ HEAD `401188a` (journalist-commit väntar)
+**PR:** skapas av journalisten i detta steg - se nedan
+**Board:** Kort #24 satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekräftat).
+
+**Vad T24 levererade:**
+- `room_reactions`-tabell med schema + RLS + Realtime live (1 migrering).
+- Kurerad 8-emoji-pallett konstant-matchad mot klient-konstanten CHECK (ingen drift möjlig).
+- Tolerant-inert hook: optimistisk UI-uppdatering faller tyst om Supabase-anrop misslyckas.
+- Aggregat-vy + `MatchReactions`-komponent integrerad i dagens-vyn.
+- rooms.css §9: single-sourcad count-färg, contrast-t24.mjs verifierar AA live.
+- Review-F1 åtgärdad: versions-placeholder-claims pinnade med ärlig precision i decisions-raden.
+
+**Commits (T24):**
+- `cc7ef75` - feat(T24): emoji-reaktioner pa matcher i rummet (#24)
+- `20830b6` - design(T24): reaktionsradens premium-finish, kvallsljus-brickor (#24)
+- `401188a` - dirigent: review-F1, arlig versions-precision i decisions-raden (#24)
+
+**Verifiering:** build EXIT 0, full svit EXIT 0 (1650 gröna/173 filer), lint/format rena.
+RLS live-bevisad 2 vägar, 0 test-rester. Reviewer PASS, F1 pinnad + åtgärdad,
+lesson committad-migration-pastar Förekomst 2.
+
+**Acceptanskriterier issue #24 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Reagera med emoji på matcher/topplista, syns för rummet
+- [x] AC2: RLS så bara rum-medlemmar ser/reagerar
+- [x] AC3: Tester för reaktions-lagring + behörighet
+- [x] AC4: Bygger grönt, lint rent, reviewad (lokal panel + copilot-loop), inga olösta findings
+
+**FORTSATTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR för T24/#24 (feature/T24-reaktioner) ANNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge <PR-nummer> --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #24 manuellt: `gh issue close 24`.
+> Flytta kort #24 till Done på boarden.
+> Merga även äldre öppna PR:er om de fortfarande är öppna (se föregående RESUME-HERE för lista,
+> inkl. PR #127 T19/#19 om inte redan mergad).
+>
+> Om PR för T24/#24 REDAN mergad:
+> T24 klar. Nästa task i kön: **#64 (TWA Play Protect)** - läs issuen noggrant.
+> Bedöm vad som går utan Daniels Play-konto. Trolig AVGRÄNSNING: dokumentera vad som kräver honom,
+> bygg det som kan bevisas utan Play-konto (assetlinks-fil, bubblewrap-config-utkast, installationstest).
+> Darefter: D-resten: FIFA-juni-ranking (npm run gen:team-profiles + rank-värden), #25 prestanda/E2E/a11y,
+> #56 modal-primitiv (rule-of-three x5!), #48+demo-chip-AA-utökningen, lean-städet
+> (install-maskineri + RoomPanel-teardown-flaky + migrations-versions-städ-kandidaten).
+>
+> Bär framåt (alla tasks):
+> - Kommentar-pastar Förekomst 7: FLAGGAD för Daniel (se nedan) - vaktar på godkännande för befordran.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (5+ dialoger), kort i Ready.
+> - **#48 (demo-chip a11y):** 4+ vyer under AA 3.17:1 i ljust tema.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **"Behöver Daniel"-kö:** befordringar (kommentar-pastar 7), IMPROVEMENTS-kandidater (6 st nu),
+>   FIFA-juni-ranking, release-gränsen, #39-F1, T48b.
+> - **Daniels process-beslut:** Copilot-loopen PAUSAD, lokala granskningen är sista grinden.
+> - **Vakthund-rutinen:** varje väntan får deadline + eskalering.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T19/#19 (gamification) KLAR - PR vantar pa merge
 
 **Branch:** `feature/T19-gamification` @ HEAD `29a1b0e` (journalist-commit)
