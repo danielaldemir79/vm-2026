@@ -333,7 +333,15 @@ function TipsBracketPresentation({ data }: { data: TipsBracketData }) {
             →
           </span>
         </p>
-        <div data-bracket-scroll="" className="vm-bracket-scroll -mx-1 overflow-x-auto px-1 pb-2">
+        {/* A11y (T25, axe scrollable-region-focusable): tangentbords-åtkomst till den
+            scrollbara ytan, samma fix som BracketView (tabIndex + role/namn). */}
+        <div
+          data-bracket-scroll=""
+          role="group"
+          aria-label="Slutspelsträd för tipset, bläddra i sidled"
+          tabIndex={0}
+          className="vm-bracket-scroll -mx-1 overflow-x-auto px-1 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+        >
           <div className="flex min-w-max gap-5">
             {rounds.map((round) => (
               <RoundColumn
