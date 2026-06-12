@@ -23,12 +23,18 @@ när det officiella resultatet vävs in, T48), ingen ny polling. En live-match r
 DAG-MEDVETNA `nowMs` från `useTodayKey` (flyttar vid midnatt via minut-tick gatad på dygnsväxling +
 visibilitychange vid flik-väckning), inte mot det mount-frusna `now`. Användarens medvetna val
 PINNAS (`pinnedKey`): när hen bläddrat stannar dagen, den hoppar inte under hen vid midnatt; först
-när hen "följer" (inget pinnat) auto-flyttar bläddraren till aktuell dag.
+när hen "följer" (inget pinnat) auto-flyttar bläddraren till aktuell dag. Navigerar hen TILLBAKA till
+den dag som ÄR den härledda aktuella dagen (idag) NOLLSTÄLLS pinningen (`pinnedKey = null`) så
+följ-läget ÅTERUPPTAS; en bläddring bort och tillbaka till idag låser alltså inte bläddraren på idag.
+Pinning på en ANNAN dag är orörd (rycker aldrig en användare som bläddrar i resultaten).
 **Varför:** PWA:n lämnas öppen hela VM:t, så dagen måste flytta utan reload (samma anda som T27:s
 `useTodayKey` och T35:s tick). Det tidigare mount-frusna `now` plus en sync-back-effekt som
 permanent-pinnade den härledda nyckeln gjorde att bläddraren stod kvar på gårdagen tills reload. Den
 permanenta pinningen ersattes av en explicit `pinnedKey` (null = följ verklig dag), vilket gör
-auto-flytten korrekt OCH testbar utan att yanka en bläddrande användare.
+auto-flytten korrekt OCH testbar utan att yanka en bläddrande användare. Reviewerns F1 (#98): utan
+nollställningen pinnade en bläddring TILL idag den dagen permanent, så nästa dygnsväxling i en öppen
+flik flyttade inte bläddraren (Daniels symptom efter en bläddring i samma session). Fixen härleder
+"är idag?" med SAMMA regel som `selectedIndex` (`initialDayIndex` mot `liveNowMs`), en sanning.
 
 **Beslut (resultat i listan, krav 3):** Matchkortet visar nu RESULTATET för en färdigspelad match
 (ordinarie "hemma-borta", t.ex. "2-1", plus straffar separat i slutspel: "(4-3 på straffar)"), via

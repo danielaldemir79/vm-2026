@@ -168,11 +168,18 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
       if (index < 0 || index >= days.length) {
         return; // utanför intervall: ignorera (knapparna är ändå disabled vid kant)
       }
-      // Användaren väljer en dag medvetet -> PINNA den (dagen ska inte hoppa under
-      // hen om midnatt passerar medan hen bläddrar bakåt i resultaten).
-      setPinnedKey(days[index].dateKey);
+      // Navigerar användaren till den dag som ÄR den härledda aktuella dagen (t.ex.
+      // bläddrar bort och TILLBAKA till idag), NOLLSTÄLL pinningen -> follow-läget
+      // återupptas, så nästa dygnsväxling auto-flyttar bläddraren igen. Annars
+      // permanent-pinnades idag av en bläddring och bläddraren skulle stå kvar på
+      // gårdagen vid midnatt (Daniels rapporterade symptom, efter en bläddring i
+      // samma öppna flik). Pinnad på en ANNAN dag = orörd: en medveten dag stannar
+      // (hoppar aldrig under hen). Samma härledning (initialDayIndex mot det
+      // dag-medvetna liveNowMs) som selectedIndex använder, så "är idag?" är EN regel.
+      const todayIdx = initialDayIndex(days, liveNowMs);
+      setPinnedKey(index === todayIdx ? null : days[index].dateKey);
     },
-    [days]
+    [days, liveNowMs]
   );
   const goPrev = useCallback(() => goToIndex(selectedIndex - 1), [goToIndex, selectedIndex]);
   const goNext = useCallback(() => goToIndex(selectedIndex + 1), [goToIndex, selectedIndex]);
