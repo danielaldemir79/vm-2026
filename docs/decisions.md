@@ -5,6 +5,57 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T54 (#93): glasklar kom-igång-yta (installera ELLER använd direkt)
+
+**Bakgrund (Daniels live-feedback 2026-06-11):** "många lyckas inte förstå hur de ska installera det
+som en app eller att de kan använda sidan direkt". Install-bannern (T13/T39) är diskret och kan
+avfärdas; onboardingens install-steg (T39) var ren info utan väg (T39/#68 F1). Det fattades en
+GLASKLAR, alltid-nåbar yta som säger BÅDA vägarna med rätt steg per enhet.
+
+**Beslut/struktur:** Ny kom-igång-yta i `src/features/app-settings/` (samma feature som install/
+onboarding, så ingen cross-feature-cykel): ren logik+data (`get-started-steps.ts`) + a11y-dialog
+(`GetStartedDialog.tsx`) + trigger (`GetStartedControl.tsx`). Plattforms-detekteringen ÅTERANVÄNDER
+T39:s `detectStandalone`/`detectIos`/`detectAndroid` (EN sanning, kan inte drifta från install-
+knappen). Play Skydd-noten återanvänds ordagrant (`ANDROID_PLAY_PROTECT_NOTE`). Triggern monteras på
+TVÅ ställen: i inställnings-portalen (`SettingsControl`, alltid nåbar efter onboardingen) + som inline
+"Visa hur"-CTA i onboardingens install-steg. Dialog-kontraktet är den femte handrullade a11y-dialogen
+(samma kopierade kontrakt som ScoreGuide T34), `<Modal>`-extraktionen är fortfarande en egen pinnad
+refaktor-task (T34/#62-flaggan), inte smyglagd här.
+
+**Källhänvisade externa fakta (gissas inte, så reviewern kan BEKRÄFTA mot källan):**
+- **iOS-rekommendationen (review-F1-rättad, verifierad 2026-06-12):** Safari är enklaste vägen, men
+  sedan iOS 16.4 (mars 2023) kan även Chrome/Edge/Firefox på iPhone lägga till på hemskärmen via sin
+  Dela-meny. Texten rekommenderar Safari UTAN att påstå exklusivitet (det gamla "funkar bara i Safari"
+  var föråldrat och hade lett Chrome-vänner fel åt andra hållet). Källor: Apple "Add a website to your
+  Home Screen" (Safari-vägen, ingen exklusivitet fastställd) + Progressier "PWA installation"
+  (tredjepartsstödet sedan 16.4). Inline i `get-started-steps.ts` (`IOS_SAFARI_REQUIREMENT`).
+- **iOS-webbens ~7-dagars självrensning:** WebKit ITP nollar all script-writable storage (inkl.
+  localStorage) efter 7 dagars frånvaro av interaktion i webb-läge; en installerad (standalone) PWA
+  omfattas inte på samma sätt, därför rekommenderas hemskärmen. Källa: WebKit-bloggen "Full Third-Party
+  Cookie Blocking and More" (7-day cap on all script-writable storage). Inline i `WEB_MODE_FACTS`.
+- **Install-vägarna per plattform:** iOS Dela -> Lägg till; Android install-knapp/meny -> Installera
+  app; desktop install-ikon i adressfältet. Källor: Apple-guiden (iOS) + web.dev "Customize the install
+  experience" (Android/desktop, samma WebAPK-väg T39 byggde). Inline per väg i `GET_STARTED_PATHS`.
+
+**Verifiering:** plattformsgrenarna + standalone testas mot ett riktigt Window med mockad UA/matchMedia
+(samma grepp som T39); flikbyte, webb-läges-info, standalone-kortet och båda call-sites (inställningar +
+onboarding) render-testas. Build/test/lint/format grönt.
+
+**Copilot runda 3 (#93) , a11y-flikar + Escape-regression:**
+- **WAI-ARIA Tabs-tangentbord i `PlatformTabs` (F1):** plattforms-flikarna fick förut hela Tab-ordningen
+  och saknade pil-stöd. Implementerat enligt WAI-ARIA APG Tabs-mönstret
+  (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/): roving tabindex (bara aktiv flik tabIndex=0),
+  vänster/höger-pil med wrap + Home/End. **Tolkningsval: AUTOMATIC ACTIVATION (selection follows
+  focus)** , att flytta fokus byter direkt vald flik + panel. APG tillåter både automatic och manual
+  activation; automatic rekommenderas när panelinnehållet är billigt att visa (här ren, redan laddad
+  data) och flikantalet är litet (3 st), så det valdes (enklast, vanligast). Inline källhänvisat i
+  `GetStartedDialog.tsx`.
+- **Regressionstest för capture-Escape (F2):** capture-fas + `stopPropagation` (så en Escape bara
+  stänger översta dialogen vid staplade modaler) saknade test. Lagt i `GetStartedControl.test.tsx`,
+  mutationsverifierat (borttagen capture ELLER stopPropagation => rött). jsdom-not: i jsdom stoppar
+  `stopPropagation` i capture-fasen även en bubbel-lyssnare på SAMMA target (document) , empiriskt
+  probe-bekräftat innan testet skrevs, så testet vilar inte på en gissad event-semantik.
+
 ## 2026-06-12 , T60 (#102): 4 röda baslinje-tester var tidskopplade, inte en regression
 
 **Symtom:** `feedback-seam.test.tsx` (3 fall) + `ResultEntryView.test.tsx` (1 fall, "Unable to find

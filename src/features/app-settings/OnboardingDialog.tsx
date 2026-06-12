@@ -15,6 +15,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { springs, transitions } from '../../motion';
 import { ONBOARDING_STEPS, ONBOARDING_STEP_COUNT } from './onboarding';
 import { OnboardingArt } from './OnboardingArt';
+import { GetStartedControl } from './GetStartedControl';
 import { useOnboarding, type OnboardingApi } from './use-onboarding';
 
 /**
@@ -168,6 +169,24 @@ export function OnboardingDialog({ onboarding }: { onboarding?: OnboardingApi } 
             </header>
           </motion.div>
         </AnimatePresence>
+
+        {/* Kom-igång-CTA i install-steget (T54/#93): touren BESKREV tidigare bara
+            installationen (ren info, T39/#68 F1), en vän visste inte HUR. Nu öppnar
+            "Visa hur" samma kom-igång-dialog med båda vägarna + rätt steg för enheten,
+            direkt i onboardingen. Bara på install-steget; övriga steg bär ingen CTA.
+            (Dialogen ligger i ett eget portal-topplager ovanpå touren, så den hamnar
+            inte bakom tour-overlayn.)
+
+            LIGGER UTANFÖR AnimatePresence-blocket (gatad på det LIVE härledda `step`,
+            samma sanning som prickarna/footern nedan använder via stepIndex): med
+            mode="wait" lever det utgående steg-innehållet kvar tills exit-animationen
+            slutförts, så en CTA INUTI presence-barnet skulle släpa efter steg-bytet.
+            Här utanför speglar den steget direkt. */}
+        {step.art === 'install' ? (
+          <div data-onboarding-get-started="">
+            <GetStartedControl variant="inline" />
+          </div>
+        ) : null}
 
         {/* Steg-indikator: prickar som visar var i touren man är. aria-hidden,
             steg-status bärs av "Steg X av Y"-texten nedan för skärmläsare. */}
