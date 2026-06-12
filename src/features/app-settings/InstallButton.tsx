@@ -43,9 +43,10 @@ export function InstallButton() {
         type="button"
         data-install-button="native"
         onClick={promptInstall}
-        // KOMPAKT, diskret pill, samma lågmälda surface-ton som guide-varianten
-        // (GetStartedControl variant="install") så ytan ser likadan ut oavsett gren.
-        className="inline-flex items-center gap-2 rounded-pill border border-border bg-surface px-4 py-2 font-display text-sm font-semibold text-fg outline-none transition-colors hover:border-accent/60 hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+        // KOMPAKT, diskret pill: den delade .vm-install-pill (tokens.css §22), EXAKT
+        // samma utseende som guide-varianten (GetStartedControl variant="install"), en
+        // sanning i stället för en kopierad klass-sträng (F1, Daniels direktiv).
+        className="vm-install-pill"
       >
         {/* Liten "lägg till"-ikon (pil ner mot bas), dekorativ; texten bär namnet. */}
         <svg
@@ -58,7 +59,7 @@ export function InstallButton() {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="shrink-0 text-accent"
+          className="vm-install-pill-icon"
         >
           <path d="M12 3v12" />
           <path d="m7 10 5 5 5-5" />
