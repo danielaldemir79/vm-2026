@@ -56,7 +56,9 @@ fg-muted spec 0,2,0 < min-count fg spec 0,3,0, vinner korrekt).
 
 **Beslut:** Ny tabell `public.room_reactions` (room_id, user_id, match_id, emoji, created_at) för
 emoji-reaktioner på matcher per rum. Migration `20260612160000_t24_room_reactions_schema_rls_realtime.sql`,
-applicerad LIVE och committad 1:1 (samma version + namn + innehåll = fresh-replaybar, repo == live-historik).
+applicerad LIVE. ÄRLIG precision (review-F1): namn + INNEHÅLL är 1:1 (live-schemat verifierat kolumn för
+kolumn), men fil-versionen är en placeholder-stämpel, live-apply-versionen är `20260612134058` (samma
+MCP-nyans som T45/T19/T53/T67). Ett `db reset` replayar samma slutläge under filens stämpel.
 **Varför:** Snabbt, lekfullt social-lager ovanpå kommentarerna (T66): noll text, bara en knapp. Snacket
 runt matcherna är halva nöjet.
 
