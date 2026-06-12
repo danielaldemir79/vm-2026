@@ -37,6 +37,9 @@ ISO (formatDeadline/DeadlineNotice), ingen dubblerad tid.
 ett hypotetiskt ankare 25/6 behåller 25/6 (förkorta aldrig). FAIL-SAFE bevarad (explicit null-gren).
 Migrationen i `list_migrations` heter `t67_extended_deadline_to_21_june` (live-version `20260612101851`,
 MCP-genererad stämpel skiljer från filnamnets `20260612080000`, samma nyans som T15/T16/T53, namn + SQL 1:1).
+OBS precision (review-F1): "1:1" avser den EXEKVERBARA SQL:en; live-funktionens inline-kommentar
+applicerades på engelska (MCP-artefakt) medan committad fil bär svensk kommentar per konvention, nästa
+`db reset` återställer den svenska. Noll beteendepåverkan.
 
 **Källa:** Daniels task-direktiv T67 (#123) + live-verifierat spelschema (`match_kickoffs`) + T53-modellen.
 
