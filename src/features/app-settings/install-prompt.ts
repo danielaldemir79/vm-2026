@@ -32,56 +32,8 @@
 export const ANDROID_PLAY_PROTECT_NOTE =
   'Visar telefonen en varning från Play Protect? Appen är säker, det är en känd Android-varning för webb-appar. Välj installera ändå.';
 
-/** Vad installations-ytan ska visa, härlett ur plattform + event + avfärdande. */
-export type InstallUiMode =
-  | 'hidden' // redan installerad, avfärdad, eller ingen väg att installera än
-  | 'prompt' // Chrome/Android: vi har ett beforeinstallprompt-event redo
-  | 'ios-instructions'; // iOS Safari: visa "Dela -> Lägg till på hemskärm"
-
-/** Indata till mode-beslutet (rena värden, lätt att testa varje kombination). */
-export interface InstallContext {
-  /** true om appen körs i installerat/standalone-läge (då finns inget att visa). */
-  isStandalone: boolean;
-  /** true om plattformen är iOS (iPhone/iPad), som saknar beforeinstallprompt. */
-  isIos: boolean;
-  /** true om ett beforeinstallprompt-event fångats och ännu kan visas. */
-  hasPromptEvent: boolean;
-  /** true om användaren tidigare avfärdat bannern (persistent). */
-  dismissed: boolean;
-}
-
 /**
- * Avgör vad installations-ytan ska visa.
- *
- * Prioritetsordning (medvetet):
- *   1. Redan installerad -> dölj (inget att göra).
- *   2. Avfärdad av användaren -> dölj (respektera valet, visa inte igen).
- *   3. Chrome/Android med ett event redo -> egen install-knapp.
- *   4. iOS Safari (ej installerad, ej avfärdad) -> instruktion (enda vägen där).
- *   5. Annars dölj: en icke-iOS-webbläsare UTAN event har (ännu) ingen
- *      installerbar väg vi kan agera på, så vi visar inget hellre än en knapp
- *      som inte gör något (ärlig affordans, gissar inte).
- */
-export function resolveInstallMode(ctx: InstallContext): InstallUiMode {
-  if (ctx.isStandalone) {
-    return 'hidden';
-  }
-  if (ctx.dismissed) {
-    return 'hidden';
-  }
-  if (ctx.hasPromptEvent) {
-    return 'prompt';
-  }
-  if (ctx.isIos) {
-    return 'ios-instructions';
-  }
-  return 'hidden';
-}
-
-/**
- * Vad den KOMPAKTA install-knappen (T63, #113) ska göra när den klickas. Skild från
- * resolveInstallMode (som styr den GAMLA info-bannern): knappen är en diskret CTA, inte
- * en informationsruta, och fallbacken skiljer sig på TVÅ avgörande punkter:
+ * Vad den KOMPAKTA install-knappen (T63, #113) ska göra när den klickas. Fyra grenar:
  *
  *   - 'hidden':       BARA i standalone. Daniels skarpa krav (#113): i app-läge ska
  *                     INGEN install-yta synas ("onödigt surr där då den redan är
@@ -97,11 +49,11 @@ export function resolveInstallMode(ctx: InstallContext): InstallUiMode {
  *                     ALDRIG en död knapp (#113-AC): finns ingen native-väg just nu
  *                     visar vi vägen i stället för att göra ingenting.
  *
- * VIKTIGT (skillnad mot resolveInstallMode): `dismissed` döljer INTE knappen. Den gamla
- * bannern hade en "Inte nu"-knapp och respekterade avfärdandet permanent; den kompakta
- * knappen har ingen sådan affordans, den är en alltid-nåbar liten CTA. Att en native-
- * prompt avvisats betyder bara att vi faller till guiden ('guide'), inte att knappen
- * försvinner. Därför läses `dismissed` inte här.
+ * VIKTIGT: ett avfärdande av native-prompten döljer INTE knappen. Den kompakta knappen
+ * är ingen avfärdbar banner, den är en alltid-nåbar liten CTA; en avvisad native-prompt
+ * faller bara till guiden ('guide'), knappen försvinner inte. (Den gamla, avfärdbara
+ * InstallBannern och dess mode-/dismiss-maskineri togs bort i T70/#136, dött sedan
+ * InstallButton ersatte bannern i T63.)
  */
 export type InstallButtonAction = 'hidden' | 'native-prompt' | 'guide-ios' | 'guide';
 
