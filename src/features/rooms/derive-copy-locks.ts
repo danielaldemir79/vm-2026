@@ -6,14 +6,15 @@
 //
 // EN SANNING FÖR DEADLINE-ANKARET (gissas inte, källåkrat mot RLS-migrationerna):
 //   * MATCH-tips    -> matchens egen avspark (match_id). RAW (oförlängd).
-//   * GRUPP-tips     -> GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 14/6
+//   * GRUPP-tips     -> GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 21/6
 //                       21:59Z), via groupFirstMatchId + applyExtendedDeadline, samma
-//                       som RLS-helpern group_deadline_kickoff (T53-förlängningen).
+//                       som RLS-helpern group_deadline_kickoff (T67-förlängningen).
 //   * BRACKET-tips   -> slottens egen avspark (M73..M104) RAW, och 'champion' ->
 //                       GREATEST(g-A-1, fasta söndagstiden), via bracketDeadlineMatchId
 //                       + applyExtendedDeadline, samma som RLS bracket_deadline_kickoff.
-// T53 (#95): grupp- + champion-deadlinen förlängdes till söndag 14/6 (FÖRLÄNG, FÖRKORTA
-// ALDRIG: en sen grupp behåller sitt senare ankare). match-tips + bracket-SLOTS är
+// T53 (#95) införde förlängningen, T67 (#123) flyttade den till söndag 21/6 (FÖRLÄNG,
+// FÖRKORTA ALDRIG: en grupp med ankare efter 21/6 behåller sitt senare ankare , inget
+// riktigt gruppankare gör det, men regeln, inte datat, är garantin). match-tips + SLOTS är
 // OFÖRÄNDRADE (egna avsparks-lås). Lås-pre-klassificeringen MÅSTE följa samma förlängning
 // som RLS, annars skulle copy hoppa över ett grupp/champion-item som servern faktiskt
 // tillåter (falskt "låst") , därav applyExtendedDeadline på grupp/champion-grenen nedan.
