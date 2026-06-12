@@ -42,7 +42,21 @@ vi.mock('../../data/rooms', () => ({
   upsertRoomResult: (...a: unknown[]) => api.upsertRoomResult(...a),
 }));
 
-const fakeClient = {} as VmSupabaseClient;
+// Attrapp-klient med den MINIMALA realtids-ytan (T18, #18): rooms-API:t är mockat,
+// men RoomsProvider öppnar nu en realtidskanal (useRealtimeSubscription) i live-läge,
+// vilket rör client.channel()/realtime.setAuth(). Vi ger en no-op-stub så den RIKTIGA
+// prenumerations-vägen körs utan att krascha (testet handlar om resultat-wiringen, inte
+// realtid; realtids-seamen har egna tester). En chainbar kanal-attrapp speglar
+// supabase-js (.on().on().subscribe()).
+const fakeChannel = {
+  on: () => fakeChannel,
+  subscribe: () => fakeChannel,
+};
+const fakeClient = {
+  channel: () => fakeChannel,
+  removeChannel: () => Promise.resolve('ok'),
+  realtime: { setAuth: () => Promise.resolve() },
+} as unknown as VmSupabaseClient;
 
 function liveEnv(): ImportMetaEnv {
   return {

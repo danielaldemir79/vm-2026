@@ -5,6 +5,59 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T18 (#18): Supabase Realtime , prenumeration som SIGNAL -> befintlig tyst re-fetch (ingen rad-merge), sekretess via begränsad publikation + RLS-refetch
+
+**Mål (issue #18):** appen ska leva utan reload, ett inmatat officiellt resultat ska synas direkt
+hos ALLA anslutna klienter (live-tracker, tabeller, slutspelsträd, topplista, avslöjande), och rum-
+data (medlemmar/delade resultat) ska uppdateras live.
+
+**Beslut 1 (ARKITEKTUR, KISS + härledd state): Realtime-händelsen är bara en SIGNAL, inte data.**
+Vi merge:ar ALDRIG postgres_changes-payloadens rad i klienten. En händelse på en tabell kör i
+stället SAMMA tysta re-fetch-väg som fokus/online-lyssnaren redan har (`OfficialResultsProvider
+.refresh()` / `RoomsProvider.loadRoomData()` + `tipsRefreshNonce`-bump). Re-fetchen går genom RLS
+som vanligt, så facit/medlemmar/resultat alltid blir korrekt filtrerade. Varför: appen är redan
+härledd state (official_match_results driver tracker + topplista via `useOfficialResultsSync` /
+`useLeaderboardData`; tips-vyerna läser `tipsRefreshNonce`), så att återanvända refetch-vägen är
+mindre kod, en sanning, och kan inte drifta från den fetch som testas. Rad-merge i klienten vore en
+NY dataväg att hålla i synk + en sekretess-risk (se nedan).
+
+**Beslut 2 (SEKRETESS-HARD): vi prenumererar BARA på `official_match_results`, `room_match_results`
+och `room_members`, ALDRIG på predictions-tabellerna.** Migrationen
+`20260612072518_t18_realtime_publication.sql` lägger de tre i `supabase_realtime`-publikationen
+(read-only-verifierat: publikationen var TOM före, och innehåller exakt dessa tre efter, INTE
+predictions/group_predictions/bracket_predictions). Andras tips är hemliga FÖRE avspark (RLS:
+eget tips alltid, andras bara `now() >= kickoff`). Även om postgres_changes respekterar RLS väljer
+vi försvar-på-djupet: ingen tips-tabell broadcastas alls, så det finns NOLL yta för en pre-avspark-
+tips att läcka via realtidskanalen. Tips-färskhet drivs i stället av resultat-/medlemshändelserna
+som bumpar `tipsRefreshNonce` -> tips-vyer/topplista hämtar om sina RLS-synliga rader (avslöjade
+tips kommer in, dolda förblir dolda). Den re-fetchen går genom RLS, server-side sanningen.
+
+**Källa (platforms-fakta, verifierad, inte gissad):** Supabase "Realtime Authorization", avsnitt
+"Interaction with Postgres Changes": *"When using Postgres Changes on tables with RLS, database
+records are sent only to clients who are allowed to read them based on your RLS policies."*
+(https://supabase.com/docs/guides/realtime/authorization, web-verifierat 2026-06-12). Enable-syntax
+`alter publication supabase_realtime add table ...` + React-cleanup `supabase.removeChannel(channel)`
+ur Supabase "Postgres Changes" + "Getting Started with Realtime" (samma datum). OBS: dokumenten
+specar INTE reconnect/backoff eller status-enumen utöver `'SUBSCRIBED'`, så vi förlitar oss på
+supabase-js interna WebSocket-reconnect + behåller skyddsnäten (se Beslut 3) i stället för att
+bygga en egen reconnect-loop.
+
+**Beslut 3 (skyddsnät BEHÅLLS): fokus/online-refetch + minut-ticken tas INTE bort.** Realtime är
+ett TILLÄGG (snabbare push), inte en ersättning. Faller kanalen (tappad anslutning, kanal-fel)
+loggar vi fail-loud i konsolen men appen lever vidare: nästa fokus/online-event och leaderboardens
+minut-tick (`lockedMatchCount`) hämtar ändå färsk data. supabase-js återansluter WebSocket internt.
+
+**Beslut 4 (REPLICA IDENTITY default, inte `full`):** vi läser aldrig `old`-raden (vi refetchar),
+så vi behöver inte previous-values i UPDATE/DELETE-payloads. KISS/YAGNI.
+
+**Återanvändning (ingen dubblett):** all kanal-logik bor i EN modul `src/data/realtime/`
+(`subscribeToTableChanges` + `useRealtimeSubscription`-hook), så facit-lagret OCH rums-lagret delar
+samma setup; providers rör aldrig Supabase-kanal-API:t direkt. Prenumerationen ligger co-located med
+varje providers egen refresh (lägsta koppling, speglar de befintliga fokus/online-lyssnarna):
+OfficialResultsProvider -> `official_match_results` (statisk, globalt facit); RoomsProvider ->
+`room_match_results` + `room_members` filtrerat på aktivt rum (`subscriptionKey = rum-id`, rum-byte
+river + öppnar ny kanal, cleanup vid unmount/rum-byte).
+
 ## 2026-06-12 , T63 (#113): ytan överst blir en KOMPAKT install-knapp (ersätter info-bannern), tre klick-grenar
 
 **Symptom/önskan (Daniels issue #113 + två förtydliganden 2026-06-12):** "info överst som ser ut som en
