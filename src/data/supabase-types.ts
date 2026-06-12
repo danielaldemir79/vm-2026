@@ -333,6 +333,43 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      // T45 (#76): admin-statistik, AVSLÖJADE tips ÖVER ALLA rum (gatad på
+      // is_app_admin i RPC:n; icke-admin får tom mängd). Returnerar BARA tips vars
+      // deadline passerat (now() >= deadline, samma gräns som RLS own_or_after_kickoff),
+      // ALDRIG framtida/hemliga tips. team_a/team_b är generiska bärare vars semantik
+      // beror på `kind` (se admin-stats-api.ts). Args: never (inga parametrar).
+      admin_revealed_predictions: {
+        Args: never;
+        Returns: {
+          room_id: string;
+          user_id: string;
+          kind: string;
+          key: string;
+          // team_a/team_b kan vara null (bracket-tips har bara team_a; en saknad rad
+          // ska aldrig låtsas vara non-null), så typen får inte ljuga om non-null.
+          team_a: string | null;
+          team_b: string | null;
+        }[];
+      };
+      // T45 (#76): admin-statistik, per rum + medlem (gatad på is_app_admin i RPC:n;
+      // icke-admin får tom mängd). Aggregaten (member_count, *_prediction_count)
+      // upprepas per medlemsrad (en rad per rum+medlem). INGA tips-VÄRDEN, bara antal.
+      admin_room_stats: {
+        Args: never;
+        Returns: {
+          room_id: string;
+          room_name: string;
+          room_code: string;
+          room_created_at: string;
+          member_count: number;
+          match_prediction_count: number;
+          group_prediction_count: number;
+          bracket_prediction_count: number;
+          member_user_id: string;
+          member_display_name: string;
+          member_joined_at: string;
+        }[];
+      };
       // T16 (#16): deadline-ankare för ett bracket-tips. Per-slot (M73..M104) =
       // slottens egen avspark; 'champion' = turneringsstart (g-A-1). Bygger på
       // match_kickoff, så samma NULL-fail-safe gäller (okänd slot => NULL =>

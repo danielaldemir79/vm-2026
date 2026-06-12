@@ -5,6 +5,47 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T45 (#76): admin-statistik (alla rum + medlemmar + vem tippar bäst)
+
+**Beslut:** Två SECURITY DEFINER-RPC:er (`admin_room_stats()` + `admin_revealed_predictions()`),
+BÅDA gatade på `is_app_admin()` i första raden (en icke-admin får TOM mängd, ingen rad). Migration
+`20260612140000_t45_admin_stats_rpcs.sql`, applicerad LIVE och committad 1:1 (samma version + namn +
+innehåll = fresh-replaybar, repo == live-historik). Daniels feedback 2026-06-11: arrangören ska se
+HELA ligan.
+**Varför RPC (inte admin-SELECT-policies på tabellerna):** minst yta + sekretess-vänligt. En admin-
+SELECT-policy hade öppnat hela rader (rådata-tips) över alla rum; en aggregat-RPC returnerar bara det
+som är säkert att visa. Det är samma roll-gatade-läsning-anda som T42:s facit-skydd, men för LÄSNING
+över rumsgränser (en vanlig medlem ser bara egna rum, T14/T15/T16).
+
+**Beslut (SEKRETESS-HARD): RPC:erna läcker ALDRIG ett framtida (hemligt) tips.**
+- `admin_room_stats` returnerar bara AGGREGAT: per rum namn/kod/skapad + medlemsantal + ENGAGEMANGS-
+  räknare (antal match-/grupp-/bracket-tips) + medlemmarnas visningsnamn. Ett ANTAL läcker inget om VAD
+  någon tippat, bara hur aktiv hen är.
+- `admin_revealed_predictions` returnerar rådata-tips över alla rum men BARA de vars deadline REDAN
+  passerat (`now() >= deadline`). Det är EXAKT samma gräns som tips-sekretessens RLS SELECT
+  (`*_select_own_or_after_kickoff`), och vi återanvänder SAMMA deadline-helpers (`match_kickoff` /
+  `group_deadline_kickoff` / `bracket_deadline_kickoff`) som RLS, så "avslöjad" är EN sanning som inte
+  kan drifta. Ett avslöjat tips är per definition inte längre hemligt (alla rumsmedlemmar ser det redan).
+
+**Beslut: "vem tippar bäst" RÄKNAS INTE i SQL.** Det vore att duplicera den källhänvisade poäng-/facit-
+motorn (FIFA-tiebreak, bracket-härledning, score-reglerna). I stället matar `admin_revealed_predictions`
+de AVSLÖJADE tipsen till den befintliga, testade TS-motorn (`buildLeaderboard` mot det PUBLIKA globala
+facit, samma `derivePoolFacit` som rummens egen topplista T17). Servern levererar den säkra delmängden;
+klienten poängsätter med en sanning. Källa till poäng-/facit-modellen: docs/decisions.md T15/T16/T17.
+
+**GATE + SEKRETESS BEVISAT (T42/T53-playbook), LIVE (kmzhyblzxangpxydufve):** server-side DO-block med
+riktiga roller (`set role authenticated` + `request.jwt.claims`), read-only, ingen proof-data:
+(1) en icke-admin-sub (inte i app_admins) -> BÅDA RPC:erna 0 rader; (2) admin-sub (i app_admins) ->
+`admin_room_stats` > 0 rader; (3) läckage-koll: av 545 match-tips totalt avslöjas BARA 19 (now() >=
+kickoff), 526 framtida/hemliga BORTFILTRERADE; grupp/bracket 0 avslöjade (deadlines ej passerade) =
+deras hemliga tips lämnar aldrig DB:n. Plus env-gatat integrationstest med RIKTIGA anon-sessioner
+(`src/data/admin/admin-stats-rls.integration.test.ts`, kört grönt live): en icke-admin får tomt ur
+båda. Den fulla admin-vägen kan inte bevisas via klienten i prod (vi gör inte en främling till admin).
+
+**UI:** `AdminStats` renderas inifrån `AdminResultEntry` (bakom `official.isAdmin`, AdminSection-gaten),
+så vanliga medlemmar ser den aldrig (dubbel gating: UI + server-RPC). Funktionell + tillgänglig bas
+(semantiska tabeller, data-*-hakar); premium-design polerar design-frontend efter.
+
 ## 2026-06-12 , T66 (#121): kommentarer i rummet (medlemmar snackar match live)
 
 **Beslut:** Ny tabell `public.room_comments` (id, room_id, user_id, body, created_at) för korta

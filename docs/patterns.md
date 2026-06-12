@@ -9,6 +9,49 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### admin-aggregat-rpc-laser-over-rumsgranser-utan-att-lacka-hemliga-tips (Supabase, VM 2026)
+
+**Recept (en ROLL-gatad läsning ÖVER per-rum-RLS, som returnerar AGGREGAT/avslöjat , aldrig hemlig
+rådata, och INTE duplicerar poäng-motorn):**
+
+1. **Problemet:** en vanlig medlems RLS låser läsning till EGNA rum + EGNA/avslöjade tips (T14/T15/T16).
+   En admin behöver en överblick ÖVER ALLA rum. Det MÅSTE vara server-side (bara admin får läsa över
+   rumsgränser), annars vore det ett läckage. Samma anda som facit-skyddets roll-gate (T42), fast för LÄSNING.
+2. **SECURITY DEFINER-RPC, gatad på `is_app_admin()` i FÖRSTA raden.** Definer-läget låter RPC:n läsa
+   förbi RLS (det är hela poängen), men `if not public.is_app_admin() then return; end if;` gör att en
+   icke-admin (eller anon) får TOM mängd, ingen data. Samma härdning som de andra helpers (`security
+   definer`, `stable`, `set search_path = ''`, EXECUTE för anon/authenticated , RLS-/RPC-uttryck
+   evalueras i anroparens roll).
+3. **Returnera AGGREGAT, inte rådata.** En överblick (rum + medlemsantal + ENGAGEMANGS-räknare = antal
+   tips) läcker inget om VAD någon tippat, bara hur aktiv hen är. Ett ANTAL är sekretess-säkert; en rå
+   tips-rad är det inte (före deadline).
+4. **Om rådata MÅSTE returneras: filtrera på SAMMA gräns som sekretess-RLS:en.** En andra RPC som
+   returnerar tips-rader gör det BARA för tips vars deadline passerat (`now() >= deadline`), och
+   ÅTERANVÄNDER samma deadline-helpers (`match_kickoff` / `group_deadline_kickoff` /
+   `bracket_deadline_kickoff`) som RLS:s `*_select_own_or_after_kickoff`. Då är "avslöjad" EN sanning
+   som inte kan drifta, och ett avslöjat tips är per definition inte längre hemligt (alla medlemmar ser
+   det redan). FRAMTIDA tips lämnar aldrig DB:n.
+5. **DUPLICERA INTE en källhänvisad domän-motor i SQL.** Poäng (FIFA-tiebreak, bracket-härledning,
+   score-regler) räknas INTE i RPC:n , den levererar den säkra delmängden (avslöjade tips), och den
+   befintliga, testade TS-motorn (`buildLeaderboard` mot publika facit, samma `derivePoolFacit` som
+   rummens topplista) poängsätter klient-sidan. En sanning, ingen parallell motor som kan drifta.
+6. **BEVISA gaten + sekretessen med riktiga roller, FÖRE klient-koden** (T42/T53-anda): read-only
+   DO-block med `set role authenticated` + `request.jwt.claims` mot det levande projektet. Bevisa BÅDE
+   nekat (icke-admin-sub -> 0 rader ur varje RPC) OCH tillåtet (admin-sub -> data), PLUS läckage-kollen
+   (antal totala tips vs antal avslöjade , de framtida ska vara bortfiltrerade). Plus ett env-gatat
+   integrationstest med RIKTIGA anon-sessioner (icke-admin -> tomt). Den fulla admin-vägen kan inte
+   bevisas via klienten i prod (gör inte en främling till admin), så server-DO-blocket bär det beviset.
+7. **Dubbel gating i UI:t:** admin-vyn renderas bakom klient-`isAdmin` (visning) OCH datan kommer ur de
+   server-gatade RPC:erna (skydd). En kringgången klient får tomt, inte allas data.
+
+**Varför:** "arrangören ser hela ligan" är exakt den klass som ser ut att kunna lösas i klienten men
+MÅSTE vara server-side i en delad anon-auth-app, och måste BEVISAS. Aggregat-RPC:n minimerar ytan och
+gör läckage strukturellt omöjligt (antal i stället för innehåll; avslöjat i stället för hemligt), och
+genom att återanvända RLS:s egna deadline-helpers + den befintliga poäng-motorn införs ingen andra
+sanning. Källa: T45 (`supabase/migrations/*t45*`, `src/data/admin/`, `src/features/admin/AdminStats.tsx`
++ `derive-admin-stats.ts` + `use-admin-stats.ts`, `admin-stats-rls.integration.test.ts` + DO-block-
+beviset i decisions.md T45).
+
 ### global-admin-gatad-facit-med-allowlist-rls-bevisad-med-riktiga-roller (Supabase, VM 2026)
 
 **Recept (en GLOBAL, offentlig-läsbar tabell som BARA en admin får skriva, bevisat inte påstått):**
