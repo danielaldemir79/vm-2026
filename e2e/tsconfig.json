@@ -1,0 +1,20 @@
+{
+  // Fristående typkontroll för E2E-sviten (Playwright). MEDVETET UTANFÖR root-ens
+  // `tsc -b`-referenser (tsconfig.json): app-bygget (tsc.app/.node) ska inte dra in
+  // Playwright-/Node-typer i app-grafen (samma princip som tsconfig.node håller
+  // @types/node borta från app-projektet). Playwright transpilerar själv via esbuild
+  // vid körning, så detta tsconfig är för editor + ev. en separat `tsc -p`-koll.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true
+  },
+  "include": ["**/*.ts", "../playwright.config.ts"]
+}

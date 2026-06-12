@@ -5,6 +5,102 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T25 (#25): code-splitting (manualChunks), E2E-svit (Playwright) + a11y-audit (axe)
+
+### Del 1: prestanda , vendor-split (manualChunks)
+
+**Problem (KA-F4-pinnen från T13, "manualChunks om LCP-problem"):** produktionsbygget var EN
+monolitisk JS-chunk, så ALLT, app-koden OCH alla tunga tredjeparts-paket, laddades och parsades som
+ett enda block, och Rollup varnade ("chunks larger than 500 kB").
+
+**Beslut:** `build.rollupOptions.output.manualChunks` (vite.config.ts) delar de tre stora, sällan-
+ändrade vendorerna till egna chunks: `react`/`react-dom` -> `react-vendor`, `motion` ->
+`motion-vendor`, `@supabase/supabase-js` -> `supabase-vendor`.
+
+**Före/efter (vite build-output, ärligt, gzip i parentes):**
+
+| Chunk | Före | Efter |
+|---|---|---|
+| `index` (app-kod) | 894.98 kB (245.80) | **580.51 kB (157.43)** |
+| `react-vendor` | , | 11.21 kB (4.03) |
+| `motion-vendor` | , | 94.98 kB (31.36) |
+| `supabase-vendor` | , | 208.40 kB (54.19) |
+| CSS (oförändrad) | 121.59 kB (17.21) | 121.59 kB (17.21) |
+
+**Vad vinsten FAKTISKT är (ärlig avgränsning):** den totala initiala JS-mängden är ungefär
+oförändrad, splittad, inte borttagen. Vinsten är (1) **cache-granularitet**: app-koden (ändras varje
+deploy) invaliderar inte längre vendor-cachen, en återbesökare efter en app-only-deploy hämtar bara
+~580 kB app-delta i stället för hela monoliten; (2) **parallell nedladdning** av de fyra chunksen i
+stället för ett seriellt block; (3) den 895 kB-monolit som utlöste 500 kB-varningen är nu reviewbara
+delar. Det är en LCP-/cache-förbättring, inte ett mindre totalt nedladdnings-paket.
+
+**Medvetet INTE gjort (KISS, ingen prematur optimering):**
+- **Ingen per-vy-lazy-load.** Appen är EN skroll-sida utan router där alla sektioner renderas direkt
+  vid laddning; att Suspense-dela mitt-på-sidan-sektioner (admin-statistik, slutspelsträd) skulle
+  lägga till komplexitet utan att krympa det INITIALA innehållet (de syns ändå direkt). Vendor-splitten
+  är den värdefulla, låg-risk-vinsten.
+- **supabase-vendor laddas EAGERT även i fixtures-läge.** Verifierat: `dist/index.html` har
+  `<link rel="modulepreload" ... supabase-vendor>`. Roten är att flera providers (RoomsProvider,
+  OfficialResultsProvider, LeaderboardProvider, PredictionsProvider m.fl.) STATISKT importerar
+  `getSupabaseClient` från `supabase-browser.ts`, som statiskt importerar `@supabase/supabase-js`.
+  `getSupabaseClient()` lat-initierar visserligen klienten (cachedClient), men det STATISKA modul-
+  importet drar in hela biblioteket i den eager-grafen. Att göra den lazy kräver att ~10 providers
+  görs async (de behöver klienten synkront i sin render-väg när live är på), en djup refaktor med
+  risk, utanför ett kvalitetspass scope. Pinnat som en framtida förbättring, inte gjort nu.
+
+### Del 2: E2E-svit (Playwright)
+
+**Beslut:** `@playwright/test` (devDep) + `playwright.config.ts` mot `vite preview` (det BYGGDA
+dist:et, inte dev-servern, så sviten fångar bygg-/chunk-fel). En FOKUSERAD svit (`e2e/flows.spec.ts`,
+7 scenarier) över kritiska flöden i FIXTURES-läge.
+
+**Varför fixtures i CI (ingen live-DB):** config:en sätter MEDVETET inga `VITE_SUPABASE_*`-env, så
+datalagrets gata (data-source.ts) faller till fixtures och alla sociala providers är vilande. Sviten
+är då deterministisk och kräver inga hemligheter. De 7 scenarierna: (1) appen laddar + alla
+huvudsektioner renderas, (2) komprimera/expandera (aria-expanded + dubblerad toggle), (3) dag-
+bläddring (rubrik byter + återställs), (4) what-if öppna + avbryt (data-simulation-active), (5)
+lagprofil-modal öppna + Esc (role=dialog tas bort), (6) tema-växling (data-theme på html), (7)
+install-ytan som ärlig guide-fallback i en vanlig flik.
+
+**Stabilitet (inga flaky-sleeps):** sviten lutar sig helt på Playwrights auto-wait (locator-
+assertions retas tills de stämmer), inga `waitForTimeout`. Onboarding-touren (en z-50 overlay vid
+första besök som fångar alla klick) sås som "sedd" via `addInitScript` FÖRE laddning. NB: flaggans
+sanna värde i localStorage är exakt "1" (FLAG_TRUE i safe-storage.ts), inte "true", en init-script
+som skrev "true" gjorde att touren ändå öppnades och blockerade klicken (fångat under bygget).
+
+**E2E körs SEPARAT:** `npm run test:e2e` (Playwright) kör BARA e2e/; `npm test` (Vitest) är pinnat
+till `include: ['src/**/*.{test,spec}.{ts,tsx}']` så Vitest ALDRIG plockar upp e2e/*.spec.ts
+(Playwrights test.describe kraschar under Vitest). E2E:s tsconfig (e2e/tsconfig.json) ligger
+MEDVETET utanför root-ens `tsc -b`-referenser så app-bygget inte drar in Playwright-/Node-typer.
+
+### Del 3: A11y-audit (axe-core), WCAG AA
+
+**Beslut:** `@axe-core/playwright` kör axe på huvudvyn i BÅDA teman (ljust + mörkt) i fixtures-läge
+(`e2e/a11y.spec.ts`), mot taggarna wcag2a/wcag2aa/wcag21a/wcag21aa.
+
+**Äkta violations som ÅTGÄRDADES (båda teman):**
+
+- `aria-prohibited-attr` (serious) på Wordmark-spanen: `aria-label` är bara tillåtet på element som
+  tar ett tillgängligt namn. En naken `<span>` (generisk roll) gör inte det. FIX: span-varianten får
+  `role="img"` (kanoniskt mönster för stiliserad text-logga); h1-varianten orörd (rubriker namnges
+  lagligt av aria-label). Wordmark.tsx.
+- `scrollable-region-focusable` (serious) på `.vm-bracket-scroll`: en scrollbar yta måste nås med
+  tangentbord (när slottarna är tomma finns inga fokuserbara barn att tabba till). FIX: ytan får
+  `tabIndex={0}` + `role="group"` + aria-label + focus-visible-ring, i BÅDE BracketView.tsx och
+  TipsBracketView.tsx (samma fix båda ställen).
+
+**MEDVETET AVVISAD regel (false positive, verifierad, inte hand-wave):**
+
+- `color-contrast` (6 noder, bara LJUST tema): axe komposterar inte `color-mix(...)`-tonade pill-ytor
+  korrekt och gissar mot fel bakgrund. De flaggade elementen är "Dagens match"-etiketten + match-
+  kortens stage-/TV-chip, alla `text-fg-muted` eller full `text-fg` på color-mix-tvättar. EMPIRISKT
+  verifierat att de är AA: fg-muted ljust (#4f6258) = **6.52:1 mot vit surface / 5.92:1 mot bg
+  #f1f5f0**, full fg är 12.6-17.9:1 (tokens.css §0, redan canvas-komposit-mätt). Bägge >> 4.5. Regeln
+  avvisas därför EXPLICIT i a11y.spec.ts (`disableRules(['color-contrast'])`) med denna motivering;
+  ALLA andra axe-regler vaktas skarpt (en äkta saknad etikett/fel roll/dubbla id failar rött). Att
+  låta axe "rätta" de redan-mätta color-mix-värdena vore att jaga ett spöke (jfr lessons aa-kontrast-
+  false-positive vs den ÄKTA T29-gold-on-tint-skulden, som var en annan, gold-text-klass).
+
 ## 2026-06-12 , T29 (#48 + T56-review F4): demo-data-chippet till AA-säker solid-form, EN delad klass
 
 **Problem (gold-on-tint-fällan, lessons aa-kontrast-pastad-...-text-på-tint):** "Demo-data"-märket i
