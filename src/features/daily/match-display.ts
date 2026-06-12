@@ -6,7 +6,7 @@
 // tills seedningen i T9, SPEC §6) visas en tydlig platshållare i stället för att
 // gissa ett lag (gissa aldrig, PRINCIPLES).
 
-import type { Match, MatchStage, Team } from '../../domain/types';
+import type { FinishedMatch, Match, MatchResult, MatchStage, Team } from '../../domain/types';
 import { teamShortName } from '../../domain';
 
 /** Svensk etikett per slutspels-/gruppsteg (för matchkortets steg-märke). */
@@ -48,6 +48,37 @@ export function teamDisplayName(
   }
   const team = teamsById.get(teamId);
   return team ? teamShortName(team) : UNKNOWN_TEAM_LABEL;
+}
+
+/**
+ * Är matchen färdigspelad (bär ett resultat)? En typ-narrowande vakt så
+ * konsumenter (matchkortet) kan plocka ut `match.result` (icke-null) utan en egen
+ * null-check, via det diskriminerade unions-kontraktet (status <-> result).
+ */
+export function isFinished(match: Match): match is FinishedMatch {
+  return match.status === 'finished';
+}
+
+/**
+ * Resultatet på formen "hemma-borta" i ordinarie tid, t.ex. "2-1". Bindestreck
+ * (inte em-dash) per projektets svenska copy-regel (CLAUDE.md). Ren sträng-
+ * formatering så matchkortets resultat-rad är enhetstestbar och konsekvent.
+ */
+export function formatScore(result: MatchResult): string {
+  return `${result.homeGoals}-${result.awayGoals}`;
+}
+
+/**
+ * Straffresultatet på formen "(X-Y på straffar)" när matchen avgjordes på straffar
+ * (bara slutspel, oavgjort i ordinarie tid), annars null. Visas SEPARAT från
+ * ordinarie-resultatet så ett slutspels-resultat inte är tvetydigt: "2-2" plus
+ * "(4-3 på straffar)" säger exakt vad som hände, i stället för att gömma straffarna.
+ */
+export function formatPenalties(result: MatchResult): string | null {
+  if (!result.penalties) {
+    return null;
+  }
+  return `(${result.penalties.homeGoals}-${result.penalties.awayGoals} på straffar)`;
 }
 
 /**

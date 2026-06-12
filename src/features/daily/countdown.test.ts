@@ -17,6 +17,15 @@ function sched(id: string, kickoff: string): Match {
   };
 }
 
+/** Som sched men FÄRDIGSPELAD (bär ett resultat), för fokus-flytt-testerna (T57). */
+function finished(id: string, kickoff: string): Match {
+  return {
+    ...sched(id, kickoff),
+    status: 'finished',
+    result: { homeGoals: 1, awayGoals: 0 },
+  };
+}
+
 describe('splitDuration, delar upp ms i dygn/timmar/minuter/sekunder', () => {
   it('delar upp en blandad varaktighet korrekt', () => {
     const ms = 2 * 86400000 + 3 * 3600000 + 4 * 60000 + 5 * 1000;
@@ -112,5 +121,42 @@ describe('selectMatchOfTheDay, deterministiskt val (tidigast, id som tie-break)'
 
   it('returnerar null för en tom dag', () => {
     expect(selectMatchOfTheDay([])).toBeNull();
+  });
+});
+
+describe('selectMatchOfTheDay, fokus lyfter nästa OSPELADE match (T57, #98)', () => {
+  it('hoppar över en färdigspelad tidig match och fokuserar nästa ospelade', () => {
+    // Tidig match avgjord, nästa ännu ospelad: fokus ska FLYTTA till den ospelade
+    // (Daniels feedback: "Dagens match" stod kvar på den avslutade matchen).
+    const matches = [
+      finished('tidig', '2026-06-11T16:00:00.000Z'),
+      sched('nasta', '2026-06-11T19:00:00.000Z'),
+    ];
+    expect(selectMatchOfTheDay(matches)?.id).toBe('nasta');
+  });
+
+  it('väljer den tidigaste OSPELADE när flera är ospelade (ordnings-oberoende)', () => {
+    const matches = [
+      finished('spelad', '2026-06-11T13:00:00.000Z'),
+      sched('sen', '2026-06-11T22:00:00.000Z'),
+      sched('mitt', '2026-06-11T19:00:00.000Z'),
+    ];
+    expect(selectMatchOfTheDay(matches)?.id).toBe('mitt');
+  });
+
+  it('faller tillbaka på dagens tidigaste match när HELA dagen är spelad (hero försvinner inte)', () => {
+    // Alla matcher färdiga: hero ska ändå visa en match (den tidigaste), nu med
+    // sitt resultat, i stället för att bli tom.
+    const matches = [
+      finished('sen', '2026-06-11T22:00:00.000Z'),
+      finished('tidig', '2026-06-11T16:00:00.000Z'),
+    ];
+    expect(selectMatchOfTheDay(matches)?.id).toBe('tidig');
+  });
+
+  it('en LIVE-match räknas som ospelad och kan vara fokus (bär inget resultat än)', () => {
+    const live = { ...sched('live', '2026-06-11T16:00:00.000Z'), status: 'live' } as Match;
+    const matches = [finished('klar', '2026-06-11T13:00:00.000Z'), live];
+    expect(selectMatchOfTheDay(matches)?.id).toBe('live');
   });
 });
