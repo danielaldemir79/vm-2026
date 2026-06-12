@@ -136,6 +136,36 @@ describe('CommentsProvider , realtids-signal -> tyst re-fetch', () => {
   });
 });
 
+describe('CommentsProvider , cancelled-vakt vid unmount (T70)', () => {
+  it('ett laddnings-svar som FAILar EFTER unmount rör ingen state (ingen window-not-defined i teardown)', async () => {
+    // ROTORSAK till de intermittenta teardown-felen (#136): listRoomComments-Promisen
+    // kan landa EFTER att providern avmonterats (eller jsdom tagits ner mellan testfiler).
+    // .catch körde då setError/setStatus mot en avmonterad komponent (raden ~150), vilket
+    // ger "window is not defined" i teardown. Cleanup sätter cancelled=true och alla
+    // state-setters gatas på den. Vi bevisar det: en avvisad fetch EFTER unmount får
+    // INTE kasta (om setError körde mot en riven render skulle React klaga/krascha här).
+    let reject!: (err: Error) => void;
+    api.listRoomComments.mockReturnValueOnce(
+      new Promise((_resolve, rej) => {
+        reject = rej;
+      })
+    );
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { unmount } = renderProvider();
+    // Avmontera MEDAN laddningen är i flykten (Promisen ännu inte avgjord).
+    unmount();
+    // Avvisa nu, efter unmount: cancelled-vakten ska svälja det utan state-touch.
+    await act(async () => {
+      reject(new Error('sent nätfel efter unmount'));
+      // Spola mikrotasks så .catch hinner köra (och no-op:a) innan vi mäter.
+      await Promise.resolve();
+    });
+    // Ingen React-felmupp om setState-efter-unmount (cancelled-vakten höll).
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+});
+
 describe('CommentsProvider , skriv + radera', () => {
   it('addComment speglar in den sparade kommentaren optimistiskt (nyast nederst)', async () => {
     api.listRoomComments.mockResolvedValue([
