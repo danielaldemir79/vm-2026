@@ -24,7 +24,7 @@
 // med maskinläsbart datetime (UTC-instanten). Lag-emblemen är dekorativa
 // (aria-hidden). Arena visas bara om den är verifierad (platshållaren döljs).
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { formatKickoffTime } from './format-datetime';
 import {
@@ -57,6 +57,15 @@ export interface MatchCardProps {
    * inkonsekvent UI när turneringen låg dagar bort (#54, C3).
    */
   highlightLabel?: string;
+  /**
+   * Valfri FOTRAD under kortets metadata (T24, #24): t.ex. emoji-reaktions-raden i
+   * dagens-vyn. En ren render-SLOT så MatchCard förblir en presentations-komponent
+   * UTAN beroende till rums-feature:n (lägsta koppling): den som renderar kortet
+   * injicerar innehållet. Default null = ingen fotrad (kortet ser ut precis som förr,
+   * t.ex. i hero:n och i enhetstesterna). Ligger UTANFÖR <article>:ns a11y-namn, så
+   * reaktions-knapparna har sina egna etiketter och inte dubbel-läses i kort-labeln.
+   */
+  footer?: ReactNode;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -117,6 +126,7 @@ export function MatchCard({
   teamsById,
   highlight = false,
   highlightLabel = 'Dagens match',
+  footer = null,
 }: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
@@ -280,6 +290,10 @@ export function MatchCard({
           </div>
         ) : null}
       </dl>
+
+      {/* Valfri fotrad (T24, #24): reaktions-raden injiceras här av dagens-vyn. En ren
+          slot, så kortet är orört utan den (hero, tester). */}
+      {footer}
     </article>
   );
 }

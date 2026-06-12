@@ -16,3 +16,13 @@ export { summarizeCopyReport } from './copy-report-summary';
 export { CommentsProvider, type CommentsProviderProps } from './CommentsProvider';
 export { RoomComments } from './RoomComments';
 export { useCommentsStore, type CommentsStore, type CommentsStatus } from './comments-context';
+// T24 (#24): emoji-reaktioner på matcher i rummet (provider + UI + store + aggregering).
+export { ReactionsProvider, type ReactionsProviderProps } from './ReactionsProvider';
+export { MatchReactions, type MatchReactionsProps } from './MatchReactions';
+export { useReactionsStore, type ReactionsStore, type ReactionsStatus } from './reactions-context';
+export {
+  aggregateReactionsByMatch,
+  summaryForMatch,
+  type MatchReactionSummary,
+  type ReactionTally,
+} from './reaction-aggregate';

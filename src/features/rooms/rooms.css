@@ -389,3 +389,94 @@
 .vm-comment-count[data-count-tone='over'] {
   color: var(--color-danger);
 }
+
+/* -----------------------------------------------------------------------------
+   9. EMOJI-REAKTIONER på matchkorten (T24, #24). [design-frontend premium-finish]
+
+   Det LÄTTASTE sociala lagret: en snabb känsla på en match (mål, het, skratt ...),
+   en reaktion per medlem. Reaktions-raden bor i FOTEN på matchkorten i dagens-vyn
+   (där snacket händer), så finishen ska kännas LEVANDE men inte stojig (taskens ord),
+   en del av "arena i kvällsljus"-familjen, aldrig konfetti.
+
+   ÄGARSKAP (seam): senior-dev äger semantik + data-hakar i MatchReactions.tsx
+   (data-reactions-*, role/aria, etiketter, aria-pressed för "min"). Detta lager
+   STYLAR ovanpå hakarna och rör inte logiken/a11y-semantiken (samma seam som
+   kommentarerna ovan). Allt via tema-token (color-mix / var(--vm-*)), aldrig ett
+   rått färg-beslut, så raden är trogen BÅDA teman.
+
+   FÄRG-OBEROENDE: emojin SJÄLV bär betydelsen (en bild-glyf, tema- och färg-oberoende),
+   och "min" status bärs av aria-pressed + en accent-RING (form), inte bara en ton. Den
+   enda TEXTEN på en bricka är ANTALET (count), och den hålls AA-säker mot sin tintade
+   pill-fond i BÅDA teman (solid-form-disciplin, taskens punkt 3).
+
+   KONTRAST-VAKT (WCAG AA, UPPMÄTT per tema, sRGB-luminans, canvas-komposit VÄRSTA fall,
+   scripts/contrast-t24.mjs, lessons aa-kontrast: mät VARJE tema, attribuera rätt):
+     - vilo-brickans antal (fg-muted) på guld-4%-pill: mörkt 6.99:1, ljust 6.25:1.
+     - MIN brickas antal (LYFT till fg) på accent-10%-pill: mörkt 12.43:1, ljust 15.61:1
+       (och även OM det vore fg-muted skulle det hålla: mörkt 6.12:1 / ljust 5.69:1).
+     - "Reagera"-etiketten (fg-muted) på add-knappens surface-fond: mörkt 7.50:1, ljust 6.52:1.
+     - MIN brickas accent-kant (ren UI-dekor, bär ingen text): mörkt 9.68:1 / ljust 5.40:1
+       mot surface (>= 3:1, UI-komponent-tröskeln). Alla text-ytor >= 4.5:1 (normal text).
+   Picker-options bär bara en emoji (ingen text), så vald-tinten (accent 18%) är ren dekor.
+
+   RÖRELSE: ingen brick-/pop-animation behövs (taskens punkt 3: statisk är fin). Den enda
+   rörelsen är de delade hover/fokus-övergångarna som senior-devs Tailwind redan satt
+   (transition-[...] duration-150), och de nollas av den svepande reduced-motion-grinden
+   i index.css. Inga rums-egna @keyframes här, så inget extra att nolla.
+   -------------------------------------------------------------------------- */
+
+/* VILO-BRICKAN (andras / ej min reaktion): en lätt, rund pill med en hårfin guld-
+   värme i fonden (samma kvällsljus-detalj som .vm-comment-input), så raden känns
+   som en del av snacket, inte en främmande grå knapp-rad. Senior-devs Tailwind ger
+   redan border/radie/hover-kant/fokus-ring; här bara den varma vilo-ytan. */
+.vm-reaction-tally {
+  background-color: color-mix(in srgb, var(--vm-gold) 4%, var(--color-surface));
+}
+
+/* VILO-BRICKANS ANTAL: dämpad (fg-muted) som default, single-sourcat HÄR i stället
+   för en Tailwind text-utility i TSX, så count-färgen är EN sanning (vilo = fg-muted,
+   min = fg nedan) och inte en specificitets-strid mellan en utility och denna regel
+   (lessons tailwind-utility-vs-handskriven-css). UPPMÄTT 6.99:1 mörkt / 6.25:1 ljust. */
+.vm-reaction-tally [data-reactions-count] {
+  color: var(--color-fg-muted);
+}
+
+/* MIN BRICKA (data-mine): markeringen är FÄRG-OBEROENDE (aria-pressed bär den för
+   skärmläsare), och visuellt bärs den av en accent-RING (kant, satt av Tailwinds
+   aria-pressed:border-accent) + en lugn accent-tint i ytan här. Tinten ensam räcker
+   aldrig (formen/ringen + aria-pressed bär signalen), men den lyfter "min" tydligt
+   ur raden utan att skrika. */
+.vm-reaction-tally[data-mine] {
+  background-color: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+}
+
+/* MIN BRICKAS ANTAL: lyft från fg-muted till FULL fg (kombineras med font-semibold i
+   TSX) så "min" count läses starkt mot den accent-tintade ytan (UPPMÄTT 12.43:1 mörkt /
+   15.61:1 ljust, gott om marginal). En vilo-brickas antal förblir fg-muted (dämpat). */
+.vm-reaction-tally[data-mine] [data-reactions-count] {
+  color: var(--color-fg);
+}
+
+/* ADD-KNAPPEN ("Lägg till en reaktion"): senior-devs Tailwind gör den redan diskret
+   (dashed kant, fg-muted, hover -> accent). Vi behöver inte överstyra den; den lever
+   på matchkortets surface och håller AA (mätt). Lämnas medvetet ostylad här (KISS):
+   en extra rums-regel vore brus när Tailwind redan bär den lugna add-affordansen. */
+
+/* PICKERN (den utfällda 8-emoji-väljaren): en liten LUGN popover-yta. Senior-devs
+   Tailwind ger surface-raised + border + radie; här lägger vi bara en mjuk höjd
+   (skugga) så den läser som ett svävande lager ovanför raden, inte en inbäddad ruta,
+   plus en hårfin inre topp-högdager (kvällsljus) så den känns upphöjd. Ren dekor
+   (box-shadow), bär ingen text, så ingen kontrast hänger på den. */
+.vm-reaction-picker {
+  box-shadow:
+    var(--vm-shadow-raised),
+    inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 14%, transparent);
+}
+
+/* PICKER-OPTIONEN: senior-devs Tailwind bär hover-tint + fokus-ring + aria-pressed-
+   tint (vald). Vi lägger bara en lugn vald-RING (accent-kant) på MIN nuvarande emoji
+   så "vald" syns som FORM (inte bara accent-tinten), konsekvent med brickans accent-
+   ring. Ren dekor; aria-pressed + aria-label "vald" bär betydelsen för skärmläsare. */
+.vm-reaction-option[data-mine] {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
