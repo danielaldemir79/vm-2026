@@ -120,12 +120,12 @@ describe('App-skalet', () => {
   });
 });
 
-// Install-bannern gatas bakom onboarding-touren (T39/#68, F1): touren är en z-50
-// helskärms-overlay vid första besöket och ligger ÖVER bannern, så install-knappen
-// ser ut att "inte göra något". Medan touren är öppen ska den fristående bannern
-// alltså INTE finnas i DOM:en; när touren är klar/hoppad visas den normalt (om
-// promptbar). Testerna verifierar BÅDA grenarna av gaten.
-describe('App-skalet, install-banner gatad bakom onboarding (T39/#68)', () => {
+// Den kompakta install-knappen (T63, #113) gatas bakom onboarding-touren (T39/#68, F1):
+// touren är en z-50 helskärms-overlay vid första besöket och ligger ÖVER ytan, så knappen
+// skulle se ut att "inte göra något". Medan touren är öppen ska install-knappen alltså
+// INTE finnas i DOM:en; när touren är klar/hoppad visas den normalt (här i en promptbar
+// Chrome/Android-kontext = native-vägen). Testerna verifierar BÅDA grenarna av gaten.
+describe('App-skalet, install-knappen gatad bakom onboarding (T39/#68, T63/#113)', () => {
   beforeEach(() => {
     resetInstallPromptCaptureForTest();
     registerInstallPromptCapture();
@@ -153,30 +153,33 @@ describe('App-skalet, install-banner gatad bakom onboarding (T39/#68)', () => {
     });
   }
 
-  it('döljer den fristående install-bannern medan onboarding-touren är ÖPPEN', async () => {
+  it('döljer den kompakta install-knappen medan onboarding-touren är ÖPPEN', async () => {
     // Touren öppen = flaggan EJ satt (renderApp:s beforeEach satte den, rensa den
     // här för att simulera en första-gångs-vän som öppnar delningslänken).
     window.localStorage.removeItem(ONBOARDING_DONE_KEY);
     renderApp();
     fireBeforeInstallPrompt();
 
-    // Touren ligger över allt; den fristående bannern får inte finnas i DOM:en.
+    // Touren ligger över allt; install-knappen får inte finnas i DOM:en (den syns inte
+    // bakom touren och skulle se ut att inte göra något). Touren själv är dialogen.
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(document.querySelector('[data-install-banner]')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Installera som app/i })).not.toBeInTheDocument();
     await waitForAppSettled();
   });
 
-  it('visar den fristående install-bannern när onboarding är klar (flaggan satt) + promptbar', async () => {
+  it('visar den kompakta install-knappen när onboarding är klar (flaggan satt) + promptbar', async () => {
     // renderApp:s beforeEach sätter ONBOARDING_DONE_KEY = '1' (touren redan sedd),
-    // så detta är "onboarding klar"-grenen.
+    // så detta är "onboarding klar"-grenen. Kontexten är promptbar (event fångat) =>
+    // native-vägen: knappen finns och bär native-markören.
     renderApp();
     fireBeforeInstallPrompt();
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    // Vänta in att skalet SETTLAT (laddnings-texten borta) FÖRST, så bannern
+    // Vänta in att skalet SETTLAT (laddnings-texten borta) FÖRST, så knappen
     // bedöms i ett stabilt träd och inget state-update sker efter testet (act).
     await waitForAppSettled();
-    expect(document.querySelector('[data-install-banner]')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Installera' })).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: /Installera som app/i });
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveAttribute('data-install-button', 'native');
   });
 });
