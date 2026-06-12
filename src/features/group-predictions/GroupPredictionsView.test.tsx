@@ -197,4 +197,51 @@ describe('GroupPredictionsView', () => {
     expect((selects[0] as HTMLSelectElement).value).toBe('MEX');
     expect((selects[1] as HTMLSelectElement).value).toBe('RSA');
   });
+
+  // ---- T65 (#119): "Föreslå ur mina matchtips"-knappen, wiring via match-tips ------
+
+  /** Ett match-tips i den form storen bär (matchId -> Prediction). */
+  function pred(matchId: string, homeGoals: number, awayGoals: number): Prediction {
+    return { matchId, userId: 'me', homeGoals, awayGoals, updatedAt: 't' };
+  }
+
+  it('FÖRSLAG: utan match-tips är varje grupps förslags-knapp inaktiverad med ärlig text', () => {
+    renderView(store({}), new Date('2026-06-10T00:00:00Z')); // inga match-tips injicerade
+    const aForm = document.querySelector('[data-group-id="A"]')!;
+    const suggest = aForm.querySelector('[data-group-prediction-suggest]') as HTMLButtonElement;
+    expect(suggest).not.toBeNull();
+    expect(suggest.disabled).toBe(true);
+    expect(aForm.querySelector('[data-group-prediction-suggest-hint]')).not.toBeNull();
+  });
+
+  it('FÖRSLAG: komplett tippad grupp (alla dess matcher) -> knappen aktiv för just den gruppen', () => {
+    // Grupp A har EN gruppmatch i test-matchplanen (g-A-1). Tippar vi den är A komplett
+    // -> knappen aktiv. Grupp B (g-B-1 otippad) förblir inaktiverad, per grupp.
+    renderView(
+      store({}),
+      new Date('2026-06-10T00:00:00Z'),
+      new Map([['g-A-1', pred('g-A-1', 2, 0)]])
+    );
+    const aSuggest = document
+      .querySelector('[data-group-id="A"]')!
+      .querySelector('[data-group-prediction-suggest]') as HTMLButtonElement;
+    const bSuggest = document
+      .querySelector('[data-group-id="B"]')!
+      .querySelector('[data-group-prediction-suggest]') as HTMLButtonElement;
+    expect(aSuggest.disabled).toBe(false);
+    expect(bSuggest.disabled).toBe(true);
+  });
+
+  it('FÖRSLAG: en LÅST grupp har ingen förslags-knapp', () => {
+    // 15/6 08:00: grupp A är låst (förlängda söndagen passerad). Även med ett komplett
+    // match-tips på g-A-1 ska A:s formulär INTE ha någon förslags-knapp (låst).
+    renderView(
+      store({}),
+      new Date('2026-06-15T08:00:00Z'),
+      new Map([['g-A-1', pred('g-A-1', 2, 0)]])
+    );
+    const aForm = document.querySelector('[data-group-id="A"]')!;
+    expect(aForm.querySelector('[data-group-prediction-lock]')).not.toBeNull();
+    expect(aForm.querySelector('[data-group-prediction-suggest]')).toBeNull();
+  });
 });

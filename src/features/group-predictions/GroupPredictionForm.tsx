@@ -19,6 +19,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { GroupTeamOption } from './group-predictable-data';
+import type { GroupSuggestion } from '../simulation/derive-tipped-group-table';
 import { TeamFlag } from '../daily/TeamFlag';
 import { DeadlineNotice } from '../predictions/DeadlineNotice';
 
@@ -38,6 +39,15 @@ export interface GroupPredictionFormProps {
   deadlineIso: string | null;
   /** Injicerbart "nu" (testbarhet) för deadline-radens relativa etikett, default nuet. */
   now?: Date;
+  /**
+   * FÖRSLAG på 1:a/2:a UR mina tippade matchresultat (T65, #119), eller null när
+   * gruppens matcher INTE alla är tippade (då går inget ärligt förslag att räkna).
+   * Driver "Föreslå ur mina matchtips"-knappen: satt -> knappen aktiv, ett klick
+   * FÖRIFYLLER väljarna (sparar ALDRIG, det är användarens egen Spara-handling).
+   * null -> knappen inaktiverad med ärlig text ("tippa gruppens alla matcher först").
+   * Utelämnad (undefined) -> ingen förslags-knapp alls (vyer utan match-tips-lager).
+   */
+  suggestion?: GroupSuggestion | null;
   /**
    * Spara mitt grupp-tips. Kastar vid fel (formuläret visar det inline). Returnerar
    * en Promise så formuläret kan visa "sparar..."/fel-tillstånd.
@@ -210,6 +220,7 @@ export function GroupPredictionForm({
   locked,
   deadlineIso,
   now,
+  suggestion,
   onSubmit,
 }: GroupPredictionFormProps) {
   // Seeda väljarna från mitt nuvarande tips (redigera = se det jag tippat).
@@ -242,6 +253,24 @@ export function GroupPredictionForm({
       setSaved(false);
       setter(v);
     };
+  }
+
+  /**
+   * FÖRIFYLL 1:a/2:a ur mitt match-tips-förslag (T65, #119). Detta är ENBART en
+   * formulär-förändring: vi sätter väljarna och markerar formuläret "dirty" (så den
+   * externa seed-effekten inte skriver över valet), men anropar ALDRIG onSubmit.
+   * Användaren trycker själv Spara, precis som vid vanlig redigering (aldrig auto-spar,
+   * HARD-regel i issuen). Inaktiv när inget förslag finns (knappen är då disabled).
+   */
+  function applySuggestion() {
+    if (!suggestion) {
+      return;
+    }
+    dirtyRef.current = true;
+    setSaved(false);
+    setError(null);
+    setWinner(suggestion.winnerCode);
+    setRunnerUp(suggestion.runnerUpCode);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -411,6 +440,55 @@ export function GroupPredictionForm({
             error={error !== null}
             describedBy={describedBy}
           />
+
+          {/* FÖRSLAGS-KNAPPEN (T65, #119): förifyll 1:a/2:a ur mina tippade matchresultat.
+              Bara i öppet läge (en låst grupp har ingen knapp, formuläret är ändå låst).
+              Renderas bara när match-tips-lagret finns (suggestion !== undefined). Aktiv
+              när ett komplett förslag finns; annars disabled med ärlig text ("tippa
+              gruppens alla matcher först"), gissa ALDRIG. Ett klick fyller bara i
+              fälten, det sparar aldrig (data-attributet är test/design-haken). */}
+          {!locked && suggestion !== undefined ? (
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                data-group-prediction-suggest=""
+                disabled={suggestion === null}
+                onClick={applySuggestion}
+                aria-describedby={suggestion === null ? `${baseId}-suggest-hint` : undefined}
+                className="inline-flex h-10 items-center gap-2 self-start rounded-pill border border-[color-mix(in_srgb,var(--vm-gold)_40%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_8%,var(--color-surface))] px-4 font-display text-[0.8125rem] font-semibold text-fg shadow-sm transition-[transform,box-shadow,filter,border-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--vm-gold)_60%,var(--color-border))] hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--vm-gold)_55%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none disabled:hover:border-[color-mix(in_srgb,var(--vm-gold)_40%,var(--color-border))]"
+              >
+                {/* Glittrande "förslag"-glyf (gnista), ren dekoration (aria-hidden). */}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  className="h-4 w-4 shrink-0 text-warning"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M8 1.5l1.4 3.6L13 6.5l-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4z" />
+                  <path d="M12.5 11l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z" />
+                </svg>
+                Föreslå ur mina matchtips
+              </button>
+              {/* Ärlig förklaring när förslaget inte går att räkna (ofullständigt tippad
+                  grupp). Hinten kopplas till knappen via aria-describedby, en ren
+                  beskrivnings-relation (ingen role sätts, review-F1: kommentaren ska
+                  inte påstå ARIA-semantik som koden inte skriver). */}
+              {suggestion === null ? (
+                <p
+                  id={`${baseId}-suggest-hint`}
+                  data-group-prediction-suggest-hint=""
+                  className="m-0 text-[0.75rem] leading-snug text-fg-muted"
+                >
+                  Tippa gruppens alla matcher först, så kan vi föreslå 1:an och 2:an ur dina
+                  resultat.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Sparat-podiumet (stolt sammanfattning) när ett tips just sparats (öppet läge). */}
           {!locked && saved && hasPodium ? podiumSummary : null}

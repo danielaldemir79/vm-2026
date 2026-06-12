@@ -5,6 +5,69 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T65/#119 (föreslå-knapp) KLAR - PR #122 väntar på merge
+
+**Branch:** `feature/T65-foresla-knapp` @ HEAD `3c39b1e`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/122 mot `develop` (Closes #119, state: OPEN)
+**Board:** kort #119 tillagt och satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekräftat: name="In Review").
+
+**Vad T65 levererade:**
+- `deriveTippedGroupSuggestion` i `src/features/tips-bracket/derive-tipped-group-suggestion.ts`: per-grupp-härledning av 1:a/2:a ur delade motorer (samma `deriveGroupTables` + `computeStandings` som T64). Separerat från tips-bracket-lagret för testbarhet och återanvändning.
+- Identitets-seamen id->code testad mot drift: grupp-id och lagkod är separata entiteter, ingen sammanblandning möjlig.
+- Knappen förifyller formulärfälten, sparar aldrig automatiskt. Inaktiverad vid ofullständiga matchtips, dold vid passerad deadline.
+- aria-describedby-kommentar rattad (reviewer F1): kommentaren beskriver nu faktiskt vad attributet gor, inte en kopia av label-texten.
+- 1550 tester grona, build EXIT 0, lint/format rena.
+- Lokal reviewer PASS (F1 åtgärdad, F2-stro-fil städad av dirigenten pre-review). Copilot pausad.
+
+**Commits:**
+- `266e86f` - T65 (#119): deriveTippedGroupSuggestion per-grupp, aldrig auto-spar
+- `3c39b1e` - T65: review-F1, sann aria-describedby-kommentar (#119) - HEAD
+
+**Verifiering:** build EXIT 0, 1550 grona, 0 roda, lint/format rena. Lokal reviewer PASS.
+
+**Acceptanskriterier issue #119 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Knapp per grupp som förifyller 1:a/2:a ur matchtipsen
+- [x] AC2: Aldrig auto-spar, befintliga tips orörda tills användaren själv sparar
+- [x] AC3: Ärligt inaktiverad vid ofullständiga matchtips, dold/låst vid passerad deadline
+- [x] AC4: Delad härledning med T64, tester, grönt + reviewad
+
+**Daniels process-beslut (sparat i user-memory 2026-06-12):**
+Vakthund-rutinen: varje väntande PR/beslut får en deadline + eskaleringsplan. Nästa steg dispatchas i samma tur för att undvika att arbetsflödet stannar.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #122 (T65/#119, feature/T65-foresla-knapp) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 122 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #119 manuellt (`gh issue close 119`).
+> Flytta kort #119 till Done på boarden (nu i "In Review", projekt 2, item PVTI_lAHODcT4Cc4BaIWPzgvhm8w).
+> Merga även äldre öppna PR:er om de fortfarande är öppna: PR #120 (T64/#118), PR #116 (T63/#113), PR #115 (T62/#111), PR #114 (T61/#110), PR #117 (T18/#18), PR #112 (T54/#93), PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #122 REDAN mergad:
+> T65 klar. Nästa tasks i kön PARALLELLT om möjligt:
+> 1. **#121 (T66 Kommentarer i rummet)** - Daniel har lovat klassen! Läs issuen noggrant. Kräver: RLS-bevis + Supabase Realtime + input-validering. Hög prioritet.
+> 2. **T67 (deadline-flytt 14/6 -> 21/6 för grupp+champion)** - Daniels beslut. Byggs OMEDELBART, samma mönster som T53. Viktigt innan 14/6.
+> Därefter: #76 (T45 admin-statistik) -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshållare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready. 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three passerad (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **Lean-städ-kandidat (T63):** resolveInstallMode/dismiss-maskineriet produktions-dött, pinnat för framtida task.
+> - **T16b-pin:** slot-tippbarhet ur simulering = eget framtida server-side-beslut.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), befordran kommentar-pastar Förekomst 6 (reviewer.md, väntar godkännande), 3 äldre befordringar (Förekomst 3+/4), 5 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook + T58-callsite-krav), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **Daniels process-beslut:** Copilot-loopen PAUSAD, lokala granskningen är sista grinden. Aterstarts när lanseringstrycket är over.
+> - **Vakthund-rutinen (nytt 2026-06-12):** varje väntan får deadline + eskalering, nästa steg dispatchas i samma tur.
+> - **T26 DR-webb-inbäddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T64/#118 (treor ur matchtipsen) KLAR - PR #120 väntar på merge
 
 **Branch:** `feature/T64-treor-ur-matchtips` @ HEAD `7d76887`
