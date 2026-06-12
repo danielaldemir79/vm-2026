@@ -48,7 +48,12 @@ const BTN_SEND =
 // Hur nära gränsen räknaren börjar varna (visuell förstärkning, ren design). Under
 // tröskeln är den tyst dämpad; nära gränsen blir den varm (warning), över gränsen
 // blir den danger. Logiken (canSend/tooLong) är oförändrad, detta styr bara tonen.
-const COUNT_WARN_AT = Math.floor(COMMENT_MAX_LEN * 0.9);
+// LAT funktion, INTE modul-konstant (review-F1): en modul-nivå-läsning av den
+// importerade COMMENT_MAX_LEN evalueras eagert via rooms-barreln och knäckte två
+// orelaterade testfilers ofullständiga vi.mock av '../../data/rooms'.
+function countWarnAt(): number {
+  return Math.floor(COMMENT_MAX_LEN * 0.9);
+}
 
 /** En läsbar lokal tid ur en ISO-tidsstämpel (sv-SE, kort). Fail-safe: rå sträng vid skräp. */
 function formatTime(iso: string): string {
@@ -95,7 +100,7 @@ export function RoomComments() {
   const canSend = trimmed.length > 0 && !tooLong && !busy;
   // Räknarens TON (ren förstärkning): tyst tills man närmar sig gränsen, sedan varm,
   // sedan danger. Bär inte själv betydelsen (siffran gör det), så färg-oberoende.
-  const countTone = tooLong ? 'over' : trimmed.length >= COUNT_WARN_AT ? 'near' : 'calm';
+  const countTone = tooLong ? 'over' : trimmed.length >= countWarnAt() ? 'near' : 'calm';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
