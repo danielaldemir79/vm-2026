@@ -1,0 +1,202 @@
+VM 2026, arena + värdstad per match, rått textutdrag (gold source för arena-fyllning).
+====================================================================
+Detta är det OFÖRÄNDRADE källutdraget som src/data/wc2026/venue-parser.ts parsar
+(via scripts/generate-matches.ts) in i matches.ts:s venue-fält. Committat så att
+arena-datan kan REGENERERAS och diffas mot källan i CI (venue-source.test.ts), och
+så att en människa kan spot-checka raderna mot källorna nedan. Samma mönster som
+tv-schedule-source.txt (T4b) och team-profiles-source.txt (T10).
+
+BAKGRUND: tv-schedule-source.txt (T4b) bar TID + svensk TV-kanal men INTE arena, så
+matches.ts hade en uttrycklig "ej verifierad"-platshållare per match (gissas aldrig).
+DENNA källa (T4c, #35) fyller arenan + värdstaden per match ur FIFA:s spelschema,
+korskollad mot en andra oberoende källa. Ingen arena gissas: varje rad kommer ur en
+faktisk källa nedan.
+
+KÄLLOR (gissas ALDRIG), hämtade 2026-06-12 (VM:et pågår LIVE sedan 11 juni):
+A. PRIMÄR (auktoritativ), FIFA:s officiella spelschema (16 arenor i USA/Mexiko/Kanada):
+   - 16-arenor-listan + kapaciteter: Wikipedia "2026 FIFA World Cup"
+     (https://en.wikipedia.org/wiki/2026_FIFA_World_Cup), FIFA-arenanamn + värdstad.
+   - Per-match gruppspel: Al Jazeera "World Cup 2026: Full match schedule"
+     (https://www.aljazeera.com/sports/2026/6/11/world-cup-2026-full-match-schedule-groups-teams-and-start-times).
+   - Per-match slutspel (matchnummer 73-104 + exakt kommun): Wikipedia
+     "2026 FIFA World Cup knockout stage".
+B. KORSKOLL (oberoende andra källa), per arena/match:
+   - MLSSoccer "FIFA World Cup 2026 schedule: Every game by city & stadium"
+     (https://www.mlssoccer.com/news/fifa-world-cup-2026-schedule-every-game-by-city-stadium),
+     grupperad per arena, korskollad match för match mot A.
+   - ESPN-spelschemat (https://www.espn.com/soccer/story/_/id/48939282/...) för exakt
+     KOMMUN (Zapopan/Guadalupe/Miami Gardens/Inglewood/East Rutherford/Foxborough/
+     Santa Clara/Arlington), och Wikipedia per-grupp-sidor (t.ex. "2026 FIFA World Cup Group A").
+   - Spelade matcher (11-12 juni) korskollade mot MATCHRAPPORTER (historiskt fakta):
+     Mexiko-Sydafrika 2-0 @ Estadio Azteca (ESPN/CNN), Sydkorea-Tjeckien 2-1 @ Estadio
+     Akron, Zapopan (ESPN/Outlook/Sky Sports), Belgien-Egypten @ Lumen Field, Seattle
+     (Lumen Field officiella sida + Seattle Sounders + ESPN, se AVVIKELSE nedan).
+
+ARENANAMN-VAL (källhänvisat, inte gissat): FIFA använder sponsor-fria turneringsnamn
+("Mexico City Stadium", "Estadio Guadalajara", "Estadio Monterrey", "Dallas Stadium"
+osv.), men de FAKTISKA arenanamnen (som matchrapporterna + Match.venue-exemplet i
+domain/types.ts använder, "MetLife Stadium, East Rutherford") är de etablerade. Vi
+använder det ETABLERADE arenanamnet + den FAKTISKA kommunen, konsekvent över alla
+matcher, t.ex. "Estadio Akron, Zapopan" (inte "Estadio Guadalajara, Guadalajara") och
+"MetLife Stadium, East Rutherford" (inte "New York New Jersey Stadium, New Jersey").
+Se docs/decisions.md (T4c) för hela namn-/kommun-tabellen + varför.
+
+AVVIKELSE MELLAN KÄLLOR (flaggad, INTE gissad): Belgien-Egypten (g-G-1, 15 juni).
+Al Jazeera skrev "BC Place, Vancouver", men FYRA andra källor (Lumen Field officiella
+event-sida, Seattle Sounders matchpreview, ESPN, MLSSoccer) säger Lumen Field, Seattle.
+Vald: Lumen Field, Seattle (4 källor mot 1, inkl. arenans egen event-sida). Al Jazeeras
+Vancouver bedöms vara ett enstaka fel. Se docs/decisions.md (T4c).
+
+STADSNAMN: amerikanska/mexikanska/kanadensiska kommuner skrivs på engelska/spanska som
+de heter lokalt (ingen svensk exonym finns etablerad för dem i appen; jämför "Mexico
+City" som matches.ts-grannfält redan inte översätter). Diakriter bevaras (Curaçao-laget
+påverkar inte arena-strängarna; alla 16 arenanamn är ASCII).
+
+FORMAT: en rad per match, exakt 104 rader (en per match i matches.ts). Tomma rader och
+rader som börjar med '#' (kommentar/grupprubrik) ignoreras. Fältordning per rad,
+separerade med ' | ':
+  MATCH_ID | venue=Arena, Värdstad | match=läsbar match (för människans spot-check)
+MATCH_ID = matches.ts:s stabila id (g-<GRUPP>-<n> för gruppspel, M<nr> för slutspel),
+join-nyckeln. venue = "Arena, Stad". match = en läsbar etikett (lag för gruppspel,
+FIFA-position för slutspel) ENBART för spot-check, parsern läser den inte. Parsern
+matchar MATCH_ID exakt mot matches.ts och failar högt om en match saknas, är dubblerad,
+har okänt id, eller om venue inte är en av de 16 kända arenorna.
+
+VENUES
+# Grupp A
+g-A-1 | venue=Estadio Azteca, Mexico City | match=Mexiko vs Sydafrika (SPELAD 11 juni, 2-0)
+g-A-2 | venue=Estadio Akron, Zapopan | match=Sydkorea vs Tjeckien (SPELAD 11 juni, 2-1)
+g-A-3 | venue=Mercedes-Benz Stadium, Atlanta | match=Tjeckien vs Sydafrika
+g-A-4 | venue=Estadio Akron, Zapopan | match=Mexiko vs Sydkorea
+g-A-5 | venue=Estadio BBVA, Guadalupe | match=Sydafrika vs Sydkorea
+g-A-6 | venue=Estadio Azteca, Mexico City | match=Tjeckien vs Mexiko
+
+# Grupp B
+g-B-1 | venue=BMO Field, Toronto | match=Kanada vs Bosnien och Hercegovina
+g-B-2 | venue=Levi's Stadium, Santa Clara | match=Qatar vs Schweiz
+g-B-3 | venue=SoFi Stadium, Inglewood | match=Schweiz vs Bosnien och Hercegovina
+g-B-4 | venue=BC Place, Vancouver | match=Kanada vs Qatar
+g-B-5 | venue=BC Place, Vancouver | match=Schweiz vs Kanada
+g-B-6 | venue=Lumen Field, Seattle | match=Bosnien och Hercegovina vs Qatar
+
+# Grupp C
+g-C-1 | venue=MetLife Stadium, East Rutherford | match=Brasilien vs Marocko
+g-C-2 | venue=Gillette Stadium, Foxborough | match=Haiti vs Skottland
+g-C-3 | venue=Gillette Stadium, Foxborough | match=Skottland vs Marocko
+g-C-4 | venue=Lincoln Financial Field, Philadelphia | match=Brasilien vs Haiti
+g-C-5 | venue=Mercedes-Benz Stadium, Atlanta | match=Marocko vs Haiti
+g-C-6 | venue=Hard Rock Stadium, Miami Gardens | match=Skottland vs Brasilien
+
+# Grupp D
+g-D-1 | venue=SoFi Stadium, Inglewood | match=USA vs Paraguay
+g-D-2 | venue=BC Place, Vancouver | match=Australien vs Turkiet
+g-D-3 | venue=Lumen Field, Seattle | match=USA vs Australien
+g-D-4 | venue=Levi's Stadium, Santa Clara | match=Turkiet vs Paraguay
+g-D-5 | venue=SoFi Stadium, Inglewood | match=Turkiet vs USA
+g-D-6 | venue=Levi's Stadium, Santa Clara | match=Paraguay vs Australien
+
+# Grupp E
+g-E-1 | venue=NRG Stadium, Houston | match=Tyskland vs Curaçao
+g-E-2 | venue=Lincoln Financial Field, Philadelphia | match=Elfenbenskusten vs Ecuador
+g-E-3 | venue=BMO Field, Toronto | match=Tyskland vs Elfenbenskusten
+g-E-4 | venue=Arrowhead Stadium, Kansas City | match=Ecuador vs Curaçao
+g-E-5 | venue=Lincoln Financial Field, Philadelphia | match=Curaçao vs Elfenbenskusten
+g-E-6 | venue=MetLife Stadium, East Rutherford | match=Ecuador vs Tyskland
+
+# Grupp F
+g-F-1 | venue=AT&T Stadium, Arlington | match=Nederländerna vs Japan
+g-F-2 | venue=Estadio BBVA, Guadalupe | match=Sverige vs Tunisien
+g-F-3 | venue=NRG Stadium, Houston | match=Nederländerna vs Sverige
+g-F-4 | venue=Estadio BBVA, Guadalupe | match=Tunisien vs Japan
+g-F-5 | venue=Arrowhead Stadium, Kansas City | match=Tunisien vs Nederländerna
+g-F-6 | venue=AT&T Stadium, Arlington | match=Japan vs Sverige
+
+# Grupp G
+g-G-1 | venue=Lumen Field, Seattle | match=Belgien vs Egypten (AVVIKELSE löst, se preambeln)
+g-G-2 | venue=SoFi Stadium, Inglewood | match=Iran vs Nya Zeeland
+g-G-3 | venue=SoFi Stadium, Inglewood | match=Belgien vs Iran
+g-G-4 | venue=BC Place, Vancouver | match=Nya Zeeland vs Egypten
+g-G-5 | venue=BC Place, Vancouver | match=Nya Zeeland vs Belgien
+g-G-6 | venue=Lumen Field, Seattle | match=Egypten vs Iran
+
+# Grupp H
+g-H-1 | venue=Mercedes-Benz Stadium, Atlanta | match=Spanien vs Kap Verde
+g-H-2 | venue=Hard Rock Stadium, Miami Gardens | match=Saudiarabien vs Uruguay
+g-H-3 | venue=Mercedes-Benz Stadium, Atlanta | match=Spanien vs Saudiarabien
+g-H-4 | venue=Hard Rock Stadium, Miami Gardens | match=Uruguay vs Kap Verde
+g-H-5 | venue=NRG Stadium, Houston | match=Kap Verde vs Saudiarabien
+g-H-6 | venue=Estadio Akron, Zapopan | match=Uruguay vs Spanien
+
+# Grupp I
+g-I-1 | venue=MetLife Stadium, East Rutherford | match=Frankrike vs Senegal
+g-I-2 | venue=Gillette Stadium, Foxborough | match=Irak vs Norge
+g-I-3 | venue=Lincoln Financial Field, Philadelphia | match=Frankrike vs Irak
+g-I-4 | venue=MetLife Stadium, East Rutherford | match=Norge vs Senegal
+g-I-5 | venue=Gillette Stadium, Foxborough | match=Norge vs Frankrike
+g-I-6 | venue=BMO Field, Toronto | match=Senegal vs Irak
+
+# Grupp J
+g-J-1 | venue=Arrowhead Stadium, Kansas City | match=Argentina vs Algeriet
+g-J-2 | venue=Levi's Stadium, Santa Clara | match=Österrike vs Jordanien
+g-J-3 | venue=AT&T Stadium, Arlington | match=Argentina vs Österrike
+g-J-4 | venue=Levi's Stadium, Santa Clara | match=Jordanien vs Algeriet
+g-J-5 | venue=Arrowhead Stadium, Kansas City | match=Algeriet vs Österrike
+g-J-6 | venue=AT&T Stadium, Arlington | match=Jordanien vs Argentina
+
+# Grupp K
+g-K-1 | venue=NRG Stadium, Houston | match=Portugal vs Kongo-Kinshasa
+g-K-2 | venue=Estadio Azteca, Mexico City | match=Uzbekistan vs Colombia
+g-K-3 | venue=NRG Stadium, Houston | match=Portugal vs Uzbekistan
+g-K-4 | venue=Estadio Akron, Zapopan | match=Colombia vs Kongo-Kinshasa
+g-K-5 | venue=Mercedes-Benz Stadium, Atlanta | match=Kongo-Kinshasa vs Uzbekistan
+g-K-6 | venue=Hard Rock Stadium, Miami Gardens | match=Colombia vs Portugal
+
+# Grupp L
+g-L-1 | venue=AT&T Stadium, Arlington | match=England vs Kroatien
+g-L-2 | venue=BMO Field, Toronto | match=Ghana vs Panama
+g-L-3 | venue=Gillette Stadium, Foxborough | match=England vs Ghana
+g-L-4 | venue=BMO Field, Toronto | match=Panama vs Kroatien
+g-L-5 | venue=MetLife Stadium, East Rutherford | match=Panama vs England
+g-L-6 | venue=Lincoln Financial Field, Philadelphia | match=Kroatien vs Ghana
+
+# Sextondelsfinaler (Round of 32, FIFA-matchnummer)
+M73 | venue=SoFi Stadium, Inglewood | match=2A vs 2B
+M74 | venue=Gillette Stadium, Foxborough | match=1E vs 3ABCDF
+M75 | venue=Estadio BBVA, Guadalupe | match=1F vs 2C
+M76 | venue=NRG Stadium, Houston | match=1C vs 2F
+M77 | venue=MetLife Stadium, East Rutherford | match=1I vs 3CDFGH
+M78 | venue=AT&T Stadium, Arlington | match=2E vs 2I
+M79 | venue=Estadio Azteca, Mexico City | match=1A vs 3CEFHI
+M80 | venue=Mercedes-Benz Stadium, Atlanta | match=1L vs 3EHIJK
+M81 | venue=Levi's Stadium, Santa Clara | match=1D vs 3BEFIJ
+M82 | venue=Lumen Field, Seattle | match=1G vs 3AEHIJ
+M83 | venue=BMO Field, Toronto | match=2K vs 2L
+M84 | venue=SoFi Stadium, Inglewood | match=1H vs 2J
+M85 | venue=BC Place, Vancouver | match=1B vs 3EFGIJ
+M86 | venue=Hard Rock Stadium, Miami Gardens | match=1J vs 2H
+M87 | venue=Arrowhead Stadium, Kansas City | match=1K vs 3DEIJL
+M88 | venue=AT&T Stadium, Arlington | match=2D vs 2G
+
+# Åttondelsfinaler (Round of 16)
+M89 | venue=Lincoln Financial Field, Philadelphia | match=W74 vs W77
+M90 | venue=NRG Stadium, Houston | match=W73 vs W75
+M91 | venue=MetLife Stadium, East Rutherford | match=W76 vs W78
+M92 | venue=Estadio Azteca, Mexico City | match=W79 vs W80
+M93 | venue=AT&T Stadium, Arlington | match=W83 vs W84
+M94 | venue=Lumen Field, Seattle | match=W81 vs W82
+M95 | venue=Mercedes-Benz Stadium, Atlanta | match=W86 vs W88
+M96 | venue=BC Place, Vancouver | match=W85 vs W87
+
+# Kvartsfinaler
+M97 | venue=Gillette Stadium, Foxborough | match=W89 vs W90
+M98 | venue=SoFi Stadium, Inglewood | match=W93 vs W94
+M99 | venue=Hard Rock Stadium, Miami Gardens | match=W91 vs W92
+M100 | venue=Arrowhead Stadium, Kansas City | match=W95 vs W96
+
+# Semifinaler
+M101 | venue=AT&T Stadium, Arlington | match=W97 vs W98
+M102 | venue=Mercedes-Benz Stadium, Atlanta | match=W99 vs W100
+
+# Bronsmatch + final
+M103 | venue=Hard Rock Stadium, Miami Gardens | match=RU101 vs RU102 (bronsmatch)
+M104 | venue=MetLife Stadium, East Rutherford | match=W101 vs W102 (final)

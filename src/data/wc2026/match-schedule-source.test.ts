@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 // Källfilerna läses som rå text via Vites `?raw` (typad av vite/client), så
 // testet behöver inga Node-beroenden och typkollas av app-bygget.
 import sourceText from './tv-schedule-source.txt?raw';
+import venueSource from './venue-source.txt?raw';
 import committedMatches from './matches.ts?raw';
 // Återanvänd EXAKT generatorns parsnings-/emit-logik (ingen duplicerad parser):
 // testet bevisar att DEN HÄR koden, körd på den committade källan, ger den
@@ -18,6 +19,10 @@ import {
   EXPECTED_TOTAL_MATCHES,
   type ParsedKnockoutMatch,
 } from './match-schedule-parser';
+// Arena-injektionen (T4c #35): matches.ts bär nu verifierade arenor, så låset måste
+// regenerera MED arena-tabellen (annars skulle filen få platshållare och inte matcha).
+// Arena-källans EGNA korskoll (16 arenor, spelade matcher m.m.) bor i venue-source.test.ts.
+import { buildVenueTable, parseVenues } from './venue-parser';
 import { WC2026_MATCHES } from './matches';
 import { WC2026_TEAMS } from './teams';
 import { BRACKET_MATCHES } from '../../domain/bracket/bracket-structure';
@@ -42,6 +47,18 @@ const groupById = new Map(WC2026_TEAMS.map((t) => [t.id, t.group]));
 const groupOf = (id: string) => groupById.get(id);
 
 /**
+ * Arena-uppslag (match-id -> venue) ur den committade arena-källan (T4c #35). Måste
+ * med i regenerera-och-diffa-låset, annars skulle den regenererade filen få
+ * platshållare och inte matcha den committade matches.ts (som nu bär verifierade
+ * arenor). Join-mängden är matchplanens id:n.
+ */
+const venueTable = buildVenueTable(
+  parseVenues(venueSource),
+  buildMatches(parseSchedule(sourceText), groupOf).map((m) => m.id)
+);
+const venueOf = (id: string) => venueTable.get(id);
+
+/**
  * Radslut-normalisering före jämförelse. Den committade .ts:en kan vara CRLF på
  * Windows (git autocrlf) medan generatorn emittar LF; en RÅ byte-jämförelse
  * skulle annars faila på enbart radslut, inte på innehåll (känd fallgrop:
@@ -53,10 +70,11 @@ function normalizeEol(text: string): string {
 
 describe('Matchplanen: låst mot den svenska TV-tablån (regenerera och diffa)', () => {
   it('regenererad matches.ts ur källutdraget är värde-identisk med matches.ts', () => {
-    // Detta är låset. Skiljer en enda match sig (fel tid, fel lag, fel kanal,
-    // tappad match, hand-edit, drift generator<->fil) failar testet. String-
-    // jämförelse ger en exakt diff vid fel (fail loud).
-    const regenerated = buildMatchesFile(sourceText, groupOf);
+    // Detta är låset. Skiljer en enda match sig (fel tid, fel lag, fel kanal, fel
+    // arena, tappad match, hand-edit, drift generator<->fil) failar testet. String-
+    // jämförelse ger en exakt diff vid fel (fail loud). Regenereras MED arena-tabellen
+    // (T4c) så låset täcker både tablå-fälten och arenorna.
+    const regenerated = buildMatchesFile(sourceText, groupOf, venueOf);
     expect(normalizeEol(regenerated)).toBe(normalizeEol(committedMatches));
   });
 
@@ -80,7 +98,10 @@ describe('Matchplanen: MUTATIONSTEST (beviset att låset fångar ett bytt värde
   it('en kanal-mutation gör matchplanen skild från den committade (låset fångar felet)', () => {
     const mutated = mutateChannel();
     expect(mutated).not.toBe(sourceText); // mutationen tog faktiskt effekt
-    const regenerated = buildMatchesFile(mutated, groupOf);
+    // Regenerera MED arena-tabellen så den ENDA skillnaden mot committen är den
+    // muterade kanalen (annars skulle saknade arenor också skilja, och testet bevisade
+    // inte att kanal-låset specifikt biter).
+    const regenerated = buildMatchesFile(mutated, groupOf, venueOf);
     expect(normalizeEol(regenerated)).not.toBe(normalizeEol(committedMatches));
   });
 });
@@ -306,18 +327,29 @@ describe('Matchplanen: avsparkstid härledd rätt i svensk tid (off-by-one-skydd
   });
 });
 
-describe('Matchplanen: TV-kanal och arena-lucka', () => {
+describe('Matchplanen: TV-kanal och arena', () => {
   it('varje match har en svensk TV-kanal (SVT eller TV4)', () => {
     for (const m of WC2026_MATCHES) {
       expect(['SVT', 'TV4'], `${m.id}: ${m.tvChannel}`).toContain(m.tvChannel);
     }
   });
 
-  it('varje match flaggar arena som ej verifierad (källan saknar arena, gissas aldrig)', () => {
-    // Känd lucka: tablån bär tid + kanal men inte arena. venue är ett obligatoriskt
-    // fält, så vi sätter en UTTRYCKLIG "ej verifierad"-text i stället för en gissad
-    // arena (PRINCIPLES: gissa aldrig). Detta test låser att ingen arena smugits in.
+  it('varje match har en verifierad arena, INTE platshållaren (arenan fylld i T4c #35)', () => {
+    // T4b bar bara tid + kanal, så venue var FÖRR VENUE_UNKNOWN för alla matcher. T4c
+    // fyller arenan per match ur arena-källan (venue-source.txt), korskollad mot FIFA.
+    // Här låser vi bara att ingen platshållare är kvar; de fullständiga arena-korskollen
+    // (16 distinkta arenor, spelade matcher, källavvikelse) bor i venue-source.test.ts.
     for (const m of WC2026_MATCHES) {
+      expect(m.venue, `${m.id}: ${m.venue}`).not.toBe(VENUE_UNKNOWN);
+    }
+  });
+
+  it('utan arena-källa faller buildMatches tillbaka till platshållaren (gissa-aldrig kvar)', () => {
+    // Fallbacket finns kvar: anropas buildMatches UTAN venue-lookup (en ännu-overifierad
+    // framtida match) får varje match VENUE_UNKNOWN, inte en gissad arena. Det är just
+    // detta T4b-fallback-beteende venue-källan ersätter när arenan ÄR verifierad.
+    const fallback = buildMatches(parseSchedule(sourceText), groupOf);
+    for (const m of fallback) {
       expect(m.venue, m.id).toBe(VENUE_UNKNOWN);
     }
   });
