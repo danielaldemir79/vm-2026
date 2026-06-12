@@ -107,6 +107,14 @@ export function CommentsProvider({
   // Ladda rummets kommentarer (vid rum-byte ELLER realtids-signal). Tom utan rum.
   useEffect(() => {
     const token = ++loadTokenRef.current;
+    // CANCELLED-VAKT (T70): den asynkrona listRoomComments-resolutionen kan landa EFTER
+    // att komponenten avmonterats / testmiljön (jsdom) tagits ner. Då finns inget
+    // `window` och ett setError/setStatus (raden ~150) i .catch ger "window is not
+    // defined"-brus i teardown. token-vakten skyddar mot FÖRÅLDRADE svar (nyare effekt
+    // hann starta) men inte mot ett svar som kommer efter UNMOUNT (ingen nyare effekt
+    // bumpar token då). Cleanup sätter cancelled=true, och alla state-setters gatas på
+    // den, samma cancelled-mönster som OfficialResultsProvider redan använder.
+    let cancelled = false;
     if (!supabase || activeRoomId === null) {
       // Inget aktivt rum: nolla, gå till idle (inte loading/error).
       setComments([]);
@@ -125,16 +133,16 @@ export function CommentsProvider({
     }
     listRoomComments(supabase, activeRoomId)
       .then((rows) => {
-        if (token !== loadTokenRef.current) {
-          return; // föråldrat svar (nyare rum-byte/signal hann starta), kasta tyst
+        if (cancelled || token !== loadTokenRef.current) {
+          return; // avmonterad ELLER föråldrat svar (nyare rum-byte/signal hann starta)
         }
         setComments(rows);
         setStatus('ready');
         loadedRoomIdRef.current = activeRoomId;
       })
       .catch((err: unknown) => {
-        if (token !== loadTokenRef.current) {
-          return;
+        if (cancelled || token !== loadTokenRef.current) {
+          return; // avmonterad (inget window kvar) ELLER föråldrat svar: rör ingen state
         }
         // FELVÄG, TYST RE-FETCH (samma val som T55): en realtids-triggad omhämtning som
         // failar får ALDRIG kasta bort de befintliga (giltiga) kommentarerna. Behåll
@@ -150,6 +158,9 @@ export function CommentsProvider({
         setError(err instanceof Error ? err.message : 'Kunde inte ladda kommentarerna.');
         setStatus('error');
       });
+    return () => {
+      cancelled = true;
+    };
   }, [supabase, activeRoomId, realtimeNonce]);
 
   // REALTID (T18, #18): prenumerera på det AKTIVA rummets kommentarer, filtrerat på

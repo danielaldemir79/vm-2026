@@ -94,12 +94,29 @@ export function subscribeToTableChanges(config: RealtimeSubscriptionConfig): Uns
     );
   }
 
+  // Deklareras FÖRE subscribe så status-callbacken kan se rivnings-flaggan: ett
+  // sent 'CLOSED'/'TIMED_OUT' som anländer EFTER att vi rivit kanalen (eller efter att
+  // testmiljön tagit ner jsdom) ska tystas, inte loggas (se nedan).
+  let removed = false;
+
   channel.subscribe((status) => {
     // 'SUBSCRIBED' = uppkopplad (Supabase "Realtime Authorization"-exemplet). Alla
     // andra status (fel/timeout/stängd) loggas fail-loud men appen lever vidare på
     // skyddsnäten (fokus/online-refetch + minut-tick). Vi gör ingen egen reconnect-
     // loop: supabase-js sköter åter-uppkoppling av WebSocket internt, och nästa
     // lyckade subscribe / fokus-refetch hämtar ändå färsk data.
+    //
+    // TYSTA STATUS EFTER RIVNING (T70): subscribe-callbacken är ASYNKRON och kan fyra
+    // ett 'CLOSED'/'TIMED_OUT' EFTER att vi redan rivit kanalen (unsubscribe -> removed)
+    // eller, i testmiljön, efter att jsdom tagits ner mellan testfiler (då finns inget
+    // `window` och en logg/scheduler-touch ger "window is not defined"-brus i teardown).
+    // En status som kommer efter att vi medvetet stängt kanalen är per definition inte
+    // intressant (vi kopplar inte upp igen), så vi loggar den inte. Detta är även korrekt
+    // i produktion: en CLOSED som är följden av VÅR egen removeChannel är väntad, inte ett
+    // fel att larma om.
+    if (removed || typeof window === 'undefined') {
+      return;
+    }
     if (status !== 'SUBSCRIBED') {
       console.warn(
         `[VM2026] Realtime-kanal "${channelName}" status: ${status}. ` +
@@ -108,7 +125,6 @@ export function subscribeToTableChanges(config: RealtimeSubscriptionConfig): Uns
     }
   });
 
-  let removed = false;
   return () => {
     if (removed) {
       return; // idempotent: dubbel-unsubscribe (t.ex. unmount + rum-byte) är säkert
