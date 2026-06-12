@@ -27,7 +27,14 @@
 import type { CSSProperties } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { formatKickoffTime } from './format-datetime';
-import { isVenuePlaceholder, stageLabel, teamDisplayName } from './match-display';
+import {
+  formatPenalties,
+  formatScore,
+  isFinished,
+  isVenuePlaceholder,
+  stageLabel,
+  teamDisplayName,
+} from './match-display';
 import { TeamFlag } from './TeamFlag';
 import { TvBadge } from './TvBadge';
 import { TeamNameButton } from '../team-profile';
@@ -119,9 +126,22 @@ export function MatchCard({
   const stage = stageLabel(match);
   const showVenue = !isVenuePlaceholder(match.venue);
 
-  // Tillgängligt namn: en mening som sammanfattar kortet (tid, lag, steg, kanal).
+  // Resultat för en färdigspelad match (T57, #98): visas i kortet så man kan
+  // bläddra bakåt i dag-listan och se alla resultat utan att öppna varje match.
+  // Datan är den VÄVDA matchdatan (officiella resultat driver storen sedan T48),
+  // så kortet visar facit, inte den statiska planen. isFinished narrowar typen så
+  // match.result är icke-null (diskriminerat unions-kontrakt).
+  const finished = isFinished(match);
+  const score = finished ? formatScore(match.result) : null;
+  const penalties = finished ? formatPenalties(match.result) : null;
+
+  // Tillgängligt namn: en mening som sammanfattar kortet. För en spelad match
+  // läses "Mexiko 2-1 Sydafrika" (resultatet i mitten); annars "Mexiko mot
+  // Sydafrika" (ospelad). Straffar läggs till efteråt så slutspel inte är tvetydigt.
   const channelPart = match.tvChannel ? `, ${match.tvChannel}` : '';
-  const label = `${time}, ${home} mot ${away}, ${stage}${channelPart}`;
+  const resultPart = penalties ? ` ${penalties}` : '';
+  const matchupPart = finished ? `${home} ${score} ${away}${resultPart}` : `${home} mot ${away}`;
+  const label = `${time}, ${matchupPart}, ${stage}${channelPart}`;
 
   // FÄRG-OBEROENDE featured-stil (T7-pin): guld-ton i kant + upphöjd yta + en
   // mjuk gradient, allt via color-mix mot tokens (följer temat, ingen rå hex).
@@ -172,15 +192,46 @@ export function MatchCard({
         </span>
       </div>
 
-      {/* Mitt-rad: lagen med emblem, speglade runt "mot". "mot" bär a11y-namnet
-          redan, så separatorn är aria-hidden för att inte dubbel-läsas. */}
+      {/* Mitt-rad: lagen med emblem, speglade runt mitten. Mitten bär antingen
+          "mot" (ospelad match) eller RESULTATET (spelad match, T57). Det
+          tillgängliga namnet på <article> bär redan hela sammanfattningen, så
+          mitten är aria-hidden för att inte dubbel-läsas av en skärmläsare.
+          Resultatet är FÄRG-OBEROENDE (T7-pin: ingen accent/success-färg, som i
+          ljust tema är samma gröna): det bärs av tyngd + tabular-nums i fg, så det
+          läses i båda teman utan att låsa en statusfärg. */}
       <div className="flex items-center gap-2 text-base font-semibold">
         <TeamSide teamId={match.homeTeamId} name={home} code={homeCode} align="end" />
-        <span aria-hidden="true" className="shrink-0 text-xs font-normal text-fg-muted">
-          mot
-        </span>
+        {score !== null ? (
+          <span
+            aria-hidden="true"
+            data-match-score=""
+            // På ett FÄRDIGSPELAT kort är resultatet hjälten: man vill läsa facit
+            // DIREKT, inte kickoff-tiden (som är historisk när matchen är spelad).
+            // Därför bär resultatet samma tyngd som tiden (text-xl, font-display,
+            // bold, tabular-nums) i stället för en snäpp mindre (text-lg), så det
+            // blir kortets ankarpunkt jämte tiden i stället för att klämmas in i
+            // mitten av lag-raden. FÄRG-OBEROENDE (T7-pin): tyngd + storlek bär
+            // signalen, ingen accent/success-färg som i ljust tema är samma gröna.
+            className="shrink-0 font-display text-xl font-bold tabular-nums leading-none"
+          >
+            {score}
+          </span>
+        ) : (
+          <span aria-hidden="true" className="shrink-0 text-xs font-normal text-fg-muted">
+            mot
+          </span>
+        )}
         <TeamSide teamId={match.awayTeamId} name={away} code={awayCode} align="start" />
       </div>
+
+      {/* Straffrad: bara i slutspel som avgjordes på straffar. Separat rad så
+          ordinarie-resultatet och straffarna aldrig blandas ihop till en tvetydig
+          siffra (aria-hidden: ligger redan i kortets a11y-namn). */}
+      {penalties !== null ? (
+        <p aria-hidden="true" className="-mt-1 text-center text-xs text-fg-muted">
+          {penalties}
+        </p>
+      ) : null}
 
       {/* Botten-rad: metadata (TV-kanal-märke + ev. arena + featured-etikett).
           dl/dt/dd ger semantiska par. De flesta dt:er är visuellt dolda (sr-only)

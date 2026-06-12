@@ -105,6 +105,47 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     expect(screen.queryByText('Torsdag 11 juni')).not.toBeInTheDocument();
   });
 
+  it('visar RESULTATET för en färdigspelad match (T57): siffrorna + a11y-namnet (gruppspel)', () => {
+    const finished = groupMatch({
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    });
+    const { container } = renderCard(<MatchCard match={finished} teamsById={teamsById} />);
+
+    // Resultatet syns i kortet (data-match-score är den stabila styling-/test-haken).
+    const score = container.querySelector('[data-match-score]');
+    expect(score).not.toBeNull();
+    expect(score).toHaveTextContent('2-1');
+
+    // A11y-namnet bär resultatet i mitten ("Mexiko 2-1 Sydafrika"), inte "mot".
+    const card = screen.getByRole('article');
+    expect(card).toHaveAccessibleName(/Mexiko 2-1 Sydafrika/);
+    expect(card.getAttribute('aria-label')).not.toContain('Mexiko mot Sydafrika');
+  });
+
+  it('en OSPELAD match visar "mot" och INGET resultat (data-match-score saknas)', () => {
+    const { container } = renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
+    expect(container.querySelector('[data-match-score]')).toBeNull();
+    expect(screen.getByRole('article')).toHaveAccessibleName(/Mexiko mot Sydafrika/);
+  });
+
+  it('visar STRAFFAR separat för ett slutspel avgjort på straffar (inte tvetydigt, T57)', () => {
+    const ko = groupMatch({
+      id: 'M104',
+      stage: 'final',
+      groupId: null,
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 2, penalties: { homeGoals: 4, awayGoals: 3 } },
+    });
+    renderCard(<MatchCard match={ko} teamsById={teamsById} />);
+
+    // Ordinarie-resultatet och straffarna står SEPARAT.
+    expect(screen.getByText('2-2')).toBeInTheDocument();
+    expect(screen.getByText('(4-3 på straffar)')).toBeInTheDocument();
+    // A11y-namnet rymmer bägge så en skärmläsare hör hela slutresultatet.
+    expect(screen.getByRole('article')).toHaveAccessibleName(/2-2 .*\(4-3 på straffar\)/);
+  });
+
   it('slutspelsmatch utan kända lag visar platshållare, inte ett gissat lag', () => {
     const ko = groupMatch({
       id: 'M73',

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Match, Team } from '../../domain/types';
+import type { Match, MatchResult, Team } from '../../domain/types';
 import {
+  formatPenalties,
+  formatScore,
+  isFinished,
   isVenuePlaceholder,
   stageLabel,
   teamDisplayName,
@@ -63,6 +66,56 @@ describe('teamDisplayName, KORT namn i trånga ytor (matchkort/slutspelsträd, T
 
   it('faller tillbaka till name när laget INTE satt shortName (default-fallet)', () => {
     expect(teamDisplayName('mex', teamsById)).toBe('Mexiko');
+  });
+});
+
+describe('isFinished, narrowar typen för en färdigspelad match (T57)', () => {
+  function withStatus(status: Match['status'], result: Match['result']): Match {
+    return {
+      id: 'm',
+      stage: 'group',
+      groupId: 'A',
+      homeTeamId: 'mex',
+      awayTeamId: 'rsa',
+      kickoff: '2026-06-11T19:00:00.000Z',
+      venue: 'Arena ej verifierad (egen data-punkt)',
+      tvChannel: 'TV4',
+      status,
+      result,
+    } as Match;
+  }
+
+  it('är true för en finished-match och false för scheduled/live', () => {
+    expect(isFinished(withStatus('finished', { homeGoals: 2, awayGoals: 1 }))).toBe(true);
+    expect(isFinished(withStatus('scheduled', null))).toBe(false);
+    expect(isFinished(withStatus('live', null))).toBe(false);
+  });
+});
+
+describe('formatScore, ordinarie-resultatet "hemma-borta" (T57)', () => {
+  it('formaterar mål med bindestreck (inte em-dash, svensk copy-regel)', () => {
+    expect(formatScore({ homeGoals: 2, awayGoals: 1 })).toBe('2-1');
+    expect(formatScore({ homeGoals: 0, awayGoals: 0 })).toBe('0-0');
+  });
+
+  it('hanterar tvåsiffriga mål (osannolikt men inte trasigt)', () => {
+    expect(formatScore({ homeGoals: 10, awayGoals: 0 })).toBe('10-0');
+  });
+});
+
+describe('formatPenalties, straffresultat bara när straffar avgjorde (slutspel, T57)', () => {
+  it('ger null när matchen inte avgjordes på straffar (gruppspel/ordinarie)', () => {
+    const result: MatchResult = { homeGoals: 2, awayGoals: 1 };
+    expect(formatPenalties(result)).toBeNull();
+  });
+
+  it('formaterar straffarna SEPARAT så slutspels-resultatet inte blir tvetydigt', () => {
+    const result: MatchResult = {
+      homeGoals: 2,
+      awayGoals: 2,
+      penalties: { homeGoals: 4, awayGoals: 3 },
+    };
+    expect(formatPenalties(result)).toBe('(4-3 på straffar)');
   });
 });
 
