@@ -34,12 +34,28 @@ export const SOURCE_START_MARKER = 'TV-TIDER';
 export const SOURCE_TIMEZONE = 'Europe/Stockholm';
 
 /**
- * Platshållare för arena/stad. Källan bär INTE arena (känd lucka, se preambeln i
- * tv-schedule-source.txt + docs/decisions.md). Match.venue är ett obligatoriskt
- * fält, så vi sätter en UTTRYCKLIG "ej verifierad"-text i stället för att gissa
- * en arena (PRINCIPLES: gissa aldrig, fail loud / synligt i stället för tyst).
+ * Platshållare för arena/stad. TV-tablå-källan (T4b) bär INTE arena, så detta var
+ * FÖRR venue för ALLA matcher. Arenan fylls nu per match ur en SEPARAT källåkrad
+ * arena-källa (venue-source.txt + venue-parser.ts, T4c #35), injicerad via `venueOf`
+ * nedan. Denna platshållare är kvar som det UTTRYCKLIGA fallbacket för en match som
+ * INTE kan verifieras (ingen arena-rad): hellre synlig "ej verifierad" än en gissad
+ * arena (PRINCIPLES: gissa aldrig, fail loud / synligt i stället för tyst). I praktiken
+ * har alla 104 matcher en verifierad arena (venue-parser:s drift-vakt kräver det), men
+ * fallbacket finns kvar så en framtida tillagd, ännu-overifierad match inte tyst gissas.
  */
 export const VENUE_UNKNOWN = 'Arena ej verifierad (egen data-punkt)';
+
+/**
+ * Slår upp en verifierad arena ("Arena, Stad") för ett match-id, eller undefined om
+ * matchen inte har en verifierad arena (då används VENUE_UNKNOWN). Injiceras i
+ * buildMatches/buildMatchesFile så matchtablå-generatorn INTE dubblerar arena-källan
+ * (samma mönster som groupOf för gruppindelningen): arena-datan bor i venue-parser.ts,
+ * en sanning, korskollad i venue-source.test.ts.
+ */
+export type VenueLookup = (matchId: string) => string | undefined;
+
+/** Standard-uppslag när ingen arena-källa injiceras: alla matcher får platshållaren. */
+const NO_VENUES: VenueLookup = () => undefined;
 
 /** Endast dessa TV-kanaler förekommer i källan (svensk sändningsrätt, SPEC §4). */
 const VALID_CHANNELS = new Set(['SVT', 'TV4']);
@@ -435,9 +451,17 @@ export const EXPECTED_TOTAL_MATCHES = EXPECTED_GROUP_MATCHES + EXPECTED_KNOCKOUT
  * lever i bracket-structure.ts (en sanning för slutspels-positionerna). Den
  * parsade källan korskollas mot bracket-structure i match-schedule-source.test.ts.
  *
+ * Arenan (venue) slås upp via `venueOf` (arena-källan, T4c #35); saknas en arena för
+ * matchen används VENUE_UNKNOWN-platshållaren (gissa aldrig). Utan injicerad arena-
+ * källa (NO_VENUES) får alla matcher platshållaren, som före T4c.
+ *
  * @throws Om en gruppmatchs lag inte tillhör samma kända grupp (data-defekt).
  */
-export function buildMatches(parsed: ParsedMatch[], groupOf: TeamGroupLookup): Match[] {
+export function buildMatches(
+  parsed: ParsedMatch[],
+  groupOf: TeamGroupLookup,
+  venueOf: VenueLookup = NO_VENUES
+): Match[] {
   const groupSeq = new Map<GroupId, number>();
   const out: Match[] = [];
 
@@ -458,27 +482,29 @@ export function buildMatches(parsed: ParsedMatch[], groupOf: TeamGroupLookup): M
       }
       const n = (groupSeq.get(homeGroup) ?? 0) + 1;
       groupSeq.set(homeGroup, n);
+      const id = `g-${homeGroup}-${n}`;
       out.push({
-        id: `g-${homeGroup}-${n}`,
+        id,
         stage: 'group',
         groupId: homeGroup,
         homeTeamId: p.homeTeamId,
         awayTeamId: p.awayTeamId,
         kickoff: p.kickoffUtc,
-        venue: VENUE_UNKNOWN,
+        venue: venueOf(id) ?? VENUE_UNKNOWN,
         tvChannel: p.tvChannel,
         result: null,
         status: 'scheduled',
       });
     } else {
+      const id = `M${p.matchNumber}`;
       out.push({
-        id: `M${p.matchNumber}`,
+        id,
         stage: p.stage,
         groupId: null,
         homeTeamId: null,
         awayTeamId: null,
         kickoff: p.kickoffUtc,
-        venue: VENUE_UNKNOWN,
+        venue: venueOf(id) ?? VENUE_UNKNOWN,
         tvChannel: p.tvChannel,
         result: null,
         status: 'scheduled',
@@ -494,14 +520,25 @@ export function buildMatches(parsed: ParsedMatch[], groupOf: TeamGroupLookup): M
  * ------------------------------------------------------------------ */
 
 /**
- * Citera en sträng som en TS single-quote-litteral (matchar projektets Prettier-
- * stil, så den GENERERADE filen redan är format:check-ren och inte driver mot
- * det committade innehållet vid regenerera-och-diffa). Värdena här är lag-id,
- * ISO-datum, grupp-id och kanalnamn, alla utan citattecken/backslash, men vi
- * escapar ändå defensivt så emit aldrig kan bryta litteralen.
+ * Citera en sträng som en TS-litteral i projektets Prettier-stil, så den GENERERADE
+ * filen redan är format:check-ren och inte driver mot det committade innehållet vid
+ * regenerera-och-diffa. Prettier föredrar SINGLE quotes, MEN byter till double quotes
+ * när strängen innehåller en apostrof och inget citationstecken (så apostrofen slipper
+ * escapas, t.ex. "Levi's Stadium, Santa Clara"). Vi replikerar den regeln EXAKT (samma
+ * motgift som team-profiles-parser.tsString); annars skriver `prettier --write` om
+ * raden och bryter låset. De flesta värden (lag-id, ISO-datum, grupp-id, kanal, de
+ * flesta arenor) saknar apostrof och blir single-citerade som förr.
  */
 function tsString(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  const escaped = value.replace(/\\/g, '\\\\');
+  const hasSingle = escaped.includes("'");
+  const hasDouble = escaped.includes('"');
+  // Single om möjligt; double bara när det sparar en escape (apostrof finns men inget
+  // citationstecken). Finns båda: single + escapa apostrofen (Prettiers default).
+  if (hasSingle && !hasDouble) {
+    return `"${escaped}"`;
+  }
+  return `'${escaped.replace(/'/g, "\\'")}'`;
 }
 
 /** Emittera EN Match-literal (scheduled, resultat null) i kompakt, läsbar form. */
@@ -542,11 +579,19 @@ function emitMatchLiteral(m: Match): string {
  * och källånkrings-testet kör DENNA funktion, så testet bevisar att källan ->
  * tabell-koden ger exakt den committade matches.ts.
  *
+ * Arenan (venue) injiceras via `venueOf` (arena-källan, T4c #35). Utan den får alla
+ * matcher VENUE_UNKNOWN-platshållaren (som före T4c); generatorn + källånkrings-testet
+ * skickar med arena-tabellen så den committade matches.ts bär verifierade arenor.
+ *
  * @throws Om källan inte ger 72 gruppmatcher + 32 slutspelsmatcher.
  */
-export function buildMatchesFile(text: string, groupOf: TeamGroupLookup): string {
+export function buildMatchesFile(
+  text: string,
+  groupOf: TeamGroupLookup,
+  venueOf: VenueLookup = NO_VENUES
+): string {
   const parsed = parseSchedule(text);
-  const matches = buildMatches(parsed, groupOf);
+  const matches = buildMatches(parsed, groupOf, venueOf);
 
   const groupCount = matches.filter((m) => m.stage === 'group').length;
   const knockoutCount = matches.length - groupCount;
@@ -561,10 +606,12 @@ export function buildMatchesFile(text: string, groupOf: TeamGroupLookup): string
   return `// GENERERAD FIL, redigera inte för hand. Se scripts/generate-matches.ts.
 //
 // VM 2026:s fullständiga matchplan: 72 gruppmatcher + 32 slutspelsmatcher
-// (M73-M104), med avsparkstid (UTC) och svensk TV-kanal. GENERERAD ur den
-// committade svenska TV-tablån (tv-schedule-source.txt) via den rena parsern
-// (match-schedule-parser.ts), och VÄRDE-LÅST mot källan i CI
-// (match-schedule-source.test.ts: regenerera-och-diffa + mutationstest).
+// (M73-M104), med avsparkstid (UTC), svensk TV-kanal och verifierad arena/stad.
+// GENERERAD ur den committade svenska TV-tablån (tv-schedule-source.txt, tid +
+// kanal) + arena-källan (venue-source.txt, arena + stad) via den rena parsern
+// (match-schedule-parser.ts + venue-parser.ts), och VÄRDE-LÅST mot källorna i CI
+// (match-schedule-source.test.ts + venue-source.test.ts: regenerera-och-diffa +
+// mutationstest).
 //
 // KÄLLA (gissas ALDRIG): Svensk TV-tablå (Daniel, 2026-06-09), ur SPEC §8:s
 //   svenska sändningskällor (svenskafans, fotbollskanalen). AUKTORITATIV för
@@ -578,8 +625,9 @@ export function buildMatchesFile(text: string, groupOf: TeamGroupLookup): string
 //   Lagen är ÄNNU OKÄNDA (homeTeamId/awayTeamId = null) tills seedningen (T4/T9)
 //   löst dem; positions-källan (1A/3ABCDF/W73/RU101) lever i bracket-structure.ts.
 //
-// ARENA-LUCKA (känd, gissas ALDRIG): källan bär inte arena/stad, så venue är en
-//   uttrycklig "ej verifierad"-platshållare (ingen gissad arena). Se docs/decisions.md.
+// ARENA/STAD (T4c #35, gissas ALDRIG): venue = verifierad "Arena, Stad" ur FIFA:s
+//   spelschema (16 arenor i USA/Mexiko/Kanada), korskollad mot en andra oberoende
+//   källa. Källor + en löst källavvikelse: venue-source.txt + docs/decisions.md (T4c).
 
 import type { Match } from '../../domain/types';
 
