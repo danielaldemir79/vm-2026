@@ -5,6 +5,63 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T44 (#75) footer-promo , PR #140 mot develop , Copilot-loopen aterupptas
+
+**Branch:** `feature/T44-footer-promo` @ HEAD `267017b`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/140 mot `develop` (Closes #75, state: OPEN)
+**Live preview:** varje commit till branchen syns via Cloudflare PR-preview. Develop-main: vm-2026.pages.dev
+
+### Vad T44 levererade
+
+Daniels feedback (#75, 2026-06-11): "footern ska lyfta upp mig, fa med hela min hemsida sa man
+ser att man kan klicka dit." Implementerades i tva rundor:
+
+- **Runda 1 (senior-dev, 9bf727c):** lugn variant - synlig app-adress i ledtexten, danielaldemir.com
+  som separat inline-lank bredvid namnet (punkt-divider-variant).
+- **Daniels live-feedback:** runda 1 var for blygsam. Runda 2 kravdes.
+- **Runda 2 (design-frontend, a2a0b76):** hela footer-strukturen omskriven: DA-sigill (.vm-signature-seal,
+  solid accent-bricka) + "Byggd av" / "Daniel Aldemir" som blickfang pa en framtradande rad,
+  ".NET-systemutvecklare" som stodtext, danielaldemir.com som CTA-pill (.vm-install-pill-aterbruk,
+  extern-lank-ikon, hover-accent-kant). Kontrast AA bada teman, min 5.40:1 (sigill ljust tema).
+- **Copilot R1 (dirigent-fix, 267017b):** 2 triviala fynd atgardade - testnamn uppdaterade sa de
+  matchar shippad layout (CTA-pill, inte "bredvid namnet").
+
+**Commits pa branchen:**
+- `9bf727c` - T44: footer-promo, synlig adress + utvecklar-promotion (#75)
+- `a2a0b76` - T44: footer-promo runda 2, lyft Daniel + klickbar hemside-CTA (#75)
+- `267017b` - T44: Copilot R1, testnamn matchar layouten (CTA-pill, inte bredvid namnet)
+
+**Verifiering (HEAD 267017b):** build EXIT 0, npm test 1699 grona / 53 skip / 0 fail,
+lint + format:check EXIT 0. Kontrast AA bada teman min 5.40:1. Reviewer PASS (lokal panel).
+Copilot R1: 2 fynd atgardade, exit-kriterierna nackte.
+
+**docs/decisions.md:** T44-blocket synkat mot shippad markup (runda-2-struktur dokumenterad,
+punkt-divider-beskrivningen ersatt, testraden rattad till +3 nya T44 + 1 omskrivet T38-test).
+
+### Nasta steg
+
+**Om PR #140 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 140 --merge --repo danielaldemir79/vm-2026`.
+Stang issue #75: `gh issue close 75`. Flytta kort #75 till Done pa boarden.
+
+**Om PR #140 REDAN mergad:**
+T44 klar. Nasta task i Daniels beordrade ko: **#35 (T4c arena/stad per match)** och
+**#23 (T23 pinnat favoritlag + personlig statistik)**.
+
+Copilot-loopen ar ATERUPPTAS pa Daniels order. Kors pipeline: lokal panel -> Copilot-loop -> merge.
+
+**Behover-Daniel-listan (oforandrad fran slutkonsolidering):**
+- Befordringar (vackar pa godkannande): kommentar-pastar Forekomst 8, uttommande-test Forekomst 3,
+  pastar-filer-saknas Forekomst 3 (journalist).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- Release-gransen develop->main: nar ska main fa en formell release?
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T48b: recoverable admin-login (#81 OPEN).
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- Board-kort #129/#132/#136: verifiera att de visas som Done i GitHub Projects.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , SLUTKONSOLIDERING , backloggen TOM, allt live pa develop
 
 **Branch:** `chore/handoff-slutkonsolidering` (docs-only, ingen kod)
