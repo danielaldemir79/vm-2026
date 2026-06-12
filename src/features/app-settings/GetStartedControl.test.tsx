@@ -71,6 +71,48 @@ describe('Kom igång är nåbar via inställningarna (alltid efter onboardingen)
   });
 });
 
+// Regressionstest för capture-Escape-fixen (copilot R2, GetStartedControl.tsx:49-61):
+// dialogen lyssnar på document i CAPTURE-fas och kallar stopPropagation, så när
+// kom-igång-dialogen öppnas OVANPÅ en annan modal (onboardingens "Visa hur") stänger
+// EN Escape bara den översta dialogen, inte båda. Vi simulerar den underliggande
+// modalens lyssnare med en bubbel-spion på document: efter Escape ska dialogen vara
+// stängd OCH spionen ALDRIG ha anropats (capture + stopPropagation slukar eventet).
+//
+// Mutationsverifiering: tas `true` (capture) bort på rad 59/60, ELLER stopPropagation
+// på rad 55, så når bubbel-fasen den underliggande lyssnaren och spionen anropas =>
+// detta test blir rött. Bekräftat manuellt under utveckling.
+describe('Escape stoppas i capture-fas (staplade modaler stängs inte båda på en gång)', () => {
+  it('en Escape stänger bara kom-igång-dialogen, inte en underliggande modals lyssnare', async () => {
+    // Spion för "underliggande modals" Escape-lyssnare: bubbel-fas (default, capture=false),
+    // precis som en vanlig modal-lyssnare. Den ska ALDRIG nås medan kom-igång-dialogen är
+    // öppen, eftersom dialogens capture-lyssnare stoppar propagationen först.
+    const underlyingEscape = vi.fn();
+    const underlyingListener = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        underlyingEscape();
+      }
+    };
+    document.addEventListener('keydown', underlyingListener);
+
+    try {
+      render(<GetStartedControl variant="settings" />);
+      const trigger = screen.getByRole('button', { name: /Kom igång/i });
+      fireEvent.click(trigger);
+      await screen.findByRole('dialog');
+
+      // EN Escape.
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      // Översta dialogen stängs...
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      // ...men den underliggande modalens lyssnare nåddes ALDRIG (stopPropagation i capture).
+      expect(underlyingEscape).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('keydown', underlyingListener);
+    }
+  });
+});
+
 // AC: kom-igång-ytan visas också i onboardingen. Call-site-test: install-steget bär
 // "Visa hur"-CTA:n; tidigare steg gör det inte.
 describe('Kom igång är nåbar i onboardingens install-steg', () => {
