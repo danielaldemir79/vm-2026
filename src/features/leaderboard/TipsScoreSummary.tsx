@@ -30,6 +30,7 @@ import { useMemo } from 'react';
 import { useLeaderboardStore } from './leaderboard-context';
 import { deriveSelfSummary } from './self-summary';
 import { buildSourceBreakdownRows } from './source-breakdown-rows';
+import { buildBadgeRow } from './badge-row';
 
 /** Formatera ett poängvärde med svensk "p"-enhet ("3 p"). EN formatering, stadiga tal. */
 function formatPoints(points: number): string {
@@ -53,6 +54,11 @@ export function TipsScoreSummary() {
     () => (store.selfBreakdown ? buildSourceBreakdownRows(store.selfBreakdown.bySource) : null),
     [store.selfBreakdown]
   );
+
+  // MÄRKES-RADEN (T19, #19): streak + tjänade märken, härledda ur store.selfBadges (samma
+  // tips + facit). Raderna (vilka + ordning + etikett) bor i buildBadgeRow (en sanning).
+  // Tom lista = inga märken än -> hela raden utelämnas (hellre inget än en tom etikett).
+  const badges = useMemo(() => buildBadgeRow(store.selfBadges), [store.selfBadges]);
 
   // Bara i ready-läge (samma gate som topplistan) OCH när vi kan peka ut en egen rad.
   const ready = store.enabled && store.status === 'ready';
@@ -146,6 +152,31 @@ export function TipsScoreSummary() {
             </div>
           ))}
         </dl>
+      ) : null}
+
+      {/* MÄRKES-RADEN (T19, #19): streak + tjänade märken som små brickor med titel. Bara
+          när det FINNS minst ett märke (annars utelämnas raden helt, ingen tom etikett).
+          Varje bricka bär sin förklaring som sr-only + title, så den är begriplig för
+          både skärmläsare och vid hover. data-badge-row / data-badge = design/test-hakar. */}
+      {badges.length > 0 ? (
+        <ul
+          data-badge-row=""
+          className="vm-badge-row m-0 flex flex-wrap gap-2 p-0"
+          aria-label="Dina märken"
+        >
+          {badges.map((badge) => (
+            <li
+              key={badge.id}
+              data-badge={badge.id}
+              title={badge.description}
+              className="vm-badge inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none"
+            >
+              <span aria-hidden="true" className="vm-badge-marker translate-y-px" />
+              <span>{badge.label}</span>
+              <span className="sr-only"> , {badge.description}</span>
+            </li>
+          ))}
+        </ul>
       ) : null}
     </div>
   );

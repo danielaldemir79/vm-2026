@@ -14,6 +14,7 @@ import { createContext, useContext } from 'react';
 import type { Team } from '../../domain/types';
 import type { LeaderboardEntry, ScoreBySource } from './aggregate-scores';
 import type { RevealedMatch } from './reveal';
+import type { MemberBadges } from './derive-badges';
 
 /** Laddningstillstånd (samma vokabulär som T15/T16:s stores). */
 export type LeaderboardStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -49,6 +50,13 @@ export interface LeaderboardStore {
    * EN poäng-källa (ingen dubbelhämtning, providern hoistad i App så båda når den).
    */
   selfBreakdown: { bySource: ScoreBySource; total: number } | null;
+  /**
+   * AKTUELL användares STREAK + MÄRKEN (T19, #19), eller null tills vi kan peka ut en
+   * egen medlem (samma gate som selfBreakdown). HÄRLEDDA (deriveMemberBadges) ur samma
+   * tips + facit topplistan redan har, ingen DB. Konsumeras av tips-vyns summering
+   * (badge-raden), så märkena delar samma poäng-källa som allt annat (en hämtning).
+   */
+  selfBadges: MemberBadges | null;
 }
 
 /**

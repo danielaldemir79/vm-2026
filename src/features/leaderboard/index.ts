@@ -19,6 +19,7 @@ export {
 export {
   buildLeaderboard,
   scoreMemberBreakdown,
+  JOKER_MULTIPLIER,
   type LeaderboardEntry,
   type MemberPredictions,
   type ScoreBySource,
@@ -39,3 +40,12 @@ export {
   type PendingMatchPick,
 } from './reveal';
 export { deriveSelfSummary, type SelfSummary } from './self-summary';
+
+// T19 (#19): gamification, streaks + märken HÄRLEDDA ur tips + facit (ingen DB).
+export {
+  deriveMemberBadges,
+  PERFECT_ROUND_MIN_MATCHES,
+  type MemberBadges,
+  type StreakInfo,
+  type BadgeId,
+} from './derive-badges';

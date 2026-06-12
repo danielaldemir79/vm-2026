@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   listRoomPredictions: vi.fn(),
   listRoomGroupPredictions: vi.fn(),
   listRoomBracketPredictions: vi.fn(),
+  listRoomJokers: vi.fn(),
 }));
 vi.mock('../../data/predictions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../data/predictions')>();
@@ -23,6 +24,7 @@ vi.mock('../../data/predictions', async (importOriginal) => {
     listRoomPredictions: api.listRoomPredictions,
     listRoomGroupPredictions: api.listRoomGroupPredictions,
     listRoomBracketPredictions: api.listRoomBracketPredictions,
+    listRoomJokers: api.listRoomJokers,
   };
 });
 
@@ -130,6 +132,7 @@ beforeEach(() => {
   api.listRoomPredictions.mockResolvedValue([]);
   api.listRoomGroupPredictions.mockResolvedValue([]);
   api.listRoomBracketPredictions.mockResolvedValue([]);
+  api.listRoomJokers.mockResolvedValue([]);
 });
 
 function renderProvider(now: Date) {

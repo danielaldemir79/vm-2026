@@ -29,6 +29,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     teams: [],
     currentUserId: null,
     selfBreakdown: null,
+    selfBadges: null,
     ...partial,
   };
 }
@@ -161,5 +162,46 @@ describe('TipsScoreSummary, summering överst i tips-vyn', () => {
       (d) => d.textContent
     );
     expect(rowPoints).toEqual(['0 p', '0 p', '0 p', '0 p']);
+  });
+
+  // ---- MÄRKES-RADEN (T19, #19) ----------------------------------------------
+
+  it('visar märkes-raden med tjänade märken (streak + skräll + perfekt omgång)', () => {
+    const { container } = renderView(
+      store({
+        leaderboard: [entry('u1', 'Anna', 12, 1)],
+        currentUserId: 'u1',
+        selfBadges: {
+          streak: { current: 3, longest: 4 },
+          calledUpset: true,
+          perfectRound: true,
+        },
+      })
+    );
+    const row = container.querySelector('[data-badge-row]');
+    expect(row).toBeInTheDocument();
+    const ids = Array.from(row!.querySelectorAll('[data-badge]')).map((el) =>
+      el.getAttribute('data-badge')
+    );
+    expect(ids).toEqual(['streak', 'called-upset', 'perfect-round']);
+    expect(within(row as HTMLElement).getByText('3 i rad')).toBeInTheDocument();
+  });
+
+  it('utelämnar märkes-raden helt när inga märken tjänats (ingen tom etikett)', () => {
+    const { container } = renderView(
+      store({
+        leaderboard: [entry('u1', 'Anna', 0, 1)],
+        currentUserId: 'u1',
+        selfBadges: { streak: { current: 1, longest: 1 }, calledUpset: false, perfectRound: false },
+      })
+    );
+    expect(container.querySelector('[data-badge-row]')).not.toBeInTheDocument();
+  });
+
+  it('utelämnar märkes-raden när selfBadges är null (ingen härledning än)', () => {
+    const { container } = renderView(
+      store({ leaderboard: [entry('u1', 'Anna', 5, 1)], currentUserId: 'u1', selfBadges: null })
+    );
+    expect(container.querySelector('[data-badge-row]')).not.toBeInTheDocument();
   });
 });

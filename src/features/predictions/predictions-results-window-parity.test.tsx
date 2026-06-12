@@ -22,6 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
 import { PredictionsView } from './PredictionsView';
 import { PredictionsStoreContext, type PredictionsStore } from './predictions-context';
+import { JokerStoreContext, type JokerStore } from './joker-context';
 import { ResultEntryView } from '../results/ResultEntryView';
 import { ResultsProvider } from '../results/ResultsProvider';
 import type { DataSource } from '../../data';
@@ -141,9 +142,22 @@ async function visibleInBothViews(
   expect(res.container.querySelectorAll('[data-match-id]')).toHaveLength(matches.length);
   const resVisible = visibleMatchIds(res.container);
 
+  // Joker-läget är irrelevant för fönster-pariteten; en inaktiv joker-store räcker
+  // (ingen joker-knapp renderas, vyn beter sig som före T19 för fönster-urvalet).
+  const inactiveJoker: JokerStore = {
+    enabled: false,
+    status: 'idle',
+    error: null,
+    activeRoomId: null,
+    myJokers: new Map(),
+    setJoker: vi.fn().mockResolvedValue(undefined),
+    clearJoker: vi.fn().mockResolvedValue(undefined),
+  };
   const pred = render(
     <PredictionsStoreContext.Provider value={predictionsStore()}>
-      <PredictionsView now={now} />
+      <JokerStoreContext.Provider value={inactiveJoker}>
+        <PredictionsView now={now} />
+      </JokerStoreContext.Provider>
     </PredictionsStoreContext.Provider>
   );
   const predVisible = visibleMatchIds(pred.container);
