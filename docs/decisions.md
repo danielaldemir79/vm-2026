@@ -23,10 +23,12 @@ TVÅ ställen: i inställnings-portalen (`SettingsControl`, alltid nåbar efter 
 refaktor-task (T34/#62-flaggan), inte smyglagd här.
 
 **Källhänvisade externa fakta (gissas inte, så reviewern kan BEKRÄFTA mot källan):**
-- **iOS-kravet (Safari, inte Chrome):** "Lägg till på hemskärmen" finns bara via Safaris Dela-meny på
-  iPhone/iPad; tredjeparts-webbläsare (Chrome iOS, som ändå kör WebKit) exponerar den inte. Att inte
-  säga det leder en Chrome-på-iOS-vän in i en återvändsgränd. Källa: Apple "Add a website to your Home
-  Screen" (iPhone-användarguide). Inline i `get-started-steps.ts` (`IOS_SAFARI_REQUIREMENT`).
+- **iOS-rekommendationen (review-F1-rättad, verifierad 2026-06-12):** Safari är enklaste vägen, men
+  sedan iOS 16.4 (mars 2023) kan även Chrome/Edge/Firefox på iPhone lägga till på hemskärmen via sin
+  Dela-meny. Texten rekommenderar Safari UTAN att påstå exklusivitet (det gamla "funkar bara i Safari"
+  var föråldrat och hade lett Chrome-vänner fel åt andra hållet). Källor: Apple "Add a website to your
+  Home Screen" (Safari-vägen, ingen exklusivitet fastställd) + Progressier "PWA installation"
+  (tredjepartsstödet sedan 16.4). Inline i `get-started-steps.ts` (`IOS_SAFARI_REQUIREMENT`).
 - **iOS-webbens ~7-dagars självrensning:** WebKit ITP nollar all script-writable storage (inkl.
   localStorage) efter 7 dagars frånvaro av interaktion i webb-läge; en installerad (standalone) PWA
   omfattas inte på samma sätt, därför rekommenderas hemskärmen. Källa: WebKit-bloggen "Full Third-Party
