@@ -5,6 +5,30 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T29 (#48 + T56-review F4): demo-data-chippet till AA-säker solid-form, EN delad klass
+
+**Problem (gold-on-tint-fällan, lessons aa-kontrast-pastad-...-text-på-tint):** "Demo-data"-märket i
+fyra vyers rubriker (GroupStageView, BracketView, DailyMatchesView, ScenarioView) renderade rå
+`--vm-gold` som TEXT på en `color-mix(--vm-gold 12%, transparent)`-tint, fyra IDENTISKA inline-recept.
+I MÖRKT tema är `--vm-gold` ljust (#f3c14e) så det höll, men i LJUST tema byter tokenen till mörk amber
+(#b07d10) medan ytan är nästan vit -> **uppmätt 3.17:1** (under AA-text 4.5:1). Det är exakt samma fälla
+som T9 redan fixade för "Dagens match"-chippet och som T13-review (#48) + T56-review (F4) flaggade här.
+
+**Beslut:** byt ALLA fyra demo-chip till den färg-OBEROENDE **solid-bricka-formen** (SOLID `--vm-gold`-yta
+med mörk ink `--vm-coupon-ink` #1c1403), single-sourcad i EN delad klass `.vm-demo-chip` (tokens.css §24),
+samma single-sourcing som `.vm-install-pill` och samma visuella form som `.vm-coupon-mine` /
+`.vm-reveal-actual` / `.vm-tips-sim-badge` bär i hela appen. De fyra spridda inline-recepten ersätts av
+`className="vm-demo-chip"`.
+
+**AA-mätning (canvas-komposit, `scripts/contrast-t29.mjs`, källskannat av `src/theme/demo-chip-aa-guard.test.ts`):**
+`--vm-coupon-ink` (#1c1403) på SOLID `--vm-gold` per tema: **LJUST (gold #b07d10) = 5.03:1, MÖRKT (gold
+#f3c14e) = 10.90:1**. Båda >= 4.5, AA i BÅDA teman. (Det ljusare guldet i mörkt tema ger den HÖGRE ration
+mot den mörka inken, inte tvärtom.) Samma redan-uppmätta par som de övriga solid-guld-brickorna i appen
+(decisions.md T15/T17-visuellt). Det GAMLA receptet mäts också i scriptet (7.86 mörkt / 3.17 ljust) som
+bevis på varför bytet behövdes. Vakten `demo-chip-aa-guard.test.ts` källskannar de fyra vyerna (måste
+använda `.vm-demo-chip`, får aldrig återinföra `color: var(--vm-gold)`-receptet) OCH räknar AA mot de
+FAKTISKA token-värdena per tema (når medvetet den ljusa grenen där gamla formen bröts).
+
 ## 2026-06-12 , T33 (#56): delad `<Modal>`-primitiv (a11y-dialog-kontraktet, EN sanning)
 
 **Beslut (ren refaktor, beteende-neutral):** det a11y-dialog-kontrakt som FEM dialoger handrullade
