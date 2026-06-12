@@ -23,6 +23,12 @@
 // (pointTypeOf, samma sanning som poäng-siffran). Inte en egen tröskel mot points-talet,
 // en sanning för "vad är en exakt träff" OCH "varför fick tipset sin poäng".
 //
+// VARFÖR-ETIKETTEN (orden) kommer ur den DELADE, utfalls-medvetna matchPointLabel
+// (T58, #99), samma funktion tips-listans poäng-rad använder, så texten har EN sanning
+// på båda ytorna. Den är utfalls-MEDVETEN: en 1-poängare på ett OAVGJORT facit heter
+// "Rätt kryss", inte "Rätt vinnare" (#69-noten, ett oavgjort har ingen vinnare). Den
+// färg-oberoende MARKÖREN (ikon/form) bor kvar lokalt (MARK_BY_TYPE), bara orden delas.
+//
 // T55 (#96): PÅGÅR-LÄGET. Avslöjandet visas nu redan vid AVSPARK, inte först vid
 // slutsignal. En LÅST men PÅGÅENDE match (store.reveal-rad med status 'live') visar
 // allas tips MEN inget facit och INGA poäng (ärligt "Pågår", vi gissar aldrig poäng på
@@ -41,7 +47,13 @@
 
 import { useMemo } from 'react';
 import { useLeaderboardStore } from './leaderboard-context';
-import { type MatchPointType, type Scoreline } from '../../data/predictions';
+import {
+  matchPointLabel,
+  outcomeOf,
+  type MatchPointType,
+  type Outcome,
+  type Scoreline,
+} from '../../data/predictions';
 import type { RevealedMatch, FinishedRevealedMatch, PendingRevealedMatch } from './reveal';
 
 /** Formatera en målställning som "2-1". */
@@ -57,49 +69,41 @@ function formatPointDelta(points: number): string {
   return points > 0 ? `+${points}` : `${points}`;
 }
 
-/** En utfalls-kategori + dess färg-oberoende markör (ikon, form, etiketter). */
-interface Outcome {
+/** En utfalls-kategoris färg-oberoende MARKÖR (ikon + form) + dess synliga VARFÖR-etikett. */
+interface OutcomeMark {
   /** data-outcome-värde (CSS-hak för vänsterkant + markör-variant). Lika med pointType. */
   key: MatchPointType;
   /** Markör-glyf (ikon/form). Skiljer kategorierna även utan färg. */
   glyph: string;
   /** CSS-modifierare för markör-brickan. */
   markClass: string;
-  /** SYNLIG VARFÖR-etikett (T46): orsaken bredvid poängen, "Exakt resultat" osv. */
+  /** SYNLIG VARFÖR-etikett (T46/T58): orsaken bredvid poängen, utfalls-medveten (#69). */
   reason: string;
-  /** Dold etikett för skärmläsare (kort besked i ord, samma anda som reason). */
-  label: string;
 }
 
 /**
- * Slå upp utfalls-kategorin ur poäng-TYPEN (pointTypeOf, score.ts). Uttömmande över
- * MatchPointType ('exact' | 'outcome' | 'miss'), inget default-fall: en ny typ blir ett
- * KOMPILERINGSFEL här i stället för en tyst fallback (fail-loud i typen). VARFÖR-texten
- * (reason) följer poängregeln: exakt resultat / rätt vinnare-utfall / miss.
+ * Den färg-oberoende MARKÖREN (ikon + form) per poäng-typ. Bär BARA det VISUELLA;
+ * själva ORD-etiketten kommer ur den delade, utfalls-medvetna matchPointLabel (en
+ * sanning för texten, #99 anti-dubblett). Uttömmande över MatchPointType, inget
+ * default-fall: en ny typ blir ett KOMPILERINGSFEL (fail-loud i typen).
  */
-const OUTCOME_BY_TYPE: Record<MatchPointType, Omit<Outcome, 'key'>> = {
-  exact: {
-    glyph: '✓',
-    markClass: 'vm-reveal-mark--exact',
-    reason: 'Exakt resultat',
-    label: 'Exakt resultat',
-  },
-  outcome: {
-    glyph: '◐',
-    markClass: 'vm-reveal-mark--outcome',
-    reason: 'Rätt vinnare',
-    label: 'Rätt vinnare',
-  },
-  miss: {
-    glyph: '✗',
-    markClass: 'vm-reveal-mark--miss',
-    reason: 'Miss',
-    label: 'Miss',
-  },
+const MARK_BY_TYPE: Record<MatchPointType, Pick<OutcomeMark, 'glyph' | 'markClass'>> = {
+  exact: { glyph: '✓', markClass: 'vm-reveal-mark--exact' },
+  outcome: { glyph: '◐', markClass: 'vm-reveal-mark--outcome' },
+  miss: { glyph: '✗', markClass: 'vm-reveal-mark--miss' },
 };
 
-function outcomeFor(pointType: MatchPointType): Outcome {
-  return { key: pointType, ...OUTCOME_BY_TYPE[pointType] };
+/**
+ * Slå ihop markören (form) + den utfalls-medvetna etiketten (ord) för en pick.
+ * `actualOutcome` (outcomeOf på facit) avgör bara 'outcome'-ordet (kryss vs vinnare,
+ * #69), markören är samma form oavsett. Texten är EN sanning, delad med tips-vyn.
+ */
+function outcomeMarkFor(pointType: MatchPointType, actualOutcome: Outcome): OutcomeMark {
+  return {
+    key: pointType,
+    ...MARK_BY_TYPE[pointType],
+    reason: matchPointLabel(pointType, actualOutcome),
+  };
 }
 
 /** Lagnamn-uppslag (Team.id -> namn). Returnerar en stabil fallback, ingen krasch. */
@@ -147,7 +151,9 @@ function FinishedMatchCard({
       {match.picks.length > 0 ? (
         <ul data-reveal-picks="" className="mt-3 flex list-none flex-col gap-1.5 p-0">
           {match.picks.map((pick) => {
-            const outcome = outcomeFor(pick.pointType);
+            // Etiketten är utfalls-medveten (#69): "Rätt kryss" på ett oavgjort facit,
+            // "Rätt vinnare" annars. Härleds ur facit-utfallet, samma sanning som tips-vyn.
+            const outcome = outcomeMarkFor(pick.pointType, outcomeOf(match.actual));
             return (
               <li
                 key={pick.userId}

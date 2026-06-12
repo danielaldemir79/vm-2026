@@ -23,7 +23,7 @@ import { OfficialResultsProvider } from './features/official-results';
 import { PredictionSection } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
-import { LeaderboardSection } from './features/leaderboard';
+import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
 import { AdminSection } from './features/admin';
 import {
   InstallBanner,
@@ -254,60 +254,70 @@ function AppShell() {
           <RoomSection surface={(children) => <Panel>{children}</Panel>} />
         </Slide>
 
-        {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
-            så PredictionSection visar tips-vyn när det sociala lagret är konfigurerat
-            (live-läge), med "gå med i ett rum för att tippa" tills ett rum är aktivt.
-            Deadline-låset (inget tips efter avspark) + tips-sekretessen (andras tips
-            dolda före avspark) upprätthålls SERVER-SIDE av RLS, bevisat med riktiga
-            sessioner. Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik
-            + data-attribut, samma #39-formspråk som resultatinmatningen); design-
-            frontend ger premium-finish ovanpå. */}
-        <Slide direction="up">
-          <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
-        </Slide>
+        {/* EN DELAD LeaderboardProvider (T58, #99) omsluter tips-poolens sektioner OCH
+            topplistan, så tips-sektionens poäng-summering (TipsScoreSummary) och
+            topplistan läser SAMMA store och delar EN hämtning, ingen dubbelhämtning mot
+            Supabase. Providern är vilande (enabled=false) utan Supabase/aktivt rum, så
+            ingen sektion påverkas i fixtures-läge. Tidigare ägde LeaderboardSection sin
+            egen provider; den hoistades hit just för att tips-vyn skulle nå samma store. */}
+        <LeaderboardProvider>
+          {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
+              så PredictionSection visar tips-vyn när det sociala lagret är konfigurerat
+              (live-läge), med "gå med i ett rum för att tippa" tills ett rum är aktivt.
+              Deadline-låset (inget tips efter avspark) + tips-sekretessen (andras tips
+              dolda före avspark) upprätthålls SERVER-SIDE av RLS, bevisat med riktiga
+              sessioner. Poäng-summeringen överst (T58) läser den delade providern.
+              Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik +
+              data-attribut, samma #39-formspråk som resultatinmatningen); design-
+              frontend ger premium-finish ovanpå. */}
+          <Slide direction="up">
+            <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
+          </Slide>
 
-        {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
-            grupp FÖRE gruppspelet. Per rum, deadline per grupp (gruppens första
-            match), server-side RLS-lås + sekretess (bevisat med riktiga sessioner).
-            Funktionellt + tillgängligt UI byggs här; design-frontend ger finishen.
-            Bracket-/slutspels-tipsen (vem går vidare per slot + VM-vinnaren) har
-            full datakärna (schema/RLS/poäng/API) men dess UI är en pinnad
-            fortsättning, se T16 HANDOFF + docs/decisions.md. */}
-        <Slide direction="up">
-          <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
-        </Slide>
+          {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
+              grupp FÖRE gruppspelet. Per rum, deadline per grupp (gruppens första
+              match), server-side RLS-lås + sekretess (bevisat med riktiga sessioner).
+              Funktionellt + tillgängligt UI byggs här; design-frontend ger finishen.
+              Bracket-/slutspels-tipsen (vem går vidare per slot + VM-vinnaren) har
+              full datakärna (schema/RLS/poäng/API) men dess UI är en pinnad
+              fortsättning, se T16 HANDOFF + docs/decisions.md. */}
+          <Slide direction="up">
+            <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
+          </Slide>
 
-        {/* Bracket-/slutspels-tipsen (T16b, #59): tippa VM-vinnaren + vem som går
-            vidare ur varje slutspels-slot (M73-M104). Per rum, deadline per slot
-            (slottens egen avspark) + champion vid turneringsstart, server-side
-            RLS-lås + sekretess (bevisat i T16). En slot tippas först när dess två lag
-            är kända (gissa aldrig laget). Funktionellt + tillgängligt UI byggs här;
-            design-frontend ger finishen ovanpå (datakärnan finns från T16). */}
-        <Slide direction="up">
-          <BracketPredictionSection surface={(children) => <Panel>{children}</Panel>} />
-        </Slide>
+          {/* Bracket-/slutspels-tipsen (T16b, #59): tippa VM-vinnaren + vem som går
+              vidare ur varje slutspels-slot (M73-M104). Per rum, deadline per slot
+              (slottens egen avspark) + champion vid turneringsstart, server-side
+              RLS-lås + sekretess (bevisat i T16). En slot tippas först när dess två lag
+              är kända (gissa aldrig laget). Funktionellt + tillgängligt UI byggs här;
+              design-frontend ger finishen ovanpå (datakärnan finns från T16). */}
+          <Slide direction="up">
+            <BracketPredictionSection surface={(children) => <Panel>{children}</Panel>} />
+          </Slide>
 
-        {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
-            arrangören (Daniel) och gäller GLOBALT för alla rum. För en admin visas
-            facit-inmatningen; för en vanlig deltagare en read-only-not + en lågmäld
-            arrangörs-inloggning (e-post magic-link/OTP). Bara i live-läge, precis som
-            de andra sociala sektionerna. Poäng-källan för topplistan nedan är detta
-            globala facit (inte längre per-rum). Funktionell bas här; premium-design
-            i T42b (samma arbetsdelning som T16/T16b). */}
-        <Slide direction="up">
-          <AdminSection surface={(children) => <Panel>{children}</Panel>} />
-        </Slide>
+          {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
+              arrangören (Daniel) och gäller GLOBALT för alla rum. För en admin visas
+              facit-inmatningen; för en vanlig deltagare en read-only-not + en lågmäld
+              arrangörs-inloggning (e-post magic-link/OTP). Bara i live-läge, precis som
+              de andra sociala sektionerna. Poäng-källan för topplistan nedan är detta
+              globala facit (inte längre per-rum). Funktionell bas här; premium-design
+              i T42b (samma arbetsdelning som T16/T16b). */}
+          <Slide direction="up">
+            <AdminSection surface={(children) => <Panel>{children}</Panel>} />
+          </Slide>
 
-        {/* Topplistan + tips-avslöjandet (T17, #17): vem tippar bäst (poäng från
-            ALLA tre tips-typer mot facit, delad placering vid lika, rörelse-animation
-            vid placeringsändring) + vad alla tippade per avgjord match (avslöjas
-            FÖRST efter avspark, sekretessen är server-side i RLS, T15/T16). Per rum,
-            "gå med i ett rum" tills ett rum är aktivt. Det FUNKTIONELLA + tillgängliga
-            UI:t byggs här (stabil semantik + data-attribut); design-frontend ger
-            premium-finish (medaljer, glow, finputsad rörelse) ovanpå. */}
-        <Slide direction="up">
-          <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
-        </Slide>
+          {/* Topplistan + tips-avslöjandet (T17, #17): vem tippar bäst (poäng från
+              ALLA tre tips-typer mot facit, delad placering vid lika, rörelse-animation
+              vid placeringsändring) + vad alla tippade per avgjord match (avslöjas
+              FÖRST efter avspark, sekretessen är server-side i RLS, T15/T16). Per rum,
+              "gå med i ett rum" tills ett rum är aktivt. Konsumerar den delade providern
+              ovan (T58). Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik
+              + data-attribut); design-frontend ger premium-finish (medaljer, glow,
+              finputsad rörelse) ovanpå. */}
+          <Slide direction="up">
+            <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
+          </Slide>
+        </LeaderboardProvider>
 
         <footer className="flex flex-col gap-2 border-t border-border pt-6 text-sm text-fg-muted">
           <p>

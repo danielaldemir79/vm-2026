@@ -6,6 +6,7 @@ export { LeaderboardProvider } from './LeaderboardProvider';
 export { LeaderboardSummary } from './LeaderboardSummary';
 export { LeaderboardView } from './LeaderboardView';
 export { RevealView } from './RevealView';
+export { TipsScoreSummary } from './TipsScoreSummary';
 export {
   useLeaderboardStore,
   LeaderboardStoreContext,
@@ -17,8 +18,10 @@ export {
 // de kan återanvändas/testas av andra (t.ex. T18 realtid, mini-ligor T20).
 export {
   buildLeaderboard,
+  scoreMemberBreakdown,
   type LeaderboardEntry,
   type MemberPredictions,
+  type ScoreBySource,
 } from './aggregate-scores';
 export {
   derivePoolFacit,
