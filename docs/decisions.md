@@ -5,6 +5,96 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T45 (#76): admin-statistik (alla rum + medlemmar + vem tippar bäst)
+
+**Beslut:** Två SECURITY DEFINER-RPC:er (`admin_room_stats()` + `admin_revealed_predictions()`),
+BÅDA gatade på `is_app_admin()` i första raden (en icke-admin får TOM mängd, ingen rad). Migration
+`20260612140000_t45_admin_stats_rpcs.sql`, applicerad LIVE och committad 1:1 (samma version + namn +
+innehåll = fresh-replaybar, repo == live-historik). Daniels feedback 2026-06-11: arrangören ska se
+HELA ligan.
+**Varför RPC (inte admin-SELECT-policies på tabellerna):** minst yta + sekretess-vänligt. En admin-
+SELECT-policy hade öppnat hela rader (rådata-tips) över alla rum; en aggregat-RPC returnerar bara det
+som är säkert att visa. Det är samma roll-gatade-läsning-anda som T42:s facit-skydd, men för LÄSNING
+över rumsgränser (en vanlig medlem ser bara egna rum, T14/T15/T16).
+
+**Beslut (SEKRETESS-HARD): RPC:erna läcker ALDRIG ett framtida (hemligt) tips.**
+- `admin_room_stats` returnerar bara AGGREGAT: per rum namn/kod/skapad + medlemsantal + ENGAGEMANGS-
+  räknare (antal match-/grupp-/bracket-tips) + medlemmarnas visningsnamn. Ett ANTAL läcker inget om VAD
+  någon tippat, bara hur aktiv hen är.
+- `admin_revealed_predictions` returnerar rådata-tips över alla rum men BARA de vars deadline REDAN
+  passerat (`now() >= deadline`). Det är EXAKT samma gräns som tips-sekretessens RLS SELECT
+  (`*_select_own_or_after_kickoff`), och vi återanvänder SAMMA deadline-helpers (`match_kickoff` /
+  `group_deadline_kickoff` / `bracket_deadline_kickoff`) som RLS, så "avslöjad" är EN sanning som inte
+  kan drifta. Ett avslöjat tips är per definition inte längre hemligt (alla rumsmedlemmar ser det redan).
+
+**Beslut: "vem tippar bäst" RÄKNAS INTE i SQL.** Det vore att duplicera den källhänvisade poäng-/facit-
+motorn (FIFA-tiebreak, bracket-härledning, score-reglerna). I stället matar `admin_revealed_predictions`
+de AVSLÖJADE tipsen till den befintliga, testade TS-motorn (`buildLeaderboard` mot det PUBLIKA globala
+facit, samma `derivePoolFacit` som rummens egen topplista T17). Servern levererar den säkra delmängden;
+klienten poängsätter med en sanning. Källa till poäng-/facit-modellen: docs/decisions.md T15/T16/T17.
+
+**GATE + SEKRETESS BEVISAT (T42/T53-playbook), LIVE (kmzhyblzxangpxydufve):** server-side DO-block med
+riktiga roller (`set role authenticated` + `request.jwt.claims`), read-only, ingen proof-data:
+(1) en icke-admin-sub (inte i app_admins) -> BÅDA RPC:erna 0 rader; (2) admin-sub (i app_admins) ->
+`admin_room_stats` > 0 rader; (3) läckage-koll: av 545 match-tips totalt avslöjas BARA 19 (now() >=
+kickoff), 526 framtida/hemliga BORTFILTRERADE; grupp/bracket 0 avslöjade (deadlines ej passerade) =
+deras hemliga tips lämnar aldrig DB:n. Plus env-gatat integrationstest med RIKTIGA anon-sessioner
+(`src/data/admin/admin-stats-rls.integration.test.ts`, kört grönt live): en icke-admin får tomt ur
+båda. Den fulla admin-vägen kan inte bevisas via klienten i prod (vi gör inte en främling till admin).
+
+**UI:** `AdminStats` renderas inifrån `AdminResultEntry` (bakom `official.isAdmin`, AdminSection-gaten),
+så vanliga medlemmar ser den aldrig (dubbel gating: UI + server-RPC). Funktionell + tillgänglig bas
+(semantiska tabeller, data-*-hakar); premium-design polerar design-frontend efter.
+
+## 2026-06-12 , T45-visuellt (#76): arrangörens kontrollpanel, premium-finish (design-frontend)
+
+**Beslut (identitet):** admin-statistiken är Daniels EGNA kontrollpanel (enda yta bara arrangören ser).
+Funktion före fluff, men den ska höra hemma i appens premium-familj, inte vara en grå admin-tabell. Tre
+lager (tokens.css §23): (A) ÖVERSIKTS-KORTEN (Rum/Tippare totalt) som stat-kort med grön arena-glow +
+talet som en SOLID guld-bricka (`.vm-admin-stat-value`); (B) GLOBAL TOPPLISTA med samma PODIUM-estetik som
+rummens topplista T17, topp-3 bär pallplats-MEDALJER (`.vm-pool-medal` gold/silver/bronze, DRY mot T16/T17,
+ingen ny medalj) och ledar-raden ärver topplistans guld-glow (`.vm-board-row[data-leader]`-receptet);
+(C) RUM-KORTEN som lugna kort med guld-hörn-glow (kupong-värmen, samma som `.vm-reveal-card`), en kod-CHIP
++ engagemangs-PILLAR (skan-bara surface-raised-pillar i stället för en löptext-rad) + en mini-topplista.
+
+**Beslut (KISS, lång lista):** både den globala topplistan och rum-kortens mini-listor kan bli långa (alla
+rum × alla medlemmar). I stället för en expanderbar mekanik valde jag max-höjd + intern scroll
+(`.vm-admin-scroll` 22rem global / `.vm-admin-scroll--room` 14rem), `overscroll-behavior: contain` så en
+uttömd inre scroll inte läcker till sidan. Listan är sorterad (bäst först) så det viktigaste alltid syns
+utan att scrolla, ingen expander-knapp behövs.
+
+**DRY (återbruk, ingen ny vokabulär):** medaljerna (`.vm-pool-medal`), ledar-glow:en, den neutrala rank-
+pillen (`.vm-board-rank`) och den färg-oberoende solid-bricka-formen (`--vm-coupon-ink` på `--vm-gold`,
+samma som `.vm-tips-summary-total`/`.vm-coupon-mine`/`.vm-reveal-actual`) är ALLA befintliga recept ur
+T15/T16/T17/T58, inte nyuppfunna. Bara de tre admin-specifika ytorna (stat-kort, rum-kort, scroll-container)
+är nya klasser.
+
+**FIX (lessons mellanslag-komma-mellanslag):** den funktionella basen hade engagemanget som en löptext med
+` , ` (mellanslag-komma-mellanslag) i renderad text, exakt det husstils-komma som lessons-filen flaggat som
+ett stavfel i user-facing prosa. Premium-finishen ersätter den raden med skan-bara pillar (varje pill bär
+"12 medlemmar"/"64 matchtips"/... med ett RIKTIGT mellanslag mellan tal och etikett), så ` , ` är borta.
+
+**LESSONS-VAKT (T66 module-level-eager):** `MEDAL_CLASS` ligger på modul-nivå men är en PLAIN literal
+(inga importerade värden), så `AdminStats`-modulen kan importeras (via en barrel) utan att binda någon
+mockad symbol. Inget importerat värde lyfts till modul-nivå (jämför T66:s `Math.floor(COMMENT_MAX_LEN*0.9)`
+som knäckte barrel-mockar). Engagemangs-pillens "10 matchtips" hålls som ETT sammanhängande tecken-spann
+(`{value}{' '}{label}`) så admin-vyns test `toContain('10 matchtips')` fortsatt håller; alla 11 data-*-hakar
+oförändrade.
+
+**AA (scripts/contrast-t45.mjs, canvas-komposit VÄRSTA fall = text rakt på glow-toppen, BÅDA teman):** all
+läsbar text står på opak surface/surface-raised eller en LÅG-alfa tint mätt som komposit. Stat-tal +
+medalj-siffror är mörk ink på SOLID token-yta (guld 10.90/5.03, silver 10.99/8.40, brons 6.60/4.87,
+ALDRIG ljus token-text på tint); stat-kort-etikett (fg-muted på grön-10%-glow) 6.12/5.69; ledar-rad fg på
+guld-7%-glow 13.29/16.58, ledar-poäng (warning guld-TEXT, ALDRIG rå `--vm-gold`) 8.80/5.48; rum-namn fg på
+guld-6%-glow 13.50/16.75; pillar/kod-chip fg-muted/fg på surface-raised 6.23/12.66. MIN över ALLA nya text-
+ytor: mörkt 6.12:1 / ljust 4.87:1, alla >= 4.5 (normal text). Glow-/kant-/topplist-lagren bär ALDRIG text.
+
+**Responsivitet + rörelse:** mobil-först. Stat-korten `grid-cols-2` (två i bredd även smalt, korta tal),
+rum-korten `grid-cols-1 lg:grid-cols-2`, globala topplistan staplar rum under namnet `< sm` (egen rum-kolumn
+först från `sm`) så tabellen håller sig smal på foldable cover/mobil, namn truncar (`min-w-0 truncate`).
+REDUCED-MOTION: inga layout-/transform-animationer, bara en lugn FÄRG-hover på rum-kortet (prefers-reduced-
+motion skyddar transform/position, inte färg), så ingen reduced-motion-grind bryts.
+
 ## 2026-06-12 , T66 (#121): kommentarer i rummet (medlemmar snackar match live)
 
 **Beslut:** Ny tabell `public.room_comments` (id, room_id, user_id, body, created_at) för korta
