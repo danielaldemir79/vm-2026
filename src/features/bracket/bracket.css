@@ -450,3 +450,102 @@
     inset 0 1px 0 0 rgb(255 255 255 / 0.3),
     0 2px 8px -3px color-mix(in srgb, var(--vm-gold) 60%, transparent);
 }
+
+/* =============================================================================
+   7. DET LEVANDE TRÄDET UNDER GRUPPSPELET, PRELIMINÄRA LAG (T56, #100).
+   [design-frontend, ovanpå senior-devs seam: data-bracket-preliminary,
+   data-slot-resolution='preliminary', data-slot-preliminary]
+   =============================================================================
+
+   IDENTITET: under gruppspelet bär trädet KONKRETA lag (gruppernas nuvarande
+   1:or/2:or + de 8 bästa treorna), men de är PRELIMINÄRA, de rör sig vid varje
+   resultat och är inte facit. Den visuella uppgiften: få dem att kännas LEVANDE
+   (de hör hemma i trädet, inte tomma platshållare) men TYDLIGT O-LÅSTA (en seende
+   ska aldrig förväxla ett preliminärt lag med ett resolved/avgjort).
+
+   FAMILJEN (samma språk som resten av slutspels-ytorna): vinnar-slot:en (data-
+   winner, §4) bär en STARK accent-vänsterbar + bock; tips-trädets TIPPAD-slot
+   (§6) en accent-bar; ÖPPEN TREA en streckad neutral kant; TBD är dämpad. Den
+   PRELIMINÄRA slot:en lägger sig MELLAN dem: en MJUK, "andande" accent-vänsterbar
+   (levande, men lättare än vinnarens solida bar) + en hårfin accent-tint, plus en
+   FÄRG-OBEROENDE "nu"-glyf på under-etiketten. Accent (inte guld) för att tonen
+   ska läsa "ställningen lever just nu" (samma anda som T55:s pågår-pill), guld är
+   reserverat för det AVGJORDA (final/facit).
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall, mätt KOMPOSITERAT båda teman):
+   slot-texten (lagnamnet) är fg-muted (seamen sätter text-fg-muted för icke-resolved),
+   och den preliminära slot-tinten är en LÅG-alfa accent-color-mix BAKOM texten, den
+   bär aldrig läsbarhet själv. Uppmätt fg-muted på 6%-accent-tinten över kort-ytan:
+   6.64:1 mörkt / 6.01:1 ljust (>= 4.5:1, normal text, gäller även 0.625rem-under-
+   etiketten). De FÄRG-OBEROENDE signalerna (mjuk kant-bar + "nu"-glyf) bär läget,
+   tinten förstärker bara.
+   -------------------------------------------------------------------------- */
+
+/* "NUVARANDE STÄLLNING"-PILLEN (header): samma LEVANDE accent-pågår-pill som tips-
+   avslöjandets .vm-reveal-pending (T55), en sanning för "lever just nu, ännu inte
+   avgjort". Lätt 9%-accent-tint + hårfin accent-kant + accent-text (AA: 8.10:1
+   mörkt / 4.77:1 ljust, samma mätta recept). En pulsande prick (.vm-pending-dot,
+   delad, reduced-motion-nollad i index.css) ger "nu"-känslan. Inte alarmistisk:
+   lugn, inbjudande, signalerar "kolla ställningen", inte "varning". Ersätter den
+   gamla guld-som-text-på-12%-guld-tinten (uppmätt 3.17:1 ljust = UNDER AA). */
+.vm-bracket-prelim-pill {
+  background-color: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
+}
+
+/* PRELIMINÄR SLOT, den LEVANDE men O-LÅSTA raden. En MJUK accent-vänsterbar (form-
+   signal: "ett lag står här just nu") + en hårfin accent-yt-tint, BÅDA lättare än
+   vinnar-slot:ens (§4) solida bar + 12%-tint, så hierarkin håller: resolved-vinnare
+   > preliminärt-lag. En color-mix-bar (inte solid accent) gör den "andande"/mjuk,
+   tydligt skild från det avgjorda. Texten bär fg-muted (seamen), tinten förstärker. */
+.vm-bracket-slot[data-slot-resolution='preliminary'] {
+  background-color: color-mix(in srgb, var(--color-accent) 6%, transparent);
+  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+/* FÄRG-OBEROENDE "nu"-MARKÖR på under-etiketten ("... , nu"): en liten accent-prick
+   FÖRE texten (form, inte färg-beroende, syns i gråskala / för färgblind), samma
+   prick-språk som tips-trädets TIPPAD-markör (§6) men på under-raden, så ögat ser
+   "den här platsen lever just nu" även utan att läsa. Ritad via pseudo så seamens
+   markup + alla tester (data-slot-preliminary, "... , nu"-texten) står orörda. */
+.vm-bracket-slot-prelim::before {
+  content: '';
+  display: inline-block;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  margin-right: 0.375rem;
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+  vertical-align: middle;
+  /* "Andas" lugnt i takt med pillens prick (delad vm-pulse, nollad vid reducerad
+     rörelse nedan), så hela det preliminära läget känns levande som EN sak. */
+  animation: vm-pulse 2s ease-in-out infinite;
+}
+
+/* DISKRET FLYTT-TRANSITION (taskens punkt 3): när ett resultat ändras och ett
+   preliminärt lag byter plats i trädet, glider lagnamnet + tinten mjukt i stället
+   för att hoppa, så det KÄNNS att trädet rör sig. Billigt (bara färg/opacitet, ingen
+   layout, CLS=0). Gatad på prefers-reduced-motion: no-preference, så den globala
+   reduced-motion-grinden (index.css) gör läget HELT statiskt för den som bett om det
+   (markör + bar + text står kvar, bara rörelsen tas bort, WCAG 2.3.3). */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-bracket-slot[data-slot-resolution='preliminary'] {
+    transition:
+      background-color 0.35s ease,
+      box-shadow 0.35s ease;
+  }
+  .vm-bracket-slot[data-slot-resolution='preliminary'] .vm-bracket-slot-name {
+    transition: color 0.35s ease;
+  }
+}
+
+/* A11y-grind: vid reducerad rörelse stannar den preliminära prickens puls (statisk
+   prick), och flytt-transitionerna nollas av den globala svepande regeln (index.css).
+   Läget förblir tydligt: mjuk accent-bar + "nu"-prick (statisk) + under-etikett står
+   kvar, bara rörelsen tas bort. */
+@media (prefers-reduced-motion: reduce) {
+  .vm-bracket-slot-prelim::before {
+    animation: none !important;
+  }
+}

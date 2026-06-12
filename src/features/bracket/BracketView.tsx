@@ -299,17 +299,23 @@ export function BracketView() {
           ) : null}
           {/* PRELIMINÄR-märke (T56): under gruppspelet visas det NUVARANDE läget med
               konkreta lag. ÄRLIGT märkt så ingen tror att det är klart, samma anda
-              som T51:s simulering. Visas bara när trädet faktiskt har preliminära lag. */}
+              som T51:s simulering. Visas bara när trädet faktiskt har preliminära lag.
+
+              VISUELL FAMILJ (T56-finish): samma LEVANDE accent-pågår-pill som tips-
+              avslöjandets "Pågår"-bricka (T55), inte en guld-VARNINGS-ton. Grön accent
+              = turneringens energi ("ställningen lever, rör sig vid varje resultat"),
+              guld är reserverat för det AVGJORDA (facit/final). En pulsande prick +
+              ordet bär budskapet FÄRG-OBEROENDE (formen syns i gråskala / för färgblind
+              / vid reducerad rörelse, då pricken blir statisk). AA: accent-text på den
+              lätta 9%-accent-tinten = 8.10:1 mörkt / 4.77:1 ljust (samma mätta recept
+              som .vm-reveal-pending, DRY). Den gamla guld-som-text-på-12%-guld-tinten
+              föll under AA i ljust tema (uppmätt 3.17:1, den kända guld-på-tint-fällan). */}
           {bracket?.preliminary ? (
             <span
               data-bracket-preliminary=""
-              className="rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--vm-gold) 45%, transparent)',
-                backgroundColor: 'color-mix(in srgb, var(--vm-gold) 12%, transparent)',
-                color: 'var(--vm-gold)',
-              }}
+              className="vm-bracket-prelim-pill inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
             >
+              <span aria-hidden="true" className="vm-pending-dot" />
               Nuvarande ställning
             </span>
           ) : null}
