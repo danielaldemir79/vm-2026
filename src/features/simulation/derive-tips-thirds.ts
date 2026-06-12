@@ -80,8 +80,12 @@ const EMPTY_SEEDING: TipsThirdSeeding = {
  * scenario-motorns syntheticMatch (DRY-anda): vi sätter status 'finished' + result
  * så computeStandings räknar in den. Identitet/grupp/lag tas oförändrat ur den
  * statiska matchen, bara resultatet kommer ur tipset. straffar utelämnas (gruppspel).
+ *
+ * Exporteras så T65:s per-grupp-förslag (derive-tipped-group-table.ts) bygger sina
+ * syntetiska matcher med EXAKT samma adapter, en sanning för "tips -> färdigspelad
+ * match" (ingen parallell variant, PRINCIPLES §4).
  */
-function tippedGroupMatch(match: Match, score: MatchTipScore): Match {
+export function tippedGroupMatch(match: Match, score: MatchTipScore): Match {
   const result: MatchResult = { homeGoals: score.homeGoals, awayGoals: score.awayGoals };
   return {
     id: match.id,

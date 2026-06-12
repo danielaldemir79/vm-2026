@@ -35,5 +35,9 @@ export {
   type MatchTipScore,
   type TipsThirdSeeding,
 } from './derive-tips-thirds';
+// Per-grupp 1:a/2:a UR match-tipsen (T65, #119): driver "Föreslå ur mina matchtips"-
+// knappen i grupp-tippningen. Återanvänder samma deriveGroupTables-härledning, men
+// per grupp (1:a/2:a beror bara på den gruppens matcher, se decisions.md T65).
+export { deriveTippedGroupSuggestion, type GroupSuggestion } from './derive-tipped-group-table';
 export { useTipsBracketData, type TipsBracketData } from './use-tips-bracket-data';
 export { TipsBracketView, type TipsBracketViewProps } from './TipsBracketView';

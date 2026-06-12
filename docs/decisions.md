@@ -5,6 +5,43 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T65 (#119): "Föreslå ur mina matchtips"-knapp i grupp-tippningen (per grupp, förifyller, aldrig auto-spar)
+
+Daniels önskan: en knapp i grupp-tippningen som FÖRIFYLLER gruppens 1:a + 2:a ur de tippade
+matchresultaten, så man slipper räkna ut tabellen i huvudet. Användaren trycker själv Spara.
+
+**Beslut 1 (KNAPP PER GRUPP, inte global "föreslå alla").** Knappen ligger i varje grupps kupong
+(GroupPredictionForm), där 1:a/2:a väljs, så förslaget hamnar där handlingen sker. En global
+"föreslå alla"-knapp hade förifyllt 12 formulär på en gång (svårare att överblicka vad som ändras,
+och en grupp kan vara komplett tippad medan en annan inte är det). AC#4 sa "välj per grupp om inget
+talar emot", och inget gör det. KISS + tydlighet.
+
+**Beslut 2 (PER-GRUPP-GRÄNS, MEDVETET annorlunda än T64:s ALLA-12-krav).** Knappen är aktiv så snart
+DEN gruppens alla matcher är tippade, oavsett om andra grupper är klara. Det SKILJER sig från T64
+(de 8 bästa treorna), som kräver att ALLA 12 grupper är helt tippade. Varför skillnaden är korrekt,
+inte en inkonsekvens: en grupps 1:a + 2:a beror BARA på den gruppens egna matcher (ren grupptabell),
+medan de 8 bästa treorna kräver en kollisionsfri Annexe C-rad RANKAD ÖVER alla 12 gruppers treor, så
+en enda otippad grupp gör hela trea-mängden ogiltig. Samma allt-eller-inget-anda (gissa aldrig ur en
+ofullständig tabell), men den rätta enheten är per grupp här, per turnering där. Ofullständigt tippad
+grupp -> knappen inaktiverad med ärlig text ("tippa gruppens alla matcher först"), aldrig en gissning.
+Antalet gruppmatcher per grupp HÄRLEDS ur matchplanen (inte hårdkodat 6), så gränsen följer datan.
+
+**Beslut 3 (EN SANNING: återanvänder deriveGroupTables, ingen parallell tabellräkning).**
+deriveTippedGroupSuggestion bygger syntetiska färdigspelade gruppmatcher ur tipsen via SAMMA
+tippedGroupMatch-adapter som T64 (nu exporterad, delad) -> deriveGroupTables -> computeStandings
+(FIFA Article 13:s tiebreak) och plockar rank 1 + rank 2. Ingen egen sortering/rank-regel.
+
+**Beslut 4 (ALDRIG AUTO-SPAR, HARD).** Knappen sätter BARA formulär-state (winner/runnerUp) och
+markerar formuläret "dirty"; den anropar aldrig onSubmit. Spara är användarens egen handling, precis
+som idag. Ett befintligt sparat tips är orört tills användaren själv sparar. Låst grupp (deadline
+passerad) -> ingen knapp (formuläret är ändå låst).
+
+**Identitets-rymd vid seamen (T16/F1-fällan):** standings bär Team.id (gemen "swe"), men formuläret
+väljer/lagrar Team.CODE (versal "SWE", DB-constraint ^[A-Z]{3}$). Förslaget översätter id -> code vid
+seamen (spegelbilden av deriveTipsBracket:s code -> id), så det landar i formulärets rymd. Ett test
+matar de två verkliga källorna (deriveGroupTables-tabellen vs förslaget) mot varandra, så en
+mappnings-drift failar rött i stället för att tyst välja fel lag.
+
 ## 2026-06-12 , T64 (#118): de 8 bästa treorna i simuleringsträdet seedas ur MATCH-tipsen (annars öppna)
 
 Daniels feedback: "gällande slutspelsträdet i simuleringsläge, utifrån sina tippade resultat i

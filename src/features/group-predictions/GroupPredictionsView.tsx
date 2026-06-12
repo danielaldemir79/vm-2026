@@ -19,15 +19,19 @@
 
 import { useMemo } from 'react';
 import { useGroupPredictionsStore } from './group-predictions-context';
+import { usePredictionsStore } from '../predictions/predictions-context';
 import { useGroupPredictableData } from './use-group-predictable-data';
 import { selectPredictableGroups } from './group-predictable-data';
 import { GroupPredictionForm } from './GroupPredictionForm';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
 import { teamCode } from '../../domain/team-code';
+import type { GroupId } from '../../domain/types';
 // SIMULERAD slutspelsbild ur tipsen (T51, #88): direkt under kupongerna ser man
 // hur sextondelen (+ vägen mot finalen) blir UR de tippade ettorna/tvåorna.
 // Ligger inuti GroupPredictionsProvider (samma store), så den läser mina tips.
-import { TipsBracketView } from '../simulation';
+// deriveTippedGroupSuggestion (T65, #119) driver "Föreslå ur mina matchtips"-knappen:
+// den räknar gruppens 1:a/2:a ur MINA match-tips (samma deriveGroupTables-härledning).
+import { TipsBracketView, deriveTippedGroupSuggestion, type MatchTipScore } from '../simulation';
 
 export interface GroupPredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -41,6 +45,9 @@ export function GroupPredictionsView({
   now = new Date(),
 }: GroupPredictionsViewProps) {
   const store = useGroupPredictionsStore();
+  // MINA match-tips (samma per-rum-store som tips-vyn, hoistad i App sedan T64). De
+  // driver "Föreslå ur mina matchtips"-knappen: ur dem räknas gruppens 1:a/2:a.
+  const matchStore = usePredictionsStore();
   // En laddning: vi behåller hela datan (predictableData) och skickar ned den till
   // den simulerade slutspels-vyn, så den INTE laddar samma turneringsdata igen
   // (T51 Copilot-fynd, ingen dubbel fetch).
@@ -62,6 +69,38 @@ export function GroupPredictionsView({
     () => predictableGroups.filter((g) => !g.locked).length,
     [predictableGroups]
   );
+
+  // Adaptera mina MATCH-tips (matchId -> Prediction) till härledningens form (matchId
+  // -> mål hemma/borta). Samma form som derive-tipped-group-table väntar, så ingen
+  // översättning vid seamen. Tom map utan aktivt rum/tips -> inga förslag (knappar
+  // inaktiverade), aldrig en gissning.
+  const matchTipsByMatchId = useMemo<Map<string, MatchTipScore>>(() => {
+    const tips = new Map<string, MatchTipScore>();
+    for (const [matchId, pred] of matchStore.myPredictions) {
+      tips.set(matchId, { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals });
+    }
+    return tips;
+  }, [matchStore.myPredictions]);
+
+  // FÖRSLAG per grupp UR mina match-tips (T65, #119): gruppens 1:a/2:a räknad ur de
+  // tippade matchresultaten (deriveTippedGroupSuggestion, samma deriveGroupTables-
+  // härledning, EN sanning). null när gruppens matcher inte alla är tippade -> knappen
+  // inaktiveras ärligt. Gata på 'ready' så vi inte räknar på halv-laddad data.
+  const suggestionByGroup = useMemo<
+    Map<GroupId, ReturnType<typeof deriveTippedGroupSuggestion>>
+  >(() => {
+    const byGroup = new Map<GroupId, ReturnType<typeof deriveTippedGroupSuggestion>>();
+    if (status !== 'ready') {
+      return byGroup;
+    }
+    for (const { groupId } of predictableGroups) {
+      byGroup.set(
+        groupId,
+        deriveTippedGroupSuggestion(groupId, groups, teams, matches, matchTipsByMatchId)
+      );
+    }
+    return byGroup;
+  }, [status, predictableGroups, groups, teams, matches, matchTipsByMatchId]);
 
   const ready = store.enabled && status === 'ready' && store.status === 'ready';
 
@@ -182,6 +221,10 @@ export function GroupPredictionsView({
                   locked={locked}
                   deadlineIso={deadlineIso}
                   now={evalNow}
+                  // FÖRSLAGS-KNAPPEN (T65): bara för en ÖPPEN grupp (en låst grupp har
+                  // ingen knapp). null = gruppens matcher inte alla tippade (ärligt
+                  // inaktiverad). undefined = låst -> ingen knapp alls.
+                  suggestion={locked ? undefined : (suggestionByGroup.get(groupId) ?? null)}
                   onSubmit={async (gid, winnerCode, runnerUpCode) => {
                     // Brandning vid UI-gränsen: formulärets värden kommer från
                     // <option value={t.code}> (versal FIFA-code). teamCode() validerar
