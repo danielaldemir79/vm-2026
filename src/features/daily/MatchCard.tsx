@@ -265,17 +265,24 @@ export function MatchCard({
           tvetydigt. Alla dt:er når ändå skärmläsare oavsett. */}
       <dl className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-fg-muted">
         {/* FAVORIT-BRICKAN (T23, #23): en DISKRET markering "ditt favoritlag spelar".
-            Lågmäld med flit (en liten kant-bricka + stjärna), så den inte tävlar med
-            hero-chippet (highlight). Identiteten bär dt:n (sr-only "Favoritlag") + det
-            synliga ordet; data-favorite-chip = design-/test-hak för finputsning. */}
+            Lågmäld MED FLIT: en UTLINJERAD guld-pill (.vm-favorite-chip, tokens.css §25),
+            den LUGNA motsatsen till hero-chippets SOLIDA guld-bricka nedan. De två kan
+            stå på SAMMA kort (favoritlaget spelar dagens match) utan att tävla: solid
+            guld = "dagens hjälte", utlinjerad guld = "ditt lag, var det än spelar".
+            Stjärnan bär den AA-säkra guld-TEXT-tonen (.vm-favorite-chip-star = warning,
+            ALDRIG rå --vm-gold på tint, lessons), texten "Favorit" är full fg (AA mätt
+            12.40 mörkt / 16.04 ljust på tinten). Identiteten bär dt:n (sr-only "Favoritlag")
+            + det synliga ordet; data-favorite-chip = design-/test-hak. */}
         {favorite ? (
           <div className="flex items-center gap-1">
             <dt className="sr-only">Favoritlag</dt>
             <dd
               data-favorite-chip=""
-              className="inline-flex items-center gap-1 rounded-pill border border-border px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide"
+              className="vm-favorite-chip inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-fg"
             >
-              <span aria-hidden="true">★</span>
+              <span aria-hidden="true" className="vm-favorite-chip-star leading-none">
+                ★
+              </span>
               <span>Favorit</span>
             </dd>
           </div>

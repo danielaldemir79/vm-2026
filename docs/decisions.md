@@ -43,6 +43,38 @@ på AVGJORDA matcher (status 'finished'), samma poäng-/avslöjande-modell som t
 EDGE-fall (alla rena, testade i personal-stats.test.ts): inga tips / inga avgjorda matcher / allt miss ger
 tom statistik (accuracy null eller 0, bestCall null), så den börjar tom och fylls löpande när matcher avgörs.
 
+**T23-visuellt (design-frontend, premium-finish ovanpå senior-devs bas): HIERARKI-disciplin, ingen tävlar.**
+Designvärdena bor i `src/theme/tokens.css` §25 (`.vm-favorite-chip` + `.vm-personal-stats` + syskon). Tre delar:
+- **Favorit-chippet (matchkortet):** en DISKRET markering som ligger på SAMMA kort som hero-kortets SOLIDA
+  guld-"Dagens match"-bricka och kan SAMMANFALLA med den. Därför med flit en LUGNARE form: en UTLINJERAD
+  guld-pill (låg guld-tint + guld-kant + en guld-stjärna), INTE en solid guld-yta. Solid guld = "dagens
+  hjälte" (en per dag); utlinjerad guld = "ditt lag, var det än spelar". Så de två kan stå bredvid varandra
+  utan att slåss om blicken (acceptanskriteriet: får inte krocka visuellt med `data-highlight`).
+- **Statistik-panelen:** ett SYSKON till poäng-summeringen (TipsScoreSummary, §20) som ligger DIREKT OVANFÖR
+  den. Summeringen är "din STÄLLNING" (total + placering, den stolta solida guld-totalen). Statistiken är
+  "din SPELSTIL". Den får DÄRFÖR inte härma totalens solida guld-bricka (två guld-block hade tävlat). I
+  stället: samma kvällsljus-familj (surface + svag guld-glow), men en LUGNARE glow (7% vs summeringens 8%)
+  + en NEUTRAL inset-topplist (inte guld). Träffsäkerheten (viktigaste talet) lyfts varmt med en guld-TINT-
+  bricka + guld-TEXT-etikett (inte en solid guld-yta); övriga tre nyckeltal är lugna neutrala surface-raised-
+  rutor. Bästa call-kortet bär en låg guld-glow (det stolta ögonblicket); joker-markören återbrukar den
+  SOLIDA guld-bricka-formen (DRY mot `.vm-coupon-mine`).
+- **Favoritlags-väljaren:** appens etablerade form-språk (accent-fokus-ring + accent-hover-kant, samma
+  `FIELD_BASE`-disciplin som PredictionForm/resultatinmatningen), så den känns som EN familj med övriga
+  inmatningar i stället för en avvikande egen-stil.
+
+**WCAG AA (mätt med `scripts/contrast-t23.mjs`, canvas-komposit VÄRSTA fall, BÅDA teman, MÖRKT / LJUST):**
+All guld bär text som ANTINGEN full `fg` på en låg guld-tint ELLER den AA-säkra guld-TEXT-tonen
+(`--color-warning`, djup amber i ljust tema), ALDRIG rå `--vm-gold` som text på tint (den kända fällan).
+- Favorit-chip text (fg) på guld-10%-tint: **12.40 / 16.04**. Stjärnan (warning guld-text): **8.21 / 5.31**.
+- Panel-eyebrow (warning guld-text) på guld-7%-glow: **8.80 / 5.48**. Rubrik (fg): **13.29 / 16.58**.
+- Hero-stat-tal (fg) på guld-8%-tint: **10.63 / 16.46**. Hero-stat-etikett (warning): **7.04 / 5.44**.
+- Övriga stat-brickor på opak surface-raised: tal (fg) **12.66 / 17.91**, etikett (fg-muted) **6.23 / 6.52**.
+- Bästa call på guld-6%-glow: rubrik (fg) **11.12 / 16.75**, kontext (fg-muted) **5.48 / 6.10**.
+- Joker-markör (coupon-ink på SOLID guld, ÅTERBRUK, ingen ny kombination): **10.90 / 5.03**.
+
+MIN över alla nya text-ytor: **5.48:1 mörkt / 5.03:1 ljust** (alla >= 4.5, normal text). Glow-/kant-/tint-
+lagren under tröskeln bär ALDRIG text. Tomt-läge + gating oförändrade funktionellt (alla T23-tester gröna).
+
 ---
 
 ## 2026-06-12 , T4c (#35): arena + värdstad per match, källåkrad + korskollad
