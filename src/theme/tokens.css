@@ -1965,3 +1965,80 @@ body {
 .vm-get-started-note--warning .vm-get-started-note-glyph {
   color: var(--color-warning);
 }
+
+/* =============================================================================
+   22. INSTALL-PILLEN, "Installera som app"-knappen överst (T63, issue #113).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET (Daniels skarpa krav, #113): ytan överst ska vara ett KOMPAKT och
+   DISKRET erbjudande som INTE tar fokus från sidan, inte en stor banner och ingen
+   informationsruta. Tonläget är därför medvetet lågmält: en surface-tonad pill
+   (inte den accent-FYLLDA primärknappens ton) med en lugn medium-vikt, så den läses
+   som ett vänligt erbjudande, inte som en primär uppmaning. Men den ska ändå vara
+   HITTBAR: en liten install-ikon (pil mot bas) + tydlig text gör affordansen
+   omisskännlig, och appens pill-form knyter den till resten av gränssnittet.
+
+   EN SANNING (F1 från senior-dev, Daniels direktiv: delad klass hellre än
+   divergerande inline-classes): pillen renderas från TVÅ medvetna call-sites,
+   InstallButtons native-gren (ett klick = webbläsarens äkta install-prompt) och
+   GetStartedControls install-variant (öppnar guiden när ingen native-prompt finns,
+   iOS + fallback). Båda bär EXAKT samma utseende, så det bor HÄR i en delad klass i
+   stället för i två kopierade Tailwind-strängar som kan drifta isär.
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall, per tema): texten är fg på en
+   opak surface-yta, den README-mätta brödtext-paret (fg mot surface = 12.6:1 - 17.9:1
+   i BÅDA teman, sektion 0), så etiketten är bekvämt över AA i ljust och mörkt. Install-
+   ikonen är accent på surface (>= 3:1 för grafik/UI per sektion 0) men bär ingen
+   läsbarhet (dekor, aria-hidden i markup), texten bär namnet. Diskretionen kommer ur
+   VIKTEN och den dämpade surface-tonen, inte ur att tona ner etikettens kontrast.
+
+   RÖRELSE (Daniels krav "diskretion", lessons reduced-motion): ingen egen animation.
+   Endast en lugn färg-övergång på hover (transition-colors, samma som appens övriga
+   kontroller); prefers-reduced-motion skyddar transform/position, inte färg, så detta
+   bryter ingen reduced-motion-grind. Hover lyfter ytan en aning + tänder en accent-kant
+   som affordans, fokus ger den delade accent-ringen (samma som alla kontroller).
+   -------------------------------------------------------------------------- */
+.vm-install-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding: 0.5rem 1rem;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  color: var(--color-fg);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-install-pill {
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease;
+  }
+}
+
+.vm-install-pill:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
+  background-color: var(--color-surface-raised);
+}
+
+/* Den delade accent-fokusringen (samma som appens övriga kontroller): en 2px
+   accent-ring 2px ut från pillen mot sidans fond. outline ger ringen + offset
+   utan en extra layout-yta. */
+.vm-install-pill:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+/* Install-ikonen (pil mot bas): accent-tonad, krymper aldrig. Ren dekor (aria-hidden
+   i markup), texten bär namnet. */
+.vm-install-pill-icon {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}

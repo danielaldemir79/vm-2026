@@ -30,6 +30,26 @@ describe('GetStartedControl, varianter', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
+  it('install-varianten (T63) är en kompakt "Installera som app"-pill som öppnar dialogen', async () => {
+    render(<GetStartedControl variant="install" />);
+    const trigger = screen.getByRole('button', { name: /Installera som app/i });
+    expect(trigger).toHaveAttribute('data-get-started-open', 'install');
+    fireEvent.click(trigger);
+    expect(await screen.findByRole('dialog', { name: /Använd appen direkt/i })).toBeInTheDocument();
+  });
+
+  it('initialPlatform (T63) tvingar dialogens START-flik (iPhone), oavsett browser-härledning', async () => {
+    // jsdom-default (setup.ts matchMedia matches:false) ger en desktop-härledd förvald
+    // flik. initialPlatform='ios' ska ändå öppna dialogen PÅ iPhone-fliken, så install-
+    // knappens iOS-gren landar rätt även när browsern inte ser ut som en iPhone.
+    render(<GetStartedControl variant="install" initialPlatform="ios" />);
+    fireEvent.click(screen.getByRole('button', { name: /Installera som app/i }));
+    const dialog = await screen.findByRole('dialog', { name: /Använd appen direkt/i });
+    const iphoneTab = within(dialog).getByRole('tab', { name: /iPhone/i });
+    expect(iphoneTab).toHaveAttribute('aria-selected', 'true');
+    expect(document.querySelector('[data-get-started-steps="ios"]')).toBeInTheDocument();
+  });
+
   it('återställer fokus till triggern när dialogen stängs (a11y)', async () => {
     render(<GetStartedControl variant="settings" />);
     const trigger = screen.getByRole('button', { name: /Kom igång/i });

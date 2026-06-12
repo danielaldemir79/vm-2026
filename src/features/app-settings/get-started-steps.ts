@@ -4,7 +4,8 @@
 //
 // VARFÖR denna task finns (T54, #93, Daniels live-feedback 2026-06-11): "många
 // lyckas inte förstå hur de ska installera det som en app eller att de kan använda
-// sidan direkt". Den befintliga InstallBannern (T13/T39) är diskret och kan döljas;
+// sidan direkt". Dåvarande InstallBannern (T13/T39, sedan T63 ersatt av den kompakta
+// InstallButton) var diskret och kunde döljas;
 // onboardingens install-steg (T39) är ren info utan väg. Det fattades en GLASKLAR,
 // alltid-nåbar yta som säger BÅDA vägarna (använd direkt i webbläsaren ELLER lägg på
 // hemskärmen) med rätt steg för rätt enhet. Den ytan bor här.
@@ -112,9 +113,10 @@ export const GET_STARTED_PATHS: readonly GetStartedPath[] = [
     platform: 'android',
     label: 'På Android',
     steps: [
-      // Knapp-citatet matchar InstallBannerns FAKTISKA knapptext "Installera"
-      // (copilot R4: ett felciterat knappnamn gör att användaren inte hittar den).
-      { id: 'android-button', text: 'Tryck på knappen "Installera" här på sidan.' },
+      // Knapp-citatet matchar install-pillens FAKTISKA knapptext "Installera som app"
+      // (InstallButton, T63; T54 copilot R4-lärdomen: ett felciterat knappnamn gör
+      // att användaren inte hittar den).
+      { id: 'android-button', text: 'Tryck på knappen "Installera som app" här på sidan.' },
       {
         id: 'android-menu',
         text: 'Ser du ingen knapp? Tryck på de tre prickarna uppe i hörnet och välj "Installera app".',
