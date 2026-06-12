@@ -5,6 +5,67 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T68 (#129): Komprimerbara sektioner, ETT delat mönster (CollapsibleSection)
+
+**Bakgrund:** sidan har vuxit till åtta tunga sektioner och blev en oöverskådlig vägg att skrolla.
+Daniels spec: varje sektion ska bli överblickbar via ETT delat komprimerings-mönster, rubrik +
+beskrivning alltid synliga, bara "toppen" av innehållet synligt komprimerat, tydlig expandera.
+
+**Beslut , komprimerings-METOD per sektion (Daniels direktiv: "render-subset för grupper/listor med
+count, höjd-klipp för träd"):**
+
+- **Delad primitiv `CollapsibleBody` / `CollapsibleSection`** (`src/components/CollapsibleSection.tsx`):
+  återanvänder den befintliga `ExpandToggle` (T39/#68, utökad med en valfri binär `labels`-prop) så
+  hela sidans expandera-kontroller bär IDENTISK a11y-semantik (aria-expanded/-controls, chevron,
+  fokus-flytt vid ihopfällning). EN markup-källa = ingen drift.
+- **HÖJD-KLIPP med gradient-fade valdes för ALLA sektioner**, inte render-subset. Varför: "första
+  raden"/"toppen" är RESPONSIV (ett grid visar 1/2/3/4 kort per rad beroende på skärmbredd; ett träd
+  har en topp-del oavsett kort-antal). En render-subset kan inte veta brytpunkten vid render-tid, så
+  ett höjd-klipp till ungefär en rad + fade är den ÄRLIGA "första raden synlig"-effekten oavsett
+  skärmbredd (mobil först). `collapsedMaxHeight` per sektion (grupper/vad krävs 13.5rem = en kort-rad,
+  träd 17rem, tips-sektionerna 15-16rem, admin 9rem, topplistan 14rem). Komprimerat innehåll DÖLJS
+  inte ur a11y-trädet (det syns visuellt + nås av skärmläsare), bara höjden klipps.
+- **State överlever INTE reload** (KISS, dokumenterat): expanderat/komprimerat är lokal useState. En
+  sidladdning återställer till det överblickbara default-läget, vilket är hela poängen.
+- **Tips-LISTAN (Tippa matcherna) komprimeras INTE via CollapsibleBody** utan via sitt EGNA fönster-
+  mönster (count-baserad lista), se nästa beslut.
+- **Topplistan/avslöjandet (punkt 11) startar UTFÄLLD** (`startExpanded`): dirigentens tolkning av
+  Daniels "expanderat direkt också". Poäng-sammanfattningen (egen poäng) hålls ALLTID synlig överst,
+  bara topplistan + avslöjandet är komprimerbara. Flippa default om Daniel vill ha den komprimerad direkt.
+- **RÖRS INTE:** dagens matcher + nedräkning (DailyMatchesView) och rum-sektionen (RoomSection), per spec.
+
+## 2026-06-12 , T68 (#129): Tips-listan visar BARA DAGENS matcher (paritetsguard MEDVETET uppdaterad)
+
+**Beslut:** "Tippa matcherna"-listan default visar nu BARA dagens matcher (`selectTodayMatches` i
+`src/features/results/result-window.ts`), expandera fäller ut alla. Detta ERSÄTTER tips-listans
+tidigare igår+framåt-fönster (T62, `windowMatches`).
+
+**Varför + paritetsguarden:** RESULTAT-/poängvyn (ResultEntryView/RevealView) BEHÅLLER sitt bredare
+fönster (igår + idag + 2 fram), där T62 medvetet tog med IGÅR så gårdagens avgjorda matchers poäng
+syns kvar. TIPS-listan handlar om vad man kan tippa NU (dagens kommande matcher), inte om gårdagens
+redan spelade. De två vyerna har därför nu MEDVETET OLIKA default-fönster. Det tidigare
+paritets-kontraktet (`predictions-results-window-parity.test.tsx`) vaktade LIKHET; det är nu
+omskrivet att vakta den AVSEDDA SKILLNADEN, så att (a) tips-vyn aldrig av misstag faller tillbaka
+till det bredare fönstret (då dyker gårdagens spelade upp i tippnings-listan), och (b) resultatvyn
+aldrig krymper till bara-idag (då försvinner gårdagens poäng, det T62 löste). `selectTodayMatches`
+delar shape (visible/hiddenCount/anchorKey) med `windowMatches`, så ExpandToggle-wiringen är oförändrad.
+
+## 2026-06-12 , T68 (#129): VM-mästar-listan alfabetisk + "Spara grupptips"-knappen + osparat-indikator
+
+- **VM-mästar-listan (champion-väljaren) sorteras ALFABETISKT** på visningsnamn med svensk locale
+  (`localeCompare(..., 'sv')`, så å/ä/ö hamnar efter z) i `selectPredictableBracket`
+  (`bracket-predictable-slots.ts`). Bland alla 48 lag är det enklast att hitta sitt lag i
+  bokstavsordning. Bara CHAMPION-listan sorteras; match-slotsen (M73..M104) är binära (hemma/borta)
+  och behåller sin naturliga ordning.
+- **Grupp-tips-knappen heter ALLTID "Spara grupptips"** (aldrig "Ändra"), per Daniels uttryckliga
+  krav. Ett tips ändras genom att man Sparar om, så samma verb varje gång är ärligare. INGEN
+  auto-spar (dirigentens beslut på Daniels fråga, tydlighet i stället).
+- **Osparade-ändringar-indikator:** en synlig "Osparade ändringar"-bricka (role=status) när
+  formulär-state skiljer från senast sparade. Härleds av en snapshot-jämförelse (formulärets val mot
+  det senast sparade tipset), inte bara av en dirty-flagga, så indikatorn försvinner även om man
+  redigerar tillbaka till det sparade värdet. Den befintliga `dirtyRef`-spåren styr fortfarande den
+  externa seed-synken (rör inte halvfärdiga val); indikatorn är ny separat state.
+
 ## 2026-06-12 , T36 (#64): TWA-vägen runt Play Protect-varningen, utredd + assetlinks förberedd
 
 **Bakgrund:** T30 (#50) fastställde att Play Protect-varningen "byggd för en äldre version av Android"

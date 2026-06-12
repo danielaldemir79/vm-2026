@@ -1,22 +1,20 @@
-// PARITETS-KONTRAKT (regressionsguard, fix/tips-regression): tips-vyn och
-// resultatvyn MÅSTE tillämpa SAMMA 3-dagars fönster för samma matcher + samma
-// "nu". Båda återanvänder den rena windowMatches (results/result-window.ts) och
-// den delade ExpandToggle, men de wirar den var för sig i sin egen JSX. Detta
-// test låser att de inte kan DRIFTA isär: om en framtida ändring tappar fönstret
-// (eller `hidden`-wiringen) från ENA vyn medan den andra behåller det, rödnar
-// detta test.
+// FÖNSTER-KONTRAKT (T68/#129): tips-vyn och resultatvyn har MEDVETET OLIKA default-
+// fönster, och detta test LÅSER den skillnaden så den inte tyst regredierar.
 //
-// VARFÖR just detta test (felets FORM): den rapporterade regressionen var "tips-
-// delen syns inte / beter sig annorlunda än resultatdelen även med ett rum". Den
-// rena fönster-funktionen och varje vys eget fönster testas redan uttömmande
-// (result-window.test.ts, PredictionsView.test.tsx, ResultEntryView). Det som
-// SAKNADES var ett kontrakt som binder de TVÅ vyerna till EN sanning, så att
-// "den ena vyn tappade sitt fönster" inte kan smyga förbi grön svit. Det är inte
-// coverage-jakt: det vaktar exakt den divergens som reproducerar symptomet.
+// HISTORIK: fram till T68 delade de två vyerna EXAKT samma igår+framåt-fönster
+// (windowMatches), och detta test vaktade att de inte fick drifta isär. Daniels spec
+// T68 ÄNDRADE tips-vyns default till BARA DAGENS matcher (selectTodayMatches), medan
+// resultat-/poängvyn BEHÅLLER sitt bredare fönster (igår + idag + 2 fram, T62, där
+// gårdagens avgjorda matchers poäng ska synas). Paritetsguarden är därför MEDVETET
+// uppdaterad: den vaktar inte längre LIKHET, utan den AVSEDDA SKILLNADEN, så att
+//   (a) tips-vyn aldrig av misstag faller tillbaka till resultatvyns bredare fönster
+//       (då skulle gårdagens redan spelade matcher dyka upp i tippnings-listan), OCH
+//   (b) resultatvyn aldrig av misstag krymper till bara-idag (då skulle gårdagens
+//       poäng försvinna ur default, exakt det T62 löste).
 //
-// Vi monterar BÅDA vyerna med IDENTISK matchuppsättning och ett pinnat "nu"
-// (premiärdagen), och jämför vilka match-id som är SYNLIGA som default (i fönstret,
-// dvs deras kort-<li> är inte `hidden`). Mängderna ska vara EXAKT lika.
+// Vi monterar BÅDA vyerna med IDENTISK matchuppsättning och ett pinnat "nu" (klockan
+// FRYST), och jämför vilka match-id som är default-SYNLIGA (kort-<li> ej `hidden`).
+// Tips-vyn ska visa BARA dagens; resultatvyn igår + dagens + morgondagens.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
@@ -83,9 +81,9 @@ function predictionsStore(): PredictionsStore {
   };
 }
 
-// De match-id vars kort-<li> INTE är hidden (= synliga i default-fönstret). BÅDA
-// formulär-rötterna (PredictionForm + ResultEntryForm) bär data-match-id på sitt
-// yttersta element, så vi mäter symmetriskt via samma attribut i båda vyerna.
+// De match-id vars kort-<li> INTE är hidden (= default-synliga). BÅDA formulär-rötterna
+// (PredictionForm + ResultEntryForm) bär data-match-id på sitt yttersta element, så vi
+// mäter symmetriskt via samma attribut i båda vyerna.
 function visibleMatchIds(root: HTMLElement): string[] {
   return Array.from(root.querySelectorAll('[data-match-id]'))
     .filter((f) => !(f as HTMLElement).closest('li')?.hasAttribute('hidden'))
@@ -94,15 +92,12 @@ function visibleMatchIds(root: HTMLElement): string[] {
     .sort();
 }
 
-// Premiärdagen 11 juni 2026 (svensk). Matcher sprids över flera dagar så fönstret
-// (11-13 juni) är en ÄKTA delmängd: en del kort syns, resten döljs i BÅDA vyerna.
-const PREMIERE = new Date('2026-06-11T08:00:00.000Z');
 const MATCHES: Match[] = [
-  match('p0', '2026-06-11T18:00:00.000Z'), // i fönstret
-  match('p1', '2026-06-12T18:00:00.000Z'), // i fönstret
-  match('p2', '2026-06-13T18:00:00.000Z'), // i fönstret
-  match('p3', '2026-06-14T18:00:00.000Z'), // utanför
-  match('p9', '2026-06-20T18:00:00.000Z'), // långt utanför
+  match('y', '2026-06-15T18:00:00.000Z'), // igår
+  match('t0', '2026-06-16T18:00:00.000Z'), // idag
+  match('t1', '2026-06-16T20:00:00.000Z'), // idag
+  match('tom', '2026-06-17T18:00:00.000Z'), // i morgon
+  match('far', '2026-06-20T18:00:00.000Z'), // långt fram
 ];
 
 beforeEach(() => {
@@ -110,7 +105,7 @@ beforeEach(() => {
   predData.teams = TEAMS;
   // Fake timers så resultatvyns useTodayKey() läser en PINNAD klocka (samma "nu"
   // som tips-vyn får via now-propen, så BÅDA ankrar på samma dag). Varje test sätter
-  // sin egen systemtid (premiär resp. mitt i turneringen) via setSystemTime.
+  // sin egen systemtid via setSystemTime.
   vi.useFakeTimers();
 });
 
@@ -120,16 +115,13 @@ afterEach(() => {
 
 /**
  * Mät de default-synliga match-id:na i BÅDA vyerna för en given matchuppsättning +
- * pinnat "nu", och returnera dem för en likhets-assertion. Resultatvyn laddar
- * matcher asynkront via DataSource, så vi flushar det redan-resolvade löftet inom
- * act() (en mikro-task-tick, ingen riktig fördröjning) innan vi mäter.
+ * pinnat "nu". Resultatvyn laddar matcher asynkront via DataSource, så vi flushar det
+ * redan-resolvade löftet inom act() (en mikro-task-tick) innan vi mäter.
  */
 async function visibleInBothViews(
   matches: Match[],
   now: Date
 ): Promise<{ res: string[]; pred: string[] }> {
-  // Tips-vyns data-hook är mockad mot predData; mata den SAMMA matcher som
-  // resultatvyns DataSource får, annars jämför vi äpplen och päron.
   predData.matches = matches;
   const res = render(
     <ResultsProvider env={{} as ImportMetaEnv} dataSource={fixedDataSource(matches)}>
@@ -142,8 +134,7 @@ async function visibleInBothViews(
   expect(res.container.querySelectorAll('[data-match-id]')).toHaveLength(matches.length);
   const resVisible = visibleMatchIds(res.container);
 
-  // Joker-läget är irrelevant för fönster-pariteten; en inaktiv joker-store räcker
-  // (ingen joker-knapp renderas, vyn beter sig som före T19 för fönster-urvalet).
+  // Joker-läget är irrelevant för fönster-kontraktet; en inaktiv joker-store räcker.
   const inactiveJoker: JokerStore = {
     enabled: false,
     status: 'idle',
@@ -164,36 +155,35 @@ async function visibleInBothViews(
   return { res: resVisible, pred: predVisible };
 }
 
-describe('Fönster-paritet: tips-vyn och resultatvyn döljer SAMMA matcher', () => {
-  it('default-synliga matcher är identiska i båda vyerna (premiärfönstret)', async () => {
-    vi.setSystemTime(PREMIERE);
-    const { res, pred } = await visibleInBothViews(MATCHES, PREMIERE);
+describe('Fönster-kontrakt: tips-vyn = bara IDAG, resultatvyn = igår + idag + framåt (T68)', () => {
+  it('tips-vyn visar BARA dagens matcher, resultatvyn det bredare fönstret (medveten skillnad)', async () => {
+    const MID = new Date('2026-06-16T10:00:00.000Z'); // 12:00 svensk, idag = 16 juni
+    const { res, pred } = await visibleInBothViews(MATCHES, MID);
 
-    // KÄRNAN: samma fönster -> samma synliga mängd. På premiärdagen golvas bakåt-
-    // spannet på premiären (inget före första matchen), så fönstret är de tre
-    // (p0-p2), inte tomt och inte allt: ett ÄKTA fönster bevisar att BÅDA döljer.
-    expect(pred).toEqual(['p0', 'p1', 'p2']);
-    expect(res).toEqual(pred);
+    // TIPS-VYN: bara dagens (16 juni) matcher. Inte gårdagens, inte morgondagens.
+    expect(pred).toEqual(['t0', 't1']);
+
+    // RESULTAT-VYN: igår (15) + idag (16) + i morgon (17), far (20) döljs. Den BEHÅLLER
+    // sitt bredare fönster (T62: gårdagens poäng ska synas där).
+    expect(res).toEqual(['t0', 't1', 'tom', 'y']);
+
+    // KÄRNAN: de två fönstren är MEDVETET OLIKA (annars regrederade en av ändringarna).
+    expect(pred).not.toEqual(res);
+    // Gårdagens spelade match syns i RESULTATvyn (poäng) men INTE i tips-vyn (otippbar gammal).
+    expect(res).toContain('y');
+    expect(pred).not.toContain('y');
+    // Morgondagens match är dold i tips-default (bara idag) men nås via expandera.
+    expect(pred).not.toContain('tom');
   });
 
-  // T62: pariteten måste hålla även för det NYA bakåt-fönstret. Ankra mitt i
-  // turneringen (16 juni) med en match igår (15 juni). BÅDA vyerna ska ta med igår
-  // identiskt, annars driver de isär och en vy visar poäng som den andra gömmer.
-  it('bakåt-fönstret (igår) är identiskt i båda vyerna (T62)', async () => {
-    const MID = new Date('2026-06-16T10:00:00.000Z'); // 12:00 svensk, igår = 15 juni
-    const midMatches: Match[] = [
-      match('y', '2026-06-15T18:00:00.000Z'), // igår -> i BÅDAS fönster (T62)
-      match('t0', '2026-06-16T18:00:00.000Z'), // idag
-      match('t1', '2026-06-17T18:00:00.000Z'), // i morgon
-      match('far', '2026-06-20T18:00:00.000Z'), // utanför -> dolt i BÅDA
+  it('premiärdagen: tips-vyn visar premiärdagens matcher (inte tom port före VM-start)', async () => {
+    const PREMIERE = new Date('2026-06-11T08:00:00.000Z'); // före alla MATCHES (15-20 juni)
+    const premiereMatches: Match[] = [
+      match('p0', '2026-06-11T18:00:00.000Z'), // premiär = ankaret
+      match('p1', '2026-06-12T18:00:00.000Z'), // dagen efter
     ];
-    vi.setSystemTime(MID);
-    const { res, pred } = await visibleInBothViews(midMatches, MID);
-
-    // Fönstret 15-18 juni: igår + idag + 2 fram. far (20 juni) döljs i BÅDA.
-    expect(pred).toEqual(['t0', 't1', 'y']); // visibleMatchIds sorterar, så ordningen är alfabetisk
-    expect(res).toEqual(pred);
-    // Explicit: gårdagens match är med i BÅDA (kärnan i T62, inte bara "lika").
-    expect(pred).toContain('y');
+    const { pred } = await visibleInBothViews(premiereMatches, PREMIERE);
+    // Idag (11 juni) ÄR premiärdagen, så bara premiärdagens match syns, inte 12 juni.
+    expect(pred).toEqual(['p0']);
   });
 });

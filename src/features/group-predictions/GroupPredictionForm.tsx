@@ -229,17 +229,34 @@ export function GroupPredictionForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Dirty-medveten synk in av ett externt uppdaterat tips (samma mönster som T15).
+  // SENAST SPARADE tips-snapshot (T68/#129 punkt 13): driver "Osparade ändringar"-
+  // indikatorn. Skiljer sig formulärets state från detta -> osparade ändringar. Seedas
+  // ur mitt sparade tips (current) och uppdateras vid en lyckad Spara (och när ett
+  // externt uppdaterat tips synkas in nedan), så jämförelsen är mot vad som FAKTISKT är
+  // sparat, inte mot ett gammalt utgångsvärde. dirtyRef styr fortfarande den externa
+  // seed-synken (rör inte användarens halvfärdiga val); dirty-INDIKATORN härleds av
+  // snapshot-jämförelsen, så den är sann även efter att man redigerat tillbaka till
+  // det sparade värdet (då försvinner indikatorn, korrekt: inget osparat kvar).
   const dirtyRef = useRef(false);
+  const [savedWinner, setSavedWinner] = useState<string>(current?.winnerCode ?? '');
+  const [savedRunnerUp, setSavedRunnerUp] = useState<string>(current?.runnerUpCode ?? '');
   const seedWinner = current?.winnerCode ?? '';
   const seedRunnerUp = current?.runnerUpCode ?? '';
   useEffect(() => {
+    // Ett externt uppdaterat tips (t.ex. realtid) flyttar BÅDE väljarna OCH snapshoten,
+    // så indikatorn inte felaktigt larmar "osparat" mot ett föråldrat snapshot.
+    setSavedWinner(seedWinner);
+    setSavedRunnerUp(seedRunnerUp);
     if (dirtyRef.current) {
       return;
     }
     setWinner(seedWinner);
     setRunnerUp(seedRunnerUp);
   }, [seedWinner, seedRunnerUp]);
+
+  // OSPARADE ÄNDRINGAR: formulärets val skiljer sig från det senast sparade. Visas bara
+  // i öppet läge (en låst grupp går inte att ändra, så "osparat" är inte relevant där).
+  const dirty = winner !== savedWinner || runnerUp !== savedRunnerUp;
 
   const baseId = useId();
   const winnerId = `${baseId}-winner`;
@@ -289,6 +306,9 @@ export function GroupPredictionForm({
     try {
       await onSubmit(groupId, winner, runnerUp);
       dirtyRef.current = false;
+      // Uppdatera snapshoten till det nyss sparade -> "Osparade ändringar" försvinner.
+      setSavedWinner(winner);
+      setSavedRunnerUp(runnerUp);
       setSaved(true);
     } catch (err) {
       // Fail loud: ett serverfel (gruppen hann låsas på deadline-sekunden, RLS
@@ -493,7 +513,7 @@ export function GroupPredictionForm({
           {/* Sparat-podiumet (stolt sammanfattning) när ett tips just sparats (öppet läge). */}
           {!locked && saved && hasPodium ? podiumSummary : null}
 
-          {/* Kontroll-spåret: Spara + sparat-kvitto (role=status). Bara i öppet läge. */}
+          {/* Kontroll-spåret: Spara + osparat-indikator / sparat-kvitto. Bara i öppet läge. */}
           {!locked ? (
             <div className="flex flex-wrap items-center gap-2.5">
               <button
@@ -501,9 +521,34 @@ export function GroupPredictionForm({
                 data-group-prediction-save=""
                 className="h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
               >
-                {current ? 'Ändra grupp-tips' : 'Spara grupp-tips'}
+                {/* ALLTID "Spara grupptips", aldrig "Ändra" (T68/#129 punkt 13, Daniels
+                    uttryckliga krav). Ett tips ändras genom att man Sparar om, så samma
+                    verb varje gång är ärligare än "Ändra" (som antyder en separat handling),
+                    och "Osparade ändringar"-indikatorn nedan bär informationen om att något
+                    är oslarat i stället. INGEN auto-spar (dirigentens beslut). */}
+                Spara grupptips
               </button>
-              {saved ? (
+              {/* OSPARADE ÄNDRINGAR (T68/#129 punkt 13): tydlig indikator när formuläret
+                  skiljer sig från det senast sparade. role="status" så den annonseras
+                  artigt när den dyker upp. Guld-tonad (samma tips-kupong-ton som rubriken,
+                  --color-warning = AA-säker guld-text), inte danger (det är inte ett fel,
+                  bara en påminnelse att spara). Försvinner när man sparat eller redigerat
+                  tillbaka till det sparade värdet (dirty härleds av snapshot-jämförelsen).
+                  Sparat-kvittot visas bara när INTE dirty (annars vore det motsägelsefullt). */}
+              {dirty ? (
+                <span
+                  role="status"
+                  data-group-prediction-dirty=""
+                  className="inline-flex items-center gap-1.5 rounded-pill border border-[color-mix(in_srgb,var(--vm-gold)_35%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_8%,transparent)] px-3 py-1.5 font-display text-[0.8125rem] font-semibold leading-none text-warning"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-1.5 w-1.5 shrink-0 rounded-pill"
+                    style={{ backgroundColor: 'var(--vm-gold)' }}
+                  />
+                  Osparade ändringar
+                </span>
+              ) : saved ? (
                 <span
                   role="status"
                   data-group-prediction-saved=""

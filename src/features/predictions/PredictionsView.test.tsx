@@ -19,15 +19,17 @@ vi.mock('./use-predictable-matches', () => ({
   usePredictableData: () => dataState,
 }));
 
-// Spionera på den rena fönster-funktionen (men kör den ÄKTA implementationen) så
+// Spionera på den rena DAGENS-fönster-funktionen (men kör den ÄKTA implementationen) så
 // tick-granularitet-testerna kan assertera HUR OFTA fönstret räknas om, inte bara att
 // utdatat ser likadant ut (utdatat är värde-identiskt även under buggen, så bara ett
 // call-count-spion fångar fel-granulariteten: fönstret räknades om varje minut-tick).
+// T68 (#129): tips-vyn bytte från windowMatches (igår+framåt) till selectTodayMatches
+// (bara dagens), så vi spionerar nu på den.
 const windowMatchesSpy = vi.hoisted(() => vi.fn());
 vi.mock('../results/result-window', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../results/result-window')>();
-  windowMatchesSpy.mockImplementation(actual.windowMatches);
-  return { ...actual, windowMatches: windowMatchesSpy };
+  windowMatchesSpy.mockImplementation(actual.selectTodayMatches);
+  return { ...actual, selectTodayMatches: windowMatchesSpy };
 });
 
 const TEAMS: Team[] = [
@@ -193,15 +195,15 @@ describe('PredictionsView', () => {
 });
 
 // 3-DAGARS FÖNSTER + expandera (Daniels begäran, samma som resultatlistan #39/T27).
-// Den rena fönster-funktionen är uttömmande testad i results/result-window.test.ts;
-// här bevisar vi att TIPS-VYN tillämpar fönstret som default och att expandera-
-// kontrollen är tillgänglig och fungerar end-to-end (samma kontrakt som resultatvyn).
+// Den rena dagens-fönster-funktionen är uttömmande testad i results/result-window.test.ts;
+// här bevisar vi att TIPS-VYN tillämpar DAGENS-fönstret som default (T68/#129) och att
+// expandera-kontrollen är tillgänglig och fungerar end-to-end.
 //
 // Vi ankrar "nu" på premiärdagen (11 juni 2026) och sprider matcherna över flera dagar,
-// så fönstret (11-13 juni) är en ÄKTA delmängd och resten döljs. Ett SYNLIGT kort = ett
-// formulär vars <li> INTE är hidden; ett dolt kort renderas (bevaras) men ligger i ett
-// `hidden`-<li>, så getByRole/spinbutton räknar bara de synliga (a11y-korrekt).
-describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', () => {
+// så dagens-fönstret (bara 11 juni) är en ÄKTA delmängd och resten döljs. Ett SYNLIGT
+// kort = ett formulär vars <li> INTE är hidden; ett dolt kort renderas (bevaras) men
+// ligger i ett `hidden`-<li>, så getByRole/spinbutton räknar bara de synliga (a11y).
+describe('PredictionsView, dagens-fönster + expandera (T68/#129)', () => {
   const PREMIERE = new Date('2026-06-11T08:00:00.000Z');
 
   /** Alla tippbara formulär i DOM:en (inkl. dolda), ordnade som de renderas. */
@@ -219,10 +221,10 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     return document.querySelector('button[data-predictions-toggle-position="bottom"]');
   }
 
-  it('default: visar bara matcher inom fönstret, döljer resten, med en expandera-knapp', () => {
-    // Fönstret 11-13 juni rymmer p0-p2; p3 (14 juni) och p9 (20 juni) ligger utanför.
+  it('default: visar BARA dagens matcher, döljer resten, med en expandera-knapp', () => {
+    // Premiärdagen 11 juni: bara p0 (11 juni) är dagens. p1-p9 (12 juni och framåt) döljs.
     dataState.matches = [
-      match('p0', '2026-06-11T18:00:00.000Z'),
+      match('p0', '2026-06-11T18:00:00.000Z'), // idag
       match('p1', '2026-06-12T18:00:00.000Z'),
       match('p2', '2026-06-13T18:00:00.000Z'),
       match('p3', '2026-06-14T18:00:00.000Z'),
@@ -232,13 +234,13 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
 
     // ALLA fem korten finns i DOM:en (inget filtreras bort, så osparad inmatning bevaras).
     expect(allForms()).toHaveLength(5);
-    // Men bara fönstrets tre (11-13 juni) är SYNLIGA som default.
-    expect(visibleForms().map((f) => f.getAttribute('data-match-id'))).toEqual(['p0', 'p1', 'p2']);
+    // Men bara dagens (11 juni) är SYNLIGT som default.
+    expect(visibleForms().map((f) => f.getAttribute('data-match-id'))).toEqual(['p0']);
 
-    // Expandera-knappen finns, säger hur många som är dolda, och är ihopfälld.
+    // Expandera-knappen finns, säger hur många som är dolda (4), och är ihopfälld.
     const toggle = topToggle();
     expect(toggle).not.toBeNull();
-    expect(toggle).toHaveAccessibleName(/Visa alla matcher \(2 dolda\)/i);
+    expect(toggle).toHaveAccessibleName(/Visa alla matcher \(4 dolda\)/i);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     // aria-controls pekar på tips-listan (samma id som <ol data-predictions-list>).
     const listId = toggle?.getAttribute('aria-controls');
@@ -248,9 +250,9 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     expect(list?.hasAttribute('data-predictions-list')).toBe(true);
   });
 
-  it('expandera -> alla matcher synliga; ihopfäll -> tillbaka till fönstret', async () => {
+  it('expandera -> alla matcher synliga; ihopfäll -> tillbaka till dagens', async () => {
     dataState.matches = [
-      match('p0', '2026-06-11T18:00:00.000Z'),
+      match('p0', '2026-06-11T18:00:00.000Z'), // idag
       match('p1', '2026-06-12T18:00:00.000Z'),
       match('p2', '2026-06-13T18:00:00.000Z'),
       match('p3', '2026-06-14T18:00:00.000Z'),
@@ -258,7 +260,7 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     ];
     renderView(store({}), PREMIERE);
 
-    expect(visibleForms()).toHaveLength(3);
+    expect(visibleForms()).toHaveLength(1);
 
     // Fäll ut -> alla fem synliga, knappen blir "Visa färre" + aria-expanded=true.
     fireEvent.click(topToggle() as HTMLButtonElement);
@@ -266,15 +268,15 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     expect(topToggle()).toHaveAccessibleName(/Visa färre/i);
     expect(topToggle()).toHaveAttribute('aria-expanded', 'true');
 
-    // Fäll ihop igen -> tillbaka till fönstrets tre.
+    // Fäll ihop igen -> tillbaka till dagens enda match.
     fireEvent.click(topToggle() as HTMLButtonElement);
-    await waitFor(() => expect(visibleForms()).toHaveLength(3));
+    await waitFor(() => expect(visibleForms()).toHaveLength(1));
     expect(topToggle()).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('kontrollen är DUBBLERAD (uppe + nere) med identisk aria-semantik', async () => {
     dataState.matches = [
-      match('p0', '2026-06-11T18:00:00.000Z'),
+      match('p0', '2026-06-11T18:00:00.000Z'), // idag
       match('p1', '2026-06-12T18:00:00.000Z'),
       match('p2', '2026-06-13T18:00:00.000Z'),
       match('p9', '2026-06-20T18:00:00.000Z'),
@@ -298,12 +300,12 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     expect(bottomToggle()).toHaveAccessibleName(/Visa färre/i);
   });
 
-  it('EDGE: alla matcher inom fönstret -> ingen expandera-knapp', () => {
-    // Bara matcher 11-13 juni (allt inom fönstret) -> hiddenCount 0 -> ingen knapp.
+  it('EDGE: alla matcher är dagens -> ingen expandera-knapp', () => {
+    // Alla tre matcher 11 juni (= dagens) -> hiddenCount 0 -> ingen knapp.
     dataState.matches = [
-      match('a', '2026-06-11T18:00:00.000Z'),
-      match('b', '2026-06-12T18:00:00.000Z'),
-      match('c', '2026-06-13T18:00:00.000Z'),
+      match('a', '2026-06-11T15:00:00.000Z'),
+      match('b', '2026-06-11T18:00:00.000Z'),
+      match('c', '2026-06-11T21:00:00.000Z'),
     ];
     renderView(store({}), PREMIERE);
 
@@ -312,8 +314,8 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     expect(bottomToggle()).toBeNull();
   });
 
-  // TICK-GRANULARITET (Copilot C, T15:s knep): fönstret (vilka matcher inom 3 dagar)
-  // ska bero på DAGEN (useTodayKey), låset (är matchen låst) på MINUT-ticken
+  // TICK-GRANULARITET (Copilot C, T15:s knep): dagens-fönstret (vilka matcher som är
+  // IDAG) ska bero på DAGEN (useTodayKey), låset (är matchen låst) på MINUT-ticken
   // (useDeadlineTick). Tidigare memoizerades fönstret på `predictable`, som får ny
   // referens varje minut (locked räknas om), så fönstret räknades om varje minut, fel
   // granularitet. Dessa två tester pinnar isär kadenserna: en minut-tick UTAN dagsbyte
@@ -322,12 +324,12 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
     vi.useFakeTimers();
     try {
       // Svensk tid i juni = UTC+2. Ankra "nu" 16:59 svensk tid 15 juni (14:59Z), strax
-      // före en avspark 17:00 svensk tid (15:00Z) SAMMA dag. Fönstret ankrar på 15 juni
-      // (svensk), spänner 15-17 juni. p-far (20 juni) ligger utanför -> ett ÄKTA fönster.
+      // före en avspark 17:00 svensk tid (15:00Z) SAMMA dag. Dagens-fönstret ankrar på
+      // 15 juni. p-far (20 juni) ligger utanför -> ett ÄKTA fönster (p-far dolt).
       const before = new Date('2026-06-15T14:59:00.000Z');
       dataState.matches = [
-        match('p-soon', '2026-06-15T15:00:00.000Z'), // i fönstret, öppen (avspark strax)
-        match('p-far', '2026-06-20T18:00:00.000Z'), // utanför fönstret (20 juni)
+        match('p-soon', '2026-06-15T15:00:00.000Z'), // idag, öppen (avspark strax)
+        match('p-far', '2026-06-20T18:00:00.000Z'), // utanför dagens-fönstret (20 juni)
       ];
       vi.setSystemTime(before);
       renderView(store({}), before);
@@ -371,13 +373,13 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
   it('dagsbyte: fönstret räknas om (ankaret glider till nästa dag)', () => {
     vi.useFakeTimers();
     try {
-      // Ankra "nu" 15 juni (svensk). Fönstret 15-17 juni rymmer p-d0 (15 juni); p-d3
-      // (18 juni) ligger utanför. Efter att klockan gått till 18 juni ska fönstret
-      // (18-20 juni) i stället rymma p-d3, och p-d0 (då passerad) faller utanför det
-      // framåtblickande fönstret. Det BEVISAR att fönstret räknas om vid dagsbyte.
+      // Ankra "nu" 15 juni (svensk). Dagens-fönstret (15 juni) rymmer p-d0; p-d3 (18
+      // juni) ligger utanför. Efter att klockan gått till 18 juni ska dagens-fönstret
+      // (18 juni) i stället rymma p-d3, och p-d0 (då gårdag/passerad) faller utanför.
+      // Det BEVISAR att fönstret räknas om vid dagsbyte.
       const day0 = new Date('2026-06-15T10:00:00.000Z'); // 12:00 svensk tid 15 juni
       dataState.matches = [
-        match('p-d0', '2026-06-15T18:00:00.000Z'), // 15 juni, i startfönstret
+        match('p-d0', '2026-06-15T18:00:00.000Z'), // 15 juni, i startfönstret (idag)
         match('p-d3', '2026-06-18T18:00:00.000Z'), // 18 juni, utanför startfönstret
       ];
       vi.setSystemTime(day0);
@@ -387,7 +389,7 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
         Array.from(document.querySelectorAll('[data-prediction-form]'))
           .filter((f) => !(f as HTMLElement).closest('li')?.hasAttribute('hidden'))
           .map((f) => (f as HTMLElement).getAttribute('data-match-id'));
-      // Startfönstret (15-17 juni): p-d0 synlig, p-d3 dold.
+      // Startfönstret (idag = 15 juni): p-d0 synlig, p-d3 dold.
       expect(visibleIds()).toEqual(['p-d0']);
       const callsAtStart = windowMatchesSpy.mock.calls.length;
 
@@ -398,7 +400,7 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
         vi.advanceTimersByTime(60_000);
       });
 
-      // Nya fönstret (18-20 juni): p-d3 synlig, p-d0 (passerad, före fönstret) dold.
+      // Nya fönstret (idag = 18 juni): p-d3 synlig, p-d0 (gårdag/passerad) dold.
       expect(visibleIds()).toEqual(['p-d3']);
       // Vid dagsbyte SKA fönstret räknas om (todayKey bytte): call-count ökade.
       expect(windowMatchesSpy.mock.calls.length).toBeGreaterThan(callsAtStart);
@@ -449,17 +451,19 @@ describe('PredictionsView, 3-dagars fönster + expandera (Daniels begäran)', ()
   });
 });
 
-// BAKÅT-FÖNSTRET (T62/#111): Daniels rapport var "jag ser fortfarande inte aktuell
-// tips-resultat på varje matchtips-kort". T58:s poäng-bricka finns men visas bara på
-// AVGJORDA matcher, och de enda avgjorda är gårdagens, som det rena framåtblickande
-// fönstret gömde. Detta block är callsite-/render-beviset (lessons "handoff-pastar-
-// ett-krav-levererat-men-koden-wirar-aldrig-in-ytan"): att gårdagens avgjorda+tippade
-// match faktiskt är SYNLIG i default-vyn OCH att poäng-brickan renderas DÄR, inte bara
-// att den rena windowMatches innehåller igår (det testas i result-window.test.ts).
+// DAGENS-FÖNSTRET ERSÄTTER BAKÅT-FÖNSTRET I TIPS-VYN (T68/#129, MEDVETET). T62 (#111)
+// utökade tips-vyns default-fönster bakåt så gårdagens avgjorda matchers poäng syntes
+// i tippnings-listan. T68 ÄNDRADE riktning: tips-vyn ska visa BARA DAGENS matcher (det
+// man kan tippa NU), så gårdagens redan spelade matcher är inte längre i default, de
+// nås via expandera. "Se dina poäng på gårdagens matcher" serveras i stället av
+// resultat-/avslöjande-vyn (RevealView/LeaderboardSection), som BEHÅLLER sitt bredare
+// fönster (det testet ligger i predictions-results-window-parity.test). Detta block
+// låser den NYA tips-vy-sanningen: gårdagens match är DOLD i default, dagens synliga,
+// men korten finns kvar i DOM (poäng-brickan renderas fortfarande när man fäller ut).
 //
 // Vi FRYSER klockan (T60-mönstret, toFake:['Date'] så useDeadlineTick/useTodayKey-
 // pollingen inte stör waitFor) på en dag MITT i turneringen, med en avgjord match igår.
-describe('PredictionsView, bakåt-fönstret visar gårdagens poäng (T62/#111)', () => {
+describe('PredictionsView, dagens-fönster döljer gårdagens spelade (T68/#129)', () => {
   // 16 juni 2026, 12:00 svensk tid (10:00Z). Igår = 15 juni.
   const TODAY = new Date('2026-06-16T10:00:00.000Z');
 
@@ -468,8 +472,11 @@ describe('PredictionsView, bakåt-fönstret visar gårdagens poäng (T62/#111)',
       (f) => !(f as HTMLElement).closest('li')?.hasAttribute('hidden')
     ) as HTMLElement[];
   }
+  function topToggle(): HTMLButtonElement | null {
+    return document.querySelector('button[data-predictions-toggle-position="top"]');
+  }
 
-  it('gårdagens avgjorda + tippade match är SYNLIG i default och visar T58-poäng-brickan', () => {
+  it('gårdagens avgjorda match är DOLD i default (bara dagens visas), nås via expandera', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       vi.setSystemTime(TODAY);
@@ -488,14 +495,19 @@ describe('PredictionsView, bakåt-fönstret visar gårdagens poäng (T62/#111)',
       };
       renderView(store({ myPredictions: new Map([['y-played', mine]]) }), TODAY);
 
-      // KÄRNAN (AC1): gårdagens kort är inte hidden -> det är i default-fönstret.
+      // KÄRNAN (T68): bara dagens (16 juni) match är synlig i default; gårdagens (15)
+      // OCH morgondagens (17) döljs.
       const visibleIds = visibleForms().map((f) => f.getAttribute('data-match-id'));
-      expect(visibleIds).toContain('y-played');
+      expect(visibleIds).toEqual(['t-today']);
+      expect(visibleIds).not.toContain('y-played');
 
-      // ...och poäng-brickan (T58) renderas på just det kortet, i default-vyn.
+      // Men kortet UNMOUNTAS inte: poäng-brickan (T58) finns kvar i DOM och renderas
+      // korrekt (den visas när man fäller ut). Bevisar att vi bara döljer, inte tappar.
+      fireEvent.click(topToggle() as HTMLButtonElement);
       const card = document.querySelector(
         '[data-prediction-form][data-match-id="y-played"]'
       ) as HTMLElement;
+      expect(card.closest('li')?.hasAttribute('hidden')).toBe(false);
       const badge = card.querySelector('[data-tip-result]') as HTMLElement | null;
       expect(badge).not.toBeNull();
       // Exakt tips -> exact-typen, så vi vet att det är RÄTT poäng-väg (T58), inte tom.
@@ -505,14 +517,14 @@ describe('PredictionsView, bakåt-fönstret visar gårdagens poäng (T62/#111)',
     }
   });
 
-  it('kronologisk ordning (AC3): gårdagens avgjorda ligger FÖRE dagens kommande, inte huller om buller', () => {
+  it('kronologisk ordning (utfälld): gårdagens avgjorda ligger FÖRE dagens kommande', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       vi.setSystemTime(TODAY);
       // Avsiktligt indata-OORDNAT: idag före igår i listan. Vyn ska ändå rendera
       // tidigast-först (selectPredictableMatches sorterar), så gårdagens avgjorda
-      // (lägst kickoff) hamnar överst, dagens kommande efter. Det är kronologiskt
-      // korrekt och inte förvirrande: gårdagens kort bär låst-etikett + poäng.
+      // (lägst kickoff) hamnar överst, dagens kommande efter. Mät i UTFÄLLT läge (i
+      // default är gårdagens dold av dagens-fönstret, T68).
       dataState.matches = [
         match('t-today', '2026-06-16T18:00:00.000Z'),
         finishedMatch('y-played', '2026-06-15T18:00:00.000Z', 0, 0),
@@ -526,6 +538,8 @@ describe('PredictionsView, bakåt-fönstret visar gårdagens poäng (T62/#111)',
       };
       renderView(store({ myPredictions: new Map([['y-played', mine]]) }), TODAY);
 
+      // Fäll ut så hela listan (oavsett fönster) syns, mät dess inbördes ordning.
+      fireEvent.click(topToggle() as HTMLButtonElement);
       const order = visibleForms().map((f) => f.getAttribute('data-match-id'));
       expect(order).toEqual(['y-played', 't-today']); // tidigast (igår) först
     } finally {
