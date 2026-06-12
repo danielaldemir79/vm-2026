@@ -49,7 +49,22 @@ export interface MemberPredictions {
   groupPredictions: readonly GroupPrediction[];
   /** Bracket-/slutspels-tips inkl. mästaren (T16), keyade på slotId. */
   bracketPredictions: readonly BracketPrediction[];
+  /**
+   * JOKER-MATCHER (T19, #19): de matchId:n medlemmen satt som joker (en per omgång/dag).
+   * Ett match-tips på en joker-match får sin poäng DUBBLAD (×JOKER_MULTIPLIER). VALFRITT:
+   * default = inga jokrar (bakåtkompatibelt, en medlem utan joker poängsätts som förr).
+   * Bara MATCH-tips dubblas (jokern pekar ut en match); grupp-/bracket-poäng rörs inte.
+   */
+  jokerMatchIds?: ReadonlySet<string>;
 }
+
+/**
+ * Joker-multiplikatorn (T19, #19): en joker-matchs match-tips-poäng DUBBLAS. Stabil
+ * konstant (inget magiskt 2 i koden) så UI-text och poänglogik delar EN sanning, och en
+ * framtida justering (t.ex. ×3) sker på ETT ställe. KÄLLA: issue #19 ("joker-match dubblar
+ * poängen") + docs/decisions.md T19.
+ */
+export const JOKER_MULTIPLIER = 2;
 
 /** En rad i den rangordnade topplistan. */
 export interface LeaderboardEntry {
@@ -86,6 +101,9 @@ export interface ScoreBySource {
 
 /** En medlem helt utan poäng (alla källor 0). Delad noll-form (DRY). */
 const EMPTY_BY_SOURCE: ScoreBySource = { match: 0, group: 0, bracket: 0, champion: 0 };
+
+/** Delad tom joker-mängd (T19): en medlem utan jokrar, undviker en allokering per anrop. */
+const EMPTY_JOKER_SET: ReadonlySet<string> = new Set<string>();
 
 /** Detalj-summa för en medlem: total + antal exakta match-träffar (för tiebreak) + käll-uppdelning. */
 interface MemberScore {
@@ -125,18 +143,26 @@ function scoreMember(member: MemberPredictions, index: FacitIndex): MemberScore 
   let championPoints = 0;
   let exactHits = 0;
 
-  // 1) Match-resultat-tips (T15): mot avgjord matchs ordinarie mål.
+  // 1) Match-resultat-tips (T15): mot avgjord matchs ordinarie mål. JOKER (T19): om
+  // matchen är medlemmens joker-match dubblas poängen (×JOKER_MULTIPLIER) INNAN den
+  // läggs till matchPoints. exactHits räknas på det OBERÄKNADE utfallet (det är ett
+  // ANTAL exakta träffar, ett kvalitets-mått för tiebreaket, inte poäng, så jokern
+  // ändrar inte hur många exakta tips medlemmen prickat, bara deras poäng-tyngd).
+  const jokerMatchIds = member.jokerMatchIds ?? EMPTY_JOKER_SET;
   for (const pred of member.matchPredictions) {
     const facit = index.matchByMatchId.get(pred.matchId);
     if (!facit) {
       continue; // matchen ännu inte avgjord -> inget facit, inga poäng än
     }
-    const p = scorePrediction(
+    const base = scorePrediction(
       { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals },
       facit.actual
     );
-    matchPoints += p;
-    if (p === PREDICTION_POINTS.exact) {
+    // Joker dubblar match-poängen för just denna match. En miss (0p) ×2 = 0 (en joker på
+    // ett feltips ger ingen straff, bara ingen vinst), exakt som spelets risk fungerar.
+    const isJoker = jokerMatchIds.has(pred.matchId);
+    matchPoints += isJoker ? base * JOKER_MULTIPLIER : base;
+    if (base === PREDICTION_POINTS.exact) {
       exactHits += 1;
     }
   }

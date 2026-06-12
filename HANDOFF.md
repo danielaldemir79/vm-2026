@@ -5,6 +5,58 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T19/#19 (gamification) KLAR - PR vantar pa merge
+
+**Branch:** `feature/T19-gamification` @ HEAD `29a1b0e` (journalist-commit)
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/127 mot `develop` (Closes #19, state: OPEN)
+**Board:** Kort #19 satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekraftat).
+
+**Vad T19 levererade:**
+- `room_jokers`-tabell med 2 migrationer live (schema + constraint-trigger som gar en joker per svensk dag per rum-match).
+- `scoreMember` dubblerar BARA matchpoang nar joker-flaggan ar satt - ren, inga sidoeffekter.
+- `derive-badges` + badge-row: rena hardledningar med kallhänvisade regler, negativa fall täckta.
+- En-joker-per-svensk-dag strukturellt via before-trigger (strukturell garanti, inte applogik).
+- Joker-stjarna med pop-animation gatad bakom `prefers-reduced-motion`, märkes-brickor i solid-guld-form, ren CSS utan extra beroenden.
+- 3 review-nitar åtgärdade: sr-only-kolon, sant testnamn, no-op-test för otippad joker + F3-precisions-not.
+
+**Commits (T19):**
+- `d9a9492` - senior-dev: room_jokers 2 migrationer live, joker dubblerar bara matchpoang, derive-badges/badge-row
+- `5369f0b` - design: joker-stjarna med pop gatad reduced-motion, markes-brickor solid-guld-form, ren CSS
+- `ec6160a` - dirigent: 3 review-nitar, sr-only-kolon + sant testnamn + no-op-test otippad joker + F3-not
+
+**Verifiering:** build EXIT 0, FULL svit EXIT 0 (168 filer), lint/format rena. Reviewer PASS - mutationstestade dubblingen (rott utan fix), live-verifierade RLS-paritet med tips-sekretessen.
+
+**Acceptanskriterier issue #19 (bockade av journalisten 2026-06-12):**
+- [x] AC1: Streaks + märken delas ut korrekt efter regler, joker-match dubblar poang
+- [x] AC2: Joker last vid deadline (kan inte andras efterat)
+- [x] AC3: Tester för badge-/streak-/joker-regler (edge-fall: streak bryts, joker pa avgjord match)
+- [x] AC4: Bygger gront, lint rent, reviewad (lokal panel), inga olosta findings
+
+**FORTSATTNINGS-PROMPT (autonom ko):**
+> Kor `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR for T19/#19 (feature/T19-gamification) ANNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 127 --merge --repo danielaldemir79/vm-2026`.
+> Stang issue #19 manuellt: `gh issue close 19`.
+> Flytta kort #19 till Done pa boarden.
+> Merga aven aldre oppna PR:er om de fortfarande ar oppna (se foregaende RESUME-HERE for lista).
+>
+> Om PR for T19/#19 REDAN mergad:
+> T19 klar. Nasta task i kon: **#24 (reaktioner, KISS-MVP ovanpa room_comments?)** - läs issuen noggrant.
+> Darefter: #64 (TWA) -> D-resten (FIFA-juni-ranking, #25, #56 modal, #48+demo-chip-AA, lean-städet, RoomPanel-teardown-flaky städ).
+>
+> Ber framat (alla tasks):
+> - Kommentar-pastar Forekomst 7: FLAGGAD for Daniel (se nedan) - vaktar pa godkannande for befordran.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD, kort i Ready.
+> - **#48 (demo-chip a11y):** 4+ vyer under AA 3.17:1 i ljust tema.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **"Behover Daniel"-ko:** befordran kommentar-pastar Forekomst 7 (reviewer.md, vantar godkannande), aldre befordringar, IMPROVEMENTS-kandidater, FIFA-juni-ranking, release-granssen, #39-F1, T48b.
+> - **Daniels process-beslut:** Copilot-loopen PAUSAD, lokala granskningen ar sista grinden.
+> - **Vakthund-rutinen:** varje vantan far deadline + eskalering.
+> - **Fullmakt:** dirigenten har fullmakt hela vagen.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T45/#76 (admin-statistik) KLAR - PR #126 vantar pa merge
 
 **Branch:** `feature/T45-admin-statistik` @ HEAD `2e0b72f`

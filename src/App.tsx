@@ -20,7 +20,7 @@ import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import { RoomSection, RoomsProvider, useRoomsStore } from './features/rooms';
 import { OfficialResultsProvider } from './features/official-results';
-import { PredictionSection, PredictionsProvider } from './features/predictions';
+import { PredictionSection, PredictionsProvider, JokerProvider } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
 import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
@@ -281,7 +281,12 @@ function AppShell() {
               Providern är vilande (enabled=false) utan Supabase/aktivt rum, så fixtures-
               läget är oförändrat. */}
           <PredictionsProvider>
-            {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
+            {/* JOKER-storen (T19, #19): omsluter match-tips-sektionen så tips-kupongerna
+                når joker-väljaren (sätt/ångra "din joker idag", en per omgång). Per rum,
+                deadline = matchens avspark (samma som tipset, server-side RLS-lås). Vilande
+                utan Supabase/aktivt rum, så fixtures-läget är oförändrat. */}
+            <JokerProvider>
+              {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
                 så PredictionSection visar tips-vyn när det sociala lagret är konfigurerat
                 (live-läge), med "gå med i ett rum för att tippa" tills ett rum är aktivt.
                 Deadline-låset (inget tips efter avspark) + tips-sekretessen (andras tips
@@ -290,19 +295,20 @@ function AppShell() {
                 Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik +
                 data-attribut, samma #39-formspråk som resultatinmatningen); design-
                 frontend ger premium-finish ovanpå. */}
-            <Slide direction="up">
-              <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
-            </Slide>
+              <Slide direction="up">
+                <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
+              </Slide>
 
-            {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
+              {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
                 grupp FÖRE gruppspelet. Per rum, deadline per grupp (gruppens första
                 match), server-side RLS-lås + sekretess (bevisat med riktiga sessioner).
                 Funktionellt + tillgängligt UI byggs här; design-frontend ger finishen.
                 Den tips-härledda slutspelsbilden under kupongerna (T51/T64) läser mina
                 grupp-tips OCH mina match-tips (treorna seedas ur match-tipsen). */}
-            <Slide direction="up">
-              <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
-            </Slide>
+              <Slide direction="up">
+                <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
+              </Slide>
+            </JokerProvider>
           </PredictionsProvider>
 
           {/* Bracket-/slutspels-tipsen (T16b, #59): tippa VM-vinnaren + vem som går

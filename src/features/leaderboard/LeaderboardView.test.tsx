@@ -15,6 +15,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     teams: [],
     currentUserId: null,
     selfBreakdown: null,
+    selfBadges: null,
     ...partial,
   };
 }
