@@ -37,6 +37,11 @@ export interface BracketPredictionsProviderProps {
   client?: VmSupabaseClient;
   /** Injicerbart aktivt rum-id (testbarhet). Default = rooms-synk-seamen. */
   activeRoomId?: string | null;
+  /**
+   * Injicerbar tips-invaliderings-räknare (testbarhet, T61 #110). Default =
+   * rooms-synk-seamen. Bumpas efter en lyckad kopiering -> tyst re-fetch utan rum-byte.
+   */
+  tipsRefreshNonce?: number;
 }
 
 export function BracketPredictionsProvider({
@@ -45,9 +50,13 @@ export function BracketPredictionsProvider({
   liveReady = LIVE_READY,
   client,
   activeRoomId: activeRoomIdProp,
+  tipsRefreshNonce: tipsRefreshNonceProp,
 }: BracketPredictionsProviderProps) {
   const roomsSync = useRoomsSync();
   const activeRoomId = activeRoomIdProp !== undefined ? activeRoomIdProp : roomsSync.activeRoomId;
+  // Tips-invaliderings-räknaren ur samma seam (T61 #110): bumpas efter lyckad kopiering.
+  const tipsRefreshNonce =
+    tipsRefreshNonceProp !== undefined ? tipsRefreshNonceProp : roomsSync.tipsRefreshNonce;
 
   const liveConfigured = isSupabaseConfigured(env) && liveReady;
   const enabled = liveConfigured && activeRoomId !== null;
@@ -74,16 +83,28 @@ export function BracketPredictionsProvider({
   // av BÅDE laddningen och saveBracketPrediction.
   const loadTokenRef = useRef(0);
 
+  // Vilket rum den NU laddade datan tillhör: skiljer SYNLIG laddning (initial/rumsbyte ->
+  // 'loading') från TYST re-fetch (kopierings-invalidering, samma rum -> behåll 'ready' +
+  // datan). Samma mönster som T55/PredictionsProvider, så en copy-triggad re-fetch (T61
+  // #110) inte flimrar och tömmer bracket-tips-vyn.
+  const loadedRoomIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const token = ++loadTokenRef.current;
     if (!supabase || activeRoomId === null) {
       setMyBracketPredictions(new Map());
       setStatus('idle');
       setError(null);
+      loadedRoomIdRef.current = null;
       return;
     }
-    setStatus('loading');
-    setError(null);
+    // TYST RE-FETCH (T61 #110): en kopierings-triggad omhämtning i SAMMA rum behåller
+    // 'ready' + datan, bara INITIAL/rumsbyte visar 'loading' (se PredictionsProvider).
+    const isSilentRefetch = loadedRoomIdRef.current === activeRoomId;
+    if (!isSilentRefetch) {
+      setStatus('loading');
+      setError(null);
+    }
     listMyBracketPredictions(supabase, activeRoomId)
       .then((preds) => {
         if (token !== loadTokenRef.current) {
@@ -91,15 +112,26 @@ export function BracketPredictionsProvider({
         }
         setMyBracketPredictions(new Map(preds.map((p) => [p.slotId, p])));
         setStatus('ready');
+        loadedRoomIdRef.current = activeRoomId;
       })
       .catch((err: unknown) => {
         if (token !== loadTokenRef.current) {
           return;
         }
+        // FELVÄG, TYST RE-FETCH (samma val som T55): behåll befintlig data + 'ready' och
+        // logga, blanka aldrig bracket-tips-vyn för en transient copy-miss. INITIAL/rumsbyte
+        // -> 'error' (ingen data att skydda, fail loud PRINCIPLES §8).
+        if (isSilentRefetch) {
+          console.warn(
+            '[VM2026] Tyst omhämtning av bracket-tips (efter kopiering) misslyckades, behåller befintlig data:',
+            err
+          );
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Kunde inte ladda dina bracket-tips.');
         setStatus('error');
       });
-  }, [supabase, activeRoomId]);
+  }, [supabase, activeRoomId, tipsRefreshNonce]);
 
   const saveBracketPrediction = useCallback(
     async (input: BracketPredictionInput) => {

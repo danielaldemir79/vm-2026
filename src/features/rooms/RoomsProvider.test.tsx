@@ -61,6 +61,7 @@ function Probe() {
       data-status={store.status}
       data-enabled={String(store.enabled)}
       data-members={store.members.map((m) => m.displayName).join(',')}
+      data-tips-nonce={String(store.tipsRefreshNonce)}
     >
       rooms:{store.myRooms.length} active:{store.activeRoom?.name ?? 'none'} members:
       {store.members.length} results:{store.results.length}
@@ -235,6 +236,112 @@ describe('RoomsProvider, copyMyTips kopierar IN till det aktiva rummet (T52, #91
     // Inget aktivt rum valt -> copyMyTips ska kasta (inte tyst no-op).
     await expect(store.copyMyTips('rA')).rejects.toThrow(/inget aktivt rum att kopiera till/);
     expect(copyApi.copyMyPredictions).not.toHaveBeenCalled();
+  });
+});
+
+describe('RoomsProvider, copyMyTips bumpar tips-invaliderings-räknaren (T61, #110)', () => {
+  // ROTORSAK (#110): copyMyTips skrev nya tips-rader i målrummet men signalerade aldrig
+  // tips-vyernas providers, så tipsen syntes inte förrän man lämnade och gick in i rummet
+  // igen. Fixen: en monoton invaliderings-räknare (tipsRefreshNonce) som bumpas BARA vid
+  // en LYCKAD kopiering (copied > 0) och ligger i tips-providernas fetch-deps. Här bevisas
+  // SIGNALEN vid källan (rooms-storen); de fyra providernas TYSTA re-fetch bevisas i deras
+  // egna render-tester.
+
+  /** Bygg en CopyReport med valbara totaler (övriga fält oviktiga för nonce-logiken). */
+  function reportWithTotal(total: {
+    copied: number;
+    skippedLocked?: number;
+    skippedExisting?: number;
+    failed?: number;
+  }) {
+    return {
+      items: [],
+      total: {
+        copied: total.copied,
+        skippedLocked: total.skippedLocked ?? 0,
+        skippedExisting: total.skippedExisting ?? 0,
+        failed: total.failed ?? 0,
+      },
+      byCategory: {},
+    };
+  }
+
+  /** Rendera live, gå med i ett målrum (gör det aktivt) och vänta tills redo. */
+  async function renderInTargetRoom() {
+    api.joinRoomByCode.mockResolvedValue({ id: 'rB', name: 'Jobbet', code: 'bbb22' });
+    renderProvider(liveEnv());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe')).toHaveAttribute('data-status', 'ready')
+    );
+    await act(async () => {
+      await store.joinRoom('bbb22', 'Bob');
+    });
+  }
+
+  it('LYCKAD kopiering (copied > 0): nonce går 0 -> 1', async () => {
+    copyApi.copyMyPredictions.mockResolvedValue(reportWithTotal({ copied: 3 }));
+    await renderInTargetRoom();
+    // Före kopiering: orörd räknare.
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '0');
+
+    await act(async () => {
+      await store.copyMyTips('rA');
+    });
+    // Minst ett tips kopierat -> invaliderings-signalen bumpas exakt en gång.
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '1');
+  });
+
+  it('DELVIS kopiering (copied > 0 men några låsta/redan-tippade/failade): nonce bumpas ändå', async () => {
+    // Blandat utfall: 1 kopierad, 1 låst, 1 redan tippad, 1 failad. Eftersom MINST ETT
+    // tips landade i målet måste tips-vyerna hämta om, så signalen ska bumpas.
+    copyApi.copyMyPredictions.mockResolvedValue(
+      reportWithTotal({ copied: 1, skippedLocked: 1, skippedExisting: 1, failed: 1 })
+    );
+    await renderInTargetRoom();
+    await act(async () => {
+      await store.copyMyTips('rA');
+    });
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '1');
+  });
+
+  it('0 KOPIERADE (allt låst/redan tippat, källan tom): nonce rörs INTE (ingen onödig re-fetch)', async () => {
+    // Inget landade i målet -> ingen rad ändrades -> ingen re-fetch behövs. Vi sparar
+    // ett nätanrop genom att INTE bumpa (val: ofarligt om den skedde, men onödigt).
+    copyApi.copyMyPredictions.mockResolvedValue(
+      reportWithTotal({ copied: 0, skippedLocked: 2, skippedExisting: 1 })
+    );
+    await renderInTargetRoom();
+    await act(async () => {
+      await store.copyMyTips('rA');
+    });
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '0');
+  });
+
+  it('FAILAD kopiering (copied 0, failed > 0): nonce rörs INTE (inget landade att hämta)', async () => {
+    // Engine:n sväljer per-item-skrivfel och kastar inte, så detta utfall når success-
+    // grenen MEN inget kopierades. Ingen rad i målet ändrades -> ingen bump.
+    copyApi.copyMyPredictions.mockResolvedValue(reportWithTotal({ copied: 0, failed: 3 }));
+    await renderInTargetRoom();
+    await act(async () => {
+      await store.copyMyTips('rA');
+    });
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '0');
+  });
+
+  it('TVÅ lyckade kopieringar i rad: nonce går 1 -> 2 (ett tal, inte en boolean)', async () => {
+    // En boolean-flagga hade fastnat "på" och tappat den ANDRA kopieringens signal. Ett
+    // monotont tal ger en NY invalidering varje gång, så även en andra copy mot samma rum
+    // triggar en ny re-fetch i providers (deras dep-värde ändras 1 -> 2).
+    copyApi.copyMyPredictions.mockResolvedValue(reportWithTotal({ copied: 1 }));
+    await renderInTargetRoom();
+    await act(async () => {
+      await store.copyMyTips('rA');
+    });
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '1');
+    await act(async () => {
+      await store.copyMyTips('rA');
+    });
+    expect(screen.getByTestId('probe')).toHaveAttribute('data-tips-nonce', '2');
   });
 });
 

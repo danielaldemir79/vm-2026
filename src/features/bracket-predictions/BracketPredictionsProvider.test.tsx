@@ -1,10 +1,20 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { BracketPredictionsProvider } from './BracketPredictionsProvider';
 import { useBracketPredictionsStore } from './bracket-predictions-context';
 import type { BracketPrediction } from '../../data/predictions';
 import type { VmSupabaseClient } from '../../data/supabase-browser';
 import { teamCode } from '../../domain/team-code';
+
+/** Ett löfte vars resolve går att trigga utifrån (styr async-ordning i testet). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
 
 // Mocka bracket-tips-API:t (vi testar provider-wiringen, inte Supabase-anropen som
 // testas i bracket-predictions-api.test.ts / RLS-integrationstestet).
@@ -23,7 +33,12 @@ vi.mock('../../data', () => ({
 }));
 
 vi.mock('../rooms', () => ({
-  useRoomsSync: () => ({ activeRoomId: null, sharedResults: [], saveResult: vi.fn() }),
+  useRoomsSync: () => ({
+    activeRoomId: null,
+    sharedResults: [],
+    saveResult: vi.fn(),
+    tipsRefreshNonce: 0,
+  }),
 }));
 
 const fakeClient = {} as unknown as VmSupabaseClient;
@@ -182,5 +197,81 @@ describe('BracketPredictionsProvider', () => {
       await savePending;
     });
     expect(screen.getByTestId('keys')).not.toHaveTextContent('M73');
+  });
+});
+
+describe('BracketPredictionsProvider, T61 (#110): kopierings-invalidering hämtar om bracket-tipsen utan rum-byte', () => {
+  // Samma rotorsak + fix som match-/grupp-tipsen: en kopierings-invalidering
+  // (tipsRefreshNonce-bump) hämtar om bracket-tipsen i SAMMA rum, tyst (inget flimmer).
+
+  const statusLog: string[] = [];
+  function TrackingProbe() {
+    const store = useBracketPredictionsStore();
+    statusLog.push(store.status);
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="count">{store.myBracketPredictions.size}</span>
+      </div>
+    );
+  }
+
+  function Harness() {
+    const [nonce, setNonce] = useState(0);
+    return (
+      <BracketPredictionsProvider
+        env={env}
+        client={fakeClient}
+        activeRoomId="r1"
+        tipsRefreshNonce={nonce}
+      >
+        <TrackingProbe />
+        <button onClick={() => setNonce((n) => n + 1)}>bump</button>
+      </BracketPredictionsProvider>
+    );
+  }
+
+  it('nonce-bump hämtar om bracket-tipsen: 1 initial + 1 efter copy, nya raderna syns utan rum-byte', async () => {
+    api.listMyBracketPredictions
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([bp('M73', 'BRA'), bp('M74', 'ARG')]);
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    expect(api.listMyBracketPredictions).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('count')).toHaveTextContent('0');
+
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('count')).toHaveTextContent('2'));
+    expect(api.listMyBracketPredictions).toHaveBeenCalledTimes(2);
+  });
+
+  it('kopierings-re-fetchen är TYST: status förblir ready, inget loading-flimmer', async () => {
+    statusLog.length = 0;
+    const second = deferred<BracketPrediction[]>();
+    api.listMyBracketPredictions
+      .mockReturnValueOnce(Promise.resolve([]))
+      .mockReturnValueOnce(second.promise);
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    const seenReadyAt = statusLog.length;
+
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    expect(api.listMyBracketPredictions).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('status')).toHaveTextContent('ready');
+    expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
+
+    await act(async () => {
+      second.resolve([bp('M73', 'BRA')]);
+      await second.promise;
+    });
+    expect(screen.getByTestId('status')).toHaveTextContent('ready');
+    expect(screen.getByTestId('count')).toHaveTextContent('1');
+    expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
   });
 });
