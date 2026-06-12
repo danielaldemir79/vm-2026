@@ -5,6 +5,54 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T62 (#111): tips-/resultatfönstret utökas BAKÅT med igår (nyss spelade matcher syns)
+
+**Symptom (Daniels rapport 2026-06-12):** "jag ser fortfarande inte aktuell tips-resultat på varje
+matchtips-kort." T58:s per-match-poäng är live men visas bara på AVGJORDA matcher. De enda avgjorda
+matcherna är gårdagens (och tidigare), och tips-listans 3-dagars fönster (#39/T39) var rent
+FRAMÅTBLICKANDE (ankrat på idag + 2 fram), så gårdagens matcher gled ut ur default-vyn. Användaren
+mötte aldrig sina poäng utan att trycka "Visa alla".
+
+**Beslut (regeln, källa = issuens AC + Daniels förslag):** den DELADE rena fönster-funktionen
+`windowMatches` (`features/results/result-window.ts`) utökas BAKÅT med ett FAST spann
+`LOOKBACK_DAYS = 1` (igår). Fönstret blir alltså `igår + idag + (WINDOW_DAYS-1) fram` = fyra svenska
+kalenderdagar. Ankaret (fönstrets första dag) golvas på premiären när turneringen ej börjat (inget
+tomt bakåt-spann före första matchen). Ingen ny funktion, ingen dubblett: bakåt-delen lades i samma
+rena `windowMatches`, så BÅDA konsumenterna (tips-vyn + resultatvyn) ärver den.
+
+**Varför ett FAST spann (igår) och INTE "senaste spel-dag oavsett hur långt bort":** issuen föreslog
+båda. "Senaste spel-dag" är robust mot en vilodags-gårdag, men kräver att man avgör hur långt bort en
+match får ligga och ändå räknas som "nyss spelad" (annars drar en turnering som slutade för två veckor
+sedan in finalen i default). Ett fast spann (igår) är symmetriskt med det framåtblickande fönstret,
+drar aldrig in en gammal match, kräver ingen gissning om VM-schemats längsta vilo-lucka, och löser
+Daniels FAKTISKA problem exakt: VM:s gruppspel (11-27 juni) spelar matcher VARJE dag, så "igår" ÄR den
+senaste spel-dagen i den fas där problemet uppstår nu.
+
+**Medveten avgränsning (dokumenterad + testad):** är gårdagen en VILODAG (kan hända i fas-glappet
+gruppspel/slutspel och i slutspelet) tas förrgårs match inte med i default, den nås via "Visa alla".
+I de faserna är listan ändå kort så fönstret döljer nästan inget. Ett test
+(`result-window.test.ts`, "MEDVETEN avgränsning ...") LÅSER detta beteende så det inte tyst ändras.
+Vill man senare ha vilodags-robusthet är vägen att byta `LOOKBACK_DAYS` mot en "senaste spel-dag inom
+N dagar"-regel, men det är YAGNI nu.
+
+**Paritet (issuens AC3, rekommendationen i task-dispatchen):** BÅDA fönstren (tips + resultat) fick
+bakåt-utökningen, eftersom den bor i den DELADE `windowMatches`. Pariteten BESTÅR alltså, den bryts
+inte. Paritetsguarden (`predictions-results-window-parity.test.tsx`, T43) stärktes med ett ANDRA fall
+som ankrar mitt i turneringen (16 juni, en match igår) och bevisar att gårdagens match tas med
+IDENTISKT i båda vyerna. Resultatvyn är admin-gated i live sedan T48, så att även den visar gårdagens
+matcher stör ingen vanlig användare (och är dessutom önskvärt: man vill se nyss inmatade resultat).
+
+**Sortering/gruppering (AC3):** ingen ändring behövdes. Tips-listan renderar `selectPredictableMatches`
+(kronologiskt, tidigast först), så gårdagens (låsta, avgjorda) match hamnar ÖVERST med sin låst-etikett
++ poäng-bricka, dagens kommande efter, vilket är kronologiskt korrekt och inte förvirrande (testat).
+Resultatvyn grupperar redan per dag-rubrik (`groupMatchesForEntry`, T28), så gårdagen får sin egen
+rubrik ovanför dagens. Räknaren "X matcher öppna att tippa" (AC4) räknar bara icke-låsta matcher, så
+gårdagens låsta avgjorda exkluderas, oförändrat och testat.
+
+**Verifiering av att fixen vaktas:** negativ kontroll (playbook): med `LOOKBACK_DAYS = 0` (det gamla
+beteendet) rödnar T62-render-testerna (gårdagens kort faller ur fönstret), med = 1 är de gröna. Så
+testerna bevisar fixen, inte bara att koden kompilerar.
+
 ## 2026-06-12 , T61 (#110): kopierade tips syns DIREKT i målrummet (invaliderings-räknare)
 
 **Symptom (Daniels rapport 2026-06-12):** "när man kopierar tips från en grupp till annan så måste man
