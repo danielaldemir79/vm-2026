@@ -383,7 +383,10 @@ function PlatformTabs({
             type="button"
             role="tab"
             aria-selected={selected}
-            aria-controls={`kom-igang-steg-${path.platform}`}
+            // aria-controls BARA på den valda fliken (copilot R2): bara den aktiva
+            // tabpanel:n finns i DOM, och en IDREF mot ett orenderat id är ogiltig
+            // ARIA. Ovalda flikar utan aria-controls är tillåtet mönster.
+            aria-controls={selected ? `kom-igang-steg-${path.platform}` : undefined}
             id={`kom-igang-flik-${path.platform}`}
             data-get-started-tab={path.platform}
             onClick={() => onSelectPlatform(path.platform)}
@@ -515,11 +518,12 @@ function PlatformNote({
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          {tone === 'info' ? (
-            // Sköld = "lugnande, säkert" (Play Skydd-noten).
+          {platform === 'android' ? (
+            // Sköld = "lugnande, säkert", hör ihop med Play Skydd-INNEHÅLLET, inte
+            // tonen (copilot R2: glyf keyad på plattform så iOS inte får skölden).
             <path d="M12 3 5 6v5c0 4.2 3 7.4 7 9 4-1.6 7-4.8 7-9V6l-7-3Z" />
           ) : (
-            // Info-i = "bra att veta" (iOS Safari-kravet).
+            // Info-i = "bra att veta" (iOS Safari-rekommendationen m.fl.).
             <>
               <circle cx="12" cy="12" r="9" />
               <path d="M12 11v5M12 8h.01" />

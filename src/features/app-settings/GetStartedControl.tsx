@@ -41,17 +41,23 @@ export function GetStartedControl({ variant = 'settings' }: GetStartedControlPro
   const close = useCallback(() => setOpen(false), []);
 
   // Escape stänger. Lyssnaren bara när öppen (städas vid stängning/unmount).
+  // CAPTURE-fas + stopPropagation (copilot R2): dialogen kan öppnas OVANPÅ en annan
+  // modal (onboardingens "Visa hur"-CTA), och båda lyssnar på document. Utan detta
+  // når samma Escape-tryck även den underliggande modalens lyssnare och stänger
+  // BÅDA på en gång. Capture låter den överst liggande dialogen konsumera Escape
+  // först; den underliggande stängs av nästa tryck, som förväntat.
   useEffect(() => {
     if (!open) {
       return;
     }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.stopPropagation();
         close();
       }
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [open, close]);
 
   // Fokus in vid öppning, tillbaka till triggern vid stängning. Triggern fångas i en
