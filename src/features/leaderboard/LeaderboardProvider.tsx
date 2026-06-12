@@ -61,6 +61,12 @@ export interface LeaderboardProviderProps {
   client?: VmSupabaseClient;
   /** Injicerbart aktivt rum-id (testbarhet). Default = rooms-storen. */
   activeRoomId?: string | null;
+  /**
+   * Injicerbar tips-invaliderings-räknare (testbarhet, T61 #110). Default = rooms-storen
+   * (rooms.tipsRefreshNonce). Bumpas efter en lyckad kopiering -> tyst re-fetch av
+   * rummets aggregerade tips, så de nykopierade raderna syns i topplistan utan rum-byte.
+   */
+  tipsRefreshNonce?: number;
   /** Injicerbart "nu" (testbarhet) för avslöjande-gaten, default = nuet (minut-tick). */
   now?: Date;
 }
@@ -71,12 +77,18 @@ export function LeaderboardProvider({
   liveReady = LIVE_READY,
   client,
   activeRoomId: activeRoomIdProp,
+  tipsRefreshNonce: tipsRefreshNonceProp,
   now,
 }: LeaderboardProviderProps) {
   const rooms = useRoomsStore();
   const data = useLeaderboardData(env);
   const activeRoomId =
     activeRoomIdProp !== undefined ? activeRoomIdProp : (rooms.activeRoom?.id ?? null);
+  // Tips-invaliderings-räknaren ur rooms-storen (T61 #110): bumpas efter en lyckad
+  // kopiering IN i det aktiva rummet, ligger i fetch-effektens deps -> tyst re-fetch av
+  // rummets aggregerade tips (samma TYSTA-mönster som T55:s avspark-re-fetch nedan).
+  const tipsRefreshNonce =
+    tipsRefreshNonceProp !== undefined ? tipsRefreshNonceProp : rooms.tipsRefreshNonce;
 
   const liveConfigured = isSupabaseConfigured(env) && liveReady;
   const enabled = liveConfigured && activeRoomId !== null;
@@ -180,7 +192,10 @@ export function LeaderboardProvider({
     // lockedMatchCount (T55 #96): re-fetcha när en match passerar avspark, så RLS-
     // nyligen-släppta tips kommer in utan reload. ENDAST när talet ÄNDRAS (en ny match
     // låstes) körs effekten om, inte varje minut-tick (talet är stabilt mellan avspark).
-  }, [supabase, activeRoomId, lockedMatchCount]);
+    // tipsRefreshNonce (T61 #110): re-fetcha rummets aggregerade tips när en kopiering IN
+    // i det aktiva rummet lyckats, så de nykopierade raderna syns i topplistan/avslöjandet
+    // utan rum-byte. loadedRoomIdRef gör den re-fetchen TYST (samma rum -> behåll datan).
+  }, [supabase, activeRoomId, lockedMatchCount, tipsRefreshNonce]);
 
   // VÄVD status: topplistan är 'ready' först när BÅDE facit-datan OCH tipsen laddat.
   // Felet från endera lagret fail-loud:ar. Idle/loading speglas så vyn visar laddning.

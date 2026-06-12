@@ -26,7 +26,12 @@ vi.mock('../../data', () => ({
 // useRoomsSync ger det aktiva rummet. Vi injicerar dock activeRoomId direkt via
 // prop i testerna, men hooken anropas ovillkorligt, så den måste finnas.
 vi.mock('../rooms', () => ({
-  useRoomsSync: () => ({ activeRoomId: null, sharedResults: [], saveResult: vi.fn() }),
+  useRoomsSync: () => ({
+    activeRoomId: null,
+    sharedResults: [],
+    saveResult: vi.fn(),
+    tipsRefreshNonce: 0,
+  }),
 }));
 
 const fakeClient = {} as unknown as VmSupabaseClient;
@@ -255,5 +260,126 @@ describe('PredictionsProvider', () => {
     expect(screen.getByTestId('count').textContent).toBe('1');
     // Inget kast: en droppad stale-uppdatering är tyst (inte ett fel), som load-vakten.
     expect(screen.getByTestId('save-error').textContent).toBe('');
+  });
+});
+
+describe('PredictionsProvider, T61 (#110): kopierings-invalidering hämtar om tipsen utan rum-byte', () => {
+  // ROTORSAK (#110): kopiera-tips skrev nya match-tips-rader i målrummet, men denna
+  // provider läste bara vid mount/rum-byte och fick aldrig veta att kopieringen skrev
+  // något, så tipsen syntes inte förrän man lämnade och gick in i rummet igen. Fixen:
+  // en tips-invaliderings-räknare (tipsRefreshNonce) i fetch-deps -> en TYST re-fetch
+  // när räknaren bumpas (efter en lyckad kopiering), i SAMMA rum, utan loading-flimmer.
+
+  /** Probe som SPÅRAR varje status-värde över tid (flimmer-bevis), inte bara nuet. */
+  const statusLog: string[] = [];
+  function TrackingProbe() {
+    const store = usePredictionsStore();
+    statusLog.push(store.status);
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="count">{store.myPredictions.size}</span>
+      </div>
+    );
+  }
+
+  /** Harness som låter testet bumpa tipsRefreshNonce (simulerar en lyckad kopiering). */
+  function Harness({ initialNonce = 0 }: { initialNonce?: number }) {
+    const [nonce, setNonce] = useState(initialNonce);
+    return (
+      <PredictionsProvider
+        env={env}
+        liveReady
+        client={fakeClient}
+        activeRoomId="r1"
+        tipsRefreshNonce={nonce}
+      >
+        <TrackingProbe />
+        <button onClick={() => setNonce((n) => n + 1)}>bump</button>
+      </PredictionsProvider>
+    );
+  }
+
+  it('en kopierings-invalidering (nonce-bump) hämtar om mina tips i SAMMA rum: 1 initial + 1 efter copy', async () => {
+    // Initial: rummet har 0 egna match-tips. Efter kopieringen finns 1 (kopierat in).
+    api.listMyPredictions
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { matchId: 'g-A-1', userId: 'me', homeGoals: 2, awayGoals: 1, updatedAt: 't' },
+      ]);
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(api.listMyPredictions).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('count').textContent).toBe('0');
+
+    // Simulera en lyckad kopiering: bumpa invaliderings-räknaren.
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    // EXAKT en re-fetch till (1 initial + 1 efter copy), och de nykopierade tipsen syns
+    // UTAN rum-byte.
+    await waitFor(() => expect(screen.getByTestId('count').textContent).toBe('1'));
+    expect(api.listMyPredictions).toHaveBeenCalledTimes(2);
+  });
+
+  it('kopierings-re-fetchen är TYST: status förblir ready, inget loading-flimmer', async () => {
+    statusLog.length = 0;
+    // Andra-svaret hålls i flykten så vi kan observera status MITT i re-fetchen.
+    const second = deferred<Prediction[]>();
+    api.listMyPredictions
+      .mockReturnValueOnce(Promise.resolve([]))
+      .mockReturnValueOnce(second.promise);
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    const seenReadyAt = statusLog.length;
+
+    // Bumpa nonce -> re-fetch startar men HÄNGER (deferred ej löst).
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    expect(api.listMyPredictions).toHaveBeenCalledTimes(2);
+    // FLIMMER-BEVIS: status är fortfarande 'ready' (aldrig 'loading') medan re-fetchen pågår.
+    expect(screen.getByTestId('status').textContent).toBe('ready');
+    expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
+
+    // Lös re-fetchen: tipsen byts ut, fortfarande utan att ha flimrat loading.
+    await act(async () => {
+      second.resolve([
+        { matchId: 'g-A-1', userId: 'me', homeGoals: 2, awayGoals: 1, updatedAt: 't' },
+      ]);
+      await second.promise;
+    });
+    expect(screen.getByTestId('status').textContent).toBe('ready');
+    expect(screen.getByTestId('count').textContent).toBe('1');
+    expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
+  });
+
+  it('en misslyckad TYST re-fetch behåller befintliga tips (ready, inte error)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      api.listMyPredictions
+        .mockResolvedValueOnce([
+          { matchId: 'g-A-1', userId: 'me', homeGoals: 1, awayGoals: 0, updatedAt: 't' },
+        ])
+        .mockRejectedValueOnce(new Error('RLS nekade'));
+
+      render(<Harness />);
+      await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+      expect(screen.getByTestId('count').textContent).toBe('1');
+
+      await act(async () => {
+        screen.getByText('bump').click();
+        await Promise.resolve();
+      });
+      // BEFINTLIGA TIPS KVAR: inte 'error', inte tom. Felet loggas (fail-loud i konsolen).
+      await waitFor(() => expect(api.listMyPredictions).toHaveBeenCalledTimes(2));
+      expect(screen.getByTestId('status').textContent).toBe('ready');
+      expect(screen.getByTestId('count').textContent).toBe('1');
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

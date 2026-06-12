@@ -35,6 +35,7 @@ function stubStore(overrides: Partial<RoomsStore> = {}): RoomsStore {
     activeRoom: null,
     members: [],
     results: [],
+    tipsRefreshNonce: 0,
     createRoom: async () => {},
     joinRoom: async () => true,
     selectRoom: async () => {},

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { LeaderboardProvider } from './LeaderboardProvider';
 import { useLeaderboardStore } from './leaderboard-context';
+import type { Prediction } from '../../data/predictions';
 import type { VmSupabaseClient } from '../../data/supabase-browser';
 import type { Group, Match, Team } from '../../domain/types';
 import type { RoomMember } from '../../data/rooms';
@@ -34,6 +36,7 @@ const roomsState = vi.hoisted(() => ({
   members: [] as RoomMember[],
   activeRoom: { id: 'r1' } as { id: string } | null,
   userId: null as string | null,
+  tipsRefreshNonce: 0,
 }));
 vi.mock('../rooms', () => ({
   useRoomsStore: () => roomsState,
@@ -118,6 +121,7 @@ beforeEach(() => {
   roomsState.members = [];
   roomsState.activeRoom = { id: 'r1' };
   roomsState.userId = null;
+  roomsState.tipsRefreshNonce = 0;
   dataState.status = 'ready';
   dataState.teams = TEAMS;
   dataState.groups = WC2026_GROUPS;
@@ -539,5 +543,112 @@ describe('LeaderboardProvider, T55 (#96): avspark-triggad re-fetch är TYST', ()
       await Promise.resolve();
     });
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+  });
+});
+
+describe('LeaderboardProvider, T61 (#110): kopierings-invalidering hämtar om rummets aggregerade tips', () => {
+  // ROTORSAK (#110): en kopiering IN i det aktiva rummet skrev nya tips-rader, men
+  // topplistan/avslöjandet hämtades bara vid mount/rum-byte/avspark. Fixen: tipsRefreshNonce
+  // i fetch-deps -> en TYST re-fetch när nonce bumpas (samma loadedRoomIdRef-mönster som
+  // T55:s avspark-re-fetch, så ingen "Laddar..."-blink och topplistan inte töms).
+
+  /** En styrbar promise (resolve utifrån), för att hålla en re-fetch "i flykten". */
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => {
+      resolve = res;
+    });
+    return { promise, resolve };
+  }
+
+  /** Probe som SPÅRAR varje status-värde (flimmer-bevis). */
+  const statusLog: string[] = [];
+  function TrackingProbe() {
+    const store = useLeaderboardStore();
+    statusLog.push(store.status);
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="board">
+          {store.leaderboard.map((e) => `${e.displayName}:${e.points}`).join('|')}
+        </span>
+      </div>
+    );
+  }
+
+  /** Harness som bumpar den INJICERADE tipsRefreshNonce (simulerar en lyckad kopiering). */
+  function Harness() {
+    const [nonce, setNonce] = useState(0);
+    return (
+      <LeaderboardProvider
+        env={env}
+        client={fakeClient}
+        activeRoomId="r1"
+        tipsRefreshNonce={nonce}
+        now={new Date('2026-06-12T20:00:00Z')}
+      >
+        <TrackingProbe />
+        <button onClick={() => setNonce((n) => n + 1)}>bump</button>
+      </LeaderboardProvider>
+    );
+  }
+
+  it('nonce-bump hämtar om rummets tips: 1 initial + 1 efter copy, nya poängen syns utan rum-byte', async () => {
+    // Avgjord match (g-A-1 = 2-1). Initialt har Anna inget tips (0p); efter "kopieringen"
+    // har hon ett exakt tips (3p), vilket dyker upp i topplistan utan rum-byte.
+    dataState.matches = [groupMatch('A', 'mex', 'kor', 2, 1)];
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+    api.listRoomPredictions
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { matchId: 'A-mex-kor', userId: 'u1', homeGoals: 2, awayGoals: 1, updatedAt: '' },
+      ]);
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    expect(api.listRoomPredictions).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('board')).toHaveTextContent('Anna:0');
+
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    await waitFor(() => expect(screen.getByTestId('board')).toHaveTextContent('Anna:3'));
+    expect(api.listRoomPredictions).toHaveBeenCalledTimes(2);
+  });
+
+  it('kopierings-re-fetchen är TYST: status förblir ready, gamla poängen kvar tills nya satts', async () => {
+    statusLog.length = 0;
+    dataState.matches = [groupMatch('A', 'mex', 'kor', 2, 1)];
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+    const second = deferred<Prediction[]>();
+    api.listRoomPredictions
+      .mockReturnValueOnce(
+        Promise.resolve([
+          { matchId: 'A-mex-kor', userId: 'u1', homeGoals: 2, awayGoals: 1, updatedAt: '' },
+        ])
+      )
+      .mockReturnValueOnce(second.promise);
+
+    render(<Harness />);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('board')).toHaveTextContent('Anna:3');
+    const seenReadyAt = statusLog.length;
+
+    // Bumpa nonce -> re-fetch startar men HÄNGER (deferred ej löst).
+    await act(async () => {
+      screen.getByText('bump').click();
+    });
+    expect(api.listRoomPredictions).toHaveBeenCalledTimes(2);
+    // FLIMMER-BEVIS: status är fortfarande 'ready', gamla poängen står kvar under re-fetchen.
+    expect(screen.getByTestId('status')).toHaveTextContent('ready');
+    expect(screen.getByTestId('board')).toHaveTextContent('Anna:3');
+    expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
+
+    await act(async () => {
+      second.resolve([]); // tippet "togs bort" i kopieringen -> 0p
+      await second.promise;
+    });
+    expect(screen.getByTestId('status')).toHaveTextContent('ready');
+    expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
   });
 });
