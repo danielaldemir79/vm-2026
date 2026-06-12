@@ -5,6 +5,53 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-12 , T24-visuellt (#24, design-frontend): reaktionsradens premium-finish, AA UPPMÄTT i båda teman
+
+**Beslut:** Den visuella finishen på reaktionsraden bor i `rooms.css` §9 (`.vm-reaction-*`), samma seam
+och samma fil som kommentarernas finish (§8, T66), INTE i `tokens.css`. **Varför:** reaktionsraden är en
+del av rums-feature:ns sociala lager och ska följa dess egen stil-fil. `rooms.css` importeras via
+`RoomPanel.tsx` (exporterad ur rooms-barreln, alltid i bundlen), och appen är EN sida (DailyMatchesView +
+RoomSection i samma `<main>`), så `.vm-reaction-*` gäller där MatchReactions renderas. Logik/data-hakar/
+aria rördes ALDRIG (seam-principen): finishen hänger bara på senior-devs `data-reactions-*` + `data-mine` +
+`aria-pressed`.
+
+**Känsla (taskens ord, "levande men inte stojigt", kvällsljus-familjen):**
+- **Vilo-bricka** (andras reaktion): en lätt, rund pill med en hårfin guld-värme i fonden
+  (`color-mix(--vm-gold 4%, surface)`, samma kvällsljus-detalj som `.vm-comment-input`), så raden känns som
+  en del av snacket, inte en grå knapp-rad.
+- **MIN bricka** (`data-mine`): markeringen är FÄRG-OBEROENDE, `aria-pressed` bär den för skärmläsare, och
+  visuellt bärs den av en accent-RING (kant, via Tailwinds `aria-pressed:border-accent`) + en lugn accent-
+  tint i ytan (`color-mix(--vm-accent 10%, surface)`). Tinten ensam räcker aldrig (form + ring + aria-pressed
+  bär signalen), men den lyfter "min" tydligt ur raden.
+- **Antalet** (count) är den enda TEXTEN på en bricka. Färgen är SINGLE-SOURCAD i CSS (vilo = fg-muted, min
+  = lyft till fg), inte en Tailwind text-utility i TSX, så count-tonen är EN sanning och inte en specificitets-
+  strid (lessons tailwind-utility-vs-handskriven-css). MIN count lyfts till full fg + font-semibold så den
+  läses starkt.
+- **Add-knappen** lämnas på senior-devs diskreta dashed-pill (KISS, ingen extra rums-regel som vore brus).
+- **Pickern** (utfälld 8-emoji-väljare): en lugn popover med en mjuk höjd (`--vm-shadow-raised`) + en hårfin
+  guld inre-högdager, så den läser som ett svävande lager. Vald emoji bär en accent-RING (`box-shadow inset`)
+  så "vald" syns som FORM, konsekvent med brickans ring.
+
+**RÖRELSE / REDUCED MOTION:** ingen brick-/pop-animation (taskens punkt 3: statisk är fin). Den enda rörelsen
+är de delade hover/fokus-övergångarna senior-dev satte (`transition-[...] duration-150`), nollade av den
+svepande reduced-motion-grinden i `index.css`. INGA rums-egna `@keyframes`, så inget extra att nolla.
+
+**KONTRAST (WCAG AA, UPPMÄTT per tema, sRGB-luminans, canvas-komposit VÄRSTA fall, `scripts/contrast-t24.mjs`,
+lessons aa-kontrast: mät VARJE tema separat, attribuera rätt, mät VÄRSTA fallet):** emojin själv är en
+färg-oberoende bild-glyf; bara ANTALET är text (solid-form-disciplin).
+- Vilo-brickans antal (fg-muted) på guld-4%-pill: **mörkt 6.99:1 / ljust 6.25:1**.
+- MIN brickas antal (lyft till fg) på accent-10%-pill: **mörkt 12.43:1 / ljust 15.61:1** (och OM det vore
+  fg-muted skulle det ändå hålla: mörkt 6.12:1 / ljust 5.69:1, marginal-koll).
+- "Reagera"-etiketten (fg-muted) på add-knappens surface-fond: **mörkt 7.50:1 / ljust 6.52:1**.
+- MIN brickas accent-kant (ren UI-dekor, bär ingen text): mörkt 9.68:1 / ljust 5.40:1 mot surface
+  (>= 3:1, UI-komponent-tröskeln). Alla text-ytor >= 4.5:1 (normal text). MIN över text-ytor: **mörkt 6.12:1
+  / ljust 5.69:1**.
+
+**MOBIL FÖRST (390/280):** raden är `flex flex-wrap items-center gap-1.5` (senior-dev), så brickorna RADBRYTER
+på smala skärmar utan horisontell scroll; pickern är `w-full flex-wrap`, så de 8 emojierna bryter snyggt på
+280px. Verifierat via build (`.vm-reaction-*` i byggd CSS) + den kompilerade cascade-ordningen (vilo-count
+fg-muted spec 0,2,0 < min-count fg spec 0,3,0, vinner korrekt).
+
 ## 2026-06-12 , T24 (#24): emoji-reaktioner på matcher i rummet
 
 **Beslut:** Ny tabell `public.room_reactions` (room_id, user_id, match_id, emoji, created_at) för
