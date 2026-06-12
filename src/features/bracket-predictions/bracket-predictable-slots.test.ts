@@ -74,7 +74,8 @@ const MATCHES: Match[] = [
 ];
 
 function bracket(matches: BracketMatchState[]): BracketState {
-  return { matches, locked: true };
+  // preliminary: false = skarpt läge (T56-fältet), dessa tester gäller låsta slots.
+  return { matches, locked: true, preliminary: false };
 }
 
 describe('selectPredictableBracket', () => {
