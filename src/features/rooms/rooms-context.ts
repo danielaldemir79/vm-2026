@@ -33,6 +33,15 @@ export interface RoomsStore {
   members: RoomMember[];
   /** Delade resultat i det aktiva rummet. */
   results: RoomMatchResult[];
+  /**
+   * INVALIDERINGS-RÄKNARE för tips-vyerna (T61, #110). Bumpas av copyMyTips efter en
+   * LYCKAD kopiering (minst ett tips kopierat) IN i det aktiva rummet. Tips-vyernas
+   * providers (match-/grupp-/bracket-tips + topplistan) har detta tal i sina
+   * fetch-deps och hämtar då om sina rader, så kopierade tips syns DIREKT utan rum-byte.
+   * Samma seam-anda som T55:s `lockedMatchCount`: ett monotont tal i fetch-deps som
+   * triggar en (1) tyst re-fetch när det ändras. INGEN polling, talet är stabilt i vila.
+   */
+  tipsRefreshNonce: number;
 
   /** Skapa ett nytt rum och gör det aktivt. Kastar vid fel (UI fångar). */
   createRoom: (name: string, displayName: string) => Promise<void>;
@@ -90,6 +99,13 @@ export interface RoomsSync {
   sharedResults: RoomMatchResult[];
   /** Spara ett resultat till det aktiva rummet (no-op utan aktivt rum). */
   saveResult: (input: RoomResultInput) => Promise<void>;
+  /**
+   * Invaliderings-räknare för tips-vyerna (T61, #110): bumpas efter en lyckad
+   * tips-kopiering, så tips-providers kan re-fetcha via sina deps. 0 utan provider.
+   * Bärs på synk-seamen så tips-providers (som redan läser activeRoomId härifrån)
+   * inte behöver en NY koppling till hela rums-storen.
+   */
+  tipsRefreshNonce: number;
 }
 
 /** Inert rums-synk: inget aktivt rum, inga delade resultat, spar är en no-op. */
@@ -97,6 +113,7 @@ const INERT_ROOMS_SYNC: RoomsSync = {
   activeRoomId: null,
   sharedResults: [],
   saveResult: async () => {},
+  tipsRefreshNonce: 0,
 };
 
 /**
@@ -120,5 +137,6 @@ export function useRoomsSync(): RoomsSync {
     activeRoomId: store.activeRoom?.id ?? null,
     sharedResults: store.results,
     saveResult: store.saveResult,
+    tipsRefreshNonce: store.tipsRefreshNonce,
   };
 }

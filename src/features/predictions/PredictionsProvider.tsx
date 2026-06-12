@@ -43,6 +43,12 @@ export interface PredictionsProviderProps {
    * (useRoomsSync.activeRoomId), så tips följer rummet utan ny koppling.
    */
   activeRoomId?: string | null;
+  /**
+   * Injicerbar tips-invaliderings-räknare (testbarhet, T61 #110). Default =
+   * rooms-synk-seamen (useRoomsSync.tipsRefreshNonce). Bumpas efter en lyckad
+   * tips-kopiering så denna provider hämtar om sina tips utan rum-byte.
+   */
+  tipsRefreshNonce?: number;
 }
 
 export function PredictionsProvider({
@@ -51,11 +57,16 @@ export function PredictionsProvider({
   liveReady = LIVE_READY,
   client,
   activeRoomId: activeRoomIdProp,
+  tipsRefreshNonce: tipsRefreshNonceProp,
 }: PredictionsProviderProps) {
   // Det aktiva rummet ur rooms-synk-seamen (samma seam results-lagret läser), om
   // inte ett explicit id injicerats (test). Hook anropas ovillkorligt (regler).
   const roomsSync = useRoomsSync();
   const activeRoomId = activeRoomIdProp !== undefined ? activeRoomIdProp : roomsSync.activeRoomId;
+  // Tips-invaliderings-räknaren ur samma seam (T61 #110): bumpas efter en lyckad
+  // kopiering IN i det aktiva rummet, ligger i load-effektens deps -> tyst re-fetch.
+  const tipsRefreshNonce =
+    tipsRefreshNonceProp !== undefined ? tipsRefreshNonceProp : roomsSync.tipsRefreshNonce;
 
   // Live kräver BÅDE env OCH live-flaggan (samma tvåstegs-gate som datalagret).
   const liveConfigured = isSupabaseConfigured(env) && liveReady;
@@ -76,14 +87,31 @@ export function PredictionsProvider({
     return getSupabaseClient(env);
   }, [client, liveConfigured, env]);
 
-  // EPOCH-vakt (samma mönster som RoomsProvider.loadRoomData, KA-F2): ett snabbt
-  // rumsbyte får aldrig låta ett föråldrat svar skriva över ett nyare rums tips.
-  // Bumpas vid varje rumsbyte av load-effekten och konsulteras av BÅDE laddningen
-  // och savePrediction (C14: en optimistisk save som löser efter ett rumsbyte
-  // tillhör fel rum och måste droppas, inte skrivas i nya rummets map).
+  // FETCH-VAKT (samma mönster som RoomsProvider.loadRoomData, KA-F2): ett föråldrat
+  // LADDNINGS-svar får aldrig skriva över ett nyare. Bumpas vid VARJE effekt-körning
+  // (rumsbyte OCH tyst kopierings-re-fetch), så bara det SENASTE fetch-svaret vinner.
+  // Används BARA av laddningen, inte av savePrediction (se activeRoomIdRef nedan).
   const loadTokenRef = useRef(0);
 
-  // Ladda MINA tips för det aktiva rummet (en gång per rumsbyte). Tom utan rum.
+  // SAVE-VAKT (T61 #110, F1): det enda en optimistisk save behöver skyddas mot är ett
+  // RUM-BYTE under await:en (då tillhör svaret fel rum). Den får INTE droppas av en tyst
+  // kopierings-re-fetch i SAMMA rum (det gjorde den förut, när save delade loadTokenRef
+  // som nu bumpas även av nonce-invalidering -> pågående save tappades, ingen spegling).
+  // Därför en EGEN vakt bunden enbart till activeRoomId: en ref med det SENASTE aktiva
+  // rummet, jämförd mot rummet saven startade i. Ändras bara vid äkta rum-byte.
+  const activeRoomIdRef = useRef<string | null>(activeRoomId);
+  activeRoomIdRef.current = activeRoomId;
+
+  // Vilket rum den NU laddade datan tillhör (null = ingen data än). Skiljer en SYNLIG
+  // laddning (initial / rumsbyte: datan saknas eller hör till fel rum -> visa 'loading')
+  // från en TYST re-fetch (kopierings-invalidering: samma rum, datan finns redan ->
+  // behåll 'ready' + datan under hämtningen, byt bara ut den när svaret kommer). Samma
+  // mönster som LeaderboardProvider (T55 #96), så en copy-triggad re-fetch (T61 #110)
+  // inte flimrar "Laddar..." och tömmer tips-vyn trots att giltig data redan finns.
+  const loadedRoomIdRef = useRef<string | null>(null);
+
+  // Ladda MINA tips för det aktiva rummet (vid rumsbyte ELLER tips-invalidering). Tom
+  // utan rum.
   useEffect(() => {
     const token = ++loadTokenRef.current;
     if (!supabase || activeRoomId === null) {
@@ -91,10 +119,19 @@ export function PredictionsProvider({
       setMyPredictions(new Map());
       setStatus('idle');
       setError(null);
+      loadedRoomIdRef.current = null;
       return;
     }
-    setStatus('loading');
-    setError(null);
+    // TYST RE-FETCH (T61 #110, samma val som T55): en kopierings-triggad omhämtning
+    // (tipsRefreshNonce ändrades) i SAMMA rum vi redan har data för ska INTE flimra
+    // 'loading' och tömma tips-vyn, den ska bara KOMPLETTERA med de nykopierade raderna.
+    // 'loading' visas bara vid INITIAL hämtning (ingen data än) och RUMSBYTE (datan hör
+    // till fel rum); då är det rätt att blanka och visa laddning.
+    const isSilentRefetch = loadedRoomIdRef.current === activeRoomId;
+    if (!isSilentRefetch) {
+      setStatus('loading');
+      setError(null);
+    }
     listMyPredictions(supabase, activeRoomId)
       .then((preds) => {
         if (token !== loadTokenRef.current) {
@@ -102,15 +139,28 @@ export function PredictionsProvider({
         }
         setMyPredictions(new Map(preds.map((p) => [p.matchId, p])));
         setStatus('ready');
+        loadedRoomIdRef.current = activeRoomId;
       })
       .catch((err: unknown) => {
         if (token !== loadTokenRef.current) {
           return;
         }
+        // FELVÄG, TYST RE-FETCH (samma val som T55): en kopierings-triggad omhämtning som
+        // failar får ALDRIG kasta bort de befintliga (giltiga) tipsen. Vi behåller datan +
+        // 'ready' och loggar felet ([VM2026]-konventionen, fail-loud i konsolen) i stället
+        // för att blanka vyn för en transient miss. En INITIAL/rumsbyte-fetch som failar har
+        // ingen data att skydda, då är 'error' rätt (fail loud, PRINCIPLES §8).
+        if (isSilentRefetch) {
+          console.warn(
+            '[VM2026] Tyst omhämtning av tips (efter kopiering) misslyckades, behåller befintlig data:',
+            err
+          );
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Kunde inte ladda dina tips.');
         setStatus('error');
       });
-  }, [supabase, activeRoomId]);
+  }, [supabase, activeRoomId, tipsRefreshNonce]);
 
   const savePrediction = useCallback(
     async (input: PredictionInput) => {
@@ -137,20 +187,22 @@ export function PredictionsProvider({
       if (activeRoomId === null) {
         throw new Error('[VM2026] Spara tips misslyckades: inget aktivt rum att spara tipset i.');
       }
-      // STALE-REQUEST-VAKT (C14): boka in vilken laddnings-epok (= vilket aktivt
-      // rum) detta save tillhör. Samma loadTokenRef som load-effekten bumpar vid
-      // varje rumsbyte, så vi återanvänder seamen i stället för att uppfinna en ny.
+      // STALE-SAVE-VAKT (C14 + T61 #110/F1): boka in vilket RUM detta save tillhör.
       // myPredictions är bara keyad på matchId, så utan vakten kan ett save startat i
-      // rum A (vän byter till rum B under await) skriva A:s svar i B:s tips-map.
-      const saveToken = loadTokenRef.current;
+      // rum A (vän byter till rum B under await) skriva A:s svar i B:s tips-map. Vi
+      // jämför mot RUMMET (inte en delad load-token): en tyst kopierings-re-fetch i
+      // SAMMA rum bumpar load-token men ändrar inte rummet, och måste därför INTE
+      // klassa detta save som föråldrat (det var T61-buggen: spegling uteblev).
+      const saveRoomId = activeRoomId;
       // Kastar vid fel (UI fångar), inkl. RLS-avslag om matchen är låst (fail loud).
       const saved = await upsertMyPrediction(supabase, activeRoomId, input);
-      // Bytte det aktiva rummet under await? Då har load-effekten redan bumpat token
-      // och laddat det NYA rummets tips. A:s optimistiska uppdatering DROPPAS tyst
-      // (den tillhör ett inaktuellt rum), exakt som load-effektens epoch-vakt gör.
-      // RLS har ändå persisterat tipset i rätt rum (room_id i upserten), så inget
-      // tappas på servern, bara den lokala spegeln av ett rum vi inte längre tittar på.
-      if (saveToken !== loadTokenRef.current) {
+      // Bytte det AKTIVA rummet under await? Då tillhör A:s optimistiska uppdatering ett
+      // inaktuellt rum och DROPPAS tyst (load-effekten har redan laddat nya rummets tips),
+      // exakt som load-effektens fetch-vakt gör. En tyst re-fetch i SAMMA rum (samma
+      // saveRoomId) passerar dock, så spegling sker. RLS har ändå persisterat tipset i
+      // rätt rum (room_id i upserten), så inget tappas på servern, bara den lokala
+      // spegeln av ett rum vi inte längre tittar på.
+      if (saveRoomId !== activeRoomIdRef.current) {
         return;
       }
       // Optimistiskt: spegla in det sparade tipset i den lokala mappen direkt.

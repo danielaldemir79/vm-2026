@@ -5,6 +5,62 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-12 , T61/#110 (Kopierade tips syns direkt) KLAR - PR #114 väntar på merge
+
+**Branch:** `feature/T61-copy-refresh` @ HEAD `ad74e76`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/114 mot `develop` (Closes #110, state: OPEN)
+**Board:** issue #110 i "In Review" (satt av journalisten 2026-06-12). Dirigenten stänger issue #110 MANUELLT och flyttar kort #110 till Done EFTER merge.
+
+**Vad T61 levererade:**
+- Rotorsak: copyMyTips-anropet uppdaterade Supabase-datan men triggade ingen re-fetch i tips-vyernas providers - providers använde stale data tills rumsbyte.
+- Fix: `tipsRefreshNonce` (monoton räknare) tillagd i RoomsSync-kontexten; bumpar vid `copied > 0` i useRoomSync. Noncen injicerades i deps-arrayen i 4 providers (tips, scores, reveal, myTips) med T55:s tysta re-fetch-mönster (ingen loading-flimmer), commit `1dd77ab`.
+- Copilot R1: save-vakten separerad fran fetch-vakten i 3 providers, bunden till rum-byte via activeRoomIdRef (race-klass save-vakt atigärdad), +6 tester mutationsbevisade, commit `ad74e76`.
+- T54-doc-rubriken i decisions.md aterställd (copilot hade indragen den), commit `ad74e76`.
+
+**Commits:**
+- `1dd77ab` - feat(rooms): tipsRefreshNonce - kopierade tips syns direkt utan rum-byte (#110)
+- `ad74e76` - T61: copilot R1 - separera save-vakten fran fetch-vakten i 3 providers (#110) - HEAD
+
+**Verifiering:** build EXIT 0, 1476 gröna, 0 röda, lint/format rena. Lokal panel: PASS utan fynd. Copilot: R1 4 fynd (3 race-klass save-vakt atigärdade), R2 0 fynd, exit.
+
+**Acceptanskriterier issue #110 (bockade av journalisten 2026-06-12):**
+- [x] AC#1: kopierade tips syns direkt i tipsvyn utan manuell rum-byte
+- [x] AC#2: re-fetchen sker tyst (ingen loading-spinner/flimmer), befintlig data synlig under hämtning
+- [x] AC#3: ingen regression i befintlig providers-logik, build + tester gröna
+- [x] AC#4: tester mutationsbevisade (save-vakt separerad fran fetch-vakt, bunden till rum-byte)
+
+**Playbook-kandidater (bärs till nasta journalists tröskelflagg):**
+- "tyst store-invalidering via monoton räknare i fetch-deps" - nu 2:a förekomst (T55->T61). Vid 3:e: befordras till docs/patterns.md-recept + flaggas.
+- "mutera tillbaka den för breda vakten och visa att exakt det NYA testet failar" (mask-avslöjande mutationsgrind) - Förekomst 1, ny i T61.
+
+**FORTSÄTTNINGS-PROMPT (autonom kö):**
+> Kör `/agent-kit` i `C:\Repo\vm-2026`.
+>
+> Om PR #114 (T61/#110, feature/T61-copy-refresh) ÄNNU INTE mergad:
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 114 --merge --repo danielaldemir79/vm-2026`.
+> Stäng issue #110 manuellt (`gh issue close 110`) - auto-close funkar inte mot develop när default-branch är main.
+> Flytta kort #110 till Done pa boarden (nu i "In Review", projekt 2).
+> Merga aven äldre oppna PR:er om de fortfarande är oppna: PR #112 (T54/#93), PR #109 (T60/#102), PR #108 (T56/#100), PR #107 (T58/#99), PR #106 (T57/#98), PR #105 (T41/#70), PR #104 (T55/#96), PR #103 (T59/#97), PR #101 (T53/#95), PR #94 (T52/#91) - stäng resp. issue och flytta till Done.
+>
+> Om PR #114 REDAN mergad:
+> T61 klar. Nästa task i kön: **#111 (T62 nyss spelade matcher i tips-fönstret)** - läs issuen noggrant före start.
+> Därefter: #113 (T63 ett-klicks-install, kompakt knapp, native-prompt eller guide, dold i standalone) -> #18 -> #76 -> #19 -> #24 -> #64 -> D-resten.
+>
+> Bär framåt (alla tasks):
+> - **#35 (arena/stad):** venue = platshallare.
+> - **FNV-hash:** konsolidera vid 3:e användning.
+> - **Stegnings-dubblett:** extrahera vid 3:e användning.
+> - **#48 (demo-chip a11y):** kort i Ready. Ny kandidat fran T56: 4+ vyer med demo-chip under AA 3.17:1 i ljust tema - koppla till #48.
+> - **#56 (delad modal-primitiv):** rule-of-three PASSERAD (4 dialoger), kort i Ready.
+> - **KA-F4-notering:** bundle ca 717 kB, manualChunks om LCP-problem.
+> - **SA3-notering:** UUID = kapabilitet, accepterat.
+> - **F2-kandidat (T50):** kortnamn i RevealView-rubriker om Daniel vill.
+> - **"Behöver Daniel"-kö:** push-notiser (T22), 3 befordringar (Förekomst 3+/4), 5 IMPROVEMENTS-kandidater (build-grind STARK + nightly-tidsrota-vakt + yt-AC + diakritik-commit-hook + T58-callsite-krav), FIFA-juni-ranking, release-gränsen, #39-F1-produktbeslut, T48b.
+> - **T26 DR-webb-inbaddning:** SKIPPAD, stängd not planned. Bygg INTE.
+> - **Fullmakt:** dirigenten har fullmakt hela vägen till slutet (Daniel ger go för release-gränsen vid hemkomst).
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T54/#93 (Glasklar kom-igång) KLAR - PR #112 väntar på merge
 
 **Branch:** `feature/T54-kom-igang` @ HEAD `e7ca190`
