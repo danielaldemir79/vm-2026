@@ -7,9 +7,9 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ## RESUME-HERE , 2026-06-12 , T19/#19 (gamification) KLAR - PR vantar pa merge
 
-**Branch:** `feature/T19-gamification` @ HEAD `ec6160a`
-**PR:** Se nedan (skapas av journalisten i detta steg) mot `develop` (Closes #19, state: OPEN)
-**Board:** Kort #19 satt till "In Review" av journalisten 2026-06-12.
+**Branch:** `feature/T19-gamification` @ HEAD `29a1b0e` (journalist-commit)
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/127 mot `develop` (Closes #19, state: OPEN)
+**Board:** Kort #19 satt till "In Review" av journalisten 2026-06-12 (GraphQL-bekraftat).
 
 **Vad T19 levererade:**
 - `room_jokers`-tabell med 2 migrationer live (schema + constraint-trigger som gar en joker per svensk dag per rum-match).
@@ -36,7 +36,7 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 > Kor `/agent-kit` i `C:\Repo\vm-2026`.
 >
 > Om PR for T19/#19 (feature/T19-gamification) ANNU INTE mergad:
-> Dirigenten har fullmakt. Merga mot develop via gh pr merge <nr> --merge --repo danielaldemir79/vm-2026.
+> Dirigenten har fullmakt. Merga mot develop: `gh pr merge 127 --merge --repo danielaldemir79/vm-2026`.
 > Stang issue #19 manuellt: `gh issue close 19`.
 > Flytta kort #19 till Done pa boarden.
 > Merga aven aldre oppna PR:er om de fortfarande ar oppna (se foregaende RESUME-HERE for lista).
