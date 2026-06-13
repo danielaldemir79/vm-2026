@@ -161,11 +161,11 @@ describe('CollapsibleBody (innehålls-kompressorn sektionerna använder)', () =>
     expect(body.querySelector('[data-collapsible-fade]')).toBeNull();
   });
 
-  // T68b (#136): chevron-cue:n vid klipp-kanten är nu en RIKTIG knapp som fäller ut
-  // (Daniels feedback: "man vill klicka på pilen men inget händer"). Den är en ren
-  // mus/touch-affordans som SPEGLAR den övre ExpandToggle, INTE en andra
-  // skärmläsar-/tangentbords-kontroll (aria-hidden + tabIndex=-1).
-  describe('klickbar chevron-cue-knapp (T68b)', () => {
+  // T68b (#136): chevron-cue:n vid klipp-kanten är nu klickbar och fäller ut
+  // (Daniels feedback: "man vill klicka på pilen men inget händer"). Den är ett
+  // icke-fokuserbart aria-hidden div, en ren mus/touch-affordans som SPEGLAR den
+  // övre ExpandToggle, INTE en andra skärmläsar-/tangentbords-kontroll.
+  describe('klickbar chevron-cue (T68b)', () => {
     afterEach(() => {
       vi.restoreAllMocks();
     });

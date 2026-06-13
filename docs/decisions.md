@@ -33,8 +33,9 @@ toppknappen; mus/touch får dessutom den visuella pilen. WCAG 2.3.3 (reduced-mot
 cue-animationen) och AA bevaras (samma token-färgade pill som förr).
 
 **Bevarat:** alla befintliga data-hakar (`data-collapsible`, `-body`, `-fade`, `data-collapsed`) +
-ExpandToggle oförändrade. Ny stabil hak `data-collapsible-cue` för styling/test. Design-frontend
-finputsar cue-knappens klickbara utseende (hover/focus-affordans) på den nya haken.
+ExpandToggle oförändrade. Ny stabil hak `data-collapsible-cue` för styling/test. Design-frontend gav
+cue:n ett tydligt klickbart utseende (hover/active-affordans, ingen :focus-affordans eftersom cue:n
+avsiktligt är icke-fokuserbar) på den nya haken.
 
 ## 2026-06-12 , T23 (#23): pinnat favoritlag + personlig statistik
 
