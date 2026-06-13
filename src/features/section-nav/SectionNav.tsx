@@ -48,8 +48,11 @@ export function SectionNav() {
       }
       // Headern är det föregående sticky-bandet (sticky top-0). Navet stackas under den.
       // Headerns höjd + navets höjd = den yta en rubrik måste rensa. Vi mäter headern via
-      // dess faktiska box (närmaste <header>), inte ett antaget värde.
-      const header = document.querySelector('header');
+      // dess faktiska box, inte ett antaget värde. Vi siktar på app-headern via dess STABILA
+      // krok (data-app-header i App.tsx), INTE en ren 'header'-selektor (F1): appen har många
+      // <header>-element (sektionsvyer, dialoger), så 'header' hade träffat det FÖRSTA i DOM-
+      // ordning, en ordnings-tillfällighet en framtida banner/portal kunde tyst bryta.
+      const header = document.querySelector('header[data-app-header]');
       const headerHeight = header?.getBoundingClientRect().height ?? 0;
       const navHeight = navEl.getBoundingClientRect().height;
       const offset = Math.round(headerHeight + navHeight);
@@ -68,7 +71,8 @@ export function SectionNav() {
     if (typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(measure);
       ro.observe(nav);
-      const header = document.querySelector('header');
+      // Samma app-header-krok som i measure() (F1), inte en ren 'header'-selektor.
+      const header = document.querySelector('header[data-app-header]');
       if (header) {
         ro.observe(header);
       }
