@@ -243,8 +243,8 @@ export type Database = {
         Insert: {
           created_at?: string;
           // joker_day skrivs ÖVER av before-triggern (room_jokers_set_day) ur den
-          // server-härledda match-dagen, så klienten skickar det aldrig. Genererat som
-          // obligatoriskt av Supabase, men API:t (room-joker-api.ts) utelämnar det.
+          // server-härledda match-dagen. Genererad typ; tabellen är OANVÄND sedan T71
+          // (joker-tillägget borttaget), men lämnas orörd i DB:n (se docs/decisions.md T71).
           joker_day: string;
           match_id: string;
           room_id: string;
@@ -474,7 +474,8 @@ export type Database = {
       // T19 (#19): matchens avspark som SVENSK kalenderdag (joker-omgångens dag).
       // Returns string | null (date som ISO-datum): ger NULL för en okänd match (samma
       // fail-safe som match_kickoff). Triggern room_jokers_set_day fyller joker_day ur
-      // denna; klient-API:t kallar den inte direkt (server-härlett).
+      // denna. Genererad typ; DB-funktionen lämnas orörd men anropas inte längre av
+      // klienten sedan T71 (joker-tillägget borttaget, se docs/decisions.md T71).
       match_joker_day: { Args: { p_match_id: string }; Returns: string | null };
       // T15 (#15): slå upp en matchs avsparkstid (deadline-låsets klocka).
       // Returns string | null: RPC:n är ett rent `select k.kickoff ... where match_id = ...`

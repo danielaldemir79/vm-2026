@@ -1,7 +1,7 @@
 // Tester för den personliga statistik-sektionen (T23, #23): gating (ingen statistik /
 // inte ready -> tyst), tomt-läget (inga avgjorda tips), nyckeltalen + bästa call med
-// matchup-rubrik och joker-markering. Renderar mot en injicerad leaderboard-store
-// (samma mönster som TipsScoreSummary-testet), så vyn testas utan provider/DB.
+// matchup-rubrik. Renderar mot en injicerad leaderboard-store (samma mönster som
+// TipsScoreSummary-testet), så vyn testas utan provider/DB.
 
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
@@ -52,8 +52,7 @@ const STATS: PersonalStats = {
     awayTeamId: 'bih',
     kickoff: '2026-06-11T18:00:00Z',
     pointType: 'exact',
-    points: 6,
-    joker: true,
+    points: 3,
   },
 };
 
@@ -91,14 +90,13 @@ describe('PersonalStatsSection', () => {
     expect(container.querySelector('[data-stat="outcome"]')?.textContent).toContain('2');
   });
 
-  it('visar bästa call med matchup-rubrik (kort namn), poäng-typ och joker-markering', () => {
+  it('visar bästa call med matchup-rubrik (kort namn) och poäng-typ', () => {
     const { container } = renderSection(store({ selfStats: STATS }));
     const best = container.querySelector('[data-best-call]');
     expect(best).toBeInTheDocument();
     expect(best?.textContent).toContain('Brasilien mot Bosnien');
     expect(best?.textContent).toContain('Exakt resultat');
-    expect(best?.textContent).toContain('6 p');
-    expect(container.querySelector('[data-best-call-joker]')).toBeInTheDocument();
+    expect(best?.textContent).toContain('3 p');
   });
 
   it('utelämnar bästa call-raden när inget tips gett poäng (bestCall null)', () => {

@@ -807,63 +807,6 @@ body {
   color: var(--vm-coupon-ink);
 }
 
-/* JOKER-TOGGELN på en ÖPPEN kupong (T19, #19): "din joker idag, dubbla poäng". Det
-   SPELIGA momentet, EN joker per omgång (svensk dag), så valet ska kännas som ett litet
-   firande. Tre tydliga lägen, alla via stabila data-attribut (struktur i PredictionForm,
-   ren känsla här):
-
-   - OVALD (default): en diskret guld-konturad pill. Senior-devs Tailwind ger guld-tint-
-     fond + guld-kant + text-fg; här bara en hårfin inre högdager så pillen får relief och
-     stjärn-konturen läses som en INBJUDAN ("gör mig till din joker"), inte ett tryck-läge.
-     Text = fg på en låg guld-tint över bg/surface (fg är appens högst kontrasterande ton,
-     håller AA i båda teman med marginal).
-   - VALD (data-joker-active): senior-devs klass-byte ger .vm-coupon-mine (SOLID guld-yta
-     med mörk ink, den färg-OBEROENDE AA-säkra solid-bricka-formen, --vm-coupon-ink på
-     --vm-gold = 10.90:1 mörkt / 5.03:1 ljust, samma proof som sparat-brickan). Här lägger
-     vi guld-LYSET ovanpå: en varm yttre guld-glow + inre högdager så stjärnan känns TÄND,
-     och en liten engångs-POP när den just valts (känns som ett "ja!"). Pop:en är ren
-     transform (skala), nollad vid reducerad rörelse (samma disciplin som champion-lyftet).
-   - LÅST/UPPTAGEN (disabled medan jokern sparas): senior-devs disabled:opacity-60 dämpar
-     hela pillen medan klicket flyger till servern; ingen egen regel behövs (opacity på en
-     hel interaktiv kontroll, inte på text, är tillåtet, inte text-dimningen lessons varnar
-     för). Den BINDANDE låst-markören efter avspark är .vm-coupon-mine via data-joker-locked
-     (lugn solid guld-bricka, ingen knapp), se kupong-markup. */
-.vm-joker-toggle {
-  /* Hårfin inre topp-högdager: ger den ovalda pillen relief utan att röra fonden/texten. */
-  box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 18%, transparent);
-}
-
-/* VALD: tänd den. Solid guld-yta + ink ärvs av .vm-coupon-mine (AA-proven); vi lägger en
-   varm guld-glow runt om + en starkare inre högdager så brickan känns upplyst, inte platt.
-   Ren dekor (box-shadow), bär ingen text, så ingen kontrast hänger på glow:en. */
-.vm-joker-toggle[data-joker-active] {
-  box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.34),
-    0 4px 16px -6px color-mix(in srgb, var(--vm-gold) 70%, transparent);
-}
-
-/* POP vid val: en lugn engångs-skala när jokern just satts (data-joker-active dyker upp på
-   samma knapp-nod -> animationen körs en gång). Samma cubic-bezier + engångs-anda som
-   champion-lyftet (DRY). Nollas helt vid reducerad rörelse (gatad nedan), då är valet
-   statiskt , glow:en + den tända stjärnan bär ändå "vald"-beskedet utan rörelse. */
-@media (prefers-reduced-motion: no-preference) {
-  .vm-joker-toggle[data-joker-active] {
-    animation: vm-joker-pop 0.42s cubic-bezier(0.16, 1, 0.3, 1) 1;
-  }
-}
-
-@keyframes vm-joker-pop {
-  0% {
-    transform: scale(0.86);
-  }
-  55% {
-    transform: scale(1.07);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
 /* POÄNG-BRICKAN på ett AVGJORT tips-kort (T58, #99): "+3 · Exakt resultat" m.fl. Den bär
    en FÄRG-OBEROENDE markör-glyf via ::before, samma form-familj som facit-avslöjandets
    markör (RevealView MARK_BY_TYPE): EXAKT = bock, UTFALL = halv-cirkel, MISS = kryss. Så
@@ -2389,9 +2332,8 @@ body {
    scripts/contrast-t23.mjs, canvas-komposit VÄRSTA fall, BÅDA teman): ALL guld bär text
    som ANTINGEN full fg på en låg guld-tint, ELLER den AA-säkra guld-TEXT-tonen
    (--color-warning, mörk amber i ljust tema), ALDRIG rå --vm-gold som text på tint (den
-   kända fällan). Joker-markören återbrukar den SOLIDA guld-bricka-formen (--vm-coupon-ink
-   på SOLID --vm-gold, redan mätt 10.90/5.03, ingen ny kombination). Uppmätta MIN över
-   alla nya text-ytor: mörkt 5.48:1 / ljust 5.03:1 (alla >= 4.5, normal text). Glow-/
+   kända fällan). Uppmätta MIN över alla text-ytor: mörkt 5.48:1 / ljust 5.31:1 (alla
+   >= 4.5, normal text). Glow-/
    kant-/tint-lagren under tröskeln bär ALDRIG text. Värden i decisions.md (T23-visuellt).
    -------------------------------------------------------------------------- */
 
@@ -2458,15 +2400,4 @@ body {
     transparent 60%
   );
   box-shadow: inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 24%, transparent);
-}
-
-/* JOKER-MARKÖREN på bästa call: återbrukar den SOLIDA guld-bricka-formen (--vm-coupon-ink
-   på SOLID --vm-gold), den färg-OBEROENDE AA-säkra formen (redan mätt 10.90:1 mörkt /
-   5.03:1 ljust, DRY mot .vm-coupon-mine / .vm-tips-summary-total / .vm-badge, ingen ny
-   kombination). En joker är ett spelmoment värt en liten stolt guld-bricka, samma som
-   när jokern syns i kupongen/summeringen. */
-.vm-best-call-joker {
-  background-color: var(--vm-gold);
-  color: var(--vm-coupon-ink);
-  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.32);
 }

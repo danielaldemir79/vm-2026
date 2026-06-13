@@ -62,16 +62,6 @@ export {
   type BracketPredictionInput,
 } from './bracket-predictions-api';
 
-// T19 (#19): joker-matchen, EN per omgång (svensk kalenderdag), dubblar match-poängen.
-export {
-  listRoomJokers,
-  listMyJokers,
-  upsertMyJoker,
-  removeMyJoker,
-  type RoomJoker,
-  type RoomJokerInput,
-} from './room-joker-api';
-
 // T52 (#91): kopiera MINA tips mellan rum (match + grupp + bracket), ärlig rapport.
 export {
   copyMyPredictions,

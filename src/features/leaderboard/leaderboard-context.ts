@@ -62,8 +62,8 @@ export interface LeaderboardStore {
    * AKTUELL användares PERSONLIGA STATISTIK (T23, #23): träffsäkerhet, exakta/utfall/
    * miss-räkning, bästa call. null tills vi kan peka ut en egen medlem (samma gate som
    * selfBreakdown/selfBadges). HÄRLEDD (derivePersonalStats) ur SAMMA score.ts-poängväg
-   * som topplistan + den delade matchlistan, ingen omräkning, ingen DB. Joker-medveten
-   * bästa call (storens egna joker-set). Konsumeras av tips-vyns summering.
+   * som topplistan + den delade matchlistan, ingen omräkning, ingen DB. Konsumeras av
+   * tips-vyns summering.
    */
   selfStats: PersonalStats | null;
 }

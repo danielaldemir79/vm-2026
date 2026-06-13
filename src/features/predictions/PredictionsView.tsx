@@ -18,13 +18,11 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { ExpandToggle } from '../../components/ExpandToggle';
 import { ScoreGuide } from '../scoring-guide';
 import { useTodayKey } from '../daily';
-import { localDateKey } from '../daily/group-matches-by-day';
 import { selectTodayMatches } from '../results/result-window';
 import { usePredictionsStore } from './predictions-context';
-import { useJokerStore } from './joker-context';
 import { usePredictableData } from './use-predictable-matches';
 import { selectPredictableMatches } from './predictable-matches';
-import { PredictionForm, type JokerControl } from './PredictionForm';
+import { PredictionForm } from './PredictionForm';
 import { useDeadlineTick } from './use-deadline-tick';
 
 export interface PredictionsViewProps {
@@ -41,7 +39,6 @@ export interface PredictionsViewProps {
 // läsbart, ingen konsument behöver gissa att undefined "blir" nuet/env.
 export function PredictionsView({ env = import.meta.env, now = new Date() }: PredictionsViewProps) {
   const store = usePredictionsStore();
-  const jokerStore = useJokerStore();
   const { status, matches, teams, error } = usePredictableData(env);
 
   // Deadline-medveten re-render: låst-statusen (now >= kickoff) räknas om varje
@@ -52,66 +49,6 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
   const evalNow = useDeadlineTick(now);
 
   const teamsById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
-
-  // JOKER-läget (T19, #19): bygg en haka per match. Vi behöver veta (a) om DENNA match
-  // är min joker, och (b) om jag har jokern på en ANNAN match SAMMA svenska dag (då
-  // FLYTTAR ett klick jokern hit, en per omgång). Vi indexerar mina joker per dag ur
-  // joker-storen + matchernas dag (localDateKey, samma svensk-dag-regel som DB:ns
-  // match_joker_day, en sanning). Bara aktivt när joker-storen är enabled (rum + live).
-  const matchById = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
-  const myJokerByDay = useMemo(() => {
-    const byDay = new Map<string, string>(); // dayKey -> matchId jag har jokern på
-    for (const j of jokerStore.myJokers.values()) {
-      byDay.set(j.jokerDay, j.matchId);
-    }
-    return byDay;
-  }, [jokerStore.myJokers]);
-
-  /** Visningsnamn för en match ("Hemma mot Borta"), för "flytta jokern hit"-hinten. */
-  function matchLabelFor(matchId: string): string {
-    const m = matchById.get(matchId);
-    if (m === undefined) {
-      return matchId;
-    }
-    const h = teamsById.get(m.homeTeamId ?? '')?.name ?? m.homeTeamId ?? 'Okänt lag';
-    const a = teamsById.get(m.awayTeamId ?? '')?.name ?? m.awayTeamId ?? 'Okänt lag';
-    return `${h} mot ${a}`;
-  }
-
-  /**
-   * Bygg joker-kontrollen för EN match, eller undefined om joker-läget inte är aktivt
-   * (då visar kupongen ingen joker-knapp). isJoker = denna match är min joker. Annan
-   * joker samma dag => label för "flytta hit". onToggle SÄTTER (eller FLYTTAR) jokern
-   * hit, eller ÅNGRAR om den redan är här.
-   */
-  function jokerControlFor(matchId: string): JokerControl | undefined {
-    if (!jokerStore.enabled) {
-      return undefined;
-    }
-    const match = matchById.get(matchId);
-    if (match === undefined) {
-      return undefined;
-    }
-    const dayKey = localDateKey(match.kickoff);
-    const jokerMatchThisDay = myJokerByDay.get(dayKey) ?? null;
-    const isJoker = jokerMatchThisDay === matchId;
-    const otherJokerSameDayMatchLabel =
-      jokerMatchThisDay !== null && jokerMatchThisDay !== matchId
-        ? matchLabelFor(jokerMatchThisDay)
-        : null;
-    return {
-      isJoker,
-      otherJokerSameDayMatchLabel,
-      onToggle: async () => {
-        // Är jokern redan här -> ångra; annars sätt/flytta den hit (en per dag, DB byter).
-        if (isJoker) {
-          await jokerStore.clearJoker(matchId);
-        } else {
-          await jokerStore.setJoker(matchId);
-        }
-      },
-    };
-  }
 
   // evalNow ingår i deps (det är HELA poängen, C1): hooken ger ett "nu" som tickar
   // på en stabil minut-kadens, så detta räknas om när tiden passerar en avspark,
@@ -349,7 +286,6 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
                     onSubmit={async (matchId, homeGoals, awayGoals) => {
                       await store.savePrediction({ matchId, homeGoals, awayGoals });
                     }}
-                    joker={jokerControlFor(match.id)}
                   />
                 </li>
               );

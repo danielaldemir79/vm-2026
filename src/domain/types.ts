@@ -319,8 +319,6 @@ export interface Prediction {
   predicted: MatchResult;
   /** Tilldelade poäng efter avgjord match, null innan dess. */
   points: number | null;
-  /** Joker-match: dubblar poängen för denna omgång (SPEC §12). */
-  isJoker: boolean;
 }
 
 /** Tips på hela slutspelsträdet (Fas 2). Stub. */

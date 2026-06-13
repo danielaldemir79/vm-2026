@@ -2,8 +2,8 @@
 // React, fristående testbar. ANTI-BLOAT: streaks och märken har INGEN egen DB-tabell,
 // de RÄKNAS FRAM ur exakt samma data topplistan redan har (en medlems match-tips +
 // det härledda facit + lag-listan), precis som tabeller/träd/poäng (SPEC §6 "härledd
-// state"). En joker-DB krävs (delas/poängsätts för alla), men ett märke är bara en
-// observation om redan-känd data, så det behöver ingen persistens.
+// state"). Ett märke är bara en observation om redan-känd data, så det behöver ingen
+// persistens.
 //
 // ============================================================================
 // REGLERNA (otvetydiga, dokumenterade i docs/decisions.md T19, gissas inte)
@@ -31,10 +31,9 @@
 //
 //  * "PERFEKT OMGÅNG" = en SVENSK kalenderdag (Europe/Stockholm) där medlemmen
 //    tippade MINST 2 matcher som ALLA är avgjorda OCH ALLA gav poäng (> 0, rätt utfall
-//    eller bättre). "Omgång" = en dags matcher (samma tolkning som joker-dagen, en
-//    sanning). Minst 2 matcher så en ensam rätt-tippad match inte räknas som en hel
-//    "omgång". KÄLLA: localDateKey (samma svensk-dag-gruppering som dagsvyn T7 + joker-
-//    dagen T19) + score.ts (> 0 = rätt). En dag med en otippad eller oavgjord match
+//    eller bättre). "Omgång" = en dags matcher. Minst 2 matcher så en ensam rätt-tippad
+//    match inte räknas som en hel "omgång". KÄLLA: localDateKey (samma svensk-dag-
+//    gruppering som dagsvyn T7) + score.ts (> 0 = rätt). En dag med en otippad eller oavgjord match
 //    räknas inte som perfekt (vi kräver alla MEDLEMMENS tips den dagen rätt; en dag där
 //    hen inte tippade alla matcher kan ändå vara perfekt på de hen tippade, så länge
 //    minst 2 och alla avgjorda+rätt , se exakt regel i isPerfectRound nedan).
@@ -75,7 +74,7 @@ export interface MemberBadges {
 interface FinishedTip {
   matchId: string;
   kickoff: string;
-  /** Poängen tipset gav (0/1/3, OBERÄKNAT av joker , streak/märken är joker-oberoende). */
+  /** Poängen tipset gav (0/1/3, rå match-poäng). */
   points: number;
   /** Den svenska kalenderdagen matchen spelades (för perfekt-omgång-grupperingen). */
   dayKey: string;
@@ -240,9 +239,8 @@ function hasPerfectRound(tips: readonly FinishedTip[]): boolean {
 /**
  * Härled en medlems gamification-status (streak + märken) ur hens match-tips, den
  * delade matchlistan (facit-källan) och lag-listan (FIFA-ranking för skräll-märket).
- * REN: samma indata topplistan redan har, ingen ny sanning, ingen DB. JOKER-OBEROENDE:
- * streaks/märken bedöms på RÅ match-poäng (en joker dubblar poäng i topplistan, men en
- * skräll/streak är en bedrift oavsett om man satte joker på den).
+ * REN: samma indata topplistan redan har, ingen ny sanning, ingen DB. Streaks/märken
+ * bedöms på RÅ match-poäng (en skräll/streak är en bedrift på det rå tipset).
  *
  * @param matchPredictions  medlemmens match-tips (T15).
  * @param matches           den DELADE matchlistan (officiellt facit invävt).
