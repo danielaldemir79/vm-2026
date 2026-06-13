@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
-// Källfilen läses som rå text via Vites `?raw`, så testet kör EXAKT samma parsnings-
-// logik som datan byggs med (venue-parser.ts), ingen duplicerad parser.
+// Gold source läses som rå text via Vites `?raw`, så testet kör EXAKT samma parsnings-
+// och emit-logik som datan GENEREREras med (venue-parser.ts), ingen duplicerad parser.
+// `?raw` på gold source bor BARA i test-filer (+ generator-skriptet), ALDRIG i en
+// runtime-modul, så de 277 källraderna inte paketeras till klient-bundlen (T4e #150, F4).
 import venueSource from './venue-source.txt?raw';
+// Den committade, GENERERADE tabellen som rå text, för regenerera-och-diffa-låset nedan.
+import committedCapacities from './venue-capacities.ts?raw';
 import {
+  buildVenueCapacityFile,
   buildVenueCapacityTable,
   parseVenueCapacities,
   parseCapacityRow,
@@ -12,6 +17,16 @@ import {
 import { WC2026_VENUE_CAPACITIES } from './venue-capacities';
 import { WC2026_MATCHES } from './matches';
 import { formatCapacity, formatVenueCapacity } from '../../features/daily/match-display';
+
+/**
+ * Radslut-normalisering före jämförelse. Den committade .ts:en kan vara CRLF på Windows
+ * (innan .gitattributes/Prettier `endOfLine: "lf"` normaliserat den) medan generatorn
+ * emittar LF; en RÅ byte-jämförelse skulle annars faila på enbart radslut, inte på
+ * innehåll (lessons: idempotent-synk-verifierad-med-radslut-känslig-hash). Vi jämför INNEHÅLL.
+ */
+function normalizeEol(text: string): string {
+  return text.replace(/\r\n/g, '\n');
+}
 
 // ============================================================================
 // KÄLLÅNKRING + KORSKOLL av VM 2026:s ÅSKÅDARKAPACITET per arena (T4e #149).
@@ -27,6 +42,12 @@ import { formatCapacity, formatVenueCapacity } from '../../features/daily/match-
 // 83 000+). Vi pinnar (1) eftersom det är FIFA:s officiella turnerings-tal ur SAMMA gold
 // source som arena-listan. Detta test PINNAR de valda figurerna explicit (mot källan) +
 // låser parsern/formateringen + bevisar att en bytt siffra fångas (mutationstest).
+//
+// REGENERERA-OCH-DIFFA-LÅSET (T4e #150, F4): venue-capacities.ts är nu en GENERERAD,
+// committad tabell (inte en ?raw-parsning vid runtime, som drog hela gold source in i
+// klient-bundlen). Låset nedan regenererar tabellen ur gold source (?raw, bara i TESTET)
+// och kräver värde-likhet med den committade .ts:en, så en käll-drift fångas i testet i
+// stället för i klienten, samma mönster som matches.ts/team-profiles.ts.
 // ============================================================================
 
 describe('Kapacitet: källan parsas till 16 arenor (en per FIFA-arena)', () => {
@@ -51,6 +72,41 @@ describe('Kapacitet: källan parsas till 16 arenor (en per FIFA-arena)', () => {
     for (const venue of WC2026_VENUE_CAPACITIES.keys()) {
       expect(KNOWN_VENUES.has(venue), venue).toBe(true);
     }
+  });
+});
+
+describe('Kapacitet: GENERERAD tabell låst mot gold source (regenerera och diffa, T4e #150 F4)', () => {
+  it('regenererad venue-capacities.ts ur gold source är värde-identisk med den committade', () => {
+    // Detta är LÅSET. venue-capacities.ts är nu en genererad, committad tabell (gold
+    // source `?raw` finns BARA i test + generator, inte i klient-bundlen). Skiljer en
+    // siffra/arena sig (käll-drift, hand-edit, drift generator<->fil) failar detta i
+    // testet i stället för tyst i UI:t. String-jämförelse ger en exakt diff (fail loud).
+    const regenerated = buildVenueCapacityFile(venueSource);
+    expect(normalizeEol(regenerated)).toBe(normalizeEol(committedCapacities));
+  });
+
+  it('en bytt kapacitets-siffra i gold source bryter låset (beviset att låset fångar käll-drift)', () => {
+    // Mutationstest av själva LÅSET (skilt från parser-mutationen nedan): byt Estadio
+    // Aztecas siffra i källan och bevisa att den REGENERERADE filen INTE längre matchar
+    // den committade .ts:en. Utan detta vet vi inte att regenerera-och-diffa faktiskt
+    // skyddar mot en käll-/transkriptionsdrift in i den committade tabellen.
+    const mutated = venueSource.replace(
+      'Estadio Azteca, Mexico City, Mexiko | capacity=80824',
+      'Estadio Azteca, Mexico City, Mexiko | capacity=79999'
+    );
+    expect(mutated).not.toBe(venueSource); // mutationen tog effekt
+    const regenerated = buildVenueCapacityFile(mutated);
+    expect(normalizeEol(regenerated)).not.toBe(normalizeEol(committedCapacities));
+  });
+
+  it('buildVenueCapacityFile fail-loud:ar på en trasig källa (hellre stopp än halv tabell)', () => {
+    // En arena borttagen ur källan ska KASTA i emit-steget (via buildVenueCapacityTable),
+    // inte tyst emittera 15 rader. Så generatorn skriver aldrig en ofullständig fil.
+    const withoutAzteca = venueSource.replace(
+      'Estadio Azteca, Mexico City, Mexiko | capacity=80824\n',
+      ''
+    );
+    expect(() => buildVenueCapacityFile(withoutAzteca)).toThrow(/utan kapacitet/);
   });
 });
 
