@@ -5,6 +5,77 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T4e (#149) arena-kapacitet + FIFA-ranking på matchkortet , PR #150 mot develop , KLAR
+
+**Branch:** `feature/T4e-kapacitet-ranking` @ HEAD `3d89e9f`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/150 mot `develop` (Closes #149, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T4e levererade
+
+Matchkortet visar nu arenans publikkapacitet (t.ex. "92 000 platser") och FIFA-ranking som
+tydlig etikett ("FIFA-ranking #14"). Kapacitetsdatan lagras i en committad datafil genererad
+offline ur gold-source - inte via ?raw-import i klient-bundlen.
+
+**Kedjan:**
+
+- **Senior-developer `4b44de0`:** kapacitet källankrad mot FIFA/Wikipedia, ny genererad
+  capacity-table.ts (offline), FIFA-ranking ur befintlig team-profiles.ts.
+- **Design-frontend `9e2360e`:** balans - kapacitet till vänster, ranking till höger på kortet.
+- **Dirigent `e736274`:** tydlig "FIFA-ranking #XX"-etikett per Daniels feedback, direkt
+  kapacitets-import ur capacity-table.ts (inga ?raw-imports i runtime).
+- **Design-frontend `1829650`:** etiketten ryms på 344px utan versaler.
+- **Lokal reviewer:** GODKÄND, inga fynd.
+- **Copilot R1:** 1 fynd (barrel-import), åtgärdad.
+- **Copilot R2:** 4 fynd: 3 doc/kommentar-drift + 1 strukturellt (kapacitets-tabellen genereras
+  nu committad istället för ?raw i bundlen), åtgärdade.
+- **Copilot R3 `3d89e9f`:** 1 trivial kommentar-typo, fixad. Exit nådd.
+
+**Verifiering (HEAD `3d89e9f`):** build EXIT 0, npm test ~1798 gröna/0 fail,
+lint + format:check EXIT 0.
+
+**Acceptanskriterier T4e:**
+- [x] AC1: Matchkortet visar arenans kapacitet (källankrad, committad offline-fil)
+- [x] AC2: FIFA-ranking visas som tydlig etikett, ryms på 344px utan versaler
+- [x] AC3: Kapacitetsdatan läcker inte till klient-bundlen (ingen ?raw-import i runtime)
+- [x] AC4: Bygger grönt, lint rent, reviewad (lokal panel + Copilot R1-R3 exit), inga olösta fynd
+
+### Behöver-Daniel (oförändrad + nytillkommen)
+
+**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
+- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
+- Uttömmande-test Förekomst 3: agent-regel för reviewer.
+- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+
+**Kvar att besluta/agera:**
+- Supabase e-postmall: #81 stängdes 2026-06-12 på Daniels order.
+- RLS-testrum i Supabase: står kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- **Publik-repo-go + AI-pipeline-synlighet:** Daniel beslutar när vm-2026 kan vara publikt synligt.
+  Agent Kit får nämnas som hans kvalitets-pipeline, ingen Claude-byline, ingen Co-authored-by.
+
+### Nästa steg
+
+**Om PR #150 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 150 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #149: `gh issue close 149`. Flytta kort T4e till Done på boarden.
+Kolla om PR:ar #148 eller äldre behöver mergas i ordningen ältst -> nyast före #150.
+
+**Om PR #150 REDAN mergad:**
+T4e klar och live på develop. Kön efter T4e:
+(a) **T72** - LÅS grupp+champion-tippning efter omgång 1. Ny deadline = g-L-1 kickoff
+    2026-06-17T20:00:00Z (ersätter POOL_EXTENDED_DEADLINE 2026-06-21). Ändrar klient +
+    Supabase RLS-spegel. HARD deadline-task.
+(b) **T73** - avgjorda tips-kort visar facit + poäng + smakfulla tillägg.
+(c) **RELEASE v1.0** - develop -> main, tagg v1.0.
+(d) **README post-v1** - publik README klar för delning.
+(e) **Före-publicerings-koll** - Daniel godkänner publik-go.
+Kör `/agent-kit` för att starta nästa task.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T4d (#147) land i arena-raden , PR #148 mot develop , KLAR
 
 **Branch:** `feature/T4d-land-i-arena` @ HEAD `d6af54b`
