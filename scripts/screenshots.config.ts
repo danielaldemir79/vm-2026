@@ -19,12 +19,18 @@ export default defineConfig({
     baseURL: BASE_URL,
     ...devices['Desktop Chrome'],
   },
-  // Build + serve the dist (fixtures mode: no VITE_SUPABASE_* env set here), same
-  // as the E2E config, so the shots are of the real deployable artifact.
+  // Build + serve the dist, same as the E2E config, so the shots are of the real
+  // deployable artifact. We FORCE fixtures mode by passing the Supabase env vars
+  // empty to the build/preview process: the data-source gate treats empty/missing
+  // VITE_SUPABASE_* as "not configured" and falls back to fixtures. Without this the
+  // build would inherit a developer's shell VITE_SUPABASE_* and could accidentally
+  // produce live-mode (non-deterministic) screenshots. (A local .env.local with real
+  // values still takes precedence in Vite's env loading, so regenerate without one.)
   webServer: {
     command: `npm run build && npm run preview -- --port ${PREVIEW_PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: true,
     timeout: 120_000,
+    env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' },
   },
 });
