@@ -8,7 +8,11 @@
 
 import type { FinishedMatch, Match, MatchResult, MatchStage, Team } from '../../domain/types';
 import { teamShortName } from '../../domain';
-import { WC2026_VENUE_CAPACITIES } from '../../data/wc2026';
+// Direkt-import (inte barrel ../../data/wc2026): barrel:n re-exporterar även
+// WC2026_MATCHES/WC2026_TEAMS m.fl., så en barrel-import länkar in all den statiska
+// datan i varje konsument som bara behöver de 16 kapaciteterna. Direkt mot
+// venue-capacities håller hjälparen lätt + kopplingen smal (Copilot, PR #150).
+import { WC2026_VENUE_CAPACITIES } from '../../data/wc2026/venue-capacities';
 
 /** Svensk etikett per slutspels-/gruppsteg (för matchkortets steg-märke). */
 const STAGE_LABELS: Record<MatchStage, string> = {
@@ -140,14 +144,18 @@ export function formatVenueCapacity(venue: string): string | null {
 }
 
 /**
- * FIFA-rankings-etiketten för ett lag, t.ex. "FIFA #14", eller null om laget är okänt
- * (slutspel innan seedningen, team undefined) eller saknar ranking (Team.fifaRanking
- * undefined). Läser BARA befintlig data (T10/T69), ingen ny källa, och hanterar saknad
- * ranking TYST (ingen "FIFA #undefined"). T4e (#149).
+ * FIFA-rankings-etiketten för ett lag, t.ex. "FIFA-ranking #14", eller null om laget är
+ * okänt (slutspel innan seedningen, team undefined) eller saknar ranking
+ * (Team.fifaRanking undefined). Läser BARA befintlig data (T10/T69), ingen ny källa, och
+ * hanterar saknad ranking TYST (ingen "FIFA-ranking #undefined").
+ *
+ * VARFÖR hela ordet "FIFA-ranking" (inte bara "FIFA #14"): ett ensamt "#14" kan
+ * misstolkas som grupp-/tabellplacering. Det fulla ordet gör otvetydigt att det är
+ * lagets FIFA-världsranking (Daniels feedback 2026-06-13). T4e (#149).
  */
 export function formatFifaRanking(team: Team | undefined): string | null {
   if (team === undefined || team.fifaRanking === undefined) {
     return null;
   }
-  return `FIFA #${team.fifaRanking}`;
+  return `FIFA-ranking #${team.fifaRanking}`;
 }
