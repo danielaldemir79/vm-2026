@@ -10,10 +10,142 @@
  * visuellt, headern vinner alltid. Inga magiska pixlar: bandhöjderna mäts (SectionNav).
  *
  * Design-frontend äger den slutgiltiga visuella behandlingen (band, chip-styling,
- * aktiv-markering, swipe-affordans). Den här filen bär bara den funktionella stickyn +
- * scroll-offset-kontraktet. */
+ * aktiv-markering, swipe-affordans), den ligger i blocket "PREMIUM-FINISH" nedan. Den
+ * funktionella stickyn + scroll-offset-kontraktet bor här ovanför. */
 .vm-section-nav {
   top: var(--vm-section-nav-header-top, 0px);
+}
+
+/* =============================================================================
+   PREMIUM-FINISH (T78 design-lager). LEAN per Daniels krav: ett diskret, SEKUNDÄRT
+   band under headern, inte en andra header. Återanvänder appens etablerade former/
+   tokens (pill-formen, accent-fokusringen, det frostade glas-receptet, fg-muted/accent-
+   paren), så INGEN ny färgkombination införs som kräver en ny kontrast-mätning.
+   ============================================================================= */
+
+/* BANDET: samma frostade glas-recept som headern (App.tsx rad 119-122): en halv-
+   genomskinlig surface-ton (color-mix mot --color-surface) ovanpå en backdrop-blur, så
+   bandet hänger ihop med headern och innehållet skymtar mjukt under det vid scroll. Det är
+   medvetet ett SMALARE, lugnare band än headern: ytan är något tunnare (62% mot headerns
+   70%) så det läser som ett sekundärt under-band, och skiljelinjen nedåt är en HÅRFIN
+   tonad accent-glimt i stället för en hård border, så den känns elegant, inte tung.
+   Skiljelinjen ritas som en 1px inset box-shadow (ingen layout/CLS) tonad ur border-tonen
+   med en aning accent-värme. */
+.vm-section-nav {
+  background-color: color-mix(in srgb, var(--color-surface) 62%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--color-accent) 12%, var(--color-border));
+}
+
+/* CHIP-RADEN: horisontell scroll-container. Tre saker bor här:
+   1. SWIPE-AFFORDANS via scroll-snap: chipsen snappar lätt i sidled så en swipe känns
+      avsiktlig och landar rent (proximity, inte mandatory, så det aldrig fastnar / kämpar
+      mot en mjuk auto-scroll av det aktiva chip:et).
+   2. DÖLJ SCROLLBAREN snyggt (men behåll scroll + tangentbords-/hjälpmedels-åtkomst):
+      scrollbar-width:none + ::-webkit-scrollbar display:none. overflow-x:auto behålls, så
+      det är bara scrollbar-GRAFIKEN som göms, inte funktionen.
+   3. KANT-FADE: en mjuk mask som tonar ut höger (och vänster när man scrollat) kant, så
+      det ANTYDS att det finns mer innehåll utanför vyn. Masken ligger på själva
+      track-elementet (se nedan). */
+.vm-section-nav-track {
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox: göm scrollbar-grafiken, behåll scroll-funktionen. */
+  scroll-snap-type: x proximity;
+}
+
+.vm-section-nav-track::-webkit-scrollbar {
+  display: none; /* WebKit/Blink: samma, göm grafiken (funktionen kvar). */
+}
+
+/* KANT-FADE-MASKEN: tonar ut radens kanter så avskurna chips antyder "mer att swipa".
+   Masken är symmetrisk (mjuk in-/utgång i båda kanter); padding på track:en (px-4/sm:px-8)
+   gör att det FÖRSTA chip:et ändå börjar synligt och fade:en bara nyper i ett chip som
+   verkligen sträcker sig ut ur vyn. Ren visuell effekt (mask påverkar inte layout/scroll
+   och döljer ingen interaktion: ett delvis maskat chip är fortfarande klickbart + i
+   tab-ordningen). På breda skärmar där allt ryms ligger kanterna i radens egen padding,
+   så fade:en syns inte (inget att antyda), exakt önskat. */
+@supports (mask-image: linear-gradient(90deg, #000, transparent)) {
+  .vm-section-nav-track {
+    --vm-nav-fade: 1.5rem;
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 var(--vm-nav-fade),
+      #000 calc(100% - var(--vm-nav-fade)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 var(--vm-nav-fade),
+      #000 calc(100% - var(--vm-nav-fade)),
+      transparent 100%
+    );
+  }
+}
+
+/* CHIPSEN: små, lugna pillar i appens etablerade pill-form (samma radie/typsnitt/känsla
+   som .vm-install-pill, tokens.css §22), men kompaktare (det är en sekundär navigations-
+   rad, inte en knapp-yta). Inaktivt = diskret (fg-muted-text på opak surface, det README-
+   mätta AA-paret), aktivt = appens accent-fyllda solid-bricka-form (samma --color-accent /
+   --color-accent-fg som primärknappen/DU-brickan/sigillet, AA-mätt 10.85:1 mörkt / 5.40:1
+   ljust, ingen ny kombination). Texten står på chip:ets EGNA opaka bakgrund (inte på det
+   semi-transparenta glas-bandet), så kontrasten är den mätta surface-kontrasten. */
+.vm-section-chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  scroll-snap-align: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  outline: none;
+  cursor: pointer;
+}
+
+/* Hover (vilo-chip): texten klarnar till full fg + en hårfin accent-värme i kanten, samma
+   affordans-språk som .vm-install-pill:hover. Bara FÄRG-övergångar (gatade nedan på
+   reduced-motion), ingen transform/rörelse. */
+.vm-section-chip:hover {
+  color: var(--color-fg);
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+}
+
+/* AKTIVT chip: appens accent-fyllda solid-bricka (färg-oberoende: aria-current bär a11y-
+   sanningen, men formen + den fyllda accenten gör det visuellt omisskännligt även för en
+   färgblind användare, eftersom det är den enda FYLLDA pillen i raden). Hover på det aktiva
+   chip:et ändrar inget (det är redan målet). */
+.vm-section-chip[data-active='true'],
+.vm-section-chip[data-active='true']:hover {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+/* Mjuk, lugn färg-övergång på chip-bytet (vilo <-> hover <-> aktiv), gatad på reduced-
+   motion (samma policy som hela appen, index.css). Bara color/border/background tonar,
+   ingen transform, så inget hoppar och CLS är noll. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-section-chip {
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      background-color 0.2s ease;
+  }
+}
+
+/* Den delade accent-fokusringen (EXAKT samma som .vm-install-pill / appens kontroller):
+   2px accent-ring 2px ut från chip:et. outline ger ringen utan en extra layout-yta, så
+   tangentbordsfokus alltid är tydligt synligt (WCAG 2.4.7), oavsett tema. */
+.vm-section-chip:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 60%, transparent);
+  outline-offset: 2px;
 }
 
 /* SCROLL-OFFSET-KONTRAKTET (det centrala, robusta greppet): varje navigerbar sektion får

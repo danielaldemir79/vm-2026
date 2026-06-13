@@ -19,11 +19,17 @@
 
 import { useEffect, useRef } from 'react';
 import { useSectionNavStore } from './section-nav-context';
+import { useActiveChipScroll } from './use-active-chip-scroll';
 import './section-nav.css';
 
 export function SectionNav() {
   const { sections, activeId, scrollTo } = useSectionNavStore();
   const navRef = useRef<HTMLElement>(null);
+
+  // Håll det aktiva chip:et synligt i den horisontella raden: när scroll-spy:n byter aktiv
+  // sektion (eller man klickar) scrollas chip:et in om det ligger utanför synfältet, så man
+  // alltid ser var man är. Respekterar reduced-motion (hookens egen useReducedMotion).
+  useActiveChipScroll(navRef, activeId);
 
   // Mät de två sticky-bandens samlade höjd ROBUST (inte en magisk pixel-gissning) och
   // exponera den som --vm-section-nav-offset på <html>. scroll-margin-top på sektionerna
@@ -82,17 +88,22 @@ export function SectionNav() {
   return (
     // Stackas DIREKT under headern: headern är sticky top-0 z-10, navet sitter under den
     // med top satt till headerns höjd (via --vm-section-nav-header-top i CSS) och ett z
-    // UNDER headern (z-[9]) så banden aldrig överlappar visuellt. Frostat glas-band, samma
-    // tema-trogna color-mix-recept som headern (design-frontend finputsar utseendet).
+    // UNDER headern (z-[9]) så banden aldrig överlappar visuellt. Det frostade glas-bandet
+    // (samma tema-trogna color-mix-recept som headern), den tunna skiljelinjen, kant-faden
+    // och chip-formerna bor i .vm-section-nav* (section-nav.css), så markupen håller bara
+    // semantiken + de stabila krokarna.
     <nav
       ref={navRef}
       data-section-nav=""
       aria-label="Sektioner"
-      className="vm-section-nav sticky z-[9] border-b border-border backdrop-blur-md"
+      className="vm-section-nav sticky z-[9]"
     >
+      {/* Chip-radens scroll-container (overflow-x-auto). data-section-nav-track är haken
+        useActiveChipScroll scrollar i sidled; kant-faden + dolda scrollbaren ligger på
+        klassen. items-center håller chipsen i lodrät mitt även om de skiljer i höjd. */}
       <ul
-        className="mx-auto flex max-w-6xl items-center gap-1.5 overflow-x-auto px-4 py-2 sm:px-8"
-        style={{ backgroundColor: 'color-mix(in srgb, var(--color-surface) 70%, transparent)' }}
+        data-section-nav-track=""
+        className="vm-section-nav-track mx-auto flex max-w-6xl items-center gap-1.5 px-4 py-2 sm:px-8"
       >
         {sections.map((section) => {
           const isActive = activeId === section.id;
@@ -104,15 +115,7 @@ export function SectionNav() {
                 data-active={isActive ? 'true' : undefined}
                 aria-current={isActive ? 'true' : undefined}
                 onClick={() => scrollTo(section.id)}
-                className={
-                  'rounded-pill border px-3 py-1 font-display text-xs font-semibold ' +
-                  'whitespace-nowrap outline-none transition-colors ' +
-                  'focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] ' +
-                  'focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)] ' +
-                  (isActive
-                    ? 'border-accent bg-accent text-accent-fg'
-                    : 'border-border bg-surface text-fg-muted hover:text-fg')
-                }
+                className="vm-section-chip font-display"
               >
                 {section.label}
               </button>
