@@ -269,10 +269,10 @@ export function PredictionForm({
   const points = myMatchPoints(match, current);
 
   // FACIT (det rätta slutresultatet) för en AVGJORD match, annars null (T73). Visas i
-  // låst-etiketten OVANFÖR "Ditt tips", tydligt skilt från det egna tipset. En pågående
-  // (men låst) match ger null -> inget facit (matchen är inte avgjord), samma ärlighet
-  // som poängen. Gatat på isFinished ENSAMT (inte current): facit är publikt och visas
-  // även för den som inte hann tippa.
+  // låst-blocket UNDER "Ditt tips" (ordningen: Ditt tips -> Facit -> poäng), tydligt skilt
+  // från det egna tipset. En pågående (men låst) match ger null -> inget facit (matchen är
+  // inte avgjord), samma ärlighet som poängen. Gatat på isFinished ENSAMT (inte current):
+  // facit är publikt och visas även för den som inte hann tippa.
   const facit = matchFacit(match);
 
   // Seeda fälten från mitt nuvarande tips (redigera = se det jag tippat).

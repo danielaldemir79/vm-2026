@@ -364,7 +364,9 @@ describe('PredictionForm , facit på avgjord match (T73)', () => {
     expect(facit).toHaveAttribute('data-tip-facit-score', '1-1');
     expect(facit).toHaveTextContent('1-1');
     // Straff-tillägget (formatPenalties) syns separat, så slutspels-facit inte är tvetydigt.
-    const penalties = facit?.querySelector('[data-tip-facit-penalties]');
+    // Explicit null när facit saknas (inte undefined via ?.), så assertionen failar ärligt
+    // om facit-raden uteblir i stället för att passera på undefined !== null.
+    const penalties = facit ? facit.querySelector('[data-tip-facit-penalties]') : null;
     expect(penalties).not.toBeNull();
     expect(penalties).toHaveTextContent('5-4 på straffar');
   });
