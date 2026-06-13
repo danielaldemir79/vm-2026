@@ -40,7 +40,7 @@ import {
   UpdatePrompt,
   useOnboarding,
 } from './features/app-settings';
-import { SectionNav, SectionNavProvider } from './features/section-nav';
+import { SectionNav, SectionNavMobile, SectionNavProvider } from './features/section-nav';
 import { VersionStamp } from './components/VersionStamp';
 
 /** Ett innehållskort på en yt-token, delad yt-form för app-vyns sektioner. */
@@ -142,13 +142,17 @@ function AppShell() {
           </div>
         </header>
 
-        {/* Sticky sektions-navet (T78, #165): den smala chip-raden DIREKT under headern,
-          hoppar till varje sektion på den långa en-sides-appen. Den klistrar under headern
-          (egen sticky, mätt offset) och renderar bara chips för sektioner som FAKTISKT
-          finns i DOM:en (registret), så aldrig en död länk. Lean per Daniels krav: rums-
-          och admin-ytorna hålls utanför raden. Funktionell + tillgänglig struktur här;
-          design-frontend lägger premium-finishen ovanpå (chip-styling, band, swipe). */}
+        {/* Sticky sektions-navet (T78, #165) DIREKT under headern, hoppar till varje sektion
+          på den långa en-sides-appen. Renderar bara för sektioner som FAKTISKT finns i DOM:en
+          (registret), så aldrig en död länk. Lean per Daniels krav: rums- och admin-ytorna
+          hålls utanför. RESPONSIV VÄXLING (T79, #167): på DESKTOP (>= sm) chip-raden
+          (SectionNav), på MOBIL (< sm) en hamburgare-meny (SectionNavMobile) som listar ALLA
+          sektioner vertikalt, så man inte missar dem bakom en sidled-swipe (Daniels T78-
+          feedback). Bara EN syns åt gången via Tailwind sm:-klasser (ren CSS, ingen JS-resize-
+          gissning); båda läser SAMMA store. Funktionell + tillgänglig struktur här; design-
+          frontend lägger premium-finishen ovanpå (chip-/band-styling, ikon, panel, animation). */}
         <SectionNav />
+        <SectionNavMobile />
 
         <main className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-10 sm:px-8 sm:py-16">
           {/* Hero. Wordmark som h1 (bär appens tillgängliga namn, håller smoke-testet). */}
