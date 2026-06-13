@@ -11,9 +11,14 @@
 // i många isolerade tester UTAN en SectionNavProvider. Utan provider blir hooken en
 // no-op, så en vy aldrig kraschar för att navet inte finns. Navet i appen ligger alltid
 // under providern.
+//
+// KONSUMERAR ENBART ACTIONS-CONTEXTEN (C4): register/unregister ligger i en egen, STABIL
+// context-yta (SectionNavActionsContext) skild från sections/activeId. Därför re-renderas
+// INTE de 8 sektions-vyerna när scroll-spy:n byter aktiv sektion (activeId) , de prenumererar
+// bara på den oföränderliga actions-ytan, inte på state-ytan navet läser.
 
-import { useContext, useEffect } from 'react';
-import { SectionNavContext } from './section-nav-context';
+import { useEffect } from 'react';
+import { useSectionNavActions } from './section-nav-context';
 import type { SectionDescriptor } from './section-labels';
 
 /**
@@ -29,9 +34,9 @@ import type { SectionDescriptor } from './section-labels';
  * exhaustive-deps är nöjd med bara primitiverna.
  */
 export function useRegisterSection(section: SectionDescriptor): void {
-  const store = useContext(SectionNavContext);
-  const register = store?.register;
-  const unregister = store?.unregister;
+  const actions = useSectionNavActions();
+  const register = actions?.register;
+  const unregister = actions?.unregister;
   const { id, label, order } = section;
   useEffect(() => {
     if (!register || !unregister) {

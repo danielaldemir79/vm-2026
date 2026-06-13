@@ -11,7 +11,12 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useReducedMotion } from 'motion/react';
-import { SectionNavContext, type SectionNavStore } from './section-nav-context';
+import {
+  SectionNavActionsContext,
+  SectionNavStateContext,
+  type SectionNavActions,
+  type SectionNavState,
+} from './section-nav-context';
 import type { SectionDescriptor } from './section-labels';
 import { useSectionSpy } from './use-section-spy';
 
@@ -74,12 +79,30 @@ export function SectionNavProvider({ children }: SectionNavProviderProps) {
   );
 
   // Scroll-spy: markera aktiv sektion när man scrollar. Stabil setActiveId-referens.
+  // Wiras DIREKT mot setActiveId (inte via context), så scroll-spy-kopplingen rörs inte
+  // av context-delningen (C4).
   useSectionSpy(sections, setActiveId);
 
-  const store: SectionNavStore = useMemo(
-    () => ({ sections, activeId, register, unregister, setActiveId, scrollTo }),
-    [sections, activeId, register, unregister, scrollTo]
+  // ACTIONS: register/unregister är båda useCallback-stabila (tomma deps -> byter aldrig
+  // referens efter mount). Vi listar dem ärligt i memo-deps (nöjer exhaustive-deps utan
+  // suppression), och eftersom de är stabila får actions-värdet ändå en STABIL identitet för
+  // appens hela liv. DÄRMED re-renderas useRegisterSection-konsumenterna (de 8 sektions-vyerna)
+  // ALDRIG av ett activeId-byte, vilket är hela C4-fixen.
+  const actions: SectionNavActions = useMemo(
+    () => ({ register, unregister }),
+    [register, unregister]
   );
 
-  return <SectionNavContext.Provider value={store}>{children}</SectionNavContext.Provider>;
+  // STATE: byter referens när sections/activeId/scrollTo ändras. Bara SectionNav konsumerar
+  // den, så bara navet re-renderas när det aktiva chip:et ska uppdateras.
+  const state: SectionNavState = useMemo(
+    () => ({ sections, activeId, scrollTo }),
+    [sections, activeId, scrollTo]
+  );
+
+  return (
+    <SectionNavActionsContext.Provider value={actions}>
+      <SectionNavStateContext.Provider value={state}>{children}</SectionNavStateContext.Provider>
+    </SectionNavActionsContext.Provider>
+  );
 }

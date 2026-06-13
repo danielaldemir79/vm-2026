@@ -42,6 +42,21 @@ krävs, Slutspel, Match-tips, Grupp-tips, Mästare, Topplista. Tom rad (inga reg
 renderar `null` (ingen tom sticky-list). Funktionell + tillgänglig kärna byggd här; design-frontend stylar
 mot `data-section-nav` / `data-section-chip` / `aria-current` / `--vm-section-nav-offset`.
 
+**Beslut (C4, prestanda, Copilot-runda-2): contexten DELAS på frekvens, kanoniskt React-mönster.**
+Scroll-spy:n byter `activeId` ofta vid scroll. När register/unregister OCH sections/activeId låg i SAMMA
+context-värde bytte det värdet identitet vid VARJE activeId-uppdatering, så alla 8 sektions-vyer (som via
+`useRegisterSection` bara behöver register/unregister) re-renderades vid varje aktiv-sektion-byte , onödig
+scroll-jank på tunga mobil-vyer (gruppspelstabeller, slutspelsträd). Lösningen är context-splitting på
+frekvens: `SectionNavActionsContext` = `{register, unregister}` (STABIL identitet efter mount, memo:as på de
+useCallback-stabila callbacksen) som ENBART `useRegisterSection` konsumerar, och `SectionNavStateContext` =
+`{sections, activeId, scrollTo}` (byter vid sections/activeId) som ENBART `SectionNav` konsumerar. Därmed
+re-renderas sektions-vyerna inte längre av ett activeId-byte (bevisat med render-räknar-test:
+`section-nav-perf.test.tsx`), bara navet uppdaterar sitt aktiva chip. `setActiveId` exponeras inte längre via
+context (wiras direkt in i `useSectionSpy` i providern). Actions-hooken är fortsatt TOLERANT (no-op utan
+provider), state-hooken fail-loud (kastar utan provider). Källa: React-dokumentationens rekommendation att
+dela context när olika delar uppdateras i olika takt (Context + Reducer / "Scaling Up with Reducer and
+Context"), och det etablerade rooms-context/RoomsProvider-mönstret i detta repo.
+
 ---
 
 ## 2026-06-13 , T77 (#161): per-match kommentar-trådar HOPFÄLLDA på matchkortet
