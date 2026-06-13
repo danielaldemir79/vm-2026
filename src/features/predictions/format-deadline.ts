@@ -4,15 +4,16 @@
 //
 // VARFÖR denna fil finns (Daniels feedback 5): grupp- och bracket-tipsen säger inte
 // klart NÄR tippningen låses. Den verifierade deadline-modellen (mot RLS, docs/
-// decisions.md T16 §4 + T53) är:
-//   * grupp-tips   -> GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 21/6 21:59Z),
+// decisions.md T16 §4 + T72) är:
+//   * grupp-tips   -> den PLATTA pool-deadlinen (omgång 1 spelad = 17/6 20:00Z),
 //   * bracket-slot -> slottens egen avspark (M73..M104), OFÖRÄNDRAD,
-//   * champion     -> GREATEST(turneringens första match g-A-1, fasta söndagstiden).
-// T53 (#95) införde, T67 (#123) flyttade grupp- + champion-deadlinen till söndag 21/6 (de som inte hann
-// före premiären). Funktionen formaterar EXAKT den `deadlineIso` selektorn räknar fram
-// (rå avspark för slots, förlängd söndag för grupp/champion), så budskapet säger den
-// FAKTISKA tidpunkten, aldrig en gissad dag , den må vara en match-avspark eller den
-// förlängda söndagskvällen, det är samma ISO som driver låset (en sanning).
+//   * champion     -> den PLATTA pool-deadlinen (samma instant som grupp-tipsen).
+// T53 (#95) införde en förlängning, T67 (#123) flyttade den till 21/6, T72 (#151) gjorde
+// grupp- + champion-deadlinen PLATT (låses när omgång 1 är spelad, rättvisare). Funktionen
+// formaterar EXAKT den `deadlineIso` selektorn räknar fram (rå avspark för slots, den platta
+// pool-tiden för grupp/champion), så budskapet säger den FAKTISKA tidpunkten, aldrig en
+// gissad dag , den må vara en match-avspark eller omgång-1-tiden, det är samma ISO som
+// driver låset (en sanning).
 //
 // EN SANNING (HARD, lessons: ingen hårdkodad text-dubblett av en tid): budskapet
 // härleds ur SAMMA `deadlineIso` som driver `locked` (now >= deadlineIso) i
