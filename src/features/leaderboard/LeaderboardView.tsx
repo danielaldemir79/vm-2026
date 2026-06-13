@@ -29,6 +29,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
+import { useRegisterSection, SECTIONS } from '../section-nav';
 
 /** Spring för layout-glidet: en tävlings-tight men mjuk fjäder (premium, ingen wobble). */
 const LAYOUT_SPRING = { type: 'spring', stiffness: 520, damping: 38, mass: 0.9 } as const;
@@ -130,6 +131,9 @@ function LeaderboardRow({
 
 export function LeaderboardView() {
   const store = useLeaderboardStore();
+  // Anmäl sektionen till chip-navet (T78, #165). Vyn monteras bara i live-läge (skalet
+  // gatar på rooms.enabled), så "Topplista"-chipet finns bara då.
+  useRegisterSection(SECTIONS.leaderboard);
   const reduceMotion = useReducedMotion();
   // Animera placerings-ändringar bara om användaren inte valt minska rörelse.
   const animateLayout = !reduceMotion;
