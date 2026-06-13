@@ -57,6 +57,20 @@ provider), state-hooken fail-loud (kastar utan provider). Källa: React-dokument
 dela context när olika delar uppdateras i olika takt (Context + Reducer / "Scaling Up with Reducer and
 Context"), och det etablerade rooms-context/RoomsProvider-mönstret i detta repo.
 
+**Beslut (C1, Copilot-runda-1): `getBoundingClientRect` korrekt för sticky-element, inte `offsetTop`/`offsetParent`.**
+`offsetTop`/`offsetParent` traverserar layoutträdet och missar att ett sticky-element befinner sig
+i ett eget stacking-kontext vid scroll, vilket ger fel offset i Firefox och Safari. `getBoundingClientRect`
+mäter den faktiska renderade positionen mot viewporten och är korrekt för sticky-stacking på alla browsers.
+Alltid använda `getBoundingClientRect` vid mätning av sticky-band som ska offseta scroll-mål.
+
+**Beslut (C5, Copilot-runda-3): CSS-variabler rensas vid providerns unmount.**
+`--vm-section-nav-offset` och `--vm-section-nav-header-top` skrivs pa `<html>` av `SectionNavProvider`.
+Om providern unmountas (t.ex. via React.StrictMode dubbelmount eller framtida dynamisk routing) maste
+CSS-variablerna rensas (sättas till '' via `document.documentElement.style.removeProperty`) i cleanup-
+funktionen av den useEffect som skriver dem, annars lever de stale-värdena kvar och skjuter
+scroll-margin-top fel pa sektionerna. Rensningen bevisad negativt: utan den failar ett test som kontrollerar
+att variablerna är tomma efter unmount.
+
 ---
 
 ## 2026-06-13 , T77 (#161): per-match kommentar-trådar HOPFÄLLDA på matchkortet

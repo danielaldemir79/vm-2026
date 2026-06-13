@@ -5,6 +5,94 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T78 (#165) sticky sektions-nav (chip-rad) , PR #166 mot develop , In Review
+
+**Branch:** `feature/T78-sektions-nav` @ HEAD `2cd2b85`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/166 mot `develop` (Closes #165, state: OPEN)
+**Issue:** https://github.com/danielaldemir79/vm-2026/issues/165
+**Live preview:** vm-2026.pages.dev
+
+### Vad T78 levererade
+
+En smal, sticky chip-rad direkt under appens header som hoppar till varje sektion pa den langa
+en-sides-appen. Sektioner registrerar sig sjalvt via `useRegisterSection` - doda chips
+ar omojliga by-construction. Scroll-spy via IntersectionObserver markerar aktiv sektion
+(aria-current). Chip-klick scrollar smidigt (reduced-motion: direkt) till rubriken precis
+under raden oavsett bandhogjd. Frostat glas-band, pill-chips, mobil swipe-fade och aktiv-chip-
+auto-scroll ar de visuella finisherna. Context delad pa frekvens (actions/state) sa sektions-
+vyerna inte re-renderas vid scroll-spy-uppdateringar.
+
+**Kedjan:**
+
+- **Senior-developer `9f8740d`:** SectionNavProvider med registry-context (doda chips
+  omojliga by-construction), robust uppmatt scroll-offset via getBoundingClientRect +
+  ResizeObserver, IntersectionObserver scroll-spy, reduced-motion overallt.
+- **Senior-developer `078143d`:** fixa render-loop i useRegisterSection (oberoende av
+  anropar-form).
+- **Design-frontend `bfee012`:** premium-finish (frostat band, lugna pill-chips, mobil
+  swipe-fade, aktiv-chip-auto-scroll).
+- **Lokal reviewer `6f17e02`:** F1 (header-matning bands till app-headern via
+  data-app-header) atgardad + negativt-verifierat test (F1 bekraftad). F2 (offset vid ren
+  resize) avvisad som YAGNI. F3 (live-skarmdumar) ej blockerare.
+- **Copilot-loop R1 -> commit `fd4d101`:** C1 offsetParent-bugg (getBoundingClientRect
+  korrekt mot sticky i alla browsers), C2 React.RefObject UMD-global, C3 spy-offset stale
+  (ResizeObserver i useSectionSpy).
+- **Copilot-loop R2 -> commit `5503938`:** C4 context-split (actions/state-context) for
+  att forhinbra re-render av sektions-vyer vid scroll-aktiv-chip-byte. Testat med
+  render-raknare-test (section-nav-perf.test.tsx).
+- **Copilot-loop R3 -> commit `2cd2b85`:** C5 CSS-variabler (--vm-section-nav-offset,
+  --vm-section-nav-header-top) rensas vid providerns unmount.
+- **Copilot-loop R4:** 0 fynd. Exit (monotont 3->1->1->0, inga strukturella kvar).
+
+**Verifiering (HEAD `2cd2b85`):** build EXIT 0, npm test 1949 grona / 0 fail (junit-
+auktoritativt), lint + format:check EXIT 0.
+
+**Acceptanskriterier T78 (#165):**
+- [x] AC1: Chip-rad visas direkt under headern, sticky, hopper till ratt sektion
+- [x] AC2: Scroll-spy markerar aktiv sektion (aria-current), reduced-motion respekteras
+- [x] AC3: Doda chips omojliga - registry-mekanism bevisad (sektioner som returnerar null
+  registrerar aldrig sitt chip)
+- [x] AC4: Build/lint/format rent, Copilot R1-R4 exit, inga olosta fynd
+
+### Behover-Daniel (uppdaterat efter T78)
+
+**Befordringskandidater (flaggas nedan i "Nasta steg", Daniels godkannande kravs):**
+
+- **"Negativt verifiera ett regressions-/isolerings-test"** aterkom 4 ganger under T78
+  (F1, C3, C4, C5). Kandidat for Playbook Forekkomst >= 3.
+- **"junit-reporter som auktoritativ testsiffra"** aterkom i princip varje grind-korning
+  under T78 (Windows vitest-worker trunkerar console-summan). Kandidat for IMPROVEMENTS.md.
+
+**Kvar att besluta/agera:**
+- **Publik-repo-go:** Daniel bestammer nar vm-2026 kan vara publikt synligt. README ar nu
+  klar (PR #164 mergad).
+- **Historik-omskrivnings-go:** dirigenten kollar + lagger fram for Daniels go fore
+  publicering.
+- **AI-pipeline-synlighet i publika docs:** README namner Agent Kit. OK for publicering?
+- **Supabase e-postmall #81:** stangt 2026-06-12 pa Daniels order.
+- **RLS-testrum i Supabase:** star kvar pa Daniels uttryckliga beslut (2026-06-12 15:18).
+- **TWA/Play-kontot:** se docs/twa-guide.md.
+- **#39-F1 (post-VM-vy):** pinnad, ej byggd.
+- **T16b-slot-tippbarhet-ur-sim:** pinnad.
+
+### Nasta steg
+
+**Om PR #166 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 166 --merge --repo danielaldemir79/vm-2026`.
+Stang issue #165: `gh issue close 165`. Flytta kort T78 till Done pa boarden.
+Kör sedan fore-publicerings-kollen (secret-svep av git-historik, RLS-sammanfattning,
+Claude-attributions-rensning ur gamla commits om sadan finns) och lagg fram for Daniels go.
+Presenter befordringskandidaterna for Daniel (se Behover-Daniel ovan).
+
+**Om PR #166 REDAN mergad:**
+T78 klar och live pa develop. Hela features-kon ar nu TOM (T77 mergad, README mergad,
+T78 mergad). Kör fore-publicerings-kollen direkt: secret-svep av git-historik, RLS-
+sammanfattning, Claude-attributions-rensning ur gamla commits om sadan finns. Lagg fram
+for Daniels go pa att gora repot offentligt. Presenter befordringskandidaterna for Daniel.
+Kör `/agent-kit` for att starta fore-publicerings-kollen.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , README (#163) merit-README post-v1.0 , PR #164 mot develop , In Review
 
 **Branch:** `chore/readme` @ HEAD `9200c26`
