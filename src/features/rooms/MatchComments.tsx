@@ -140,7 +140,9 @@ export function MatchComments({ matchId }: MatchCommentsProps) {
       className="mt-2 flex flex-col gap-2"
     >
       {/* Hopfäll-knappen (affordansen): aria-expanded/-controls knyter den till tråd-
-          panelen. En diskret pratbubble-glyf + texten. Hopfälld default. */}
+          panelen. En diskret pratbubble-glyf + texten + en chevron som vrids när tråden
+          är öppen (FÄRG-OBEROENDE "fäll ut / nu öppen"-signal, formen bär den; texten +
+          aria-expanded bär betydelsen för skärmläsare). Hopfälld default. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -153,6 +155,9 @@ export function MatchComments({ matchId }: MatchCommentsProps) {
           💬
         </span>
         <span className="text-xs font-medium">{toggleText}</span>
+        <span aria-hidden="true" className="vm-match-comments-chevron text-[0.625rem] leading-none">
+          ⌄
+        </span>
       </button>
 
       {/* Tråd-panelen: utfälld bara när open. id matchar knappens aria-controls. Renderas
