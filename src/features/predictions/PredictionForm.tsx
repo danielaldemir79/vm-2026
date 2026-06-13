@@ -4,7 +4,14 @@
 // LÅST-läge. Samma fast-bredds score-grid som resultatinmatningen (#39): lagnamn
 // truncar och knuffar aldrig rutorna, stark fokus-ring, stabila data-attribut.
 // Skillnaden mot resultat: detta är en GISSNING före avspark, inte ett facit, så
-// inga straffar och ingen status-väljare, och efter avspark är formuläret LÅST.
+// man matar aldrig in straffar här och det finns ingen status-väljare, och efter
+// avspark är formuläret LÅST.
+//
+// LÅST + AVGJORD (T58 + T73): på ett låst kort visas "Ditt tips", och när matchen
+// är AVGJORD fylls kortet på med (a) FACIT, det rätta slutresultatet + ev. straffar
+// (T73, formatScore/formatPenalties, delad sanning med matchkortet + avslöjande-vyn),
+// och (b) POÄNGEN man fick, om man tippade (T58, härledd ur score.ts via myMatchPoints,
+// EN poäng-källa). Facit visas oavsett om man tippade; poäng-raden kräver ett eget tips.
 //
 // VISUELL DESIGN (design-frontend-agentens lager, T15): en EGEN identitet , en
 // TIPS-KUPONG. Resultatinmatningen är "arenan/scoreboarden" (grön pitch); tips-
@@ -18,7 +25,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { MatchContextRow } from '../results/MatchContextRow';
-import { isFinished } from '../daily';
+import { formatPenalties, formatScore, isFinished } from '../daily';
 import {
   matchPointLabel,
   outcomeOf,
@@ -147,6 +154,40 @@ function formatPointDelta(points: number): string {
 }
 
 /**
+ * FACIT (det rätta slutresultatet) för en AVGJORD match: resultat-strängen + ev.
+ * straff-tillägget. Daniels feedback 2026-06-13 (T73): ett avgjort kort visade bara
+ * "Ditt tips: X-Y" men ALDRIG facit, så man kunde inte se hur det faktiskt slutade.
+ *
+ * EN sanning: facit-talet kommer ur formatScore och straffarna ur formatPenalties
+ * (BÅDA delade med matchkortet + avslöjande-vyn, features/daily, #99 anti-dubblett),
+ * så facit läser likadant överallt och vi gör ingen ny formatering här. Returnerar
+ * null när matchen INTE är avgjord (en pågående/kommande låst match har inget facit
+ * att visa, gissa aldrig ett resultat, samma anda som T55 för poängen).
+ *
+ * Skild från myMatchPoints på EN punkt: facit visas oavsett om JAG tippade (det rätta
+ * resultatet är publikt och intressant även för den som inte hann tippa), medan
+ * poäng-raden kräver ett eget tips att döma. Därför är detta gatat på isFinished
+ * ENSAMT, inte på current.
+ */
+interface MatchFacit {
+  /** Det rätta slutresultatet i ordinarie tid, "2-1" (formatScore, delad sanning). */
+  score: string;
+  /** Straff-tillägget "(4-3 på straffar)" om matchen avgjordes på straffar, annars null. */
+  penalties: string | null;
+}
+
+function matchFacit(match: Match): MatchFacit | null {
+  if (!isFinished(match)) {
+    return null;
+  }
+  // isFinished narrowar match.result till MatchResult (icke-null) via unions-kontraktet.
+  return {
+    score: formatScore(match.result),
+    penalties: formatPenalties(match.result),
+  };
+}
+
+/**
  * Brick-formen per poäng-typ (form/vikt, inte bara färg, matchar avslöjandets markör-
  * familj översatt till kupong-estetiken): EXAKT = den STOLTA solida guld-brickan
  * (.vm-coupon-mine, samma som sparat-kvittot), UTFALL = en lugnare guld-tint-chip
@@ -226,6 +267,13 @@ export function PredictionForm({
   // -> bara "Ditt tips", ingen gissad poäng (HARD T55). En otippad avgjord match ger
   // också null (current === null) -> ingen "0 Miss"-rad för den som inte var med (ärligt).
   const points = myMatchPoints(match, current);
+
+  // FACIT (det rätta slutresultatet) för en AVGJORD match, annars null (T73). Visas i
+  // låst-etiketten OVANFÖR "Ditt tips", tydligt skilt från det egna tipset. En pågående
+  // (men låst) match ger null -> inget facit (matchen är inte avgjord), samma ärlighet
+  // som poängen. Gatat på isFinished ENSAMT (inte current): facit är publikt och visas
+  // även för den som inte hann tippa.
+  const facit = matchFacit(match);
 
   // Seeda fälten från mitt nuvarande tips (redigera = se det jag tippat).
   const [homeGoals, setHomeGoals] = useState<string>(current ? String(current.homeGoals) : '');
@@ -363,6 +411,39 @@ export function PredictionForm({
                   <span className="text-fg-muted">Du hann inte tippa.</span>
                 )}
               </p>
+
+              {/* FACIT-RADEN (T73, Daniels feedback 2026-06-13): på en AVGJORD match visas
+                  det RÄTTA slutresultatet, TYDLIGT skilt från "Ditt tips" ovanför, så man ser
+                  hur matchen faktiskt slutade (inte bara vad man gissade). Ordet "Facit" + den
+                  solida guld-brickan (.vm-reveal-actual) är SAMMA språk som avslöjande-vyns
+                  facit-tal, så facit läser likadant överallt (#99, ingen ny visuell vokabulär,
+                  ingen ny kontrast-mätning, AA-bevisad coupon-ink på guld). Talet (formatScore)
+                  + ev. straffarna (formatPenalties) är delade sanningar med matchkortet. Visas
+                  BARA när facit finns (matchen avgjord), oavsett om jag tippade. data-tip-facit
+                  / -facit-penalties = stabila hakar för design + test. design-frontend
+                  balanserar placering/storlek mot poäng-raden + mobil. */}
+              {facit ? (
+                <p
+                  data-tip-facit=""
+                  data-tip-facit-score={facit.score}
+                  className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] leading-snug"
+                >
+                  <span className="text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-fg-muted">
+                    Facit
+                  </span>
+                  <span
+                    data-tip-facit-result=""
+                    className="vm-reveal-actual inline-flex items-center rounded-pill px-2.5 py-0.5 text-sm tabular-nums"
+                  >
+                    {facit.score}
+                  </span>
+                  {facit.penalties ? (
+                    <span data-tip-facit-penalties="" className="text-[0.75rem] text-fg-muted">
+                      {facit.penalties}
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
 
               {/* POÄNG-RADEN (T58 krav 1): på en AVGJORD match jag tippade visas poängen
                   + VARFÖR direkt på tips-kortet ("+3 · Exakt resultat" / "+1 · Rätt kryss"
