@@ -18,6 +18,10 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     ...devices['Desktop Chrome'],
+    // Force reduced motion så alla transitioner (kollaps-expansion, modal-öppning) blir
+    // momentana , skärmdumparna committas och ska vara stabila, inte fångade mitt i en
+    // animation (timing-känsligt). Speglar appens egen reduced-motion-väg (WCAG 2.3.3).
+    reducedMotion: 'reduce',
   },
   // Build + serve the dist, same as the E2E config, so the shots are of the real
   // deployable artifact. We FORCE fixtures mode by passing the Supabase env vars
