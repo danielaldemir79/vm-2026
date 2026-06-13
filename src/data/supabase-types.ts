@@ -204,6 +204,8 @@ export type Database = {
           body: string;
           created_at: string;
           id: string;
+          // T77 (#161): NULL = rums-chatt (T66), satt = en match-tråd. Nullable.
+          match_id: string | null;
           room_id: string;
           user_id: string;
         };
@@ -211,6 +213,7 @@ export type Database = {
           body: string;
           created_at?: string;
           id?: string;
+          match_id?: string | null;
           room_id: string;
           user_id?: string;
         };
@@ -218,6 +221,7 @@ export type Database = {
           body?: string;
           created_at?: string;
           id?: string;
+          match_id?: string | null;
           room_id?: string;
           user_id?: string;
         };
