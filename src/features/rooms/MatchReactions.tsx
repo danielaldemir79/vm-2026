@@ -110,7 +110,13 @@ function ReactionTallyButton({ tally, nameByUser, myUserId, onToggle }: Reaction
         onPointerUp={longPress.handlers.onPointerUp}
         onPointerLeave={(e) => {
           longPress.handlers.onPointerLeave(e);
-          setHoverFocusOpen(false);
+          // Stäng hover-/focus-öppningen BARA om knappen inte har fokus. Öppnades
+          // popovern via tangentbord (focus) och musen råkar lämna knappen ska den
+          // INTE stängas , det skulle bryta tangentbords-vägen. onBlur stänger den
+          // fokus-öppnade vägen (Copilot, PR #160).
+          if (document.activeElement !== e.currentTarget) {
+            setHoverFocusOpen(false);
+          }
         }}
         onPointerCancel={longPress.handlers.onPointerCancel}
         onPointerEnter={(e) => {

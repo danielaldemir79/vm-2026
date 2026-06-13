@@ -19,7 +19,7 @@ import type { ReactionReactor } from './reaction-aggregate';
 /** Saknad medlem (lämnat rummet): samma fallback-etikett som RoomComments. */
 export const UNKNOWN_MEMBER_NAME = 'Tidigare medlem';
 
-/** En rad i "vem reagerade"-popovern: vem (namn), när (ISO + redan formaterad), min. */
+/** En rad i "vem reagerade"-popovern: vem (namn), när (rå ISO, formateras i UI:t), min. */
 export interface ReactionAuthorRow {
   /** Reagerarens user_id (stabil React-nyckel + avatar-hue-källa). */
   userId: string;
