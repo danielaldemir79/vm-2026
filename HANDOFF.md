@@ -5,6 +5,96 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T79 (#167) responsiv sektions-nav (hamburgare pa mobil) , PR #168 mot develop , In Review
+
+**Branch:** `feature/T79-responsiv-nav` @ HEAD `12836e0`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/168 mot `develop` (Closes #167, state: OPEN)
+**Issue:** https://github.com/danielaldemir79/vm-2026/issues/167
+**Live preview:** vm-2026.pages.dev
+
+### Vad T79 levererade
+
+Hamburgare-meny pa mobil (< sm) som visar alla sektioner vertikalt vid klick + chip-rad oforandrad
+pa desktop (>= sm). CSS-vissling (Tailwind sm:-klasser, ingen JS-resize-lyssnare). Delad
+`useStickyBandOffset`-hook (MAX over alla synliga band, ej summa) sa offset-kontraktet ar EN sanning
+for bada banden. Full a11y: hamburgare-knapp med aria-expanded/aria-haspopup, Escape stanger, fokus
+in-och-retur, fokus-falla, aria-controls villkorad pa oppet panel-lage. Hamburgare->kryss-animation
+via CSS (44px tap-targets, in-flow-panel, farg-oberoende aktiv-markör).
+
+**Kedjan:**
+
+- **Senior-developer `ced1bee`:** funktionell + tillganglig karna (hamburgare-meny pa mobil, chip-rad
+  pa desktop, ren CSS-vaxling, delad `useStickyBandOffset`-hook, full a11y).
+- **Design-frontend `325176e`:** premium-finish (hamburgare->kryss-animation, 44px tap-targets,
+  farg-oberoende aktiv-markör, in-flow-panel).
+- **Lokal reviewer `6c1c48d`:** F1 (offset-testet bevisade inte MAX mot SUM, dolt band mockad till 0)
+  atgardad + negativt-verifierad. Commit skarpte useStickyBandOffset-testet sa MAX vaktas mot SUM.
+- **Copilot R1 -> commit `4316602`:** C1 CSS-klass saknades pa svg-ikon (vm-section-menu-icon),
+  C2 CSS-klass saknades pa span-etikett (vm-section-menu-label), C3 kommentar-drift
+  (recompute-nyckel), C4 scroll-spy observerade bara forsta bandet (stale rootMargin pa mobil vid
+  panel-oppning) atgardad med querySelectorAll over alla band + tva-bands-harness-test,
+  C5 cleanup rensade delade CSS-vars for tidigt vid multi-instans atgardad (rensa bara nar inget
+  band kvar, negativ-kontroll).
+- **Copilot R2 -> commit `12836e0`:** C6 aria-controls pekade pa omonterad panel i stangt lage
+  atgardad (aria-controls={open ? panelId : undefined}, negativ-kontroll).
+- **Copilot R3:** 0 fynd. Exit (monotont 5->1->0, inga strukturella kvar).
+
+**Verifiering (HEAD `12836e0`):** build EXIT 0, npm test 1974/0/0 (junit-auktoritativt), lint +
+format:check EXIT 0.
+
+**Acceptanskriterier T79 (#167):**
+- [x] AC1: Hamburgare-meny pa mobil (< sm), chip-rad pa desktop (>= sm), CSS-vaxling
+- [x] AC2: Delad useStickyBandOffset-hook, MAX-offset ar EN sanning for bada banden
+- [x] AC3: Full a11y: aria-expanded/aria-controls villkorad/Escape/fokus-in-och-retur/fokus-falla
+- [x] AC4: Build/lint/format rent, Copilot R1-R3 exit (5->1->0), inga olosta fynd
+
+### Behover-Daniel (uppdaterat efter T79)
+
+**Befordrings-kandidat fran T79 (Daniels godkannande kravs):**
+- **"Mock som simulerar en observer/event-kalla maste replikera dess gating"** - nytt knep
+  fangat i T79 (C4: emitResize-mock fyrade oavsett observation, senior-dev atgardade).
+  Forekkomst 1, inskrivet i playbook. Ingen 3+-flagga an.
+- **"Invariant-test vars fixtur kollapsar operatorn som ska bevisas"** - monstret aterkom
+  under T79 (F1: offset-testet bevisade inte MAX mot SUM; C4: emitResize-mock fyrade
+  oavsett registrering). Senior-developer flaggade det i sitt handoff. Forekkomst 1 i
+  playbook (nytt, inskrivet nu). Inget >= 3 an.
+- **Negativ-kontroll (redan befordrad topp-regel)** - bekraftades aterigen under T79 (F1,
+  C4, C5, C6 - alla kravde negativ-kontroll). Inga nya atgarder kravs.
+
+**Forsla-publicering (Daniel godkant 2026-06-13, "Tona bort AI-spar, sen publik"):**
+Nasta steg efter T79-merge ar fore-publicerings-kollen. Dirigenten ansvarar:
+1. Historik-omskrivning: ta bort 348 Co-Authored-By Claude-rader + CLAUDE.md/HANDOFF.md ur
+   historiken (git filter-repo). Sanera SPEC.md. Tona ner README-noten. BEHALL decisions.md
+   och patterns.md per Daniels val.
+2. Gor repot publikt pa Daniels go.
+
+**Cache-drift (kand/AKUT):** plugin-cachen har gamla T1/T3-laerdomar som kallan saknar. De
+2026-06-13-befordrade topp-reglerna (negativ-kontroll, fixtures-forst, mat-pa-riktigt,
+bevisa-skarven, regenerera-bevisar-ej-sanning) ar committade i agent-kit-kallan men inte
+deployade till cachen forran rescue+sync gors.
+
+**Kvar att besluta/agera:**
+- Supabase e-postmall #81: stangt 2026-06-12 pa Daniels order.
+- RLS-testrum i Supabase: star kvar pa Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+
+### Nasta steg
+
+**Om PR #168 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 168 --merge --repo danielaldemir79/vm-2026`.
+Stang issue #167: `gh issue close 167`. Flytta kort T79 till Done pa boarden.
+Kör sedan fore-publicerings-kollen (historik-omskrivning + publik-go pa Daniels order).
+
+**Om PR #168 REDAN mergad:**
+T79 klar och live pa develop. Kör fore-publicerings-kollen direkt: git filter-repo pa
+historiken (Co-Authored-By Claude + CLAUDE.md/HANDOFF.md bort), sanera SPEC.md, tona ner
+README-noten. Lagg fram for Daniels go pa att gora repot offentligt.
+Kör `/agent-kit` for att starta fore-publicerings-kollen.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T78 (#165) sticky sektions-nav (chip-rad) , PR #166 mot develop , In Review
 
 **Branch:** `feature/T78-sektions-nav` @ HEAD `2cd2b85`
