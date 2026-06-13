@@ -12,13 +12,13 @@ function renderCard(ui: ReactElement) {
   return render(<TeamProfileStub>{ui}</TeamProfileStub>);
 }
 
-function team(id: string, name: string): Team {
-  return { id, name, code: id.toUpperCase(), group: 'A' };
+function team(id: string, name: string, fifaRanking?: number): Team {
+  return { id, name, code: id.toUpperCase(), group: 'A', fifaRanking };
 }
 
 const teamsById = new Map<string, Team>([
-  ['mex', team('mex', 'Mexiko')],
-  ['rsa', team('rsa', 'Sydafrika')],
+  ['mex', team('mex', 'Mexiko', 14)],
+  ['rsa', team('rsa', 'Sydafrika', 60)],
 ]);
 
 function groupMatch(overrides: Partial<Match> = {}): Match {
@@ -158,5 +158,80 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     const card = screen.getByRole('article');
     expect(within(card).getAllByText('Ej klart')).toHaveLength(2);
     expect(within(card).getByText('Sextondelsfinal')).toBeInTheDocument();
+  });
+
+  // ----------------------------------------------------------------------------
+  // T4e (#149): FIFA-ranking per lag + arena-kapacitet på kortet.
+  // ----------------------------------------------------------------------------
+
+  it('visar FIFA-rankingen per lag ur Team.fifaRanking (T4e)', () => {
+    const { container } = renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
+    // Båda lagen har en ranking i teamsById (mex #14, rsa #60).
+    expect(screen.getByText('FIFA #14')).toBeInTheDocument();
+    expect(screen.getByText('FIFA #60')).toBeInTheDocument();
+    // Exakt två ranking-hakar (en per lag-sida).
+    expect(container.querySelectorAll('[data-fifa-ranking]')).toHaveLength(2);
+  });
+
+  it('hanterar SAKNAD FIFA-ranking TYST (inget "FIFA #undefined", T4e)', () => {
+    // Ett lag UTAN ranking (vanligt för testdata/ännu obestämda lag): ingen ranking-rad.
+    const teamsNoRanking = new Map<string, Team>([
+      ['mex', team('mex', 'Mexiko')], // ingen fifaRanking
+      ['rsa', team('rsa', 'Sydafrika', 60)],
+    ]);
+    const { container } = renderCard(<MatchCard match={groupMatch()} teamsById={teamsNoRanking} />);
+    expect(screen.queryByText(/FIFA #undefined/)).not.toBeInTheDocument();
+    expect(screen.getByText('FIFA #60')).toBeInTheDocument();
+    // Bara EN ranking-hak (laget utan ranking renderar ingen).
+    expect(container.querySelectorAll('[data-fifa-ranking]')).toHaveLength(1);
+  });
+
+  it('ett okänt slutspelslag (teamId null) visar ingen FIFA-ranking (gissa aldrig, T4e)', () => {
+    const ko = groupMatch({
+      id: 'M73',
+      stage: 'round-of-32',
+      groupId: null,
+      homeTeamId: null,
+      awayTeamId: null,
+    });
+    const { container } = renderCard(<MatchCard match={ko} teamsById={teamsById} />);
+    expect(container.querySelectorAll('[data-fifa-ranking]')).toHaveLength(0);
+    expect(screen.queryByText(/FIFA #/)).not.toBeInTheDocument();
+  });
+
+  it('visar arena-KAPACITETEN för en känd arena ("80 824 platser", T4e)', () => {
+    const { container } = renderCard(
+      <MatchCard
+        match={groupMatch({ venue: 'Estadio Azteca, Mexico City, Mexiko' })}
+        teamsById={teamsById}
+      />
+    );
+    const cap = container.querySelector('[data-venue-capacity]');
+    expect(cap).not.toBeNull();
+    // Regex (siffrorna + "platser") undviker att binda assertionen till exakt vilket
+    // mellanslags-tecken (U+00A0) formateringen använder; innehållet är det som räknas.
+    expect(cap?.textContent).toMatch(/80.824 platser/);
+    // Arenan + kapaciteten står i samma Arena-dd.
+    expect(screen.getByText('Arena')).toBeInTheDocument();
+  });
+
+  it('visar INGEN kapacitet TYST för en arena utan verifierad kapacitet (T4e)', () => {
+    // En arena som inte finns i kapacitets-tabellen (t.ex. den äldre "Arena, Stad"-formen
+    // utan land): arenan visas, men ingen kapacitets-siffra (gissa aldrig).
+    const { container } = renderCard(
+      <MatchCard
+        match={groupMatch({ venue: 'MetLife Stadium, East Rutherford' })}
+        teamsById={teamsById}
+      />
+    );
+    expect(screen.getByText('MetLife Stadium, East Rutherford')).toBeInTheDocument();
+    expect(container.querySelector('[data-venue-capacity]')).toBeNull();
+  });
+
+  it('visar INGEN kapacitet när arenan är platshållaren (#35 döljs, kapacitet med, T4e)', () => {
+    const { container } = renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
+    // Default-venue i groupMatch är platshållaren -> varken arena eller kapacitet.
+    expect(screen.queryByText('Arena')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-venue-capacity]')).toBeNull();
   });
 });

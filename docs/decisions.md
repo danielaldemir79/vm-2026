@@ -5,6 +5,55 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T4e (#149): arena-kapacitet (källåkrad) + FIFA-ranking på matchkortet
+
+**Bakgrund (Daniels feedback 2026-06-13, #149):** "mer matchinfo på kortet, BALANSERAT, utan att
+stöka till det." Domare SKIPPAS (inte sourcebart i förväg). Två tillägg: (1) åskådarkapacitet per
+arena, och (2) lagets FIFA-ranking. Funktionellt + a11y-byggt av senior-dev; design-frontend
+finputsar placering/balans (kapacitet diskret efter arenan, ranking under lagnamnet) på mobil.
+
+**1) Arena-kapacitet (NY data, källåkrad, gissas ALDRIG).** Kapaciteten är PER ARENA (16 värden),
+inte per match. Den bor i en EGEN CAPACITIES-sektion i gold source (`venue-source.txt`), parsas av
+`venue-parser.ts` (`parseVenueCapacities`/`buildVenueCapacityTable`, fail-loud på okänd/dubblerad/
+saknad arena + icke-heltal), och byggs till `WC2026_VENUE_CAPACITIES` (`venue-capacities.ts`),
+värde-låst i CI (`venue-capacity-source.test.ts`: pinnar alla 16 figurer + mutationstest + svensk
+formatering). venue-strängen ("Arena, Stad, Land") är OFÖRÄNDRAD (kapaciteten är en separat per-arena-
+uppslagning, inte instoppad i strängen), och **matches.ts rörs INTE** (diff-verifierat: 0 ändringar).
+
+**Figur-VALET (viktigt, INTE en gissning):** det cirkulerar TVÅ figur-uppsättningar.
+- (1) **FIFA:s officiella TURNERINGS-kapacitet** (VALD: Estadio Azteca 80 824, AT&T 70 649, MetLife
+  80 663) = arenan i VM-konfiguration, exakta tal, internt konsistenta.
+- (2) Arenornas ordinarie MAX-/ungefärliga kapacitet (t.ex. myfootballfacts: Azteca 83 000, AT&T
+  94 000) = ordinarie/avrundad uppställning, INTE VM-konfigurationen.
+
+Vi väljer (1) för att det är (a) FIFA:s officiella turnerings-tal, (b) ur SAMMA gold source (Wikipedia
+"2026 FIFA World Cup", venue-tabellen) som redan ankrar arena-listan (T4c/T4d), och (c) korskoll-
+bekräftat. **Källa (PRIMÄR):** Wikipedia "2026 FIFA World Cup" venue-tabell
+(https://en.wikipedia.org/wiki/2026_FIFA_World_Cup), hämtad 2026-06-13. **Korskoll (oberoende):**
+Crypto Briefing "FIFA announces official seating capacities for 2026 World Cup venues"
+(https://cryptobriefing.com/fifa-2026-world-cup-venue-capacities/) bekräftar att FIFA officiellt
+tillkännagav dessa figurer och citerar Azteca 80 824, MetLife "från 80 663", BMO Field ~43 000, exakt
+samma som Wikipedia-tabellen. Wikipedia noterar att talen kan justeras av FIFA senare; vi pinnar
+2026-06-13-figurerna och datum-stämplar checken inline i `venue-source.txt`. (Daniels exempel i
+direktivet, "87 523", var arenans äldre/ordinarie siffra, inte VM-talet, alltså medvetet INTE använt.)
+
+**Svensk siffer-formatering (en sanning):** `formatCapacity` (`match-display.ts`) ger "80 824 platser"
+med FAST mellanslag (U+00A0) som tusentals-avgränsare, normaliserat ur `Intl.NumberFormat('sv-SE')`
+så det är deterministiskt oavsett Node-/ICU-version. En arena utan verifierad kapacitet hanteras
+TYST (`formatVenueCapacity` ger null, ingen gissad siffra) , men alla 16 HAR en figur, så den tysta
+grenen gäller bara en okänd arena (t.ex. den äldre "Arena, Stad"-formen utan land).
+
+**2) FIFA-ranking (BEFINTLIG data, bara UI).** `Team.fifaRanking` finns redan (T10/T69), källåkrad.
+T4e LÄSER bara fältet och visar "FIFA #14" per lag (`formatFifaRanking`). Lag UTAN känd ranking
+(ännu obestämda slutspelslag, `homeTeamId`/`awayTeamId` null, eller lag utan rankingfält) hanteras
+TYST (ingen "FIFA #undefined"). Ingen ny datakälla.
+
+**UI/a11y:** MatchCard wirar in kapaciteten i Arena-`<dd>:n` (`data-venue-capacity`-hak) och rankingen
+under lagnamnet (`data-fifa-ranking`-hak). Rankingen är LÄSBAR för skärmläsare (inte aria-hidden), då
+den inte redan ligger i kortets a11y-namn. Rena hakar lämnade åt design-frontend för balans/mobil.
+
+---
+
 ## 2026-06-13 , T4d (#147): värdland tillagt i venue-strängen ("Arena, Stad, Land")
 
 **Bakgrund (Daniels feedback 2026-06-13, #147):** matchkortet visade "Arena, Stad" (T4c, #35). Daniel

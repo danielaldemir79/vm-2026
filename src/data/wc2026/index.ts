@@ -17,3 +17,10 @@ export { WC2026_TEAMS, WC2026_GROUPS } from './teams';
 export { WC2026_MATCHES } from './matches';
 export { WC2026_TEAM_PROFILES } from './team-profiles';
 export type { TeamProfile, TeamProfileTable } from './team-profiles-parser';
+
+// Åskådarkapacitet per arena (T4e/#149): källånkrad (FIFA:s turnerings-kapaciteter,
+// Wikipedia "2026 FIFA World Cup", korskoll-bekräftad), genererad ur venue-source.txt
+// och värde-låst i CI. Per ARENA (16 värden), inte per match. Matchkortet slår upp
+// matchens arena -> kapacitet och visar den diskret. Se venue-capacities.ts.
+export { WC2026_VENUE_CAPACITIES } from './venue-capacities';
+export type { VenueCapacityTable } from './venue-parser';

@@ -67,8 +67,44 @@ City" som matches.ts-grannfält redan inte översätter). LANDET skrivs däremot
 ("Mexiko"/"USA"/"Kanada"), det är appens språk och har etablerade svenska namn. Diakriter
 bevaras (Curaçao-laget påverkar inte arena-strängarna; alla 16 arenanamn är ASCII).
 
-FORMAT: en rad per match, exakt 104 rader (en per match i matches.ts). Tomma rader och
-rader som börjar med '#' (kommentar/grupprubrik) ignoreras. Fältordning per rad,
+ÅSKÅDARKAPACITET PER ARENA (T4e #149, källåkrad, gissas ALDRIG): Daniels feedback
+2026-06-13: "mer matchinfo på kortet". Varje arena visas med sin åskådarkapacitet
+(t.ex. "Estadio Azteca ... (80 824 platser)"). Kapaciteten är PER ARENA (16 värden),
+INTE per match, så den bor i sin egen CAPACITIES-sektion nedan (en arena -> kapacitet),
+inte i venue-strängen (den hålls "Arena, Stad, Land" oförändrad, T4c/T4d).
+
+  KÄLLA (PRIMÄR, samma gold source som arena-listan): FIFA:s OFFICIELLT TILLKÄNNAGIVNA
+  turnerings-kapaciteter, Wikipedia "2026 FIFA World Cup" (venue-tabellen,
+  https://en.wikipedia.org/wiki/2026_FIFA_World_Cup), hämtad 2026-06-13.
+  KORSKOLL (oberoende andra källa): Crypto Briefing "FIFA announces official seating
+  capacities for 2026 World Cup venues" (https://cryptobriefing.com/fifa-2026-world-cup-
+  venue-capacities/) bekräftar att FIFA officiellt tillkännagav dessa turnerings-
+  kapaciteter och citerar Estadio Azteca 80 824, MetLife "från 80 663", BMO Field ~43 000,
+  EXAKT samma figurer som Wikipedia-tabellen.
+
+  VAL AV FIGUR (viktigt, INTE en gissning): det cirkulerar TVÅ figur-uppsättningar.
+  (1) FIFA:s officiella TURNERINGS-kapacitet (den vi använder: Azteca 80 824, AT&T 70 649)
+      = arenan i VM-konfiguration, exakta tal, internt konsistenta, en konfiguration.
+  (2) Arenornas vanliga MAX-/ungefärliga kapacitet (t.ex. myfootballfacts: Azteca 83 000,
+      AT&T 94 000) = ordinarie/avrundad uppställning, INTE VM-konfigurationen.
+  Vi väljer (1) eftersom det är (a) FIFA:s officiella turnerings-tal, (b) samma gold source
+  (Wikipedia "2026 FIFA World Cup") som redan ankrar arena-listan, och (c) korskoll-bekräftat
+  som FIFA:s tillkännagivna figurer. Att blanda (1) och (2) vore inkonsekvent. Se
+  docs/decisions.md (T4e). Wikipedia noterar själv att talen kan justeras av FIFA senare;
+  vi pinnar 2026-06-13-figurerna och datum-stämplar checken här.
+
+FORMAT (CAPACITIES): en rad per ARENA, exakt 16 rader. Tomma rader och '#'-rader
+ignoreras. Fältordning per rad, separerade med ' | ':
+  Arena, Stad, Land | capacity=<heltal, siffror utan avgränsare>
+Arena-strängen MÅSTE vara exakt en av de 16 KNOWN_VENUES. capacity = åskådarkapacitet
+som rent heltal (t.ex. 80824); den svenska tusentals-formateringen ("80 824 platser")
+görs i UI:t (en sanning, formatCapacity), inte i källan. Parsern failar högt om en arena
+saknas, är dubblerad, är okänd, eller om kapaciteten inte är ett positivt heltal. Parsern
+läser raderna mellan CAPACITIES-markören och nästa sektions-markör (VENUES); ALLT mellan
+dem ska vara kapacitets-rader eller '#'-kommentarer, ingen löpande text.
+
+FORMAT (VENUES): en rad per match, exakt 104 rader (en per match i matches.ts). Tomma
+rader och rader som börjar med '#' (kommentar/grupprubrik) ignoreras. Fältordning per rad,
 separerade med ' | ':
   MATCH_ID | venue=Arena, Värdstad, Värdland | match=läsbar match (för människans spot-check)
 MATCH_ID = matches.ts:s stabila id (g-<GRUPP>-<n> för gruppspel, M<nr> för slutspel),
@@ -76,6 +112,29 @@ join-nyckeln. venue = "Arena, Stad, Land". match = en läsbar etikett (lag för 
 FIFA-position för slutspel) ENBART för spot-check, parsern läser den inte. Parsern
 matchar MATCH_ID exakt mot matches.ts och failar högt om en match saknas, är dubblerad,
 har okänt id, eller om venue inte är en av de 16 kända arenorna.
+
+CAPACITIES
+# USA (11 arenor)
+MetLife Stadium, East Rutherford, USA | capacity=80663
+AT&T Stadium, Arlington, USA | capacity=70649
+SoFi Stadium, Inglewood, USA | capacity=70492
+Arrowhead Stadium, Kansas City, USA | capacity=69045
+Levi's Stadium, Santa Clara, USA | capacity=68827
+NRG Stadium, Houston, USA | capacity=68777
+Lincoln Financial Field, Philadelphia, USA | capacity=68324
+Mercedes-Benz Stadium, Atlanta, USA | capacity=68239
+Lumen Field, Seattle, USA | capacity=66925
+Hard Rock Stadium, Miami Gardens, USA | capacity=64478
+Gillette Stadium, Foxborough, USA | capacity=64146
+
+# Mexiko (3 arenor)
+Estadio Azteca, Mexico City, Mexiko | capacity=80824
+Estadio BBVA, Guadalupe, Mexiko | capacity=51243
+Estadio Akron, Zapopan, Mexiko | capacity=45664
+
+# Kanada (2 arenor)
+BC Place, Vancouver, Kanada | capacity=52497
+BMO Field, Toronto, Kanada | capacity=43036
 
 VENUES
 # Grupp A
