@@ -5,6 +5,36 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T71 (#145): joker-tillägget BORTTAGET (poängen blir en enkel summa)
+
+**Beslut: ta bort hela joker-tillägget, BARA jokern.** Daniels beslut 2026-06-13: "ta bort joker
+etc tillägget. det rör till det mer." Jokern lät en spelare markera EN match per omgång vars
+match-poäng dubblades (×2). Det förvirrade. Efter T71 räknas varje match EN gång, så poängen är
+en enkel summa utan dubbling. Detta ERSÄTTER T19-jokerbeslutet (se T19-blocket nedan):
+JOKER_MULTIPLIER, joker-storen, joker-API:t, joker-toggle-UI:t och joker-markeringen är borta.
+
+**Vad som STANNAR (joker-OBEROENDE, rör dem inte):** streak, "kallade skrällen" och "perfekt
+omgång" i `derive-badges.ts`. De bedömdes alltid på RÅ match-poäng (inte den boostade), så de är
+oförändrade i beteende, bara kommentarer som refererade "joker-dagen" är uppdaterade så de inte
+driftar (PRINCIPLES §9, kommentarer matchar koden).
+
+**Poäng-invarianten (verifierad med test):** en medlem som tidigare fått dubblad poäng på en
+joker-match får nu rå poäng. `aggregate-scores.ts` lägger `matchPoints += base` (ingen
+`base * JOKER_MULTIPLIER`-gren). Bästa call i `personal-stats.ts` väljs på rå poäng (ingen
+boostad). Test uppdaterade/borttagna som antog dubbling (aggregate-scores-joker.test.ts borttagen,
+personal-stats-tester avjokrade).
+
+**DB-beslut: tabellen `room_jokers` + RPC:n `match_joker_day` + triggern `room_jokers_set_day`
+LÄMNAS ORÖRDA i Supabase.** Ingen migration, inget destruktivt (appen är LIVE under VM, varsamhet).
+Tabellen blir oanvänd/tom, ofarlig. De genererade TS-typerna i `supabase-types.ts` BEHÅLLS därför
+(att ta bort dem skulle få den genererade typfilen att ljuga om live-schemat, en regenerering
+skulle ge tillbaka dem). Kommentarerna där är uppdaterade till att säga att tabellen är oanvänd
+sedan T71, inte att ett klient-API rör den.
+
+**SPEC-not:** SPEC §12 (Prediction "jokermarkering, dubbel-poäng") + SPEC §6/§179 (gamification
+"joker-match") är därmed FÖRÅLDRADE. Besluts-loggen är den levande sanningen och går före SPEC
+(samma konvention som T19 ersatte tidigare beslut). SPEC lämnas som historiskt dokument.
+
 ## 2026-06-13 , T68b (#136): expand-chevronen är nu klickbar (a11y-val: aria-hidden div-spegel)
 
 **Bakgrund:** Daniels feedback 2026-06-13: "den där expandera pilen ska vara klickbar också och
@@ -102,9 +132,10 @@ All guld bär text som ANTINGEN full `fg` på en låg guld-tint ELLER den AA-sä
 - Hero-stat-tal (fg) på guld-8%-tint: **10.63 / 16.46**. Hero-stat-etikett (warning): **7.04 / 5.44**.
 - Övriga stat-brickor på opak surface-raised: tal (fg) **12.66 / 17.91**, etikett (fg-muted) **6.23 / 6.52**.
 - Bästa call på guld-6%-glow: rubrik (fg) **11.12 / 16.75**, kontext (fg-muted) **5.48 / 6.10**.
-- Joker-markör (coupon-ink på SOLID guld, ÅTERBRUK, ingen ny kombination): **10.90 / 5.03**.
+  (Joker-markören som tidigare mättes här togs bort i T71, joker-tillägget borttaget.)
 
-MIN över alla nya text-ytor: **5.48:1 mörkt / 5.03:1 ljust** (alla >= 4.5, normal text). Glow-/kant-/tint-
+MIN över alla text-ytor: **5.48:1 mörkt / 5.31:1 ljust** (alla >= 4.5, normal text; ljust-MIN var
+5.03:1 medan joker-markören fanns, höjdes till 5.31:1 när den togs bort i T71). Glow-/kant-/tint-
 lagren under tröskeln bär ALDRIG text. Tomt-läge + gating oförändrade funktionellt (alla T23-tester gröna).
 
 ---
@@ -703,6 +734,11 @@ Reaktioner är ett additivt socialt lager: utan provider ska korten fungera prec
 inert store (enabled=false -> MatchReactions renderar null) är rätt, inte ett kast.
 
 ## 2026-06-12 , T19 (#19): gamification (streaks, märken, joker-match)
+
+> **DELVIS ERSATT av T71 (2026-06-13):** joker-match-delen nedan är BORTTAGEN ur appen (JOKER_MULTIPLIER,
+> joker-storen/-API:t/-UI:t, dubblingen). DB-tabellen `room_jokers` + `match_joker_day` + triggern
+> lämnades orörda men är oanvända. STREAKS + de två MÄRKENA (nedan) STÅR KVAR oförändrade, de var
+> alltid joker-oberoende. Se T71-blocket överst.
 
 **Beslut: streaks + märken HÄRLEDS rent ur befintlig data, INGEN ny DB-tabell.** Streak och
 de två märkena räknas fram ur exakt samma data topplistan redan har (en medlems match-tips +

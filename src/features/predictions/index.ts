@@ -9,9 +9,6 @@ export {
   type PredictionsStore,
   type PredictionsStatus,
 } from './predictions-context';
-// T19 (#19): joker-storen (sätt/ångra min joker-match, en per omgång).
-export { JokerProvider, type JokerProviderProps } from './JokerProvider';
-export { useJokerStore, type JokerStore, type JokerStatus } from './joker-context';
 export {
   selectPredictableMatches,
   selectOpenPredictableMatches,

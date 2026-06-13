@@ -20,7 +20,6 @@ export {
 export {
   buildLeaderboard,
   scoreMemberBreakdown,
-  JOKER_MULTIPLIER,
   type LeaderboardEntry,
   type MemberPredictions,
   type ScoreBySource,

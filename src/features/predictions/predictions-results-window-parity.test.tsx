@@ -20,7 +20,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render } from '@testing-library/react';
 import { PredictionsView } from './PredictionsView';
 import { PredictionsStoreContext, type PredictionsStore } from './predictions-context';
-import { JokerStoreContext, type JokerStore } from './joker-context';
 import { ResultEntryView } from '../results/ResultEntryView';
 import { ResultsProvider } from '../results/ResultsProvider';
 import type { DataSource } from '../../data';
@@ -134,21 +133,9 @@ async function visibleInBothViews(
   expect(res.container.querySelectorAll('[data-match-id]')).toHaveLength(matches.length);
   const resVisible = visibleMatchIds(res.container);
 
-  // Joker-läget är irrelevant för fönster-kontraktet; en inaktiv joker-store räcker.
-  const inactiveJoker: JokerStore = {
-    enabled: false,
-    status: 'idle',
-    error: null,
-    activeRoomId: null,
-    myJokers: new Map(),
-    setJoker: vi.fn().mockResolvedValue(undefined),
-    clearJoker: vi.fn().mockResolvedValue(undefined),
-  };
   const pred = render(
     <PredictionsStoreContext.Provider value={predictionsStore()}>
-      <JokerStoreContext.Provider value={inactiveJoker}>
-        <PredictionsView now={now} />
-      </JokerStoreContext.Provider>
+      <PredictionsView now={now} />
     </PredictionsStoreContext.Provider>
   );
   const predVisible = visibleMatchIds(pred.container);
