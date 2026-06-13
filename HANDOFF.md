@@ -5,6 +5,84 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T68b (chevron klickbar) , PR #143 mot develop , KLAR
+
+**Branch:** `feature/T68b-chevron-klickbar` @ HEAD `78cedd5`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/143 mot `develop` (Closes #136, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T68b levererade
+
+Daniels feedback 2026-06-13: "den dar expandera pilen ska vara klickbar ocksa och expandera."
+Chevron-cue:n längst ner i en komprimerad sektion var ren dekoration (pointer-events-none +
+aria-hidden), klick gjorde ingenting. Nu är den klickbar och fäller ut, löst EN gång i den
+delade CollapsibleBody-primitiven - alla 8 sektioner får fixet.
+
+**Kedjan:**
+
+- **Senior-developer `06bb22a`:** cue:n gjordes klickbar, gatad på `!expanded && isClipped`.
+  Faden behålls som separat pointer-events-none-lager. 4 nya tester (13 till 17).
+- **Design-frontend `a1375a2`:** tydligt klickbart utseende - hover/active-affordans, tap-highlight
+  transparent, reduced-motion behåller tillståndsfärg.
+- **Lokal reviewer:** GODKÄND, inga fynd.
+- **Copilot R1 `9bff5c7`:** 2 fynd - (1) cue:n ändrad från `<button aria-hidden tabIndex={-1}>`
+  till icke-fokuserbart `<div aria-hidden onClick>` (giltig ARIA, axe aria-hidden-focus), (2)
+  test-robusthet.
+- **Dirigent-fix R1 `9bff5c7`:** implementerade båda fynden.
+- **Copilot R2 `78cedd5`:** 6 fynd - mestadels kommentars-drift som R1-fixen introducerade (div
+  istället för button i kommentarer/doc) + 2 transform-transition-polish på cue:ns pseudo-element.
+  Kommentars-drift är det kända mönstret: när en direkt-fix ändrar ett beslut (button->div) måste
+  doc/kommentarer synkas i samma commit.
+- **Dirigent-fix R2 `78cedd5`:** synkade kommentarer/doc + lade till transform-transition.
+- **Copilot R3:** 0 fynd, "generated no new comments" - exit.
+
+**A11y:** Cue:n är ett icke-fokuserbart `<div aria-hidden="true" onClick>`, en ren mus/touch-
+spegel av den övre ExpandToggle (som behålls med aria-expanded/-controls + fokus). Skärm-
+läsare/tangentbord får INTE en dubbel kontroll, mutations-bevisat i test (getAllByRole('button') = 1).
+
+**Verifiering (HEAD 78cedd5):** build EXIT 0, npm test 1762 gröna/55 skip/0 fail (184 filer),
+lint + format:check EXIT 0.
+
+**Acceptanskriterier T68b:**
+- [x] AC1: Chevron-cue:n är klickbar och fäller ut sektionen
+- [x] AC2: Icke-fokuserbart div (giltig ARIA), skärmläsare/tangentbord får ej dubbel kontroll
+- [x] AC3: Tester vaktar beteendet (mutations-bevisade), 17 tester i sviten
+- [x] AC4: Bygger grönt, lint rent, reviewad (lokal panel + Copilot R1-R3), inga olösta findings
+
+### Behöver-Daniel (oförändrad + T68b-klar)
+
+**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
+- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
+- Uttömmande-test Förekomst 3: agent-regel för reviewer.
+- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+
+**Kvar att besluta/agera:**
+- Supabase e-postmall för inloggningsmejlet (kosmetisk): #81 stängdes 2026-06-12 på Daniels order.
+- RLS-testrum i Supabase: står kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+
+**Nästa i kön (Daniels beslut 2026-06-13):**
+1. JOKER BORT - bara jokern tas bort, övriga märken (streak/skräll/perfekt-omgång) stannar.
+2. LAND I ARENA-RADEN - Match.venue blir "Arena, Stad, Land" med svenskt landsnamn (Mexiko/USA/Kanada).
+3. RELEASE v1.0 - Daniel godkände, när kön är tom.
+
+### Nästa steg
+
+**Om PR #143 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 143 --merge --repo danielaldemir79/vm-2026`.
+Kolla om PR #140/#141/#142 även behöver mergas i ordningen #140 -> #141 -> #142 -> #143.
+
+**Om PR #143 REDAN mergad:**
+T68b klar och live på develop. Nästa fas:
+1. Bygga "Joker bort"-tasken: ta bort joker-logik, behåll övriga märken.
+2. Bygga "Land i arena-raden": Match.venue -> "Arena, Stad, Mexiko/USA/Kanada".
+3. När båda är klara: Release v1.0 (develop -> main).
+Kör `/agent-kit` för att starta nästa task.
+
+---
+
 ## RESUME-HERE , 2026-06-12 , T23 (#23) pinnat favoritlag + personlig statistik , PR #142 mot develop , KLAR
 
 **Branch:** `feature/T23-favoritlag-statistik` @ HEAD `c1ab7bb`

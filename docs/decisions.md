@@ -5,6 +5,38 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T68b (#136): expand-chevronen är nu klickbar (a11y-val: aria-hidden div-spegel)
+
+**Bakgrund:** Daniels feedback 2026-06-13: "den där expandera pilen ska vara klickbar också och
+expandera. man vill klicka på den men inget händer." Chevron-cue:n vid klipp-kanten i en komprimerad
+sektion (CollapsibleBody) var ren CSS-dekoration (`[data-collapsible-fade]::before/::after` på ett
+aria-hidden + pointer-events-none-element), så ett klick på pilen gjorde ingenting. Den enda
+interaktiva kontrollen var den övre ExpandToggle.
+
+**Beslut:** Cue:n renderas nu som ett icke-fokuserbart `<div>` med `onClick` (`data-collapsible-cue`)
+i CollapsibleBody, gatad på samma `!expanded && isClipped` som faden, som anropar samma `toggle()`.
+Pillret + chevron-glyfen flyttades från fadens pseudo-element till cue:ns
+(`[data-collapsible-cue]::before/::after`), så bara pillrets yta (2.25rem-pill centrerad i en 3rem-bred
+träffyta) fångar klick. Gradient-faden behålls som ett separat, heltäckande pointer-events-none-lager,
+så den aldrig blockerar klick/markering på komprimerat innehåll som råkar nå kanten.
+
+**A11y-val (varför ett icke-fokuserbart aria-hidden div, inte en `<button>` eller en andra märkt
+knapp):** den övre ExpandToggle är REDAN den tillgängliga kontrollen (aria-expanded/-controls,
+fokuserbar, etiketterad). Cue:n är en REN mus/touch-affordans som SPEGLAR den, så den är
+`aria-hidden="true"` och utanför a11y-trädet. Första lösningen (Copilot, PR #143) var en `<button
+aria-hidden tabIndex={-1}>`, men `aria-hidden` på ett FOKUSERBART element är ogiltig ARIA (en button
+kan ta fokus vid pekar-klick även med `tabIndex={-1}`) och trippar axe-regeln aria-hidden-focus. Ett
+`<div>` är inte fokuserbart, så `aria-hidden` är giltigt och cue:n hålls helt ur a11y-trädet. Det andra
+alternativet (en andra korrekt märkt knapp) skulle ge skärmläsar-/tangentbordsanvändare TVÅ kontroller
+med exakt samma syfte och mål, dvs redundans/förvirring i SR-navigeringen. Skärmläsare + tangentbord når
+toppknappen; mus/touch får dessutom den visuella pilen. WCAG 2.3.3 (reduced-motion nollar
+cue-animationen) och AA bevaras (samma token-färgade pill som förr).
+
+**Bevarat:** alla befintliga data-hakar (`data-collapsible`, `-body`, `-fade`, `data-collapsed`) +
+ExpandToggle oförändrade. Ny stabil hak `data-collapsible-cue` för styling/test. Design-frontend gav
+cue:n ett tydligt klickbart utseende (hover/active-affordans, ingen :focus-affordans eftersom cue:n
+avsiktligt är icke-fokuserbar) på den nya haken.
+
 ## 2026-06-12 , T23 (#23): pinnat favoritlag + personlig statistik
 
 **Bakgrund:** SPEC §10 + §6 förutser ett GENERISKT (lagagnostiskt, inte hårdkodat Sverige) pinnat
