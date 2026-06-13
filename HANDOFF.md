@@ -5,6 +5,78 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T72 (#151) lås grupp- + champion-tips efter omgång 1 , PR #152 mot develop , KLAR
+
+**Branch:** `feature/T72-deadline-omgang1` @ HEAD `600af35`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/152 mot `develop` (Closes #151, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T72 levererade
+
+Grupp- och champion-tippning låser nu vid en PLATT deadline: `2026-06-17T20:00:00Z` (avsparket för
+g-L-1, den sista gruppens första match). Alla 12 grupper + champion låser vid exakt samma instant.
+Den gamla GREATEST-logiken (T53/T67) togs bort; NULL-fail-safen bevarades. Match-tips och
+bracket-slot-tips rörs INTE (egna avsparks-lås som alltid).
+
+**Kedjan:**
+
+- **Senior-developer `600af35`:** ny Supabase-migration `20260613120000_t72_extended_deadline_round1_flat.sql`
+  applicerad live (live-version `20260613101814`). Klient: `POOL_EXTENDED_DEADLINE_ISO = 2026-06-17T20:00:00.000Z`
+  i `prediction-deadline.ts`, `applyExtendedDeadline` returnerar nu platt tid för känt ankare.
+  Schema-härlednings-test `extended-deadline-schema.test.ts` asserterar att konstanten == max(g-X-1-kickoff)
+  ur `WC2026_MATCHES`, fångar framtida schemadrift rött.
+- **Lokal HÖG-RISK-reviewer:** GODKÄND. Live SELECT bekräftade `pool_extended_deadline() = 2026-06-17 20:00:00+00`.
+  RLS-policyer orörda, match-/slot-lås oförändrade, fail-safe intakt, ingen läcka efter deadline.
+- **Copilot R1:** 0 fynd. Exit direkt.
+
+**RLS bevisat live:** savepoint-isolerat testrum + riktig authenticated-session bevisade
+(1) skriv TILLÅTEN före deadline, (2) skriv NEKAS efter simulerad now() 18/6,
+(3) match-tips oförändrade (g-A-1 styrs av 11/6 19:00), (4) slot-tips oförändrade (M73 = 28/6 19:00).
+Noll kvarliggande proof-data efter cleanup (counts identiska med baslinjen 14/27/154/10).
+
+**Verifiering (HEAD `600af35`):** build EXIT 0, npm test 1778 gröna/50 skip (RLS-integration
+env-gatad), lint + format:check EXIT 0.
+
+**Acceptanskriterier T72:**
+- [x] AC1: Deadline satt till 2026-06-17T20:00:00Z (g-L-1 kickoff), bevisad ur live DB
+- [x] AC2: Klient-konstant speglar DB (EN sanning), schema-härlednings-test i CI
+- [x] AC3: Match-/slot-lås oförändrade, GREATEST-maskineri borttaget, NULL-fail-safe bevarad
+- [x] AC4: RLS bevisat live (savepoint + rollback), bygger/testas/lints grönt
+
+### Behöver-Daniel (uppdaterat efter T72)
+
+**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
+- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
+- Uttömmande-test Förekomst 3: agent-regel för reviewer.
+- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+
+**Kvar att besluta/agera:**
+- RLS-testrum i Supabase: stands kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- **Publik-repo-go + AI-pipeline-synlighet:** Daniel beslutar när vm-2026 kan vara publikt synligt.
+
+### Nästa steg
+
+**Om PR #152 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 152 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #151: `gh issue close 151`. Flytta kort T72 till Done på boarden.
+Kolla om PR:ar #150 eller äldre behöver mergas i ordningen ältst -> nyast före #152.
+
+**Om PR #152 REDAN mergad:**
+T72 klar och live på develop. Kön efter T72:
+(a) **T73** - avgjorda tips-kort visar facit + poäng + smakfulla tillägg.
+(b) **T74** - se VEM som reagerat via långtryck (popover ovanför fingret, room_reactions
+    user_id+created_at -> displayName, RLS tillåter läsa reaktions-författare, a11y hover/focus-väg;
+    reaktioner är inte hemliga tips).
+(c) **RELEASE v1.0** - develop -> main, tagg v1.0.
+(d) **README post-v1** - publik README klar för delning (minnesfil vm2026-readme-spec).
+(e) **Före-publicerings-koll** - Daniel godkänner publik-go.
+Kör `/agent-kit` för att starta nästa task.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T4e (#149) arena-kapacitet + FIFA-ranking på matchkortet , PR #150 mot develop , KLAR
 
 **Branch:** `feature/T4e-kapacitet-ranking` @ HEAD `3d89e9f`
