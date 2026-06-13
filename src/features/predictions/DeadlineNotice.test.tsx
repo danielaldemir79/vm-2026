@@ -35,21 +35,21 @@ describe('DeadlineNotice', () => {
     expect(notice.getAttribute('data-deadline-iso')).toBe(iso);
   });
 
-  it('T67: grupp/champion-deadlinen (förlängd ISO) visas som SÖNDAG 21 juni kl 23:59', () => {
-    // När selektorn ger den FÖRLÄNGDA deadlinen (POOL_EXTENDED_DEADLINE_ISO) ska raden
-    // säga söndagen Daniel utlovade , härlett ur SAMMA ISO som driver låset (en sanning).
-    // T67 flyttade tiden från 14/6 till 21/6.
+  it('T72: grupp/champion-deadlinen (platt pool-ISO) visas som ONSDAG 17 juni kl 22:00', () => {
+    // När selektorn ger den PLATTA pool-deadlinen (POOL_EXTENDED_DEADLINE_ISO) ska raden
+    // säga onsdagen då omgång 1 är spelad , härlett ur SAMMA ISO som driver låset (en
+    // sanning). T72 gjorde tiden platt (17/6 20:00Z), ersatte 21/6 från T67.
     const { container } = render(
       <DeadlineNotice
         deadlineIso={POOL_EXTENDED_DEADLINE_ISO}
-        now={new Date('2026-06-19T08:00:00Z')}
+        now={new Date('2026-06-15T08:00:00Z')}
         lead="Tippningen låses"
       />
     );
     const notice = container.querySelector('[data-deadline-notice]') as HTMLElement;
-    // 21:59Z = 23:59 svensk sommartid, söndag 21 juni.
-    expect(notice).toHaveTextContent(/söndag 21 juni kl 23:59/);
-    // <time> bär exakt den förlängda UTC-instanten (en sanning med låset + RLS).
+    // 20:00Z = 22:00 svensk sommartid, onsdag 17 juni.
+    expect(notice).toHaveTextContent(/onsdag 17 juni kl 22:00/);
+    // <time> bär exakt den platta UTC-instanten (en sanning med låset + RLS).
     expect(notice.querySelector('time')!.getAttribute('datetime')).toBe(POOL_EXTENDED_DEADLINE_ISO);
   });
 

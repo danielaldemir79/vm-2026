@@ -3,14 +3,13 @@
 // är tunn ovanpå denna. Systerfil till predictable-matches.ts (T15).
 //
 // REGLER:
-//   * DEADLINE = GREATEST(gruppens FÖRSTA match g-X-1, fasta söndagstiden 21/6 21:59Z).
-//     T53 (#95) införde förlängningen, T67 (#123) flyttade den till söndag 21/6: de som
-//     inte hann före premiären får t.o.m. söndag 21/6 23:59 svensk tid. FÖRLÄNG, FÖRKORTA
-//     ALDRIG (GREATEST): en grupp med ankare EFTER 21/6 behåller sitt SENARE egna ankare
-//     (inget riktigt gruppankare gör det , alla g-X-1 ligger 11-17/6 , men regeln, inte
-//     datat, är garantin). Vi applicerar samma applyExtendedDeadline som RLS-helpern
-//     group_deadline_kickoff
-//     (greatest(g-X-1, pool_extended_deadline())), så lås + text är EN sanning, klient
+//   * DEADLINE = den PLATTA pool-deadlinen (T72 #151): grupp-tips låses när omgång 1 är
+//     spelad, dvs när varje grupp gått igenom sin första match = 2026-06-17 20:00Z
+//     (g-L-1, sista gruppens första match). ALLA grupper låses vid SAMMA instant (inte
+//     längre per-grupp). T53 (#95) införde en förlängning, T67 (#123) flyttade den till
+//     söndag 21/6, T72 (#151) gjorde den PLATT och tidigare (rättvisare: efter omgång 1).
+//     Vi applicerar samma applyExtendedDeadline som RLS-helpern group_deadline_kickoff
+//     (= pool_extended_deadline() för alla grupper), så lås + text är EN sanning, klient
 //     + DB. LÅST = den HÄRLEDDA deadlinen passerad (now >= deadline). Server-RLS
 //     upprätthåller låset; här härleder vi det BARA för VISNINGEN. Klockan injicerbar.
 //   * Varje grupp listar sina 4 lag (för 1:a/2:a-väljarna), i matchplanens/gruppens
@@ -35,9 +34,9 @@ export interface PredictableGroup {
   groupId: GroupId;
   /** Gruppens 4 lag (1:a/2:a väljs bland dessa). */
   teams: GroupTeamOption[];
-  /** true om gruppens första match sparkat igång (now >= g-X-1): grupp-tipset låst. */
+  /** true om den platta pool-deadlinen passerat (now >= omgång-1-tiden): grupp-tipset låst. */
   locked: boolean;
-  /** Gruppens första match (g-X-1) avspark, ISO. null om matchen saknas (oväntat). */
+  /** Den platta pool-deadlinen (T72: omgång 1 spelad), ISO. null om gruppens första match saknas. */
   deadlineIso: string | null;
 }
 
@@ -70,9 +69,11 @@ export function selectPredictableGroups(
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((group) => {
       const firstMatch = matchById.get(groupFirstMatchId(group.id));
-      // GREATEST(g-X-1, fasta söndagstiden): T53-förlängningen. applyExtendedDeadline
-      // bevarar ett senare ankare (sen grupp) och null-fail-safen (saknad match -> null),
-      // exakt som RLS-helpern group_deadline_kickoff. En sanning, klient + DB.
+      // PLATT pool-deadline (T72): omgång 1 spelad, samma instant för alla grupper.
+      // applyExtendedDeadline returnerar den platta tiden för ett känt ankare och
+      // bevarar null-fail-safen (saknad match -> null), exakt som RLS-helpern
+      // group_deadline_kickoff. En sanning, klient + DB. Ankaret skickas in så
+      // signaturen + null-fail-safen delas, men det styr inte längre tiden (platt).
       const deadlineIso = applyExtendedDeadline(firstMatch ? firstMatch.kickoff : null);
       // FAIL-SAFE för visningen: saknas gruppens första match (oväntat, matchplanen
       // är källåkrad) behandlar vi gruppen som LÅST, så vi aldrig erbjuder ett tips

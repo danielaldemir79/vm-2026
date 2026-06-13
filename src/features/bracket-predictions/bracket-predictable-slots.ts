@@ -12,15 +12,15 @@
 //     "lagen avgörs av tidigare resultat" och slotten är otippbar , samma princip
 //     som T9:s bothTeamsKnown och T15:s predictable-matches (gissa aldrig laget).
 //   * EN champion-slot (slot_id = 'champion', CHAMPION_SLOT_ID): vem vinner HELA VM.
-//     Tippas bland ALLA 48 lagen (KISS, dokumenterat val nedan). Deadline sedan T53:
-//     den FÖRLÄNGDA tiden, se nästa punkt.
+//     Tippas bland ALLA 48 lagen (KISS, dokumenterat val nedan). Deadline = den platta
+//     pool-deadlinen, se nästa punkt.
 //
-//   * DEADLINE = slottens egen avspark (M73..M104:s kickoff). Champion (T53, #95):
-//     GREATEST(g-A-1:s kickoff, den fasta förlängda söndagstiden) via
+//   * DEADLINE = slottens egen avspark (M73..M104:s kickoff). Champion (T72, #151): den
+//     PLATTA pool-deadlinen (omgång 1 spelad = 2026-06-17 20:00Z) via
 //     `applyExtendedDeadline` , samma regel som RLS-helpern bracket_deadline_kickoff
-//     efter T53-migrationen. EN sanning för ankaret: `bracketDeadlineMatchId`
-//     (bracket-predictions-api) ger ankar-matchen, kickoffen slås upp i matchplanen,
-//     och förlängningen appliceras BARA på champion-grenen , ingen dubblerad tid.
+//     efter T72-migrationen. EN sanning för ankaret: `bracketDeadlineMatchId`
+//     (bracket-predictions-api) ger champion-ankaret (g-A-1), och den platta deadlinen
+//     appliceras BARA på champion-grenen , match-SLOTSEN behåller sin egen avspark.
 //     LÅST = now >= den härledda deadlinen. Server-RLS är det riktiga låset; här
 //     härleds det BARA för VISNINGEN. Klockan är injicerbar (now), default nuet.
 //
@@ -83,17 +83,17 @@ export interface PredictableSlotRound {
  *
  * URVAL = ALLA 48 lagen (KISS, dokumenterat val, docs/decisions.md T16b): innan
  * gruppspelet vet ingen vilka som tar sig långt, så ett fritt val bland alla lag är
- * det enkla, rättvisa momentet , inte en konstruerad delmängd. Låst vid den
- * förlängda champion-deadlinen (T53: GREATEST(g-A-1, fasta söndagstiden)).
+ * det enkla, rättvisa momentet , inte en konstruerad delmängd. Låst vid den platta
+ * pool-deadlinen (T72: omgång 1 spelad = 17/6 20:00Z).
  */
 export interface ChampionSlot {
   /** Alltid CHAMPION_SLOT_ID ('champion'). */
   slotId: string;
   /** Alla lag att välja VM-vinnare bland (code-val), i lag-listans ordning. */
   teams: SlotTeamOption[];
-  /** true när champion-deadlinen passerats (T53: GREATEST(g-A-1, förlängd tid)). */
+  /** true när den platta pool-deadlinen passerats (T72: omgång 1 spelad). */
   locked: boolean;
-  /** Champion-deadline (T53-förlängd, se modul-doc), ISO. null om ankar-matchen saknas. */
+  /** Den platta pool-deadlinen (T72, se modul-doc), ISO. null om ankar-matchen saknas. */
   deadlineIso: string | null;
 }
 
@@ -147,13 +147,13 @@ export function selectPredictableBracket(
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const matchById = new Map(matches.map((m) => [m.id, m]));
 
-  // Champion-slotten: alla 48 lag (KISS). DEADLINE = GREATEST(g-A-1, fasta söndagstiden
-  // 21/6 21:59Z): T53 (#95) införde, T67 (#123) flyttade CHAMPION-tipsets förlängning till
-  // söndag 21/6 (g-A-1 = 11 juni ligger FÖRE fasta tiden, så champion förlängs till
-  // söndagen). applyExtendedDeadline speglar RLS-helpern
-  // bracket_deadline_kickoff('champion') EXAKT (greatest(g-A-1, pool_extended_deadline())).
-  // OBS: bara CHAMPION berörs , match-SLOTSEN (M73..M104) nedan behåller sina EGNA
-  // avsparks-lås orörda (deadlineIsoFor utan förlängning), exakt som RLS slot-grenen.
+  // Champion-slotten: alla 48 lag (KISS). DEADLINE = den PLATTA pool-deadlinen (omgång 1
+  // spelad = 17/6 20:00Z): T53/T67 hade en söndags-GREATEST, T72 (#151) gjorde den platt
+  // och tidigare (rättvisare: champion låses när omgång 1 är spelad, inte 21/6).
+  // applyExtendedDeadline speglar RLS-helpern bracket_deadline_kickoff('champion') EXAKT
+  // (= pool_extended_deadline() när ankaret g-A-1 finns). OBS: bara CHAMPION berörs ,
+  // match-SLOTSEN (M73..M104) nedan behåller sina EGNA avsparks-lås orörda (deadlineIsoFor
+  // utan förlängning), exakt som RLS slot-grenen.
   const championDeadlineIso = applyExtendedDeadline(deadlineIsoFor(CHAMPION_SLOT_ID, matchById));
   const champion: ChampionSlot = {
     slotId: CHAMPION_SLOT_ID,

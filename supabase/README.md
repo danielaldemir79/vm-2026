@@ -121,6 +121,23 @@ Bevisat live (read-only): pool_extended_deadline = alla 12 gruppers deadline = c
 M73 oförändrad (28/6); ett hypotetiskt ankare 25/6 behåller 25/6 (förkorta aldrig). Klient-spegel +
 beslut: `src/data/predictions/prediction-deadline.ts`, `docs/decisions.md` T67.
 
+**T72 (#151) , PLATT deadline: grupp- + champion-tips låses när OMGÅNG 1 är spelad:** migrationen
+`t72_extended_deadline_round1_flat` ändrar `pool_extended_deadline()` till `2026-06-17T20:00:00Z`
+(= g-L-1, sista gruppens första match = MAX over de 12 gruppernas första match-kickoff = när omgång 1
+är i spel). Daniels beslut #151: 21/6 var för sent, rättvisare att låsa när omgång 1 är spelad. T53/T67:s
+GREATEST ersätts av en PLATT deadline: `group_deadline_kickoff` + champion-grenen returnerar nu samma
+instant för alla (slår fortfarande upp g-X-1/g-A-1 för känd/okänd-gaten + NULL-fail-safe). SLOT-grenen
+(M73..M104) + match-tipsen OFÖRÄNDRADE. Alla tre helpers CREATE OR REPLACE:as (komplett fresh-replaybar
+ögonblicksbild). Applicerad via `apply_migration`; `list_migrations` visar `t72_extended_deadline_round1_flat`
+(live-version `20260613101814`, MCP-stämpel skiljer från filnamnets placeholder `20260613120000`, samma
+nyans som T15/T16/T53/T67; namn + exekverbar SQL 1:1). Bevisat live: (a) read-only , pool_extended_deadline
+= grupp A/G/L = champion = `2026-06-17 20:00:00+00`, okänd grupp = NULL, M73 oförändrad (`2026-06-28
+19:00:00+00`); (b) RIKTIG authenticated-session i ett isolerat test-rum (savepoint, rollback) , grupp +
+champion skriver igenom RLS FÖRE deadline (riktig now 13/6); (c) skriv-predikat NEKAS efter deadline
+(sim 18/6), tillåts före (sim 16/6); match-tips-låset g-A-1 oförändrat (egen avspark). Counts oförändrade
+efteråt (14/27/154/10), 0 leftover proof-data. Klient-spegel + beslut:
+`src/data/predictions/prediction-deadline.ts`, `docs/decisions.md` T72.
+
 **Migration-historik (T16, samma nyans som T15):** de fyra T16-migrationerna applicerades 1:1 från
 de committade filerna via `apply_migration` i samma ordning: `t16_group_predictions_schema`,
 `t16_group_predictions_rls`, `t16_bracket_predictions_schema`, `t16_bracket_predictions_rls` (samma

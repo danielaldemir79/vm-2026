@@ -5,6 +5,58 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T72 (#151): grupp- + champion-tips låses PLATT efter omgång 1 (ersätter 21/6)
+
+**Daniels beslut 2026-06-13 (källa, gissas inte):** "ändra så gruppspel tippning och mästerskap
+tippningen låser sig efter första omgången är slutspelad. dvs varje grupp har gått igenom första
+matchen. så blir det mer rättvist." Den gamla 21/6-deadlinen (T67, #123) var för sen; den nya,
+rättvisare låspunkten är när OMGÅNG 1 är spelad, dvs när varje grupp gått igenom sin första match.
+Issue #151. Match-tips + bracket-SLOT-tips (M73..M104) behåller sina EGNA avsparks-lås (rörs INTE).
+
+**FAST TIDPUNKT:** `2026-06-17T20:00:00.000Z`. Det är avsparket för den SISTA gruppens första match
+(g-L-1) = MAX över de 12 gruppernas (A..L) tidigaste match-kickoff. När den matchen startar har varje
+grupp gått igenom sin första match. Verifierat live mot `match_kickoffs` (2026-06-13): `max(kickoff)
+where match_id ~ '^g-[A-L]-1$'` = g-L-1 = `2026-06-17 20:00:00+00`. Klient-spegeln har dessutom ett
+test (`extended-deadline-schema.test.ts`) som HÄRLEDER samma max ur `WC2026_MATCHES` och asserterar
+likhet med konstanten, så en framtida schema-ändring fångas RÖTT i stället för att tyst drifta.
+
+**VARFÖR PLATT och inte längre GREATEST(ankare, fasta tiden) (T53/T67):** tidigare var den fasta tiden
+en söndags-23:59 som kunde ligga FÖRE en sen grupps första match, så GREATEST behövdes för att inte
+FÖRKORTA den gruppens fönster. Den NYA tiden ÄR den sista gruppens första match, alltså ligger den per
+definition PÅ ELLER EFTER varje grupps första match. Daniels intent är EN gemensam låspunkt (= omgång 1
+spelad), inte per-grupp-fönster. Därför låses ALLA grupp- + champion-tips vid exakt SAMMA instant
+(platt), och GREATEST-maskineriet togs bort. NULL-fail-safen BEHÅLLS (saknat ankare -> NULL-deadline ->
+skriv nekas), så en okänd grupp/slot aldrig får ett öppet fönster ur tomma luften.
+
+**EN SANNING, klient + DB:** DB: ny migration `20260613120000_t72_extended_deadline_round1_flat.sql`
+ändrar `pool_extended_deadline()` till den platta instanten; `group_deadline_kickoff` returnerar nu den
+platta tiden för en känd grupp (slår fortfarande upp g-X-1 enbart för känd/okänd-gaten), och champion-
+grenen av `bracket_deadline_kickoff` likadant (SLOT-grenen + match-tipsen oförändrade). Alla tre helpers
+CREATE OR REPLACE:as så migrationen är en komplett fresh-replaybar ögonblicksbild, inte ett implicit
+beroende på T53/T67:s ordning. Klient: `src/data/predictions/prediction-deadline.ts`
+(`POOL_EXTENDED_DEADLINE_ISO` + `applyExtendedDeadline`, som nu returnerar den platta tiden för ett känt
+ankare). Text/lås härleds ur SAMMA ISO (formatDeadline/DeadlineNotice), ingen dubblerad tid.
+
+**RLS BEVISAT LIVE (kmzhyblzxangpxydufve, allt rullat tillbaka, counts oförändrade efteråt):** (1) en
+RIKTIG authenticated-session (tillfällig auth.users + isolerat test-rum i ett savepoint) skrev FÖRE
+deadline (riktig now() 13/6 < 17/6 20:00) BÅDE ett grupp-tips OCH ett champion-tips genom RLS = TILLÅTEN,
+och såg sitt eget tips via select-policyn. (2) EFTER deadline (simulerad now() 18/6): skriv-predikatet
+`now() < group_deadline_kickoff('A')` resp. champion-grenen = FALSE => skriv NEKAS; FÖRE deadline (sim
+16/6) = TRUE => tillåten (kontrollgrupp). (3) MATCH-tips OFÖRÄNDRADE: g-A-1-låset styrs av matchens egen
+avspark (11/6 19:00), inte pool-deadlinen (sim 12/6 -> nekad). (4) SLOT-tips OFÖRÄNDRADE: `bracket_
+deadline_kickoff('M73')` = `match_kickoff('M73')` = `2026-06-28 19:00:00+00` (oförändrad). Efter beviset:
+0 leftover proof-rum/-users/-tips, rooms/members/group/bracket-counts identiska med baslinjen (14/27/154/10).
+
+**Migrationen i `list_migrations`** heter `t72_extended_deadline_round1_flat` (live-version `20260613101814`,
+MCP-genererad stämpel skiljer från filnamnets placeholder `20260613120000`, samma kända nyans som
+T15/T16/T53/T67; namn + exekverbar SQL 1:1; ett `db reset` registrerar filens version, sluttillståndet är
+verifierat identiskt med live). Som T67 kan live-funktionens inline-kommentar vara en MCP-artefakt;
+committad fil bär svensk kommentar per konvention, nästa `db reset` återställer den. Noll beteendepåverkan.
+
+**Källa:** Daniels task-direktiv T72 (#151) + live-verifierat spelschema (`match_kickoffs`, max group-first-match = g-L-1).
+
+---
+
 ## 2026-06-13 , T4e (#149): arena-kapacitet (källåkrad) + FIFA-ranking på matchkortet
 
 **Bakgrund (Daniels feedback 2026-06-13, #149):** "mer matchinfo på kortet, BALANSERAT, utan att
