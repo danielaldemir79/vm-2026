@@ -5,6 +5,67 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T79 (#167): responsiv sektions-nav (hamburgare-meny på mobil, chip-rad på desktop)
+
+**Daniels feedback på T78:** på mobil kunde man LÄTT MISSA sektioner eftersom chip-raden är swipe-bar i
+sidled och man inte visste att man kunde svipa. Krav: en HAMBURGARE-MENY på mobil som visar HELA menyn
+(alla sektioner) vertikalt vid klick; chip-raden kvar oförändrad på större skärmar.
+
+**Beslut: responsiv växling sker helt i CSS (Tailwind sm:-klasser), ingen JS-resize-gissning.** Chip-raden
+(`SectionNav`) får `hidden sm:block` (desktop, >= sm), den nya `SectionNavMobile` får `sm:hidden` (mobil,
+< sm). **Varför CSS, inte matchMedia:** task-direktivet föredrar CSS-växling, det undviker en JS-resize-
+lyssnare + hydrerings-/SSR-glapp, och `display:none` på det dolda bandet tar bort det helt ur
+tillgänglighets-trädet, så de TVÅ `<nav aria-label="Sektioner">`-landmärkena aldrig dubbleras för en
+skärmläsare (exakt ett band är i a11y-trädet per viewport). Båda banden läser SAMMA store
+(`useSectionNavState`: sections/activeId/scrollTo), så listan speglar exakt samma register-sanning som
+chip-raden, inga döda rader.
+
+**Beslut: scroll-offset-mätningen extraherades till en DELAD hook `useStickyBandOffset`** som båda banden
+använder. **Varför delad:** offset-kontraktet (`--vm-section-nav-offset` styr scroll-margin-top OCH
+scroll-spy-zonens topp) måste vara EN sanning; två kopierade mätningar kunde drifta isär (samma rot som
+C4-context-delningen). Hooken härleder offset = headerns höjd + det SYNLIGA bandets höjd, där "synligt" =
+MAX-höjden över alla `[data-section-nav]`-band (det CSS-dolda bandet rapporterar `getBoundingClientRect`-
+höjd 0). MAX (inte summa) gör skrivningen idempotent: båda bandens mät-effekter räknar fram SAMMA värde, så
+ingen kamp om CSS-variabeln oavsett körordning.
+
+**Beslut: a11y-baslinjen för hamburgare-panelen** (kärnan i tasken, design-frontend polerar utseendet):
+knappen bär `aria-expanded`/`aria-controls` (-> panelens `useId`-id)/`aria-haspopup` + tillgängligt namn
+("Sektioner" / "Sektioner: <aktiv>", så scroll-spy-värdet syns på mobil). Escape stänger; `pointerdown`
+utanför band + panel stänger (lyssnarna läggs bara när panelen är öppen). Fokus flyttas IN till första
+raden vid öppning och ÅTERSTÄLLS till knappen vid stängning (en `wasOpen`-ref hindrar fokus-stöld vid
+första render). Enkel fokus-fälla (Tab/Shift+Tab cyklar inom panelen, samma form som `Modal.trapFocus`).
+Raderna är riktiga `<button>` med `aria-current="true"` + `data-active` på den aktiva. Panel-öppningens
+animation är CSS-gatad på `prefers-reduced-motion` (WCAG 2.3.3), och rad-valet går via providerns
+reduced-motion-medvetna `scrollTo`. **Varför inte den delade `Modal`-primitiven:** Modal är en
+portal-baserad helskärms-dialog (fixed inset-0 z-50); hamburgare-menyn är ett lätt sticky-band med en
+nedfälld panel i bandets flöde (knuffar innehåll, överlappar inte), så Modal hade varit fel form. A11y-
+semantiken (Escape/fokus-in-och-retur/fokus-fälla) följer ändå samma kontrakt.
+
+**Beslut (C4, Copilot-runda-1): scroll-spy observerar ALLA band, inte bara det forsta.**
+`useSectionSpy` anropade `querySelectorAll('[data-section-nav]')` men implementationen hade en
+bugg: mock i testet fyrade `emitResize` oavsett om bandet faktiskt observerades, vilket dolde
+att bara forsta bandet observerades. Fixt: observern byggs om med `querySelectorAll` och ett
+tvabands-harness-test verifierar att hogjdandring i mobil-bandet (panel oppnas) triggar om-
+byggnad av observern med ny rootMargin. Negativ-kontroll bekraftad: querySelector-revert
+(bara ett band) rodnar bada C4-testerna. Utan fixen: stale rootMargin pa mobil-bandet vid
+panel-oppning, scroll-spy uppfattar knappt att aktiv sektion byts.
+
+**Beslut (C5, Copilot-runda-1): CSS-var-cleanup ar VILLKORAD pa att inga band kvar i DOM.**
+Bada banden skriver samma `--vm-section-nav-offset` via `useStickyBandOffset`. Vid unmount
+av ett band (t.ex. ResizeObserver-recompute) rensades variablerna alltid - vilket nollade
+offseten medan det andra bandet levde. Fix: rensa bara nar `document.querySelectorAll
+('[data-section-nav]').length === 0` (inget band kvar). Negativ-kontroll: alltid-rensa-revert
+rodnar testet som verifierar att variablerna behalles efter ett bands unmount.
+
+**Beslut (C6, Copilot-runda-2): aria-controls villkorad pa att panelen ar monterad.**
+Hamburgare-knappen bar `aria-controls` som pekade pa panelens id. Panelen renderas bara nar
+menyn ar oppen (open === true); i stangt lage ar IDREF:en ogiltig (pekar pa ett omonterat
+element). Fix: `aria-controls={open ? panelId : undefined}`. `aria-expanded` (alltid
+satt) och `aria-haspopup` barer knappens tillstand oforandrat. Kontrakt-testet skarptes:
+aria-controls ska SAKNAS i stangt lage och peka pa panelens id i oppet lage.
+
+---
+
 ## 2026-06-13 , T78 (#165): sticky sektions-nav (chip-rad) med självregistrerande sektioner
 
 **Daniels val (#165):** en smal, sticky chip-rad direkt under appens befintliga header som hoppar till

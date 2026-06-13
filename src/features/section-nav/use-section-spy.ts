@@ -132,13 +132,15 @@ export function useSectionSpy(
     }
     buildObserver();
 
-    // OFFSET-BEVAKNING (C3-fix): SectionNav uppdaterar --vm-section-nav-offset vid resize/
-    // radbrytning/zoom, men den här effekten kör inte om på offset-ändring (deps = idsKey +
+    // OFFSET-BEVAKNING (T78 C3-fix, breddad i T79 C4): useStickyBandOffset uppdaterar
+    // --vm-section-nav-offset vid resize/radbrytning/zoom OCH när ett band ändrar höjd (t.ex.
+    // mobil-panelen öppnas), men den här effekten kör inte om på offset-ändring (deps = idsKey +
     // setActiveId). Utan bevakning blev rootMargin (och tröskeln) STALE efter en höjdändring,
-    // så fel chip kunde markeras. Vi observerar samma två sticky-band som SectionNav mäter
-    // (header + nav) och faller till window 'resize' när ResizeObserver saknas. Vid en
-    // ändring läser vi om offseten och bygger BARA om observern när den AVRUNDADE px-höjden
-    // faktiskt skiljer sig (rootMargin avrundas ändå till px), så vi inte river/bygger i onödan.
+    // så fel chip kunde markeras. Vi observerar samma ytor som driver offseten (app-headern +
+    // ALLA [data-section-nav]-band, se nedan) och faller till window 'resize' när ResizeObserver
+    // saknas. Vid en ändring läser vi om offseten och bygger BARA om observern när den AVRUNDADE
+    // px-höjden faktiskt skiljer sig (rootMargin avrundas ändå till px), så vi inte river/bygger
+    // i onödan.
     function handleOffsetChange(): void {
       const next = readStickyOffset();
       if (Math.round(next) === Math.round(offset)) {
@@ -154,14 +156,19 @@ export function useSectionSpy(
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined' && typeof document !== 'undefined') {
       ro = new ResizeObserver(handleOffsetChange);
-      // Samma två band som driver offseten i SectionNav: app-headern (stabil krok) + navet.
+      // Samma ytor som driver offseten i useStickyBandOffset: app-headern (stabil krok) + ALLA
+      // [data-section-nav]-band. T79 införde TVÅ band (desktop chip-rad + mobil hamburgare-band)
+      // som delar offset-kontraktet. När mobil-panelen öppnas/stängs ändras MOBIL-bandets höjd
+      // (panelen ligger i <nav>:ens flöde), vilket ändrar --vm-section-nav-offset. Observerar vi
+      // bara FÖRSTA bandet (querySelector) missas en höjdändring i det ANDRA bandet -> stale
+      // rootMargin/tröskel -> fel activeId medan panelen är öppen. Därför querySelectorAll, så en
+      // höjdändring i VILKET band som helst triggar ombyggnad med ny offset (C4, Copilot #168).
       const header = document.querySelector('header[data-app-header]');
       if (header) {
         ro.observe(header);
       }
-      const nav = document.querySelector('[data-section-nav]');
-      if (nav) {
-        ro.observe(nav);
+      for (const band of document.querySelectorAll('[data-section-nav]')) {
+        ro.observe(band);
       }
     }
     if (typeof window !== 'undefined') {

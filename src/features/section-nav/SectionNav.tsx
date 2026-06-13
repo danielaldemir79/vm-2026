@@ -17,9 +17,10 @@
 // aldrig, så ett dött chip är omöjligt. Inga chips alls -> hela raden döljs (return null),
 // så den aldrig tar plats i ett läge där inget finns att hoppa till.
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { useSectionNavState } from './section-nav-context';
 import { useActiveChipScroll } from './use-active-chip-scroll';
+import { useStickyBandOffset } from './use-sticky-band-offset';
 import './section-nav.css';
 
 export function SectionNav() {
@@ -34,65 +35,14 @@ export function SectionNav() {
   // alltid ser var man är. Respekterar reduced-motion (hookens egen useReducedMotion).
   useActiveChipScroll(navRef, activeId);
 
-  // Mät de två sticky-bandens samlade höjd ROBUST (inte en magisk pixel-gissning) och
-  // exponera den som --vm-section-nav-offset på <html>. scroll-margin-top på sektionerna
-  // och scroll-spy-zonen läser variabeln, så ett klick landar rubriken precis under raden
-  // oavsett bandens faktiska höjd (varierar med skärmstorlek/typsnitt/temat). Mäts vid
-  // mount, vid resize och när chip-antalet ändras (live-läge tänder fler -> ev. radbrytning).
-  useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) {
-      return;
-    }
-    function measure(): void {
-      const navEl = navRef.current;
-      if (!navEl) {
-        return;
-      }
-      // Headern är det föregående sticky-bandet (sticky top-0). Navet stackas under den.
-      // Headerns höjd + navets höjd = den yta en rubrik måste rensa. Vi mäter headern via
-      // dess faktiska box, inte ett antaget värde. Vi siktar på app-headern via dess STABILA
-      // krok (data-app-header i App.tsx), INTE en ren 'header'-selektor (F1): appen har många
-      // <header>-element (sektionsvyer, dialoger), så 'header' hade träffat det FÖRSTA i DOM-
-      // ordning, en ordnings-tillfällighet en framtida banner/portal kunde tyst bryta.
-      const header = document.querySelector('header[data-app-header]');
-      const headerHeight = header?.getBoundingClientRect().height ?? 0;
-      const navHeight = navEl.getBoundingClientRect().height;
-      const offset = Math.round(headerHeight + navHeight);
-      // Två variabler: header-top = var navet ska sitta (rakt under headern), och offset =
-      // header + nav = vad en rubrik måste rensa (scroll-margin + spy-zonens topp).
-      document.documentElement.style.setProperty(
-        '--vm-section-nav-header-top',
-        `${Math.round(headerHeight)}px`
-      );
-      document.documentElement.style.setProperty('--vm-section-nav-offset', `${offset}px`);
-    }
-    measure();
-    // ResizeObserver fångar bandens höjdändring (radbrytning, typsnitts-/zoom-ändring)
-    // utan scroll-polling. Saknas den (äldre jsdom) faller vi till resize-event.
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(measure);
-      ro.observe(nav);
-      // Samma app-header-krok som i measure() (F1), inte en ren 'header'-selektor.
-      const header = document.querySelector('header[data-app-header]');
-      if (header) {
-        ro.observe(header);
-      }
-    }
-    window.addEventListener('resize', measure);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener('resize', measure);
-      // Rensa de globala CSS-variablerna (C5): de bor på <html>, inte på navet, så de
-      // överlever annars unmount och nollställs aldrig. Med deps [sections.length] kör
-      // cleanup -> measure i samma tick vid antals-ändring (rensas + sätts om direkt, ingen
-      // synlig glapp), men vid unmount eller 0 sektioner (return null) körs bara cleanup, så
-      // de tas bort och blir inte kvar som stale offset/header-top vid en senare mount.
-      document.documentElement.style.removeProperty('--vm-section-nav-header-top');
-      document.documentElement.style.removeProperty('--vm-section-nav-offset');
-    };
-  }, [sections.length]);
+  // Mät de sticky-bandens samlade höjd ROBUST (inte en magisk pixel-gissning) och exponera
+  // den som --vm-section-nav-offset / --vm-section-nav-header-top på <html>. scroll-margin-top
+  // på sektionerna och scroll-spy-zonen läser variablerna, så ett klick landar rubriken precis
+  // under det synliga bandet oavsett bandens faktiska höjd. Mät-logiken är DELAD (T79): den
+  // bor i useStickyBandOffset så den nya mobil-knappen (SectionNavMobile) skriver SAMMA
+  // offset-kontrakt utan kopierad logik (de två responsiva banden syns aldrig samtidigt, och
+  // offseten = header + det synliga bandets höjd). Mäts om vid chip-antals-ändring (deps).
+  useStickyBandOffset(navRef, sections.length);
 
   // Inget att hoppa till -> ingen rad (håller ytan lean, ingen tom sticky-list).
   if (sections.length === 0) {
@@ -106,11 +56,16 @@ export function SectionNav() {
     // (samma tema-trogna color-mix-recept som headern), den tunna skiljelinjen, kant-faden
     // och chip-formerna bor i .vm-section-nav* (section-nav.css), så markupen håller bara
     // semantiken + de stabila krokarna.
+    //
+    // RESPONSIV VÄXLING (T79): chip-raden är DESKTOP-varianten, dold under sm-brytpunkten
+    // (hidden) och synlig från sm och upp (sm:block). På mobil (< sm) visas i stället
+    // hamburgare-menyn (SectionNavMobile), så man inte missar sektioner bakom en swipe.
+    // Växlingen sker helt i CSS (Tailwind sm:-klasser), ingen JS-resize-gissning behövs.
     <nav
       ref={navRef}
       data-section-nav=""
       aria-label="Sektioner"
-      className="vm-section-nav sticky z-[9]"
+      className="vm-section-nav sticky z-[9] hidden sm:block"
     >
       {/* Chip-radens scroll-container (overflow-x-auto). data-section-nav-track är haken
         useActiveChipScroll scrollar i sidled; kant-faden + dolda scrollbaren ligger på
