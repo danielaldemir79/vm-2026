@@ -5,6 +5,72 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T71 (#145) joker-tillägget borttaget , PR #146 mot develop , KLAR
+
+**Branch:** `feature/T71-joker-bort` @ HEAD (se PR #146)
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/146 mot `develop` (Closes #145, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T71 levererade
+
+Joker-tillägget borttaget. Enkel poängsumma: matchpoäng + grupptips + slutspelstips + mestare.
+Övriga märken (streak/skräll/perfekt-omgång) stannar kvar. 31 filer, -1674 rader.
+
+**Kedjan:**
+
+- **Senior-developer `bbd6dd0`:** alla joker-filer/logik raderade, poäng-beräkning rengjord till
+  enkel summa, märken byte-identiska, DB orord, 1732 tester gröna. Commit-body amendat för
+  korrekt å/ä/ö (F2 self-flagged av senior-dev: body ursprungligen i ASCII).
+- **Design-frontend:** finish-koll utförd, INGA visuella glapp, ingen commit behövdes.
+- **Lokal reviewer:** GODKÄND. Poäng-invariant verifierat, märken byte-identiska mot disk + live-DB.
+  F1 (obetydlig): avsiktligt kvarvarande symbol i en kommentar, avvisad. F2: commit-body-diakritik,
+  rättad via amend. Lesson `ascii-substitut-for-diakriter-i-kommentarer` Förekomst 1->2.
+- **Copilot R1:** 0 inline-fynd, exit direkt.
+
+**Verifiering (HEAD `bbd6dd0`):** build EXIT 0, npm test 1732 gröna/48 skip/0 fail (180 filer),
+lint + format:check EXIT 0.
+
+**Acceptanskriterier T71:**
+- [x] AC1: Joker-logik borttagen, inga joker-referenser kvar i aktiv kod
+- [x] AC2: Poäng = enkel summa (matchpoäng + grupptips + slutspelstips + mestare), verifierat
+- [x] AC3: Övriga märken (streak/skräll/perfekt-omgång) oförändrade
+- [x] AC4: DB orord (inga migrations-ändringar), verifierat mot disk + live-DB
+- [x] AC5: Bygger grönt, lint rent, reviewad (lokal panel + Copilot R1), inga olösta findings
+
+### Behöver-Daniel (oförändrad)
+
+**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
+- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
+- Uttömmande-test Förekomst 3: agent-regel för reviewer.
+- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+
+**Kvar att besluta/agera:**
+- Supabase e-postmall för inloggningsmejlet (kosmetisk): #81 stängdes 2026-06-12 på Daniels order.
+- RLS-testrum i Supabase: står kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+
+**Nästa i kön (Daniels beslut 2026-06-13):**
+1. LAND I ARENA-RADEN - Match.venue blir "Arena, Stad, Land" med svenskt landsnamn
+   (Mexiko/USA/Kanada). Daniels feedback 2026-06-13.
+2. RELEASE v1.0 - Daniel godkände, när kön är tom.
+
+### Nästa steg
+
+**Om PR #146 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 146 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #145: `gh issue close 145`. Flytta kort T71 till Done på boarden.
+Kolla om PR:ar #143/#142/#141/#140 även behöver mergas i ordningen äldst -> nyast före #146.
+
+**Om PR #146 REDAN mergad:**
+T71 klar och live på develop. Nästa fas:
+1. Bygga "Land i arena-raden": Match.venue -> "Arena, Stad, Mexiko/USA/Kanada".
+2. När det är klart: Release v1.0 (develop -> main).
+Kör `/agent-kit` för att starta nästa task.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T68b (chevron klickbar) , PR #143 mot develop , KLAR
 
 **Branch:** `feature/T68b-chevron-klickbar` @ HEAD `78cedd5`

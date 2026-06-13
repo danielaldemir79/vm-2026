@@ -16,7 +16,7 @@
 //   kopia. Surface med en SVAG guld-hörn-glow (samma kvällsljus-signatur). HERO-stat-
 //   brickan (träffsäkerhet) är surface-raised med en låg guld-tint + guld-TEXT-eyebrow.
 //   Övriga stat-brickor är neutrala surface-raised. Bästa call-kortet bär en låg guld-
-//   glow. Joker-markören återbrukar den SOLIDA guld-bricka-formen (redan mätt 10.90/5.03).
+//   glow.
 //
 // Kör: node scripts/contrast-t23.mjs
 
@@ -149,11 +149,6 @@ const bestCallBg = {
 };
 add('Bästa call rubrik (fg) på guld-6%-glow (surface-raised)', tok('fg'), bestCallBg, 4.5);
 add('Bästa call kontext (fg-muted) på guld-6%-glow', tok('fgMuted'), bestCallBg, 4.5);
-
-// JOKER-MARKÖREN på bästa call: återbrukar den SOLIDA guld-bricka-formen (--vm-coupon-ink på
-// SOLID --vm-gold), den REDAN mätta färg-oberoende formen (DRY mot .vm-coupon-mine). Vi tar
-// med den här bara för att bekräfta paret, ingen NY kombination.
-add('Joker-markör (coupon-ink på SOLID guld, återbruk)', tok('couponInk'), tok('gold'), 4.5);
 
 // --- Rapport ------------------------------------------------------------------
 let minDark = Infinity;

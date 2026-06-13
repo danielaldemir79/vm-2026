@@ -1,7 +1,7 @@
 // Tester för den PERSONLIGA TIPS-STATISTIKEN (T23, #23). Bevisar definitionerna OCH
 // deras edge-fall/fel-vägar: inga tips, inga avgjorda matcher än, allt miss, blandat,
-// joker-medveten bästa call + dess tiebreak. Härledningen delar score.ts-poängvägen
-// med topplistan, så testerna vaktar att statistiken speglar samma poäng-sanning.
+// bästa call + dess tiebreak. Härledningen delar score.ts-poängvägen med topplistan,
+// så testerna vaktar att statistiken speglar samma poäng-sanning.
 
 import { describe, expect, it } from 'vitest';
 import type { Match } from '../../domain/types';
@@ -134,7 +134,7 @@ describe('derivePersonalStats, räkning + träffsäkerhet', () => {
   });
 });
 
-// ---- BÄSTA CALL (joker-medveten + tiebreak) ----------------------------------
+// ---- BÄSTA CALL (tiebreak) ---------------------------------------------------
 
 describe('derivePersonalStats, bästa call', () => {
   it('väljer det enskilda tips som gav HÖGST poäng (exakt slår rätt utfall)', () => {
@@ -148,31 +148,18 @@ describe('derivePersonalStats, bästa call', () => {
     expect(best?.matchId).toBe('m1');
     expect(best?.pointType).toBe('exact');
     expect(best?.points).toBe(3);
-    expect(best?.joker).toBe(false);
     // Bär lagens id:n (för matchup-rubriken i UI:t), ur den faktiska matchen.
     expect(best?.homeTeamId).toBe('bra');
     expect(best?.awayTeamId).toBe('bih');
   });
 
-  it('JOKER-MEDVETET: en dubblad exakt (6p) slår en oboostad exakt (3p)', () => {
-    const matches = [
-      finished('m1', 1, 0, '2026-06-11T18:00:00Z'), // oboostad exakt -> 3p
-      finished('m2', 2, 0, '2026-06-12T18:00:00Z'), // joker-exakt -> 6p
-    ];
-    const preds = [tip('m1', 1, 0), tip('m2', 2, 0)];
-    const best = derivePersonalStats(preds, matches, new Set(['m2'])).bestCall;
-    expect(best?.matchId).toBe('m2');
-    expect(best?.points).toBe(6);
-    expect(best?.joker).toBe(true);
-  });
-
-  it('joker på ett FELTIPS (miss) ger inga poäng -> påverkar aldrig bästa call', () => {
+  it('ett FELTIPS (miss, 0p) kan aldrig bli bästa call', () => {
     const matches = [
       finished('m1', 1, 0, '2026-06-11T18:00:00Z'), // tippas exakt -> 3p
-      finished('m2', 0, 2, '2026-06-12T18:00:00Z'), // joker-miss -> 0p
+      finished('m2', 0, 2, '2026-06-12T18:00:00Z'), // tippas fel -> 0p (miss)
     ];
     const preds = [tip('m1', 1, 0), tip('m2', 2, 0)];
-    const best = derivePersonalStats(preds, matches, new Set(['m2'])).bestCall;
+    const best = derivePersonalStats(preds, matches).bestCall;
     expect(best?.matchId).toBe('m1');
     expect(best?.points).toBe(3);
   });

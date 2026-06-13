@@ -139,7 +139,7 @@ export function PersonalStatsSection() {
             </div>
           </dl>
 
-          {/* BÄSTA CALL: det enskilda tips som gav mest poäng (joker-medvetet), "det stolta
+          {/* BÄSTA CALL: det enskilda tips som gav mest poäng, "det stolta
               ögonblicket". Bara när ett tips faktiskt gett poäng (bestCall !== null); annars
               utelämnas raden. .vm-best-call (§25) ger en surface-raised-bricka med en LÅG
               guld-glow + hårfin guld-topplist (kvällsljus-värmen ekar, dämpat), så den känns
@@ -160,18 +160,6 @@ export function PersonalStatsSection() {
                 <span>{pointTypeLabel(stats.bestCall.pointType)}</span>
                 <span aria-hidden="true">·</span>
                 <span className="tabular-nums text-fg">{stats.bestCall.points} p</span>
-                {/* JOKER-MARKÖREN: den SOLIDA guld-bricka-formen (.vm-best-call-joker, §25),
-                    samma färg-oberoende AA-säkra form som kupongens/summeringens joker (DRY,
-                    coupon-ink på solid guld = redan mätt 10.90/5.03). En joker dubblade
-                    poängen, värt en liten stolt guld-bricka. */}
-                {stats.bestCall.joker ? (
-                  <span
-                    data-best-call-joker=""
-                    className="vm-best-call-joker rounded-pill px-1.5 py-0.5 font-display text-[0.625rem] font-bold uppercase tracking-wide"
-                  >
-                    Joker
-                  </span>
-                ) : null}
               </p>
             </div>
           ) : null}

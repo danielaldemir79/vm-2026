@@ -52,25 +52,6 @@ const TEAM_LABEL =
 const CODE_CHIP =
   'shrink-0 rounded-sm px-1 py-0.5 font-display text-[0.625rem] font-bold leading-none tracking-wider';
 
-/**
- * JOKER-läget för EN match-kupong (T19, #19). Härlett ur joker-storen + match-dagen i
- * den anropande vyn, så formuläret bara RENDERAR det (ingen store-koppling här, samma
- * tunna-komponent-anda som resten). Optional: utelämnas i fixtures-/icke-rum-läge, då
- * visas ingen joker-kontroll (en kupong utan joker-läge ser ut precis som förr).
- */
-export interface JokerControl {
-  /** Är DENNA match min joker (poängen dubblas)? */
-  isJoker: boolean;
-  /**
-   * Har jag redan en joker en ANNAN match SAMMA omgång (svensk dag)? Då byter ett klick
-   * här jokern hit (en per dag). UI:t förklarar det ("flytta din joker hit"). null = jag
-   * har ingen joker den dagen än (då SÄTTER ett klick jokern).
-   */
-  otherJokerSameDayMatchLabel: string | null;
-  /** Sätt/flytta jokern hit (eller ångra om den redan är här). Kastar vid fel. */
-  onToggle: () => Promise<void>;
-}
-
 export interface PredictionFormProps {
   match: Match;
   teamsById: ReadonlyMap<string, Team>;
@@ -83,12 +64,6 @@ export interface PredictionFormProps {
    * Promise så formuläret kan visa "sparar..."/fel-tillstånd.
    */
   onSubmit: (matchId: string, homeGoals: number, awayGoals: number) => Promise<void>;
-  /**
-   * JOKER-kontrollen (T19, #19), eller utelämnad om joker-läget inte är aktivt (fixtures
-   * / inget rum). När den finns visas en stjärn-toggle på en ÖPPEN kupong ("din joker
-   * idag"), och en låst-etikett visar om jokern gällde just denna match efter avspark.
-   */
-  joker?: JokerControl;
 }
 
 function teamName(teamId: string | null, teamsById: ReadonlyMap<string, Team>): string {
@@ -211,28 +186,6 @@ function CouponTicketIcon() {
 }
 
 /**
- * Joker-stjärnan (joker-toggeln + låst joker-markören): en femuddig stjärna. Ren
- * dekoration (aria-hidden); knappens/etikettens text bär betydelsen. `filled` styr om
- * stjärnan är fylld (aktiv joker) eller bara konturad (inaktiv), via fill-attributet.
- */
-function JokerStarIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      className="h-3.5 w-3.5 shrink-0"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M8 1.6l1.9 3.9 4.3.6-3.1 3 .74 4.3L8 11.9l-3.84 2 .74-4.3-3.1-3 4.3-.6z" />
-    </svg>
-  );
-}
-
-/**
  * Hänglås-ikonen (låst-läget): ett stängt hänglås. Ren dekoration (aria-hidden);
  * låst-etikettens text bär betydelsen åt skärmläsaren. Får en lugn engångs-puls
  * via .vm-coupon-lock-icon (nollad vid reducerad rörelse).
@@ -262,32 +215,11 @@ export function PredictionForm({
   current,
   locked,
   onSubmit,
-  joker,
 }: PredictionFormProps) {
   const home = teamName(match.homeTeamId, teamsById);
   const away = teamName(match.awayTeamId, teamsById);
   const homeCode = teamCode(match.homeTeamId, teamsById);
   const awayCode = teamCode(match.awayTeamId, teamsById);
-
-  // JOKER-toggelns lokala tillstånd (T19): sparar-flagga + ev. fel. Separat från tips-
-  // sparandet (en joker är ett eget val), men samma fail-loud-anda (RLS-avslag -> synligt).
-  const [jokerBusy, setJokerBusy] = useState(false);
-  const [jokerError, setJokerError] = useState<string | null>(null);
-  async function handleJokerToggle() {
-    if (joker === undefined) {
-      return;
-    }
-    setJokerError(null);
-    setJokerBusy(true);
-    try {
-      await joker.onToggle();
-    } catch (err) {
-      // Fail loud: ett RLS-avslag (matchen hann låsas) eller nätfel visas, inte tyst.
-      setJokerError(err instanceof Error ? err.message : 'Kunde inte ändra jokern.');
-    } finally {
-      setJokerBusy(false);
-    }
-  }
 
   // MITT poäng-resultat (siffra + varför) för en AVGJORD match jag tippade, annars null.
   // Visas i låst-etiketten bredvid "Ditt tips". En pågående (men låst) match ger null
@@ -403,51 +335,6 @@ export function PredictionForm({
             kontext) från ifyllnads-zonen (mål-rutorna). Ren dekoration (aria-hidden). */}
         <div aria-hidden="true" className="vm-coupon-tear -mx-0.5 rounded-pill" />
 
-        {/* JOKER-VÄLJAREN (T19, #19): en stjärn-toggle på en ÖPPEN kupong, "din joker idag".
-            En joker dubblar matchens poäng, EN per omgång (svensk dag). Visas bara när
-            joker-läget är aktivt (rum + live). På en LÅST kupong visas i stället en lugn
-            "jokern gällde här"-markör nedanför (i låst-etiketten), inte en knapp. Stabila
-            data-attribut (data-joker-toggle / data-joker-active) är hakarna för design + test. */}
-        {joker !== undefined && !locked ? (
-          <div className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              data-joker-toggle=""
-              data-joker-active={joker.isJoker || undefined}
-              aria-pressed={joker.isJoker}
-              disabled={jokerBusy}
-              onClick={handleJokerToggle}
-              className={`vm-joker-toggle inline-flex w-fit items-center gap-1.5 rounded-pill border px-3 py-1.5 font-display text-[0.75rem] font-bold leading-none transition-[background-color,border-color,filter] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--vm-gold)_55%,transparent)] disabled:cursor-not-allowed disabled:opacity-60 ${
-                joker.isJoker
-                  ? 'vm-coupon-mine border-transparent'
-                  : 'border-[color-mix(in_srgb,var(--vm-gold)_30%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_7%,var(--color-bg))] text-fg hover:border-[color-mix(in_srgb,var(--vm-gold)_50%,var(--color-border))]'
-              }`}
-            >
-              <JokerStarIcon filled={joker.isJoker} />
-              {joker.isJoker ? 'Din joker idag (×2 poäng)' : 'Gör till din joker (×2 poäng)'}
-            </button>
-            {/* Förklaring när jokern ligger på en ANNAN match samma dag: ett klick FLYTTAR
-                den hit (en per omgång). Lugn dämpad text, inte ett fel. */}
-            {!joker.isJoker && joker.otherJokerSameDayMatchLabel !== null ? (
-              <p data-joker-move-hint="" className="m-0 text-[0.75rem] leading-snug text-fg-muted">
-                Du har jokern på {joker.otherJokerSameDayMatchLabel} idag. Ett klick flyttar den
-                hit.
-              </p>
-            ) : null}
-            {/* Joker-fel (fail loud): RLS-avslag eller nätfel. Egen liten danger-rad. */}
-            {jokerError ? (
-              <p
-                role="alert"
-                data-joker-error=""
-                className="m-0 text-[0.75rem] leading-snug"
-                style={{ color: 'var(--color-danger)' }}
-              >
-                {jokerError}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
         {/* LÅST-etikett: visas tydligt efter avspark. POSITIV inramning , "låst vid
             avspark" är spelets rättvisa (alla tippar blint), inte en frustration.
             data-prediction-lock är haken för design-frontend. aria-describedby
@@ -501,19 +388,6 @@ export function PredictionForm({
                     ·
                   </span>
                   <span>{points.reason}</span>
-                </span>
-              ) : null}
-
-              {/* JOKER GÄLLDE HÄR (T19): på en LÅST kupong som var min joker, en lugn
-                  guld-markör så man ser att poängen ovan dubblades. Bara markören (jokern
-                  är bindande efter avspark, ingen knapp). data-joker-locked = test/design-hak. */}
-              {locked && joker?.isJoker ? (
-                <span
-                  data-joker-locked=""
-                  className="vm-coupon-mine inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none"
-                >
-                  <JokerStarIcon filled />
-                  Joker, poängen dubblades
                 </span>
               ) : null}
             </div>
