@@ -5,6 +5,77 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T76 (#158) tips-korten väver in facit + tip-vs-facit-hierarki , PR #159 mot develop , KLAR
+
+**Branch:** `fix/T76-tips-kort-facit` @ HEAD `163b071`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/159 mot `develop` (Closes #158, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T76 levererade
+
+Daniels rapporterade bugg: tips-korten under "Tippa matcherna" visade ALDRIG officiella resultat
+(facit), trots att topplistan räknade poäng korrekt. Orsak: PredictionForm läste data ur
+usePredictableData (simulerings-överlägget) i stället för ur den live-synkade officiella källan.
+
+**Kedjan:**
+
+- **Senior-developer `2e0de37`:** väv in officiellt facit via useOfficialResultsSync +
+  applyRoomResults i usePredictableData, samma datakälla som topplistan. Regressionstest
+  pinnar både riktningarna (med + utan officiellt facit) - bevisar vakten aktiv.
+- **Design-frontend `e30ec42`:** vände hierarkin - facit lyft överst, tips-rutor krymper till
+  jämförelseläge, "Ditt tips"-etikett adderad. Naturlig läsordning: se utfallet först, ditt
+  tips som jämförelse under.
+- **Lokal reviewer:** GODKÄND. Regressionstest verifierat i båda riktningarna (live-DB
+  end-to-end bevisat), inga olösta fynd.
+- **Copilot R1:** 1 trivial fynd (stabil env-referens i integrationstestet).
+- **Dirigent-fix `163b071`:** Copilot R1 åtgärdad.
+- **Copilot R2:** 0 fynd. Exit.
+
+**Verifiering (HEAD `163b071`):** build EXIT 0, npm test 1803 gröna/48 skip,
+lint + format:check EXIT 0.
+
+**Acceptanskriterier T76:**
+- [x] AC1: tips-korten visar officiellt facit i realtid (samma datakälla som topplistan)
+- [x] AC2: hierarkin vänd - facit överst, "Ditt tips" under som jämförelse
+- [x] AC3: regressionstest pinnar båda riktningarna, lokal panel + Copilot R1-R2 exit, inga olösta fynd
+
+### Behöver-Daniel (uppdaterat efter T76)
+
+**Befordringar: REDAN GODKÄNDA + EXEKVERADE 2026-06-12.**
+Tre befordringar som stod som "väntar" i tidigare HANDOFF-poster är INTE längre öppna:
+- Kommentar-pastar (Förekomst 8) -> skriven som permanent regel i agent-kit/agents/senior-developer.md
+- Uttömmande-test (Förekomst 3) -> skriven som permanent regel i agent-kit/agents/senior-developer.md
+- Pastar-filer-saknas (Förekomst 4) -> skriven som permanent regel i agent-kit/agents/journalist.md
+Arkiverade i memory/archive/*-2026-06-12.md. Inget väntar på godkännande.
+
+**Kvar att besluta/agera:**
+- RLS-testrum i Supabase: står kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- Supabase e-postmall: #81 stängdes 2026-06-12 på Daniels order.
+- **Publik-repo-go + AI-pipeline-synlighet:** Daniel beslutar när vm-2026 kan vara publikt synligt.
+  Agent Kit får nämnas som hans kvalitets-pipeline, ingen Claude-byline, ingen Co-authored-by.
+
+### Nästa steg
+
+**Om PR #159 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 159 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #158: `gh issue close 158`. Flytta kort T76 till Done på boarden.
+Kolla om PR:ar #157 eller äldre behöver mergas i ordningen ältst -> nyast före #159.
+
+**Om PR #159 REDAN mergad:**
+T76 klar och live på develop. Kön efter T76:
+(a) **T74 PARKERAD** - KLART byggd (fdb833a på feature/T74-reactions-author), återupptas:
+    design -> reviewer -> Copilot-loop -> journalist -> merge. Se T74-HANDOFF-blocket längre ner.
+(b) **T77** - per-match-kommentarer hopfällda (Daniels val, se backlog).
+(c) **RELEASE v1.0** - develop -> main, tagg v1.0.
+(d) **README post-v1** - publik README klar för delning (minnesfil vm2026-readme-spec).
+(e) **Före-publicerings-koll** - Daniel godkänner publik-go.
+Kör `/agent-kit` för att starta nästa task.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T73 (#153) facit + poäng på avgjorda tips-kort , PR #154 mot develop , KLAR
 
 **Branch:** `feature/T73-facit-pa-kort` @ HEAD `485dcd7`
@@ -52,10 +123,7 @@ T73 kopplar in presentationslagret.
 
 ### Behöver-Daniel (uppdaterat efter T73/T75)
 
-**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
-- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
-- Uttömmande-test Förekomst 3: agent-regel för reviewer.
-- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+**Befordringar: REDAN GODKÄNDA + EXEKVERADE 2026-06-12** (se T76-blocket ovan).
 
 **Kvar att besluta/agera:**
 - RLS-testrum i Supabase: stands kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
@@ -124,10 +192,7 @@ env-gatad), lint + format:check EXIT 0.
 
 ### Behöver-Daniel (uppdaterat efter T72)
 
-**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
-- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
-- Uttömmande-test Förekomst 3: agent-regel för reviewer.
-- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+**Befordringar: REDAN GODKÄNDA + EXEKVERADE 2026-06-12** (se T76-blocket ovan).
 
 **Kvar att besluta/agera:**
 - RLS-testrum i Supabase: stands kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
@@ -193,10 +258,7 @@ lint + format:check EXIT 0.
 
 ### Behöver-Daniel (oförändrad + nytillkommen)
 
-**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
-- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
-- Uttömmande-test Förekomst 3: agent-regel för reviewer.
-- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+**Befordringar: REDAN GODKÄNDA + EXEKVERADE 2026-06-12** (se T76-blocket ovan).
 
 **Kvar att besluta/agera:**
 - Supabase e-postmall: #81 stängdes 2026-06-12 på Daniels order.
@@ -260,10 +322,7 @@ lint + format:check EXIT 0.
 
 ### Behöver-Daniel (oförändrad)
 
-**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
-- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
-- Uttömmande-test Förekomst 3: agent-regel för reviewer.
-- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+**Befordringar: REDAN GODKÄNDA + EXEKVERADE 2026-06-12** (se T76-blocket ovan).
 
 **Kvar att besluta/agera:**
 - Supabase e-postmall för inloggningsmejlet (kosmetisk): #81 stängdes 2026-06-12 på Daniels order.
@@ -325,10 +384,7 @@ lint + format:check EXIT 0.
 
 ### Behöver-Daniel (oförändrad)
 
-**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
-- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
-- Uttömmande-test Förekomst 3: agent-regel för reviewer.
-- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+**Befordringar: REDAN GODKÄNDA + EXEKVERADE 2026-06-12** (se T76-blocket ovan).
 
 **Kvar att besluta/agera:**
 - Supabase e-postmall för inloggningsmejlet (kosmetisk): #81 stängdes 2026-06-12 på Daniels order.
@@ -403,10 +459,7 @@ lint + format:check EXIT 0.
 
 ### Behöver-Daniel (oförändrad + T68b-klar)
 
-**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
-- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
-- Uttömmande-test Förekomst 3: agent-regel för reviewer.
-- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+**Befordringar: REDAN GODKÄNDA + EXEKVERADE 2026-06-12** (se T76-blocket ovan).
 
 **Kvar att besluta/agera:**
 - Supabase e-postmall för inloggningsmejlet (kosmetisk): #81 stängdes 2026-06-12 på Daniels order.
