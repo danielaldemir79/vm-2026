@@ -111,8 +111,13 @@ export function ReactionAuthorsPopover({
     const maxTop = Math.max(VIEWPORT_MARGIN, viewportH - p.height - VIEWPORT_MARGIN);
     const top = Math.min(Math.max(a.top - p.height - ANCHOR_GAP, VIEWPORT_MARGIN), maxTop);
 
-    setPos({ left, top });
-  }, [anchorRef, authors]);
+    // Uppdatera BARA när positionen faktiskt ändras: en realtids-refresh kan ge en ny
+    // authors-referens utan att left/top rör sig, och en setPos med samma värden vore en
+    // onödig re-render (Copilot, PR #160). Funktionell update returnerar prev oförändrad.
+    setPos((prev) => (prev.left === left && prev.top === top ? prev : { left, top }));
+    // Deps: authors.LENGTH (inte hela arrayen) , bara RAD-ANTALET påverkar popoverns höjd
+    // och därmed placeringen; en ny array-referens med samma längd ska inte mäta om.
+  }, [anchorRef, authors.length]);
 
   return (
     <div
