@@ -50,26 +50,27 @@
   );
 }
 
-/* "DET FINNS MER"-CUE-KNAPPEN vid klipp-kanten (T68b, #136): en liten accent-
+/* "DET FINNS MER"-CUE:N vid klipp-kanten (T68b, #136): en liten accent-
  * pillerknopp med en chevron-ner, centrerad längst ner. Den GÖR klipp-kanten
- * inbjudande ("det finns mer nedanför") utan extra text, OCH är nu en RIKTIG
- * <button> som fäller ut sektionen vid klick (Daniels feedback 2026-06-13:
- * "man vill klicka på pilen men inget händer"). Den kompletterar den ÖVRE
- * expandera-pillen, som bär den tillgängliga semantiken; cue-knappen är
- * aria-hidden + tabIndex=-1 (mus/touch-affordans, inte en andra SR-kontroll),
+ * inbjudande ("det finns mer nedanför") utan extra text, OCH är nu ett
+ * klickbart icke-fokuserbart <div> som fäller ut sektionen vid klick (Daniels
+ * feedback 2026-06-13: "man vill klicka på pilen men inget händer"). Den
+ * kompletterar den ÖVRE expandera-pillen, som bär den tillgängliga semantiken;
+ * cue:n är ett aria-hidden div (mus/touch-affordans, inte en andra SR-kontroll),
  * se CollapsibleSection.tsx + docs/decisions.md (T68b).
  *
- * Pillret + chevron-glyfen ritas av cue-knappens egna pseudo-element (::after =
+ * Pillret + chevron-glyfen ritas av cue:ns egna pseudo-element (::after =
  * platta, ::before = chevron), flyttade hit FRÅN fadens pseudo-element så bara
- * pillrets yta fångar klick, aldrig hela fade-bandet. Knappens egen yta
+ * pillrets yta fångar klick, aldrig hela fade-bandet. Cue:ns egen yta
  * (2.25rem-pillret centrerat i en 3rem-bred träffyta, se .tsx) är klickmålet;
  * faden förblir pointer-events-none. */
 [data-collapsible-cue] {
-  /* Nollställ webbläsarens knapp-stil: cue-knappen ska SE UT som pillret, inte
-     som en OS-knapp. Bakgrund/kant/glyf bärs av pseudo-elementen nedan; knappens
-     egen yta är en transparent träffyta. Positionering (absolute bottom/left) +
-     storlek sätts inline i .tsx, så pseudo-elementen (bottom/left) ankras mot
-     knappen. */
+  /* Bakgrund/kant/glyf bärs av pseudo-elementen nedan; cue:ns egen yta är en
+     transparent träffyta. Positionering (absolute bottom/left) + storlek sätts
+     inline i .tsx, så pseudo-elementen (bottom/left) ankras mot cue-elementet.
+     appearance/border/padding-nollningen är ofarlig belt-and-suspenders (ett div
+     ärver dem inte från någon OS-knapp, men håller stilen explicit och stabil om
+     elementet någonsin byts). */
   appearance: none;
   -webkit-appearance: none;
   padding: 0;
@@ -78,7 +79,7 @@
   /* Dämpa den fyrkantiga touch-tap-highlighten som annars ritas över HELA den
      3rem-breda osynliga träffytan vid tryck. Klick-feedbacken ska bäras av
      pillret (:active nedan), så bara pillrets yta läses som tryckt, inte en
-     rektangel runt hela ytan. (Knappens egen yta är ändå transparent.) */
+     rektangel runt hela ytan. (Cue:ns egen yta är ändå transparent.) */
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -148,8 +149,8 @@
 }
 
 /* HOVER (mus + touch-tap-highlight): cue:n ska omisskännligt läsas som "TRYCK
- * HÄR". Eftersom knappen är aria-hidden + icke-tab-bar (a11y bärs av den övre
- * ExpandToggle, decisions.md T68b) är :focus-visible mindre relevant; det är
+ * HÄR". Eftersom cue:n är ett aria-hidden, icke-fokuserbart div (a11y bärs av den
+ * övre ExpandToggle, decisions.md T68b) är :focus-visible mindre relevant; det är
  * :hover + :active som gör den läsbar som klickbar. Pillret tänds HELA vägen upp
  * till ExpandToggle-pillens hover-recept (accent 20% fond / 60% kant, samma redan
  * mätta accent-på-yta-par) och lyfts med raised-skuggan, så det "kommer upp mot
