@@ -96,6 +96,7 @@ export function ReactionAuthorsPopover({
     const a = anchor.getBoundingClientRect();
     const p = popover.getBoundingClientRect();
     const viewportW = window.innerWidth || 0;
+    const viewportH = window.innerHeight || 0;
 
     // Horisontellt: centrera över ankaret, klampa [margin, viewport - bredd - margin].
     const centeredLeft = a.left + a.width / 2 - p.width / 2;
@@ -103,8 +104,12 @@ export function ReactionAuthorsPopover({
     const left = Math.min(Math.max(centeredLeft, VIEWPORT_MARGIN), maxLeft);
 
     // Vertikalt: lägg popovern OVANFÖR ankaret (underkant = ankarets ovankant - gap).
-    // Klampa uppåt mot viewport-toppen så den aldrig hamnar ovanför skärmkanten.
-    const top = Math.max(VIEWPORT_MARGIN, a.top - p.height - ANCHOR_GAP);
+    // Klampa inom [margin, viewport - höjd - margin], SAMMA mönster som horisontellt:
+    // uppåt så den aldrig hamnar ovanför skärmkanten, OCH nedåt så en hög popover (många
+    // rader) aldrig spiller ut under skärmkanten. maxTop:s yttre Math.max ger margin som
+    // golv om popovern är högre än hela viewporten (best-effort, klampa då till toppen).
+    const maxTop = Math.max(VIEWPORT_MARGIN, viewportH - p.height - VIEWPORT_MARGIN);
+    const top = Math.min(Math.max(a.top - p.height - ANCHOR_GAP, VIEWPORT_MARGIN), maxTop);
 
     setPos({ left, top });
   }, [anchorRef, authors]);
