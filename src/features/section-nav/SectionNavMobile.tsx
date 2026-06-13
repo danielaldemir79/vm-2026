@@ -80,8 +80,10 @@ export function SectionNavMobile() {
 
   // Samma robusta offset-mätning som chip-raden (DELAD hook), så det SYNLIGA bandets höjd
   // (här: hamburgare-knappens band på mobil) driver scroll-margin + spy-zonen. recompute-
-  // nyckeln är sections.length (live-läge tänder fler) OCH open (panelen ändrar inte bandets
-  // höjd, men en om-mätning vid öppning är ofarlig och håller offseten färsk).
+  // nyckeln är BARA sections.length (live-läge tänder fler). Vi skickar INTE med `open`:
+  // panelen ligger i <nav>:ens flöde, så öppet läge ÖKAR bandets höjd, men den höjdändringen
+  // fångas av offset-hookens ResizeObserver (den observerar bandet), inte av recompute-nyckeln.
+  // En extra recompute-nyckel för `open` vore alltså redundant med ResizeObservern (C3, #168).
   useStickyBandOffset(bandRef, sections.length);
 
   const close = useCallback(() => setOpen(false), []);
@@ -189,6 +191,11 @@ export function SectionNavMobile() {
             tonas ut, helt i CSS (gatad på reduced-motion). Skiftet bär ingen a11y-betydelse,
             knappens aria-expanded + dess namn ("Sektioner: <aktiv>") är sanningen. */}
           <svg
+            // className bär den CSS som faktiskt stylar ikonen (overflow för kryss-rotationen,
+            // shrink-0, transform-box på strecken via .vm-section-menu-icon [data-icon-bar]).
+            // data-attributet behålls som ren BETEENDE-/test-krok. Utan klassen uteblir
+            // ikon-skiftet/överflödet (C1, Copilot #168), eftersom CSS:en är skriven mot klassen.
+            className="vm-section-menu-icon"
             data-section-menu-icon=""
             aria-hidden="true"
             viewBox="0 0 16 16"
@@ -203,7 +210,12 @@ export function SectionNavMobile() {
             <line data-icon-bar="mid" x1="2" y1="8" x2="14" y2="8" />
             <line data-icon-bar="bottom" x1="2" y1="12" x2="14" y2="12" />
           </svg>
-          <span data-section-menu-label="">{buttonLabel}</span>
+          {/* className bär trunkeringen (.vm-section-menu-label: overflow/ellipsis/nowrap) så ett
+            långt sektionsnamn inte overflow:ar knappen; data-attributet behålls som test-/krok.
+            Utan klassen uteblir ellipsen (C2, Copilot #168), CSS:en är skriven mot klassen. */}
+          <span className="vm-section-menu-label" data-section-menu-label="">
+            {buttonLabel}
+          </span>
         </button>
       </div>
 
