@@ -1,9 +1,10 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, act } from '@testing-library/react';
 import { SectionNavProvider } from './SectionNavProvider';
 import { SectionNav } from './SectionNav';
 import { useRegisterSection } from './use-register-section';
-import { SECTIONS } from './section-labels';
+import { useSectionSpy } from './use-section-spy';
+import { SECTIONS, type SectionDescriptor } from './section-labels';
 
 // En kontrollerbar IntersectionObserver-mock: den FÅNGAR callbacken + de observerade
 // elementen så testet kan DRIVA scroll-spy:n (jsdom emitterar aldrig riktig
@@ -142,5 +143,84 @@ describe('scroll-spy markerar aktivt chip (aria-current)', () => {
       [SECTIONS.scenarios.id]: 800,
     });
     expect(chip('Idag')).toHaveAttribute('aria-current', 'true');
+  });
+});
+
+// C3: rootMargin (observer-zonens topp) härleds ur --vm-section-nav-offset. SectionNav mäter
+// om offseten vid resize/radbrytning/zoom. Tidigare frystes offseten vid mount (effektens deps
+// är idsKey + setActiveId, inte offseten), så rootMargin blev STALE efter en höjdändring och fel
+// chip kunde markeras. Hooken bevakar nu offset-ändringar (ResizeObserver på banden + window
+// 'resize') och bygger om observern med ny rootMargin. ResizeObserver-stubben i setup.ts
+// emitterar inte, så vi driver via window 'resize'-fallbacken (samma kanal hooken lyssnar på).
+//
+// VARFÖR en fristående harness (inte renderNavWithThreeSections): SectionNav-komponentens egen
+// mount-effekt MÄTER banden (höjd 0 i jsdom utan layout) och SKRIVER --vm-section-nav-offset,
+// vilket skulle skriva över offseten testet sätter. Här driver vi useSectionSpy DIREKT mot
+// sektioner i DOM, så testet äger offset-variabeln helt och bevisar spy-hookens räkne-/ombyggnads-
+// logik isolerat (samma anda som use-active-chip-scroll.test injicerar sin egen geometri).
+function SpyHarness({ sections }: { sections: SectionDescriptor[] }) {
+  const setActiveId = vi.fn();
+  useSectionSpy(sections, setActiveId);
+  return (
+    <>
+      {sections.map((s) => (
+        <section key={s.id} aria-labelledby={s.id}>
+          <h2 id={s.id}>{s.label}</h2>
+        </section>
+      ))}
+    </>
+  );
+}
+
+describe('scroll-spy bygger om observern med ny rootMargin när offseten ändras (C3)', () => {
+  let originalIO: typeof IntersectionObserver;
+  const sections = [SECTIONS.daily, SECTIONS.groups, SECTIONS.scenarios];
+  beforeEach(() => {
+    instances = [];
+    originalIO = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver =
+      MockIntersectionObserver as unknown as typeof IntersectionObserver;
+  });
+  afterEach(() => {
+    globalThis.IntersectionObserver = originalIO;
+    // Städa offset-variabeln så den inte läcker till andra tester (default = 0/saknas).
+    document.documentElement.style.removeProperty('--vm-section-nav-offset');
+  });
+
+  it('skapar en ny observer med uppdaterad rootMargin efter att offseten höjts', () => {
+    // Initial offset 64px -> rootMargin-toppen ska vara -64px.
+    document.documentElement.style.setProperty('--vm-section-nav-offset', '64px');
+    render(<SpyHarness sections={sections} />);
+
+    const firstCount = instances.length;
+    const firstRootMargin = instances[instances.length - 1].options?.rootMargin;
+    expect(firstRootMargin).toBe('-64px 0px -55% 0px');
+
+    // Bandet växer (t.ex. radbrytning/zoom): SectionNav skulle skriva en ny offset. Vi
+    // simulerar den nya mätningen och triggar resize-kanalen hooken bevakar.
+    document.documentElement.style.setProperty('--vm-section-nav-offset', '120px');
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    // En NY observer ska ha byggts (ombyggnad), med den uppdaterade rootMargin-toppen -120px.
+    expect(instances.length).toBe(firstCount + 1);
+    const rebuiltRootMargin = instances[instances.length - 1].options?.rootMargin;
+    expect(rebuiltRootMargin).toBe('-120px 0px -55% 0px');
+  });
+
+  it('bygger INTE om observern när offseten inte ändrats meningsfullt (samma avrundade px)', () => {
+    document.documentElement.style.setProperty('--vm-section-nav-offset', '64px');
+    render(<SpyHarness sections={sections} />);
+    const countAfterMount = instances.length;
+
+    // En resize som inte ändrar den avrundade höjden (64.2px rundas till 64) ska inte
+    // riva/bygga om observern i onödan.
+    document.documentElement.style.setProperty('--vm-section-nav-offset', '64.2px');
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(instances.length).toBe(countAfterMount);
   });
 });

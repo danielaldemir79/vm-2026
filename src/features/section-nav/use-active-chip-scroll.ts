@@ -50,11 +50,21 @@ export function useActiveChipScroll(
     }
     const item = activeChip.closest<HTMLElement>('li') ?? activeChip;
 
-    // Position RELATIVT containern (inte viewporten), så beräkningen är oberoende av var raden
-    // sitter på sidan och av sidans egen scroll. offsetLeft är redan relativt track:en
-    // (track är li:ts offsetParent via dess positionerade/överflödande box).
-    const itemLeft = item.offsetLeft;
-    const itemRight = itemLeft + item.offsetWidth;
+    // Position RELATIVT track:ens innehåll (inte viewporten), så beräkningen är oberoende av
+    // var raden sitter på sidan och av sidans egen scroll.
+    //
+    // VARFÖR INTE offsetLeft: offsetLeft mäts mot elementets offsetParent (närmaste
+    // POSITIONERADE förfader, dvs position != static), INTE mot en överflödande container.
+    // Overflow skapar ingen offsetParent, och track:en sätter ingen position, så li:ts
+    // offsetParent kan bli <body> -> offsetLeft hade då blivit fel grund för synfälts-
+    // beräkningen och auto-scrollen hoppat fel. Vi räknar i stället positionen layout-sant via
+    // getBoundingClientRect-deltan: skärm-x för item minus skärm-x för track ger avståndet i
+    // track:ens VYPORT, och + scrollLeft lyfter det till track:ens INNEHÅLLS-koordinater (samma
+    // rymd som scrollLeft/clientWidth nedan). Frikopplat från CSS, inget dolt position-kontrakt.
+    const trackRect = track.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const itemLeft = itemRect.left - trackRect.left + track.scrollLeft;
+    const itemRight = itemLeft + itemRect.width;
     const viewLeft = track.scrollLeft;
     const viewRight = viewLeft + track.clientWidth;
 
