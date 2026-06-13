@@ -92,9 +92,9 @@ function teamCode(teamId: string | null, teamsById: ReadonlyMap<string, Team>): 
  * FIFA-ranking (T4e). Emblemet är dekoration; namnet är en TeamNameButton som öppnar
  * profilen, eller (för ett ännu okänt slutspelslag, teamId null) en ren text utan knapp.
  *
- * FIFA-rankingen (`ranking`, t.ex. "FIFA #14") visas DISKRET under namnet när den finns.
- * Den hanteras TYST när den saknas (okänt slutspelslag eller lag utan ranking): då är
- * `ranking` null och ingen rad renderas (ingen "FIFA #undefined"). data-fifa-ranking är
+ * FIFA-rankingen (`ranking`, t.ex. "FIFA-ranking #14") visas DISKRET under namnet när den
+ * finns. Den hanteras TYST när den saknas (okänt slutspelslag eller lag utan ranking): då
+ * är `ranking` null och ingen rad renderas (ingen "FIFA-ranking #undefined"). data-fifa-ranking är
  * design-/test-haken; design-frontend finputsar placering/storlek ovanpå.
  */
 function TeamSide({
@@ -138,10 +138,11 @@ function TeamSide({
             teamId är null (okänt slutspelslag), så vi aldrig erbjuder en knapp utan
             profil. truncate flyttas till knappen så namnet kapas inom kort-bredden. */}
         <TeamNameButton teamId={teamId} name={name} className="min-w-0 truncate" />
-        {/* FIFA-ranking, BARA när den finns (tyst annars, ingen "FIFA #undefined").
+        {/* FIFA-ranking, BARA när den finns (tyst annars, ingen "FIFA-ranking #undefined").
             Till skillnad från resultatets mitt-rad är rankingen INTE redan med i kortets
             a11y-namn, så den hålls LÄSBAR för skärmläsare (inget aria-hidden): en
-            SR-användare hör "Mexiko, FIFA #14".
+            SR-användare hör "Mexiko, FIFA-ranking #14". Hela ordet "FIFA-ranking" (inte
+            bara "#14") så det inte misstolkas som grupp-/tabellplacering (Daniels feedback).
             BALANS (design-frontend, T4e): lugn + symmetrisk under båda lagnamnen,
             tabular-nums så siffran sitter still och talar SAMMA sekundär-metadata-språk
             som tiden + resultatet (tabular-nums, fg-muted). font-normal + fg-muted +
@@ -179,7 +180,7 @@ export function MatchCard({
 
   // FIFA-ranking per lag (T4e #149): läser BEFINTLIG data (Team.fifaRanking, T10/T69),
   // ingen ny källa. null när laget är okänt (slutspel innan seedning) eller saknar ranking,
-  // då visas ingen ranking-rad (gissa aldrig, ingen "FIFA #undefined"). Slår upp laget via
+  // då visas ingen ranking-rad (gissa aldrig, ingen "FIFA-ranking #undefined"). Slår upp laget via
   // id (homeTeamId/awayTeamId kan vara null) och låter formatFifaRanking göra null-gränsen.
   const homeTeam = match.homeTeamId !== null ? teamsById.get(match.homeTeamId) : undefined;
   const awayTeam = match.awayTeamId !== null ? teamsById.get(match.awayTeamId) : undefined;

@@ -166,22 +166,23 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
 
   it('visar FIFA-rankingen per lag ur Team.fifaRanking (T4e)', () => {
     const { container } = renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
-    // Båda lagen har en ranking i teamsById (mex #14, rsa #60).
-    expect(screen.getByText('FIFA #14')).toBeInTheDocument();
-    expect(screen.getByText('FIFA #60')).toBeInTheDocument();
+    // Båda lagen har en ranking i teamsById (mex #14, rsa #60). Hela ordet "FIFA-ranking"
+    // (inte bara "#14") så det inte misstolkas som grupp-/tabellplacering (Daniels feedback).
+    expect(screen.getByText('FIFA-ranking #14')).toBeInTheDocument();
+    expect(screen.getByText('FIFA-ranking #60')).toBeInTheDocument();
     // Exakt två ranking-hakar (en per lag-sida).
     expect(container.querySelectorAll('[data-fifa-ranking]')).toHaveLength(2);
   });
 
-  it('hanterar SAKNAD FIFA-ranking TYST (inget "FIFA #undefined", T4e)', () => {
+  it('hanterar SAKNAD FIFA-ranking TYST (inget "FIFA-ranking #undefined", T4e)', () => {
     // Ett lag UTAN ranking (vanligt för testdata/ännu obestämda lag): ingen ranking-rad.
     const teamsNoRanking = new Map<string, Team>([
       ['mex', team('mex', 'Mexiko')], // ingen fifaRanking
       ['rsa', team('rsa', 'Sydafrika', 60)],
     ]);
     const { container } = renderCard(<MatchCard match={groupMatch()} teamsById={teamsNoRanking} />);
-    expect(screen.queryByText(/FIFA #undefined/)).not.toBeInTheDocument();
-    expect(screen.getByText('FIFA #60')).toBeInTheDocument();
+    expect(screen.queryByText(/FIFA-ranking #undefined/)).not.toBeInTheDocument();
+    expect(screen.getByText('FIFA-ranking #60')).toBeInTheDocument();
     // Bara EN ranking-hak (laget utan ranking renderar ingen).
     expect(container.querySelectorAll('[data-fifa-ranking]')).toHaveLength(1);
   });
@@ -196,7 +197,7 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     });
     const { container } = renderCard(<MatchCard match={ko} teamsById={teamsById} />);
     expect(container.querySelectorAll('[data-fifa-ranking]')).toHaveLength(0);
-    expect(screen.queryByText(/FIFA #/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/FIFA-ranking/)).not.toBeInTheDocument();
   });
 
   it('visar arena-KAPACITETEN för en känd arena ("80 824 platser", T4e)', () => {
