@@ -29,7 +29,11 @@ export interface UseLongPressOptions {
    * behöver en tom callback. Använd den för en sido-effekt (haptik, analytics).
    */
   onLongPress?: () => void;
-  /** Körs när trycket SLÄPPS/avbryts (oavsett om det blev ett långtryck). Dölj popovern här. */
+  /**
+   * Körs när ett AKTIVT långtryck släpps/avbryts (dölj popovern här). Ett vanligt tap
+   * (släppt FÖRE tröskeln, långtrycket blev aldrig aktivt) triggar den INTE, det finns
+   * ingen popover att dölja då. Speglar end():s `if (activeRef.current)`-gren.
+   */
   onRelease?: () => void;
   /** Tröskel i ms (default LONG_PRESS_THRESHOLD_MS). Injicerbar för test. */
   thresholdMs?: number;
