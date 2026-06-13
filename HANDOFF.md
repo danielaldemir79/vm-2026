@@ -5,6 +5,80 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , README (#163) merit-README post-v1.0 , PR #164 mot develop , In Review
+
+**Branch:** `chore/readme` @ HEAD `9200c26`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/164 mot `develop` (Closes #163, state: OPEN)
+**Issue:** https://github.com/danielaldemir79/vm-2026/issues/163
+**Live preview:** vm-2026.pages.dev
+
+### Vad README-tasken levererade
+
+En proffsig, delbar merit-README i engelska. Tackar Daniels namn, Agent Kit-pipelinen och
+sex skärmdumpar (fixtures-lage, ingen live-Supabase-env kravs). Ingen Claude-byline.
+Dokumenterar: alla features (live-tracker, tips, topplista, reaktioner, kommentarer, RLS,
+PWA), lokal korning fixtures-forst, arkitektur (React+Vite+Supabase+Cloudflare Pages),
+och hur man ser appen live (vm-2026.pages.dev).
+
+**Kedjan:**
+
+- **Senior-developer `fb5e961`:** engelsk merit-README, verifierad lokal korning
+  fixtures-forst, 6 skärmdumpar, Agent Kit som Daniels pipeline, ingen Claude-byline.
+- **Lokal reviewer (F1):** faktakollade lokal korning + features mot kod. F1: test-siffran
+  1874/49 stammer inte pa fresh clone (faktiskt 1867/56 pa fresh clone). Siffran bevisad
+  deterministisk via 2x korning + ren `.env.local`-borttagen fresh-clone-korning.
+- **F1-fix `f921237`:** test-siffran rättad till fresh-clone-värdet 1867/56.
+- **Copilot R1 `66a0164`:** skärmdumps-env-force (fixtures-lage i capture-spec).
+- **Copilot R2 `3debfbe`:** Motion-namnet + reuseExistingServer false.
+- **Copilot R3 `532f564`:** env-precedens-kommentar i capture-config.
+- **Copilot R4 `9fcc486` + format-fix `9200c26`:** CI-formulering + capture-toggle-robusthet
+  + reducedMotion-kommentar.
+
+Alla R1-R4-fynd var kosmetiska/accuracy, inga säkerhetsfynd. Copilot exit efter R4.
+
+**Verifiering (HEAD `9200c26`):** build EXIT 0, lint + format:check EXIT 0,
+npm test 1867 grona / 56 skip (fresh clone deterministiskt).
+
+**Acceptanskriterier README (#163):**
+- [x] AC1: Engelsk merit-README - funktioner, lokal korning, arkitektur, skärmdumpar
+- [x] AC2: Daniels namn + Agent Kit-pipeline nämns, ingen Claude-/AI-byline i README
+- [x] AC3: Test-siffra matchar fresh-clone-korvärdet (1867/56) - faktakollad av reviewer
+- [x] AC4: Build/lint/format rent, Copilot R1-R4 exit, inga olosta fynd
+
+### Behover-Daniel (uppdaterat efter README)
+
+**Inga nya befordringar fran denna task** (se T77-blocket for tidigare befordringslagets status).
+
+**Kvar att besluta/agera:**
+- **Publik-repo-go:** Daniel bestammer nar vm-2026 kan vara publikt synligt. README är nu klar.
+  Agent Kit far nämnas som hans kvalitets-pipeline, ingen Claude-byline.
+- **Historik-omskrivnings-go:** om gamla commits har Co-authored-by: Claude (vilket de inte ska)
+  behovs ett `git filter-repo`-svep fore publicering. Dirigen kollar + lägger fram for Daniels go.
+- **AI-pipeline-synlighet i publika docs:** README nämner Agent Kit. OK for publicering?
+- **Supabase e-postmall #81:** stangt 2026-06-12 pa Daniels order. Inga atgarder kvar.
+- **RLS-testrum i Supabase:** star kvar pa Daniels uttryckliga beslut (2026-06-12 15:18).
+- **TWA/Play-kontot:** se docs/twa-guide.md.
+- **#39-F1 (post-VM-vy):** pinnad, ej byggd.
+- **T16b-slot-tippbarhet-ur-sim:** pinnad.
+
+### Nasta steg
+
+Hela features-kon ar TOM (T77 mergad, README klar). Enda kvar ar FORE-PUBLICERINGS-KOLLEN.
+
+**Om PR #164 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 164 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #163: `gh issue close 163`. Flytta kort README till Done pa boarden.
+Kör sedan fore-publicerings-kollen (secret-svep av git-historik, RLS-sammanfattning,
+Claude-attributions-rensning ur gamla commits om sadan finns) och lägg fram for Daniels go.
+
+**Om PR #164 REDAN mergad:**
+README klar och live pa develop. Hela features-kon + README ar KLARA. Kör
+fore-publicerings-kollen direkt: secret-svep av git-historik, RLS-sammanfattning,
+Claude-attributions-rensning ur gamla commits om sadan finns. Lägg fram for Daniels go
+pa att gora repot offentligt. Kör `/agent-kit` for att starta fore-publicerings-kollen.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T77 (#161) per-match kommentarer hopfallda pa matchkortet , PR #162 mot develop , In Review
 
 **Branch:** `feature/T77-match-kommentarer` @ HEAD `a8eb6ed`
