@@ -8,9 +8,10 @@
  *   - en diskret höjd-transition mellan komprimerat och utfällt,
  *   - allt tema-medvetet (fadeTo styr bakytan) och reduced-motion-gatat.
  *
- * Stylas ENBART via senior-devs befintliga data-hakar (data-collapsible,
- * -body, -fade, data-collapsed) + nya rena klass-hakar, så all semantik + alla
- * tester står oförändrade.
+ * Stylas ENBART via data-hakarna (data-collapsible, -body, -fade, -cue,
+ * data-collapsed), så semantiken bärs av CollapsibleSection.tsx, inte av CSS:en.
+ * (T68b gjorde cue:n klickbar i .tsx och la till tester för den; detta CSS-lager
+ * rör bara utseendet på data-collapsible-cue, ingen logik eller a11y-semantik.)
  */
 
 /* KROPPEN: en diskret höjd-transition vid UTFÄLLNING, så toppen inte SNAPPAR fram
@@ -50,15 +51,52 @@
   );
 }
 
-/* "DET FINNS MER"-CUE vid klipp-kanten: en liten accent-pillerknopp med en
- * chevron-ner, centrerad längst ner i faden. Den GÖR klipp-kanten inbjudande
- * ("det finns mer nedanför") utan extra text, och kompletterar den ÖVRE
- * expandera-pillen (som bär den tillgängliga semantiken). REN DEKORATION:
- * faden + cue:n är aria-hidden + pointer-events-none, så den interaktiva
- * kontrollen förblir den riktiga knappen (tangentbord/skärmläsare nås av den),
- * inte denna glyf. Sitter en bit upp från botten så den vilar PÅ den mjukaste
- * delen av faden, inte mot sektionens nästa kant. */
-[data-collapsible-fade]::after {
+/* "DET FINNS MER"-CUE:N vid klipp-kanten (T68b, #136): en liten accent-
+ * pillerknopp med en chevron-ner, centrerad längst ner. Den GÖR klipp-kanten
+ * inbjudande ("det finns mer nedanför") utan extra text, OCH är nu ett
+ * klickbart icke-fokuserbart <div> som fäller ut sektionen vid klick (Daniels
+ * feedback 2026-06-13: "man vill klicka på pilen men inget händer"). Den
+ * kompletterar den ÖVRE expandera-pillen, som bär den tillgängliga semantiken;
+ * cue:n är ett aria-hidden div (mus/touch-affordans, inte en andra SR-kontroll),
+ * se CollapsibleSection.tsx + docs/decisions.md (T68b).
+ *
+ * Pillret + chevron-glyfen ritas av cue:ns egna pseudo-element (::after =
+ * platta, ::before = chevron), flyttade hit FRÅN fadens pseudo-element så bara
+ * pillrets yta fångar klick, aldrig hela fade-bandet. Cue:ns egen yta
+ * (2.25rem-pillret centrerat i en 3rem-bred träffyta, se .tsx) är klickmålet;
+ * faden förblir pointer-events-none. */
+[data-collapsible-cue] {
+  /* Bakgrund/kant/glyf bärs av pseudo-elementen nedan; cue:ns egen yta är en
+     transparent träffyta. Positionering (absolute bottom/left) + storlek sätts
+     inline i .tsx, så pseudo-elementen (bottom/left) ankras mot cue-elementet.
+     appearance/border/padding-nollningen är ofarlig belt-and-suspenders (ett div
+     ärver dem inte från någon OS-knapp, men håller stilen explicit och stabil om
+     elementet någonsin byts). */
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  /* Dämpa den fyrkantiga touch-tap-highlighten som annars ritas över HELA den
+     3rem-breda osynliga träffytan vid tryck. Klick-feedbacken ska bäras av
+     pillret (:active nedan), så bara pillrets yta läses som tryckt, inte en
+     rektangel runt hela ytan. (Cue:ns egen yta är ändå transparent.) */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Pillret (plattan) under chevron: samma affordans-språk som ExpandToggle-
+ * pillen, så cue:n och knappen läses som SAMMA inbjudan. Allt token-drivet.
+ *
+ * Vilo-tonerna (16% fond, 38% kant) är samma accent-på-yta-recept som redan bär
+ * appen, men en aning lägre än ExpandToggle-pillen (12% fond / 42% kant) eftersom
+ * cue:n är liten + andas; hover lyfter den däremot HELA vägen upp till ExpandToggle-
+ * pillens tändning (20% fond / 60% kant + raised-skugga), se :hover nedan. Ingen
+ * NY färgkombination införs: pillret + kanten bär ingen läsbar text (chevron-glyfen
+ * är ren dekor, aria-hidden), så AA-textkrav gäller inte ytan, och accent-mot-yta-
+ * paren är samma redan mätta som ExpandToggle. transition så hover/active glider
+ * mjukt (background/border/box-shadow + transform); reduced-motion nollar varaktig-
+ * heten globalt (index.css), så tillstånds-bytet blir momentant men korrekt. */
+[data-collapsible-cue]::after {
   content: '';
   position: absolute;
   bottom: 0.5rem;
@@ -67,11 +105,14 @@
   height: 1.25rem;
   transform: translateX(-50%);
   border-radius: var(--radius-pill);
-  /* Accent-tint + kant: samma affordans-språk som ExpandToggle-pillen, så cue:n
-     och knappen läses som SAMMA inbjudan. Allt token-drivet (följer temat). */
   background-color: color-mix(in srgb, var(--color-accent) 16%, var(--vm-fade-to));
   border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-border));
   box-shadow: var(--vm-shadow-card);
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
   /* Lugn "andnings"-rörelse så cue:n drar ögat (SPEC §7-ton), aldrig stökig. */
   animation: vm-collapse-cue 2.4s ease-in-out infinite;
 }
@@ -80,7 +121,7 @@
  * färg), så själva pilen färgas av --color-accent och följer temat automatiskt
  * (ingen rå hex, ingen per-tema-bild att hålla i synk). Masken är samma chevron-
  * ner som ExpandToggle, så affordansen är konsekvent över hela sidan. */
-[data-collapsible-fade]::before {
+[data-collapsible-cue]::before {
   content: '';
   position: absolute;
   bottom: 0.5rem;
@@ -96,6 +137,11 @@
   /* Följer samma andnings-rörelse som pillret under den, så glyf + platta rör
      sig som en enhet. z-index så chevron ligger ÖVER ::after-plattan. */
   z-index: 1;
+  /* transform-transition så hover-lyftet/active-nedtrycket GLIDER mjukt i takt med
+     pillret (::after), i stället för att chevronen hoppar. Under andnings-
+     animationen styr keyframen transform; transitionen gäller vid hover/active då
+     animationen är av. */
+  transition: transform 200ms ease;
   animation: vm-collapse-cue 2.4s ease-in-out infinite;
 }
 
@@ -109,11 +155,65 @@
   }
 }
 
+/* HOVER (mus + touch-tap-highlight): cue:n ska omisskännligt läsas som "TRYCK
+ * HÄR". Eftersom cue:n är ett aria-hidden, icke-fokuserbart div (a11y bärs av den
+ * övre ExpandToggle, decisions.md T68b) är :focus-visible mindre relevant; det är
+ * :hover + :active som gör den läsbar som klickbar. Pillret tänds HELA vägen upp
+ * till ExpandToggle-pillens hover-recept (accent 20% fond / 60% kant, samma redan
+ * mätta accent-på-yta-par) och lyfts med raised-skuggan, så det "kommer upp mot
+ * fingret". Chevron-glyfen lyfts en gnutta MINDRE än pillret (0.0625rem) så glyf +
+ * platta känns som EN fysisk knapp som höjs, inte två lager som glider isär.
+ *
+ * VARFÖR animationen stängs av på hover (animation: none): andnings-keyframen ÄGER
+ * `transform` i vilo-läget (puls upp/ner). Vid hover tar vi över `transform` för
+ * lyftet; lät båda gälla skulle pulsen slåss med lyftet och rycka. Vid hover är
+ * cue:n redan i fokus för ögat, så pulsen behövs inte längre, lyftet bär affordansen.
+ * Mus-hover finns inte på touch, så touch-användaren ser i stället :active nedan. */
+[data-collapsible-cue]:hover::after {
+  background-color: color-mix(in srgb, var(--color-accent) 20%, var(--vm-fade-to));
+  border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
+  box-shadow: var(--vm-shadow-raised);
+  animation: none;
+  transform: translateX(-50%) translateY(-0.125rem);
+}
+
+[data-collapsible-cue]:hover::before {
+  animation: none;
+  transform: translateX(-50%) translateY(-0.0625rem);
+}
+
+/* ACTIVE (mus-tryck + touch-tap): ett kännbart NEDTRYCK precis när man klickar, så
+ * både mus och touch får direkt fysisk respons (touch saknar :hover, så :active är
+ * den primära klick-feedbacken där). Pillret pressas ihop en aning (skala 0.94) och
+ * sätter sig tillbaka mot vilo-skuggan; glyfen följer med samma skala så de pressas
+ * som en enhet. animation: none även här, så pulsen inte återtar `transform` mitt i
+ * trycket. transform-origin vid pillrets botten-mitt så nedtrycket känns ankrat. */
+[data-collapsible-cue]:active::after {
+  box-shadow: var(--vm-shadow-card);
+  animation: none;
+  transform: translateX(-50%) scale(0.94);
+  transform-origin: 50% 100%;
+}
+
+[data-collapsible-cue]:active::before {
+  animation: none;
+  transform: translateX(-50%) scale(0.94);
+  transform-origin: 50% 100%;
+}
+
 /* WCAG 2.3.3: den som bett om minskad rörelse får en HELT statisk cue (den bär
- * ändå sitt budskap via formen + chevron-glyfen + den övre expandera-pillen). */
+ * ändå sitt budskap via formen + chevron-glyfen + den övre expandera-pillen). Den
+ * NOLLAR bara RÖRELSEN (andnings-animationen + hover-lyftets/active-nedtryckets
+ * translate/scale), inte tillstånds-FÄRGEN: hover/active behåller sin starkare kant +
+ * fond + skugga (ren tillstånds-feedback, inte rörelse), så cue:n fortfarande läses
+ * som klickbar utan att något rör sig. transform fryses till basläget (centrering). */
 @media (prefers-reduced-motion: reduce) {
-  [data-collapsible-fade]::before,
-  [data-collapsible-fade]::after {
+  [data-collapsible-cue]::before,
+  [data-collapsible-cue]::after,
+  [data-collapsible-cue]:hover::before,
+  [data-collapsible-cue]:hover::after,
+  [data-collapsible-cue]:active::before,
+  [data-collapsible-cue]:active::after {
     animation: none !important;
     transform: translateX(-50%) !important;
   }

@@ -161,6 +161,106 @@ describe('CollapsibleBody (innehålls-kompressorn sektionerna använder)', () =>
     expect(body.querySelector('[data-collapsible-fade]')).toBeNull();
   });
 
+  // T68b (#136): chevron-cue:n vid klipp-kanten är nu klickbar och fäller ut
+  // (Daniels feedback: "man vill klicka på pilen men inget händer"). Den är ett
+  // icke-fokuserbart aria-hidden div, en ren mus/touch-affordans som SPEGLAR den
+  // övre ExpandToggle, INTE en andra skärmläsar-/tangentbords-kontroll.
+  describe('klickbar chevron-cue (T68b)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('klick på cue-knappen fäller UT sektionen (samma toggle som övre kontrollen)', () => {
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Admin-innehåll.</p>
+        </CollapsibleBody>
+      );
+      const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+      // Default komprimerat: cue:n finns vid klipp-kanten.
+      const cue = body.querySelector('[data-collapsible-cue]');
+      expect(cue).not.toBeNull();
+      fireEvent.click(cue as Element);
+      // Efter klick: utfälld, precis som om man klickat den övre expandera-knappen.
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      // Och cue:n är borta (inget mer att "fälla ut" till i utfällt läge).
+      expect(body.querySelector('[data-collapsible-cue]')).toBeNull();
+    });
+
+    it('cue:n är ett icke-fokuserbart aria-hidden div (inte en andra SR-/tab-kontroll)', () => {
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Admin-innehåll.</p>
+        </CollapsibleBody>
+      );
+      const cue = document.querySelector('[data-collapsible-cue]');
+      expect(cue).not.toBeNull();
+      // Ett DIV, inte en button: aria-hidden på ett fokuserbart element (en button kan
+      // ta fokus vid klick även med tabIndex=-1) är ogiltig ARIA och trippar axe-regeln
+      // aria-hidden-focus (Copilot, PR #143). Ett div är inte fokuserbart, så aria-hidden
+      // är giltigt och cue:n hålls helt ur a11y-trädet utan att bli en andra kontroll.
+      expect(cue?.tagName).toBe('DIV');
+      expect(cue).toHaveAttribute('aria-hidden', 'true');
+      // Den tillgängliga kontrollen i komprimerat läge är PRECIS EN knapp (den övre
+      // ExpandToggle): cue:n får inte dyka upp som en andra knapp i a11y-trädet.
+      // getAllByRole('button') ser bara element i a11y-trädet -> aria-hidden räknas bort.
+      expect(screen.getAllByRole('button', { name: /Visa admin/i })).toHaveLength(1);
+    });
+
+    it('cue-knappen visas BARA i komprimerat + klippt läge', () => {
+      // Klipps inget (allt ryms): ingen cue (skulle vara ett falskt "mer nedanför").
+      let restore = stubBodyMeasurement(200, 100);
+      const { unmount } = render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Kort innehåll som ryms.</p>
+        </CollapsibleBody>
+      );
+      expect(document.querySelector('[data-collapsible-cue]')).toBeNull();
+      restore();
+      unmount();
+
+      // Komprimerat OCH klippt: cue:n visas (positiv kontroll).
+      restore = stubBodyMeasurement(100, 300);
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Långt innehåll som klipps.</p>
+        </CollapsibleBody>
+      );
+      expect(document.querySelector('[data-collapsible-cue]')).toBeInTheDocument();
+      restore();
+    });
+
+    it('utfälld (klippt eller ej): ingen cue (inget att fälla ut till)', () => {
+      // Klippt men startar utfälld -> cue:n ska inte finnas (vi är redan utfällda).
+      const restore = stubBodyMeasurement(100, 300);
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+          startExpanded
+        >
+          <p>Långt innehåll, men startar utfälld.</p>
+        </CollapsibleBody>
+      );
+      const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      expect(body.querySelector('[data-collapsible-cue]')).toBeNull();
+      restore();
+    });
+  });
+
   // T68-F1 (#136): den ÖVRE ExpandToggle gatas på SAMMA isClipped-mätning som faden.
   // Klipps inget (kort innehåll, t.ex. tomt/laddnings-/utan-rum-tillstånd som ryms inom
   // collapsedMaxHeight) ska VARKEN fade NI övre "Visa alla"-knapp visas, båda vore ett
