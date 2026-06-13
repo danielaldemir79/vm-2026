@@ -5,6 +5,70 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T4d (#147) land i arena-raden , PR #148 mot develop , KLAR
+
+**Branch:** `feature/T4d-land-i-arena` @ HEAD `d6af54b`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/148 mot `develop` (Closes #147, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T4d levererade
+
+Match.venue visar nu "Arena, Stad, Land" med korrekt svenskt landsnamn (Mexiko/USA/Kanada).
+Land lagrat direkt i matches.ts, källankrat mot FIFA:s officiella arenalista.
+Alla 104 matcher uppdaterade: USA 78, Kanada 13, Mexiko 13.
+
+**Kedjan:**
+
+- **Senior-developer `d6af54b`:** land-fält lagt till i venue-strängen i matches.ts,
+  matches.ts regenererad och diffad, alla 104 matcher verifierade. Fördelning USA/Kanada/Mexiko
+  korskolld mot FIFA:s arenalista. Commit skriven via UTF-8-fil (korrekt å/ä/ö).
+- **Design-frontend:** layout-koll utförd i 360px och 344px, INGEN visuell brytning,
+  ingen commit behövdes.
+- **Lokal reviewer:** GODKÄND utan fynd. Land per arena + fördelning externt verifierad.
+- **Copilot R1:** 0 inline-fynd, exit direkt.
+
+**Verifiering (HEAD `d6af54b`):** build EXIT 0, npm test 1783 gröna/0 fail (180 filer),
+lint + format:check EXIT 0.
+
+**Acceptanskriterier T4d:**
+- [x] AC1: venue-strängen visar "Arena, Stad, Land" i alla 104 matcher
+- [x] AC2: Landsnamn på svenska (Mexiko/USA/Kanada), källankrat mot FIFA:s arenalista
+- [x] AC3: Fördelning korrekt: USA 78, Kanada 13, Mexiko 13
+- [x] AC4: Bygger grönt, lint rent, reviewad (lokal panel + Copilot R1), inga olösta findings
+
+### Behöver-Daniel (oförändrad)
+
+**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
+- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
+- Uttömmande-test Förekomst 3: agent-regel för reviewer.
+- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+
+**Kvar att besluta/agera:**
+- Supabase e-postmall för inloggningsmejlet (kosmetisk): #81 stängdes 2026-06-12 på Daniels order.
+- RLS-testrum i Supabase: står kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+
+### Nästa steg
+
+**Om PR #148 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 148 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #147: `gh issue close 147`. Flytta kort T4d till Done på boarden.
+Kolla om PR:ar #146 eller äldre behöver mergas i ordningen ältst -> nyast före #148.
+
+**Om PR #148 REDAN mergad:**
+T4d klar och live på develop. Kön är nu TOM på feature-arbete.
+ENDA kvar: RELEASE v1.0 (Daniel godkände "Kör releasen nu").
+Nästa fas: release-städ-skillen (release-cleanup) ->
+  1. Scout vilka filer/flaggor som ska rensas före release.
+  2. Daniel godkänner borttagningslistan.
+  3. Städ-commit på release-branch.
+  4. develop -> main + tagg v1.0.
+Kör `/agent-kit` för att starta release-flödet.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T71 (#145) joker-tillägget borttaget , PR #146 mot develop , KLAR
 
 **Branch:** `feature/T71-joker-bort` @ HEAD (se PR #146)
