@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, act } from '@testing-library/react';
-import { useRef } from 'react';
+import { useRef, type RefObject } from 'react';
 import { useActiveChipScroll } from './use-active-chip-scroll';
 
 // Styr prefers-reduced-motion DETERMINISTISKT via samma mock-grepp som section-nav-motion.test:
@@ -14,13 +14,22 @@ vi.mock('motion/react', async (importOriginal) => {
   return { ...actual, useReducedMotion: () => mockUseReducedMotion() };
 });
 
-// jsdom har ingen layout: offsetLeft/offsetWidth/clientWidth = 0 och scrollTo saknas. Vi
+// jsdom har ingen layout: getBoundingClientRect/clientWidth = 0 och scrollTo saknas. Vi
 // bygger därför en kontrollerad chip-rad och INJICERAR geometri per element + en scrollTo-
 // spion på track:en, så hookens RÄKNE-logik (är chip:et utanför vyn? vart ska track:en
 // scrolla?) kan bevisas deterministiskt, oberoende av att jsdom inte layoutar.
+//
+// VARFÖR getBoundingClientRect (inte offsetLeft/offsetWidth): hooken räknar item-positionen
+// layout-sant via rect-deltan `itemRect.left - trackRect.left + scrollLeft` (se C1-fixen i
+// use-active-chip-scroll.ts), så testet stubbar getBoundingClientRect på li + track. Vi väljer
+// trackRect.left = 0 och itemRect.left = offsetLeft - scrollLeft, så hookens räkning ger exakt
+// `offsetLeft` igen (itemRect.left - 0 + scrollLeft = offsetLeft). Då bevisar testet samma
+// räkne-logik och samma förväntade scroll-mål som förr, men mot den nya, CSS-frikopplade
+// geometri-källan i stället för den buggiga offsetParent-relativa offsetLeft.
 
 interface ChipGeom {
   id: string;
+  /** Position relativt track:ens innehåll (samma rymd som scrollLeft/clientWidth). */
   offsetLeft: number;
   offsetWidth: number;
 }
@@ -28,6 +37,30 @@ interface ChipGeom {
 /** Definiera ett tal-värde som en (skrivskyddad) layout-egenskap på ett element. */
 function defineNumber(el: HTMLElement, prop: string, value: number): void {
   Object.defineProperty(el, prop, { configurable: true, value });
+}
+
+/**
+ * Stubba getBoundingClientRect så att hookens rect-delta-räkning blir deterministisk.
+ * Bara `left` och `width` används av hooken; övriga fält fylls konsekvent (right = left + width).
+ */
+function defineRect(el: HTMLElement, left: number, width: number): void {
+  const rect = {
+    left,
+    width,
+    right: left + width,
+    top: 0,
+    bottom: 0,
+    height: 0,
+    x: left,
+    y: 0,
+    toJSON() {
+      return this;
+    },
+  } as DOMRect;
+  Object.defineProperty(el, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => rect,
+  });
 }
 
 /**
@@ -66,6 +99,10 @@ function renderTrack(opts: {
               value: opts.scrollLeft,
               writable: true,
             });
+            // Track:ens rect förankras i vänsterkant 0, så li:ts rect-left (= offsetLeft -
+            // scrollLeft) ger tillbaka exakt offsetLeft i hookens delta-räkning. Bredden är
+            // irrelevant för hooken (den läser bara trackRect.left), sätt clientWidth.
+            defineRect(el, 0, opts.clientWidth);
             (el as unknown as { scrollTo: typeof scrollTo }).scrollTo = scrollTo;
           }}
         >
@@ -78,8 +115,9 @@ function renderTrack(opts: {
                   if (!li) {
                     return;
                   }
-                  defineNumber(li, 'offsetLeft', c.offsetLeft);
-                  defineNumber(li, 'offsetWidth', c.offsetWidth);
+                  // li:ts skärm-rect = offsetLeft - scrollLeft (track:en är förankrad i 0), så
+                  // hookens `itemRect.left - trackRect.left + scrollLeft` återger offsetLeft.
+                  defineRect(li, c.offsetLeft - opts.scrollLeft, c.offsetWidth);
                 }}
               >
                 <button
@@ -110,7 +148,7 @@ function ActiveChipScrollDriver({
   navRef,
   activeId,
 }: {
-  navRef: React.RefObject<HTMLElement | null>;
+  navRef: RefObject<HTMLElement | null>;
   activeId: string | null;
 }) {
   useActiveChipScroll(navRef, activeId);

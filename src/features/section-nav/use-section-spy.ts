@@ -58,8 +58,14 @@ export function useSectionSpy(
       return;
     }
 
-    const offset = readStickyOffset();
+    // Offseten (de två sticky-bandens höjd) är INTE konstant under komponentens liv:
+    // SectionNav mäter om den vid resize/radbrytning/zoom och uppdaterar CSS-variabeln
+    // --vm-section-nav-offset. Den styr både rootMargin (observer-zonens topp) och tröskeln
+    // i recompute, så vi måste hålla den färsk, inte frysa den vid mount. Vi läser den i en
+    // muterbar variabel och bygger om observern när den ändrats meningsfullt (se nedan).
+    let offset = readStickyOffset();
     // Synlighet per mål, så vi kan välja den översta sektionen vars topp passerat raden.
+    // Maparna lever över en observer-ombyggnad (offset-ändring), så markeringen inte tappas.
     const ratios = new Map<HTMLElement, number>();
     const topById = new Map<HTMLElement, number>();
 
@@ -99,26 +105,75 @@ export function useSectionSpy(
       setActiveId(headingId);
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const el = entry.target as HTMLElement;
-          ratios.set(el, entry.intersectionRatio);
-          topById.set(el, entry.boundingClientRect.top);
+    // Bygg (eller bygg om) IntersectionObservern med den AKTUELLA offseten i rootMargin.
+    // Bryts ut så vi kan riva och bygga om den när offseten ändras (se offset-bevakningen
+    // nedan), utan att tappa de redan observerade målens synlighet (ratios/topById lever kvar).
+    let observer: IntersectionObserver | null = null;
+    function buildObserver(): void {
+      observer?.disconnect();
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const el = entry.target as HTMLElement;
+            ratios.set(el, entry.intersectionRatio);
+            topById.set(el, entry.boundingClientRect.top);
+          }
+          recompute();
+        },
+        {
+          // Dra ner zonens topp under de sticky banden så markeringen byter vid raden.
+          rootMargin: `-${Math.round(offset)}px 0px -55% 0px`,
+          threshold: [0, 0.1, 0.5, 1],
         }
-        recompute();
-      },
-      {
-        // Dra ner zonens topp under de sticky banden så markeringen byter vid raden.
-        rootMargin: `-${Math.round(offset)}px 0px -55% 0px`,
-        threshold: [0, 0.1, 0.5, 1],
+      );
+      for (const el of targets) {
+        observer.observe(el);
       }
-    );
+    }
+    buildObserver();
 
-    for (const el of targets) {
-      observer.observe(el);
+    // OFFSET-BEVAKNING (C3-fix): SectionNav uppdaterar --vm-section-nav-offset vid resize/
+    // radbrytning/zoom, men den här effekten kör inte om på offset-ändring (deps = idsKey +
+    // setActiveId). Utan bevakning blev rootMargin (och tröskeln) STALE efter en höjdändring,
+    // så fel chip kunde markeras. Vi observerar samma två sticky-band som SectionNav mäter
+    // (header + nav) och faller till window 'resize' när ResizeObserver saknas. Vid en
+    // ändring läser vi om offseten och bygger BARA om observern när den AVRUNDADE px-höjden
+    // faktiskt skiljer sig (rootMargin avrundas ändå till px), så vi inte river/bygger i onödan.
+    function handleOffsetChange(): void {
+      const next = readStickyOffset();
+      if (Math.round(next) === Math.round(offset)) {
+        return;
+      }
+      offset = next;
+      buildObserver();
+      // recompute med de senast kända topparna mot den nya tröskeln, så markeringen
+      // korrigeras direkt vid höjdändringen utan att invänta nästa intersection-emit.
+      recompute();
     }
 
-    return () => observer.disconnect();
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && typeof document !== 'undefined') {
+      ro = new ResizeObserver(handleOffsetChange);
+      // Samma två band som driver offseten i SectionNav: app-headern (stabil krok) + navet.
+      const header = document.querySelector('header[data-app-header]');
+      if (header) {
+        ro.observe(header);
+      }
+      const nav = document.querySelector('[data-section-nav]');
+      if (nav) {
+        ro.observe(nav);
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleOffsetChange);
+    }
+
+    return () => {
+      observer?.disconnect();
+      ro?.disconnect();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleOffsetChange);
+      }
+    };
   }, [idsKey, setActiveId]);
 }
