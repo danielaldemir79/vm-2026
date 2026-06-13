@@ -28,8 +28,10 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { formatKickoffTime } from './format-datetime';
 import {
+  formatFifaRanking,
   formatPenalties,
   formatScore,
+  formatVenueCapacity,
   isFinished,
   isVenuePlaceholder,
   stageLabel,
@@ -86,20 +88,27 @@ function teamCode(teamId: string | null, teamsById: ReadonlyMap<string, Team>): 
 }
 
 /**
- * En sida (hemma/borta): emblem + KLICKBART namn (öppnar lagprofilen, T10).
- * Emblemet är dekoration; namnet är en TeamNameButton som öppnar profilen, eller
- * (för ett ännu okänt slutspelslag, teamId null) en ren text utan knapp.
+ * En sida (hemma/borta): emblem + KLICKBART namn (öppnar lagprofilen, T10) + ev.
+ * FIFA-ranking (T4e). Emblemet är dekoration; namnet är en TeamNameButton som öppnar
+ * profilen, eller (för ett ännu okänt slutspelslag, teamId null) en ren text utan knapp.
+ *
+ * FIFA-rankingen (`ranking`, t.ex. "FIFA #14") visas DISKRET under namnet när den finns.
+ * Den hanteras TYST när den saknas (okänt slutspelslag eller lag utan ranking): då är
+ * `ranking` null och ingen rad renderas (ingen "FIFA #undefined"). data-fifa-ranking är
+ * design-/test-haken; design-frontend finputsar placering/storlek ovanpå.
  */
 function TeamSide({
   teamId,
   name,
   code,
   align,
+  ranking,
 }: {
   teamId: string | null;
   name: string;
   code: string | null;
   align: 'start' | 'end';
+  ranking: string | null;
 }) {
   const flag =
     code !== null ? (
@@ -122,10 +131,27 @@ function TeamSide({
       }`}
     >
       {flag}
-      {/* Lagnamnet öppnar profilen (T10). TeamNameButton blir en ren <span> när
-          teamId är null (okänt slutspelslag), så vi aldrig erbjuder en knapp utan
-          profil. truncate flyttas till knappen så namnet kapas inom kort-bredden. */}
-      <TeamNameButton teamId={teamId} name={name} className="min-w-0 truncate" />
+      {/* Namn + ev. FIFA-ranking i en kolumn, så rankingen sitter direkt under namnet
+          oavsett spegling (home/away). min-w-0 så namnet kan kapas inom kort-bredden. */}
+      <span className="flex min-w-0 flex-col">
+        {/* Lagnamnet öppnar profilen (T10). TeamNameButton blir en ren <span> när
+            teamId är null (okänt slutspelslag), så vi aldrig erbjuder en knapp utan
+            profil. truncate flyttas till knappen så namnet kapas inom kort-bredden. */}
+        <TeamNameButton teamId={teamId} name={name} className="min-w-0 truncate" />
+        {/* FIFA-ranking, BARA när den finns (tyst annars, ingen "FIFA #undefined").
+            Till skillnad från resultatets mitt-rad är rankingen INTE redan med i kortets
+            a11y-namn, så den hålls LÄSBAR för skärmläsare (inget aria-hidden): en
+            SR-användare hör "Mexiko, FIFA #14". font-normal + fg-muted gör den diskret;
+            design-frontend balanserar slutgiltig vikt/placering ovanpå data-haken. */}
+        {ranking !== null ? (
+          <span
+            data-fifa-ranking=""
+            className="text-[0.625rem] font-normal uppercase tracking-wide text-fg-muted"
+          >
+            {ranking}
+          </span>
+        ) : null}
+      </span>
     </span>
   );
 }
@@ -145,6 +171,20 @@ export function MatchCard({
   const awayCode = teamCode(match.awayTeamId, teamsById);
   const stage = stageLabel(match);
   const showVenue = !isVenuePlaceholder(match.venue);
+
+  // FIFA-ranking per lag (T4e #149): läser BEFINTLIG data (Team.fifaRanking, T10/T69),
+  // ingen ny källa. null när laget är okänt (slutspel innan seedning) eller saknar ranking,
+  // då visas ingen ranking-rad (gissa aldrig, ingen "FIFA #undefined"). Slår upp laget via
+  // id (homeTeamId/awayTeamId kan vara null) och låter formatFifaRanking göra null-gränsen.
+  const homeTeam = match.homeTeamId !== null ? teamsById.get(match.homeTeamId) : undefined;
+  const awayTeam = match.awayTeamId !== null ? teamsById.get(match.awayTeamId) : undefined;
+  const homeRanking = formatFifaRanking(homeTeam);
+  const awayRanking = formatFifaRanking(awayTeam);
+
+  // Åskådarkapacitet för matchens arena (T4e #149): källånkrad per-arena-uppslagning,
+  // diskret etikett ("80 824 platser") eller null om arenan saknar verifierad kapacitet
+  // (då visas ingen siffra). Bara meningsfull när arenan visas (showVenue).
+  const venueCapacity = showVenue ? formatVenueCapacity(match.venue) : null;
 
   // Resultat för en färdigspelad match (T57, #98): visas i kortet så man kan
   // bläddra bakåt i dag-listan och se alla resultat utan att öppna varje match.
@@ -224,7 +264,13 @@ export function MatchCard({
           ljust tema är samma gröna): det bärs av tyngd + tabular-nums i fg, så det
           läses i båda teman utan att låsa en statusfärg. */}
       <div className="flex items-center gap-2 text-base font-semibold">
-        <TeamSide teamId={match.homeTeamId} name={home} code={homeCode} align="end" />
+        <TeamSide
+          teamId={match.homeTeamId}
+          name={home}
+          code={homeCode}
+          align="end"
+          ranking={homeRanking}
+        />
         {score !== null ? (
           <span
             aria-hidden="true"
@@ -245,7 +291,13 @@ export function MatchCard({
             mot
           </span>
         )}
-        <TeamSide teamId={match.awayTeamId} name={away} code={awayCode} align="start" />
+        <TeamSide
+          teamId={match.awayTeamId}
+          name={away}
+          code={awayCode}
+          align="start"
+          ranking={awayRanking}
+        />
       </div>
 
       {/* Straffrad: bara i slutspel som avgjordes på straffar. Separat rad så
@@ -319,11 +371,22 @@ export function MatchCard({
         ) : null}
         {/* Arena visas BARA om den är verifierad. Platshållaren ("Arena ej
             verifierad", #35) visas inte som om den vore data; den döljs här tills
-            riktig arena-data finns. */}
+            riktig arena-data finns. Åskådarkapaciteten (T4e #149) visas DISKRET efter
+            arena-/stadsnamnet ("Arena, Stad, Land (80 824 platser)") när den finns, tyst
+            annars. data-venue-capacity är design-/test-haken; design-frontend balanserar
+            hur diskret den ska vara (t.ex. egen rad vs inline) på mobil. */}
         {showVenue ? (
           <div className="flex items-center gap-1">
             <dt className="font-semibold">Arena</dt>
-            <dd>{match.venue}</dd>
+            <dd>
+              {match.venue}
+              {venueCapacity !== null ? (
+                <span data-venue-capacity="" className="text-fg-muted">
+                  {' '}
+                  ({venueCapacity})
+                </span>
+              ) : null}
+            </dd>
           </div>
         ) : null}
       </dl>

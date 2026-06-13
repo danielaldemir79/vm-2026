@@ -26,10 +26,18 @@
 //   - En källavvikelse (Belgien-Egypten) är LÖST mot 4 källor, inte gissad (se
 //     preambeln + docs/decisions.md T4c).
 
-/** Sätter i källtexten där dataraderna börjar (allt innan ignoreras). */
+/** Sätter i källtexten där VENUE-dataraderna börjar (allt innan ignoreras). */
 export const SOURCE_START_MARKER = 'VENUES';
 
-/** Fält-separator i en datarad ("MATCH_ID | venue=... | match=..."). */
+/**
+ * Sätter i källtexten där KAPACITETS-raderna börjar (T4e #149). Egen sektion (en rad per
+ * arena, inte per match), så åskådarkapaciteten är en PER-ARENA-uppslagning skild från
+ * venue-strängen. Källåkrad mot FIFA:s officiella turnerings-kapaciteter (Wikipedia "2026
+ * FIFA World Cup"), korskoll-bekräftad, se preambeln i venue-source.txt + docs/decisions.md.
+ */
+export const CAPACITY_SOURCE_START_MARKER = 'CAPACITIES';
+
+/** Fält-separator i en datarad ("MATCH_ID | venue=... | match=..." / "Arena | capacity=..."). */
 const FIELD_SEPARATOR = ' | ';
 
 /**
@@ -210,6 +218,138 @@ export function buildVenueTable(rows: ParsedVenueRow[], matchIds: readonly strin
     throw new Error(
       `Förväntade ${EXPECTED_VENUE_COUNT} distinkta arenor över hela planen, fick ${distinct.size}.`
     );
+  }
+
+  return table;
+}
+
+/* ------------------------------------------------------------------ *
+ * Åskådarkapacitet per arena (T4e #149), källåkrad
+ *
+ * Kapaciteten är PER ARENA (16 värden), inte per match, så den parsas ur en EGEN
+ * CAPACITIES-sektion (en rad per arena) och hålls SKILD från venue-strängen (den
+ * förblir "Arena, Stad, Land", T4c/T4d). Samma källåkrings-disciplin som arenorna:
+ * en sluten white-list (KNOWN_VENUES) + fail-loud vid okänd/dubblerad/saknad arena,
+ * så ingen kapacitet gissas. Figur-källan (FIFA:s officiella turnerings-kapaciteter,
+ * Wikipedia "2026 FIFA World Cup", korskoll-bekräftad) är dokumenterad i preambeln i
+ * venue-source.txt + docs/decisions.md (T4e).
+ * ------------------------------------------------------------------ */
+
+/** En parsad kapacitets-rad (arena -> åskådarkapacitet, innan den valideras). */
+export interface ParsedCapacityRow {
+  /** Arena + värdstad + värdland, "Arena, Stad, Land" (en av KNOWN_VENUES). */
+  venue: string;
+  /** Åskådarkapacitet i VM-konfiguration, positivt heltal (t.ex. 80824). */
+  capacity: number;
+}
+
+/** Uppslaget: arena-sträng -> åskådarkapacitet (en sanning, per arena). */
+export type VenueCapacityTable = ReadonlyMap<string, number>;
+
+/**
+ * Parsa EN kapacitets-rad ("Arena, Stad, Land | capacity=<heltal>") till en
+ * ParsedCapacityRow. Strikt: exakt två fält, känd arena, capacity = positivt heltal.
+ * Fail loud (PRINCIPLES §8) vid fel form, okänd arena eller ogiltig kapacitet, så en
+ * gissad/feltranskriberad siffra eller arena aldrig smyger in. Ren funktion.
+ */
+export function parseCapacityRow(line: string): ParsedCapacityRow {
+  const parts = line.split(FIELD_SEPARATOR).map((p) => p.trim());
+  if (parts.length !== 2) {
+    throw new Error(
+      `Kapacitets-rad ska ha exakt 2 fält (Arena, Stad, Land | capacity=...), fick ${parts.length}: "${line}".`
+    );
+  }
+  const [venue, capacityPart] = parts;
+
+  if (!KNOWN_VENUES.has(venue)) {
+    throw new Error(
+      `Okänd arena "${venue}" i kapacitets-källan (inte en av de ${EXPECTED_VENUE_COUNT} kända ` +
+        `FIFA-arenorna). Gissa aldrig, arena-strängen måste matcha KNOWN_VENUES exakt.`
+    );
+  }
+
+  const rawCapacity = fieldValue(capacityPart, 'capacity');
+  // Kapaciteten lagras som rent heltal i källan (siffror utan avgränsare); den svenska
+  // tusentals-formateringen görs i UI:t (formatCapacity), inte här. Bara heltal > 0
+  // tillåts, så en tom/icke-numerisk/negativ rad fail-loud:ar i stället för att tyst bli NaN.
+  if (!/^\d+$/.test(rawCapacity)) {
+    throw new Error(
+      `Ogiltig kapacitet "${rawCapacity}" för "${venue}" (väntade ett positivt heltal utan avgränsare).`
+    );
+  }
+  const capacity = Number.parseInt(rawCapacity, 10);
+  if (capacity <= 0) {
+    throw new Error(`Kapaciteten för "${venue}" måste vara > 0, fick ${capacity}.`);
+  }
+
+  return { venue, capacity };
+}
+
+/**
+ * Parsa kapacitets-sektionen ur källan till rader (i källans ordning). Hoppar fram till
+ * CAPACITY_SOURCE_START_MARKER och STOPPAR vid nästa sektion (SOURCE_START_MARKER,
+ * "VENUES"), så bara kapacitets-raderna läses även om sektionerna ligger i samma fil.
+ * Ignorerar tomma rader och '#'-kommentarer (land-rubriker). Ren funktion (ingen IO).
+ *
+ * @throws Om kapacitets-markören saknas, så en trasig källa inte tyst ger noll rader.
+ */
+export function parseVenueCapacities(text: string): ParsedCapacityRow[] {
+  const lines = text.split(/\r?\n/);
+  const startIndex = lines.findIndex((l) => l.trim() === CAPACITY_SOURCE_START_MARKER);
+  if (startIndex === -1) {
+    throw new Error(
+      `Hittade inte start-markören "${CAPACITY_SOURCE_START_MARKER}" i arena-utdraget.`
+    );
+  }
+  const rows: ParsedCapacityRow[] = [];
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    const trimmed = lines[i].trim();
+    // Stoppa vid nästa sektion (VENUES) så kapacitets-läsaren inte läser venue-raderna.
+    if (trimmed === SOURCE_START_MARKER) {
+      break;
+    }
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      continue;
+    }
+    rows.push(parseCapacityRow(trimmed));
+  }
+  return rows;
+}
+
+/**
+ * Bygg kapacitets-uppslaget arena -> kapacitet, VALIDERAT mot de 16 kända arenorna.
+ * Källåkringens hjärta för kapaciteter: exakt en rad per känd arena, ingen dubblett,
+ * ingen lucka. Fail loud (PRINCIPLES §8) vid:
+ *   - dubblett (samma arena två gånger i källan),
+ *   - en känd arena utan kapacitets-rad (annars skulle dess kort tyst sakna siffra),
+ *   - fel ANTAL (inte exakt 16 distinkta arenor).
+ *
+ * Att kräva ALLA 16 (ingen tyst lucka) är medvetet: uppgiften säger "en arena utan
+ * verifierad kapacitet hanteras tyst", men ALLA 16 HAR en verifierad FIFA-figur, så en
+ * saknad rad är ett data-fel, inte en legitim lucka. UI:t hanterar ändå en saknad
+ * kapacitet tyst (formatVenueCapacity ger null), som extra skydd, men byggsteget kräver
+ * fullständighet så ett tappat värde syns vid källan i stället för tyst på kortet.
+ */
+export function buildVenueCapacityTable(rows: readonly ParsedCapacityRow[]): VenueCapacityTable {
+  const table = new Map<string, number>();
+  for (const row of rows) {
+    if (table.has(row.venue)) {
+      throw new Error(`Dubblerad kapacitets-rad för "${row.venue}" (varje arena exakt en gång).`);
+    }
+    table.set(row.venue, row.capacity);
+  }
+
+  // FULLSTÄNDIGHETS-vakt: varje känd arena MÅSTE ha en kapacitet (ingen tyst lucka).
+  const missing = [...KNOWN_VENUES].filter((venue) => !table.has(venue));
+  if (missing.length > 0) {
+    throw new Error(
+      `Arena utan kapacitet (${missing.length}): ${missing.join('; ')}. Varje av de ` +
+        `${EXPECTED_VENUE_COUNT} kända arenorna måste ha en rad i kapacitets-källan.`
+    );
+  }
+  // ANTAL-vakt: exakt 16 distinkta arenor (en sista billig grind).
+  if (table.size !== EXPECTED_VENUE_COUNT) {
+    throw new Error(`Förväntade ${EXPECTED_VENUE_COUNT} kapacitets-rader, fick ${table.size}.`);
   }
 
   return table;

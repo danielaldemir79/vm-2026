@@ -8,6 +8,7 @@
 
 import type { FinishedMatch, Match, MatchResult, MatchStage, Team } from '../../domain/types';
 import { teamShortName } from '../../domain';
+import { WC2026_VENUE_CAPACITIES } from '../../data/wc2026';
 
 /** Svensk etikett per slutspels-/gruppsteg (för matchkortets steg-märke). */
 const STAGE_LABELS: Record<MatchStage, string> = {
@@ -91,4 +92,62 @@ export function formatPenalties(result: MatchResult): string | null {
  */
 export function isVenuePlaceholder(venue: string): boolean {
   return /ej\s+verifierad/i.test(venue);
+}
+
+/**
+ * Det fasta mellanslag (no-break space, U+00A0) som svensk konvention använder som
+ * tusentals-avgränsare, så talet aldrig radbryts mitt i sig. Vi binder det explicit som
+ * den literala no-break-space-konstanten nedan i stället för att lita på vilket grupperings-
+ * (vissa Node-/ICU-versioner ger U+202F narrow no-break space, andra vanligt mellanslag),
+ * så formateringen är DETERMINISTISK på alla Node-versioner (CI kör en annan än lokalt).
+ * EN sanning för avgränsaren.
+ */
+const SV_THOUSANDS_SEPARATOR = ' ';
+
+/** Svensk heltals-formatering (för t.ex. åskådarkapacitet), grupperat med fast mellanslag. */
+const svInteger = new Intl.NumberFormat('sv-SE', { useGrouping: true, maximumFractionDigits: 0 });
+
+/**
+ * Formatera ett heltal i svensk stil med fast mellanslag som tusentals-avgränsare, t.ex.
+ * 80824 -> "80 824" (mellanslaget är U+00A0, no-break). EN sanning för siffer-formatering
+ * (T4e #149), så kapacitet (och framtida tal) formateras likadant överallt. Vi normaliserar
+ * ICU:s grupperings-tecken till U+00A0 så resultatet är deterministiskt oavsett Node-/ICU-
+ * version. Negativt/icke-heltal hör inte hit (kapacitet är ett positivt heltal från källan).
+ */
+export function formatCapacity(value: number): string {
+  // Normalisera ICU:s grupperings-tecken (kan vara U+0020/U+00A0/U+202F beroende på
+  // version) till det fasta mellanslaget (\s matchar alla tre), så talet aldrig radbryts.
+  return svInteger.format(value).replace(/\s/g, SV_THOUSANDS_SEPARATOR);
+}
+
+/**
+ * Den läsbara kapacitets-etiketten för en arena, t.ex. "80 824 platser", eller null om
+ * arenan saknar en verifierad kapacitet (då visar UI:t INGEN siffra, gissa aldrig). Slår
+ * upp den källånkrade per-arena-kapaciteten (WC2026_VENUE_CAPACITIES, värde-låst mot
+ * venue-source.txt) på den FULLA venue-strängen ("Arena, Stad, Land"), samma nyckel som
+ * matchen bär. Platshållar-venue ("ej verifierad", #35) och okänd arena ger null tyst.
+ * "platser" (inte "åskådare"/"säten") = etablerad svensk arena-term. T4e (#149).
+ */
+export function formatVenueCapacity(venue: string): string | null {
+  if (isVenuePlaceholder(venue)) {
+    return null;
+  }
+  const capacity = WC2026_VENUE_CAPACITIES.get(venue);
+  if (capacity === undefined) {
+    return null;
+  }
+  return `${formatCapacity(capacity)} platser`;
+}
+
+/**
+ * FIFA-rankings-etiketten för ett lag, t.ex. "FIFA #14", eller null om laget är okänt
+ * (slutspel innan seedningen, team undefined) eller saknar ranking (Team.fifaRanking
+ * undefined). Läser BARA befintlig data (T10/T69), ingen ny källa, och hanterar saknad
+ * ranking TYST (ingen "FIFA #undefined"). T4e (#149).
+ */
+export function formatFifaRanking(team: Team | undefined): string | null {
+  if (team === undefined || team.fifaRanking === undefined) {
+    return null;
+  }
+  return `FIFA #${team.fifaRanking}`;
 }
