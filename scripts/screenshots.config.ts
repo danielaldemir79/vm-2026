@@ -29,7 +29,10 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npm run preview -- --port ${PREVIEW_PORT} --strictPort`,
     url: BASE_URL,
-    reuseExistingServer: true,
+    // Always start our OWN build/preview (never reuse a server already on the port):
+    // a reused server would skip the forced-empty Supabase env below and could serve
+    // stale or live-mode (non-deterministic) screenshots (Copilot, PR #164).
+    reuseExistingServer: false,
     timeout: 120_000,
     env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '' },
   },

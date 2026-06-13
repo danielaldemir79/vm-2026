@@ -200,8 +200,8 @@ npm run preview    # serve the built dist/ locally
 **Stack**
 
 - **Frontend:** React + TypeScript + Vite.
-- **Styling and motion:** Tailwind CSS + Framer Motion (the animations are what makes it feel
-  alive).
+- **Styling and motion:** Tailwind CSS + Motion (the `motion` package, formerly Framer Motion);
+  the animations are what makes it feel alive.
 - **PWA:** vite-plugin-pwa (installable, offline app shell, manifest, icons, silent
   auto-update service worker).
 - **Cloud:** Supabase (Postgres + Auth + Realtime + Row Level Security).
