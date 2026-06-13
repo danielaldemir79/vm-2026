@@ -29,6 +29,7 @@ import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favori
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
 import { stageLabel, teamDisplayName } from './match-display';
+import { useRegisterSection, SECTIONS } from '../section-nav';
 
 /**
  * Etiketten ovanför hero:ns framträdande match: "Dagens match" BARA när matchen
@@ -155,6 +156,9 @@ export function DailyMatchesView() {
     goNext,
   } = useDailyMatches();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
+  // Anmäl sektionen till det sticky chip-navet (T78, #165) medan vyn är monterad.
+  // Tracker-vyn renderar alltid, så "Idag"-chipet finns alltid.
+  useRegisterSection(SECTIONS.daily);
   // Dagens svenska kalenderdag (dag-medvetet: flyttar sig över midnatt/PWA-väckning,
   // se use-today-key). Driver hero-etiketten "Dagens match" vs matchens datum (#54).
   const { todayKey } = useTodayKey();
