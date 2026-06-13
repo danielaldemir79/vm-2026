@@ -224,3 +224,134 @@ describe('scroll-spy bygger om observern med ny rootMargin när offseten ändras
     expect(instances.length).toBe(countAfterMount);
   });
 });
+
+// C4 (Copilot #168): T79 införde TVÅ [data-section-nav]-band (desktop chip-rad + mobil
+// hamburgare-band). Spy:ns offset-bevakning (ResizeObserver) observerade tidigare BARA det
+// FÖRSTA bandet (document.querySelector). När mobil-panelen öppnas ändras MOBIL-bandets (det
+// andra) höjd -> --vm-section-nav-offset ändras, men en höjdändring i det andra bandet såg
+// observern aldrig -> stale rootMargin -> fel activeId medan panelen är öppen. Fixen observerar
+// ALLA band (querySelectorAll). Vi bevisar att en höjdändring i det ANDRA bandet triggar
+// observer-ombyggnad med ny rootMargin.
+//
+// För att kunna emittera en ResizeObserver-callback för ETT specifikt band (setup.ts:s globala
+// RO-stub emitterar aldrig) installerar vi en kontrollerbar RO-mock som registrerar (callback,
+// observerade element) precis som IO-mocken ovan, så testet kan driva resize-kanalen per band.
+interface MockResizeInstance {
+  callback: ResizeObserverCallback;
+  observed: Element[];
+  observer: ResizeObserver;
+}
+let resizeInstances: MockResizeInstance[] = [];
+
+class MockResizeObserver {
+  observed: Element[] = [];
+  callback: ResizeObserverCallback;
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback;
+    resizeInstances.push({
+      callback,
+      observed: this.observed,
+      observer: this as unknown as ResizeObserver,
+    });
+  }
+  observe(el: Element): void {
+    this.observed.push(el);
+  }
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+/** Simulera att JUST det angivna bandet ändrade höjd: en riktig ResizeObserver kör bara sin
+ *  callback för element den FAKTISKT observerar. Vi härmar det troget, callbacken fyras BARA om
+ *  target finns i den observerade mängden. Då blir testet ärligt beroende av att hooken
+ *  observerar bandet (C4): observerar den inte mobil-bandet (gamla querySelector-buggen), händer
+ *  ingenting, exakt som i webbläsaren, så den negativa kontrollen rödnar. */
+function emitResize(target: Element): void {
+  const inst = resizeInstances[resizeInstances.length - 1];
+  if (!inst) {
+    throw new Error('Ingen ResizeObserver skapades (offset-bevakningen monterades inte).');
+  }
+  if (!inst.observed.includes(target)) {
+    return; // oobserverat band -> ingen riktig RO skulle fyra för det
+  }
+  const entry = { target } as ResizeObserverEntry;
+  act(() => {
+    inst.callback([entry], inst.observer);
+  });
+}
+
+// Harness med TVÅ band (precis som appen): det första bär data-section-nav (chip-rad), det andra
+// bär data-section-nav + data-section-nav-mobile (mobil). Spy:n drivs direkt; den observerar
+// banden + sektionerna ligger i DOM så IO-mocken får mål att observera.
+function TwoBandSpyHarness({ sections }: { sections: SectionDescriptor[] }) {
+  const setActiveId = vi.fn();
+  useSectionSpy(sections, setActiveId);
+  return (
+    <>
+      <nav data-section-nav="" aria-label="Sektioner (chip)" />
+      <nav data-section-nav="" data-section-nav-mobile="" aria-label="Sektioner (mobil)" />
+      {sections.map((s) => (
+        <section key={s.id} aria-labelledby={s.id}>
+          <h2 id={s.id}>{s.label}</h2>
+        </section>
+      ))}
+    </>
+  );
+}
+
+describe('scroll-spy bevakar ALLA [data-section-nav]-band, inte bara det första (C4)', () => {
+  let originalIO: typeof IntersectionObserver;
+  let originalRO: typeof ResizeObserver;
+  const sections = [SECTIONS.daily, SECTIONS.groups, SECTIONS.scenarios];
+  beforeEach(() => {
+    instances = [];
+    resizeInstances = [];
+    originalIO = globalThis.IntersectionObserver;
+    originalRO = globalThis.ResizeObserver;
+    globalThis.IntersectionObserver =
+      MockIntersectionObserver as unknown as typeof IntersectionObserver;
+    globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+  });
+  afterEach(() => {
+    globalThis.IntersectionObserver = originalIO;
+    globalThis.ResizeObserver = originalRO;
+    document.documentElement.style.removeProperty('--vm-section-nav-offset');
+  });
+
+  it('observerar BÅDA banden, så det ANDRA bandet (mobil) ingår i offset-bevakningen', () => {
+    document.documentElement.style.setProperty('--vm-section-nav-offset', '64px');
+    render(<TwoBandSpyHarness sections={sections} />);
+
+    const ro = resizeInstances[resizeInstances.length - 1];
+    expect(ro).toBeDefined();
+    const mobileBand = document.querySelector('[data-section-nav-mobile]');
+    expect(mobileBand).not.toBeNull();
+    // Kärnan i C4: det ANDRA bandet (mobil) måste vara bland de observerade. Med den gamla
+    // querySelector-logiken (bara första bandet) skulle detta vara false -> negativ-kontroll.
+    expect(ro.observed).toContain(mobileBand);
+  });
+
+  it('en höjdändring i det ANDRA bandet (mobil-panel öppnas) bygger om observern med ny rootMargin', () => {
+    document.documentElement.style.setProperty('--vm-section-nav-offset', '64px');
+    render(<TwoBandSpyHarness sections={sections} />);
+
+    const countAfterMount = instances.length;
+    expect(instances[instances.length - 1].options?.rootMargin).toBe('-64px 0px -55% 0px');
+
+    // Mobil-panelen öppnas -> mobil-bandets höjd ökar -> useStickyBandOffset skulle skriva en
+    // ny offset. Vi simulerar den nya mätningen och emitterar ResizeObserver-callbacken för just
+    // DET ANDRA bandet (mobil), den kanal som var oobserverad före fixen.
+    const mobileBand = document.querySelector('[data-section-nav-mobile]');
+    if (mobileBand === null) {
+      throw new Error('Mobil-bandet saknas i harness:en.');
+    }
+    document.documentElement.style.setProperty('--vm-section-nav-offset', '112px');
+    emitResize(mobileBand);
+
+    // En NY IntersectionObserver ska ha byggts med den uppdaterade rootMargin-toppen (-112px).
+    // Utan C4-fixen observeras inte mobil-bandet, så emitResize träffar ingen RO-callback ->
+    // ingen ombyggnad -> instances.length oförändrad -> detta test RÖDNAR (negativ-kontroll).
+    expect(instances.length).toBe(countAfterMount + 1);
+    expect(instances[instances.length - 1].options?.rootMargin).toBe('-112px 0px -55% 0px');
+  });
+});
