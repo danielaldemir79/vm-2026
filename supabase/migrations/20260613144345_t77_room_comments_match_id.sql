@@ -30,7 +30,7 @@ alter table public.room_comments
   add column if not exists match_id text;
 
 comment on column public.room_comments.match_id is
-  'T77: NULL = rums-chatt (T66), satt = match-trad. match-id ur den statiska planen (text, samma form som room_reactions.match_id). RLS gatar pa room_id (oforandrad).';
+  'T77: NULL = rums-chatt (T66), satt = match-tråd. match-id ur den statiska planen (text, samma form som room_reactions.match_id). RLS gatar på room_id (oförändrad).';
 
 -- Index för det vanligaste match-uppslaget: ett rums kommentarer för EN match i tidsordning.
 -- Partiellt (bara match-tråd-rader) så rums-chatt-raderna (match_id NULL) inte blåser upp det.
