@@ -20,6 +20,17 @@ värde-låst i CI (`venue-capacity-source.test.ts`: pinnar alla 16 figurer + mut
 formatering). venue-strängen ("Arena, Stad, Land") är OFÖRÄNDRAD (kapaciteten är en separat per-arena-
 uppslagning, inte instoppad i strängen), och **matches.ts rörs INTE** (diff-verifierat: 0 ändringar).
 
+**Generator-mönster för tabellen (Copilot T4e #150, F4):** `venue-capacities.ts` är en GENERERAD,
+committad tabell (16-posters `new Map`-literal), INTE en `?raw`-parsning av gold source vid runtime.
+Skälet: tabellen används i UI:t (`match-display` -> MatchCard), så en `?raw`-import skulle paketera
+HELA `venue-source.txt` (277 rader, inkl. per-match VENUES-sektionen) till klient-bundlen bara för 16
+tal. Nu emittas tabellen av `scripts/generate-venue-capacities.ts` (`npm run gen:venue-capacities`,
+via `buildVenueCapacityFile` i `venue-parser.ts`), och gold source `?raw` finns BARA i generator +
+test, aldrig i en runtime-modul (bundle-verifierat). Regenerera-och-diffa-låset (`buildVenueCapacityFile`
+körd på gold source == committad `.ts`) + mutationstest av låset flyttar käll-drift-fångsten in i CI.
+Exakt samma mönster som `matches.ts` och `team-profiles.ts`, se `docs/patterns.md`
+"gissningskanslig-data-genereras-ur-auktoritativ-kalla-med-validerande-generator".
+
 **Figur-VALET (viktigt, INTE en gissning):** det cirkulerar TVÅ figur-uppsättningar.
 - (1) **FIFA:s officiella TURNERINGS-kapacitet** (VALD: Estadio Azteca 80 824, AT&T 70 649, MetLife
   80 663) = arenan i VM-konfiguration, exakta tal, internt konsistenta.
@@ -37,16 +48,18 @@ samma som Wikipedia-tabellen. Wikipedia noterar att talen kan justeras av FIFA s
 2026-06-13-figurerna och datum-stämplar checken inline i `venue-source.txt`. (Daniels exempel i
 direktivet, "87 523", var arenans äldre/ordinarie siffra, inte VM-talet, alltså medvetet INTE använt.)
 
-**Svensk siffer-formatering (en sanning):** `formatCapacity` (`match-display.ts`) ger "80 824 platser"
+**Svensk siffer-formatering (en sanning):** `formatCapacity` (`match-display.ts`) ger talet "80 824"
 med FAST mellanslag (U+00A0) som tusentals-avgränsare, normaliserat ur `Intl.NumberFormat('sv-SE')`
-så det är deterministiskt oavsett Node-/ICU-version. En arena utan verifierad kapacitet hanteras
-TYST (`formatVenueCapacity` ger null, ingen gissad siffra) , men alla 16 HAR en figur, så den tysta
+så det är deterministiskt oavsett Node-/ICU-version. `formatVenueCapacity` lägger på enheten och ger
+"80 824 platser" för en känd arena. En arena utan verifierad kapacitet hanteras TYST
+(`formatVenueCapacity` ger null, ingen gissad siffra) , men alla 16 HAR en figur, så den tysta
 grenen gäller bara en okänd arena (t.ex. den äldre "Arena, Stad"-formen utan land).
 
 **2) FIFA-ranking (BEFINTLIG data, bara UI).** `Team.fifaRanking` finns redan (T10/T69), källåkrad.
-T4e LÄSER bara fältet och visar "FIFA #14" per lag (`formatFifaRanking`). Lag UTAN känd ranking
-(ännu obestämda slutspelslag, `homeTeamId`/`awayTeamId` null, eller lag utan rankingfält) hanteras
-TYST (ingen "FIFA #undefined"). Ingen ny datakälla.
+T4e LÄSER bara fältet och visar "FIFA-ranking #14" per lag (`formatFifaRanking`; hela ordet, inte
+bara "#14", så det inte misstolkas som grupp-/tabellplacering, Daniels förtydligande). Lag UTAN känd
+ranking (ännu obestämda slutspelslag, `homeTeamId`/`awayTeamId` null, eller lag utan rankingfält)
+hanteras TYST (ingen "FIFA-ranking #undefined"). Ingen ny datakälla.
 
 **UI/a11y:** MatchCard wirar in kapaciteten i Arena-`<dd>:n` (`data-venue-capacity`-hak) och rankingen
 under lagnamnet (`data-fifa-ranking`-hak). Rankingen är LÄSBAR för skärmläsare (inte aria-hidden), då

@@ -354,3 +354,82 @@ export function buildVenueCapacityTable(rows: readonly ParsedCapacityRow[]): Ven
 
   return table;
 }
+
+/* ------------------------------------------------------------------ *
+ * Emit (parsad kapacitet -> .ts-filtext). Samma EN-sanning-mönster som
+ * buildMatchesFile/buildProfilesFile: gold source (venue-source.txt) parsas BARA
+ * i generator-skriptet + källånkrings-testet, ALDRIG i klient-bundlen. Runtime-
+ * konsumenten (match-display.ts) importerar i stället den GENERERADE, committade
+ * tabellen (venue-capacities.ts), så de 277 rå källraderna inte paketeras till
+ * klienten för 16 tal (Copilot T4e #150, F4). Prettier-stil DIREKT (single quotes,
+ * 2-space indent) så den genererade filen är format:check-ren och regenerera-och-
+ * diffa-låset håller (emit + prettier ger samma bytes).
+ * ------------------------------------------------------------------ */
+
+/**
+ * Emittera en arena-nyckel som TS-strängliteral i projektets Prettier-stil. Prettier
+ * föredrar SINGLE quotes men byter till DOUBLE quotes när strängen innehåller en
+ * apostrof och inget citationstecken (så apostrofen slipper escapas, t.ex. "Levi's
+ * Stadium"). Vi replikerar regeln EXAKT så emit == prettier --write (annars bryts
+ * regenerera-och-diffa-låset). Samma motgift som team-profiles-parsern.
+ */
+function venueKeyLiteral(value: string): string {
+  const escaped = value.replace(/\\/g, '\\\\');
+  const hasSingle = escaped.includes("'");
+  const hasDouble = escaped.includes('"');
+  if (hasSingle && !hasDouble) {
+    return `"${escaped}"`;
+  }
+  return `'${escaped.replace(/'/g, "\\'")}'`;
+}
+
+/**
+ * Bygg HELA innehållet i venue-capacities.ts ur källtexten (LF-radslut): ett filhuvud
+ * (redigera inte för hand + källhänvisning) + en `new Map([...])`-literal med de 16
+ * arena -> kapacitet-paren i KÄLLANS ordning (deterministiskt, så filen är stabil).
+ * Validerar via buildVenueCapacityTable (fail loud vid okänd/dubblerad/saknad arena),
+ * så en trasig källa ger ett fel, inte en halv tabell.
+ *
+ * Samma EN-sanning-mönster som buildMatchesFile/buildProfilesFile: BÅDE generator-
+ * skriptet OCH källånkrings-testet kör DENNA funktion, så testet bevisar att källan ->
+ * kapacitets-koden ger exakt den committade venue-capacities.ts (ingen duplicerad emit).
+ *
+ * @throws Vid format-fel eller drift mot de 16 kända arenorna.
+ */
+export function buildVenueCapacityFile(text: string): string {
+  const rows = parseVenueCapacities(text);
+  // Validera mot de 16 kända arenorna (fail loud) innan emit; kasta bort retur-mappen,
+  // vi emittar i KÄLLANS ordning (rows), inte i Map-insättningsordning, så filen är
+  // läsbar och grupperad som källan (USA/Mexiko/Kanada).
+  buildVenueCapacityTable(rows);
+
+  const body = rows.map((row) => `  [${venueKeyLiteral(row.venue)}, ${row.capacity}],`).join('\n');
+
+  return `// GENERERAD FIL, redigera inte för hand. Se scripts/generate-venue-capacities.ts.
+//
+// VM 2026:s åskådarkapacitet per arena (16 värden), källåkrad och värde-låst i CI.
+// GENERERAD ur det committade gold source-utdraget (venue-source.txt, CAPACITIES-
+// sektionen) via den rena parsern (venue-parser.ts), och VÄRDE-LÅST mot källan i CI
+// (venue-capacity-source.test.ts: regenerera-och-diffa + pinnade figurer + mutationstest).
+//
+// VARFÖR en genererad, committad tabell (inte ?raw-parsa källan vid runtime): tabellen
+// används i UI:t (match-display.formatVenueCapacity -> MatchCard), så en ?raw-import av
+// gold source skulle paketera HELA textfilen (277 rader, inkl. per-match VENUES-sektionen)
+// till klient-bundlen bara för 16 tal. I stället importerar runtime denna förbyggda
+// tabell; gold source rörs BARA av generatorn + testet (?raw), aldrig i klienten. Samma
+// mönster som matches.ts/team-profiles.ts (Copilot T4e #150, F4).
+//
+// KÄLLA (gissas ALDRIG): FIFA:s officiellt tillkännagivna TURNERINGS-kapaciteter,
+// Wikipedia "2026 FIFA World Cup" (venue-tabellen), hämtad 2026-06-13, korskoll-bekräftad
+// mot Crypto Briefing (FIFA:s officiella figurer). Se preambeln i venue-source.txt +
+// docs/decisions.md (T4e) för figur-valet (FIFA:s turnerings-tal, inte arenornas
+// ordinarie max-kapacitet) och korskollen.
+
+import type { VenueCapacityTable } from './venue-parser';
+
+/** Arena-sträng ("Arena, Stad, Land") -> åskådarkapacitet (VM-konfiguration). */
+export const WC2026_VENUE_CAPACITIES: VenueCapacityTable = new Map([
+${body}
+]);
+`;
+}

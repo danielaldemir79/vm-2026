@@ -11,7 +11,7 @@ import { teamShortName } from '../../domain';
 // Direkt-import (inte barrel ../../data/wc2026): barrel:n re-exporterar även
 // WC2026_MATCHES/WC2026_TEAMS m.fl., så en barrel-import länkar in all den statiska
 // datan i varje konsument som bara behöver de 16 kapaciteterna. Direkt mot
-// venue-capacities håller hjälparen lätt + kopplingen smal (Copilot, PR #150).
+// venue-capacities håller hjälparen lätt + kopplingen smal.
 import { WC2026_VENUE_CAPACITIES } from '../../data/wc2026/venue-capacities';
 
 /** Svensk etikett per slutspels-/gruppsteg (för matchkortets steg-märke). */
