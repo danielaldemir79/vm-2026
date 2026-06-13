@@ -101,9 +101,10 @@ export function isVenuePlaceholder(venue: string): boolean {
 /**
  * Det fasta mellanslag (no-break space, U+00A0) som svensk konvention använder som
  * tusentals-avgränsare, så talet aldrig radbryts mitt i sig. Vi binder det explicit som
- * den literala no-break-space-konstanten nedan i stället för att lita på vilket grupperings-
- * (vissa Node-/ICU-versioner ger U+202F narrow no-break space, andra vanligt mellanslag),
- * så formateringen är DETERMINISTISK på alla Node-versioner (CI kör en annan än lokalt).
+ * den literala no-break-space-konstanten nedan i stället för att lita på vilket
+ * grupperings-tecken Intl väljer (vissa Node-/ICU-versioner ger U+202F narrow no-break
+ * space, andra vanligt mellanslag), så formateringen är DETERMINISTISK på alla
+ * Node-versioner (CI kör en annan än lokalt).
  * EN sanning för avgränsaren.
  */
 const SV_THOUSANDS_SEPARATOR = ' ';
