@@ -196,19 +196,53 @@ export function CollapsibleBody({
         style={expanded ? { maxHeight: '200rem' } : { maxHeight: collapsedMaxHeight }}
       >
         {children}
-        {/* Gradient-fade över underkanten i komprimerat läge: smälter det klippta
-            innehållet ner i sektionens bakyta och bär en "det finns mer"-cue
-            (chevron) vid klipp-kanten. Ren dekoration (aria-hidden), pekar inte ut
-            händelser (pointer-events-none) så den inte blockerar klick på innehållet
-            som råkar nå kanten. Tema-trogen via --vm-fade-to (sektionens bakyta);
-            den eased multi-stop-gradienten + cue:n bor i collapsible.css. */}
+        {/* "Det finns mer"-kanten i komprimerat läge, TVÅ separata lager (T68b, #136):
+            1) GRADIENT-FADEN, ett heltäckande band längst ner som smälter det klippta
+               innehållet ner i sektionens bakyta. REN DEKORATION (aria-hidden) och
+               pointer-events-none ÖVER HELA bandet, så den aldrig blockerar klick/
+               markering på det komprimerade innehåll som råkar nå kanten.
+            2) CHEVRON-CUE-KNAPPEN, en liten pillerknopp centrerad vid klipp-kanten som
+               fäller ut sektionen vid klick (samma toggle som den övre ExpandToggle).
+            Varför TVÅ element och inte en klickbar fade: bara SJÄLVA pillret ska fånga
+            klick, inte hela fade-bandet. Genom att hålla faden pointer-events-none och
+            lägga klicket på en egen liten knapp fångas bara pillrets yta, resten av
+            kanten förblir genomsläpplig för innehållet. */}
         {!expanded && isClipped ? (
-          <div
-            aria-hidden="true"
-            data-collapsible-fade=""
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
-            style={{ '--vm-fade-to': fadeTo } as CSSProperties}
-          />
+          <>
+            {/* Gradient-faden: tema-trogen via --vm-fade-to (sektionens bakyta), den
+                eased multi-stop-gradienten bor i collapsible.css. Bär ingen cue längre
+                (den flyttades till knappen nedan), bara övergången till bakytan. */}
+            <div
+              aria-hidden="true"
+              data-collapsible-fade=""
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+              style={{ '--vm-fade-to': fadeTo } as CSSProperties}
+            />
+            {/* CHEVRON-CUE-KNAPPEN: en RIKTIG <button> så mus/touch kan klicka på den
+                pil man dras till och faktiskt fälla ut (Daniels feedback 2026-06-13:
+                "man vill klicka på pilen men inget händer"). Pillret + chevron-glyfen
+                ritas av collapsible.css via [data-collapsible-cue] (flyttade hit från
+                fadens pseudo-element).
+
+                A11Y-VAL (aria-hidden + tabIndex=-1), motiverat i docs/decisions.md
+                (T68b): den ÖVRE ExpandToggle är redan den tillgängliga kontrollen
+                (aria-expanded/-controls, fokuserbar, etiketterad). Den här knappen är
+                en REN mus/touch-affordans som SPEGLAR den, så vi stänger den ur
+                a11y-trädet (aria-hidden) och ur tab-ordningen (tabIndex=-1). Annars
+                skulle skärmläsar-/tangentbordsanvändare få TVÅ kontroller med samma
+                syfte (redundans/förvirring). Tangentbord + skärmläsare når toppknappen.
+                Bär --vm-fade-to så pillrets ton matchar bakytan som faden, och en egen
+                stabil hak (data-collapsible-cue) för styling/test. */}
+            <button
+              type="button"
+              aria-hidden="true"
+              tabIndex={-1}
+              data-collapsible-cue=""
+              onClick={toggle}
+              className="absolute bottom-0 left-1/2 h-9 w-12 -translate-x-1/2 cursor-pointer"
+              style={{ '--vm-fade-to': fadeTo } as CSSProperties}
+            />
+          </>
         ) : null}
       </div>
 

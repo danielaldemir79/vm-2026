@@ -9,8 +9,8 @@
  *   - allt tema-medvetet (fadeTo styr bakytan) och reduced-motion-gatat.
  *
  * Stylas ENBART via senior-devs befintliga data-hakar (data-collapsible,
- * -body, -fade, data-collapsed) + nya rena klass-hakar, så all semantik + alla
- * tester står oförändrade.
+ * -body, -fade, -cue, data-collapsed) + nya rena klass-hakar, så all semantik +
+ * alla tester står oförändrade.
  */
 
 /* KROPPEN: en diskret höjd-transition vid UTFÄLLNING, så toppen inte SNAPPAR fram
@@ -50,15 +50,36 @@
   );
 }
 
-/* "DET FINNS MER"-CUE vid klipp-kanten: en liten accent-pillerknopp med en
- * chevron-ner, centrerad längst ner i faden. Den GÖR klipp-kanten inbjudande
- * ("det finns mer nedanför") utan extra text, och kompletterar den ÖVRE
- * expandera-pillen (som bär den tillgängliga semantiken). REN DEKORATION:
- * faden + cue:n är aria-hidden + pointer-events-none, så den interaktiva
- * kontrollen förblir den riktiga knappen (tangentbord/skärmläsare nås av den),
- * inte denna glyf. Sitter en bit upp från botten så den vilar PÅ den mjukaste
- * delen av faden, inte mot sektionens nästa kant. */
-[data-collapsible-fade]::after {
+/* "DET FINNS MER"-CUE-KNAPPEN vid klipp-kanten (T68b, #136): en liten accent-
+ * pillerknopp med en chevron-ner, centrerad längst ner. Den GÖR klipp-kanten
+ * inbjudande ("det finns mer nedanför") utan extra text, OCH är nu en RIKTIG
+ * <button> som fäller ut sektionen vid klick (Daniels feedback 2026-06-13:
+ * "man vill klicka på pilen men inget händer"). Den kompletterar den ÖVRE
+ * expandera-pillen, som bär den tillgängliga semantiken; cue-knappen är
+ * aria-hidden + tabIndex=-1 (mus/touch-affordans, inte en andra SR-kontroll),
+ * se CollapsibleSection.tsx + docs/decisions.md (T68b).
+ *
+ * Pillret + chevron-glyfen ritas av cue-knappens egna pseudo-element (::after =
+ * platta, ::before = chevron), flyttade hit FRÅN fadens pseudo-element så bara
+ * pillrets yta fångar klick, aldrig hela fade-bandet. Knappens egen yta
+ * (2.25rem-pillret centrerat i en 3rem-bred träffyta, se .tsx) är klickmålet;
+ * faden förblir pointer-events-none. */
+[data-collapsible-cue] {
+  /* Nollställ webbläsarens knapp-stil: cue-knappen ska SE UT som pillret, inte
+     som en OS-knapp. Bakgrund/kant/glyf bärs av pseudo-elementen nedan; knappens
+     egen yta är en transparent träffyta. Positionering (absolute bottom/left) +
+     storlek sätts inline i .tsx, så pseudo-elementen (bottom/left) ankras mot
+     knappen. */
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+/* Pillret (plattan) under chevron: samma affordans-språk som ExpandToggle-
+ * pillen, så cue:n och knappen läses som SAMMA inbjudan. Allt token-drivet. */
+[data-collapsible-cue]::after {
   content: '';
   position: absolute;
   bottom: 0.5rem;
@@ -67,8 +88,6 @@
   height: 1.25rem;
   transform: translateX(-50%);
   border-radius: var(--radius-pill);
-  /* Accent-tint + kant: samma affordans-språk som ExpandToggle-pillen, så cue:n
-     och knappen läses som SAMMA inbjudan. Allt token-drivet (följer temat). */
   background-color: color-mix(in srgb, var(--color-accent) 16%, var(--vm-fade-to));
   border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-border));
   box-shadow: var(--vm-shadow-card);
@@ -80,7 +99,7 @@
  * färg), så själva pilen färgas av --color-accent och följer temat automatiskt
  * (ingen rå hex, ingen per-tema-bild att hålla i synk). Masken är samma chevron-
  * ner som ExpandToggle, så affordansen är konsekvent över hela sidan. */
-[data-collapsible-fade]::before {
+[data-collapsible-cue]::before {
   content: '';
   position: absolute;
   bottom: 0.5rem;
@@ -112,8 +131,8 @@
 /* WCAG 2.3.3: den som bett om minskad rörelse får en HELT statisk cue (den bär
  * ändå sitt budskap via formen + chevron-glyfen + den övre expandera-pillen). */
 @media (prefers-reduced-motion: reduce) {
-  [data-collapsible-fade]::before,
-  [data-collapsible-fade]::after {
+  [data-collapsible-cue]::before,
+  [data-collapsible-cue]::after {
     animation: none !important;
     transform: translateX(-50%) !important;
   }

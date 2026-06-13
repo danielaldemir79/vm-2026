@@ -161,6 +161,102 @@ describe('CollapsibleBody (innehålls-kompressorn sektionerna använder)', () =>
     expect(body.querySelector('[data-collapsible-fade]')).toBeNull();
   });
 
+  // T68b (#136): chevron-cue:n vid klipp-kanten är nu en RIKTIG knapp som fäller ut
+  // (Daniels feedback: "man vill klicka på pilen men inget händer"). Den är en ren
+  // mus/touch-affordans som SPEGLAR den övre ExpandToggle, INTE en andra
+  // skärmläsar-/tangentbords-kontroll (aria-hidden + tabIndex=-1).
+  describe('klickbar chevron-cue-knapp (T68b)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('klick på cue-knappen fäller UT sektionen (samma toggle som övre kontrollen)', () => {
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Admin-innehåll.</p>
+        </CollapsibleBody>
+      );
+      const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+      // Default komprimerat: cue-knappen finns vid klipp-kanten.
+      const cue = body.querySelector('[data-collapsible-cue]') as HTMLButtonElement;
+      expect(cue).toBeInTheDocument();
+      fireEvent.click(cue);
+      // Efter klick: utfälld, precis som om man klickat den övre expandera-knappen.
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      // Och cue:n är borta (inget mer att "fälla ut" till i utfällt läge).
+      expect(body.querySelector('[data-collapsible-cue]')).toBeNull();
+    });
+
+    it('cue-knappen är aria-hidden + tabIndex=-1 (inte en andra SR-/tab-kontroll)', () => {
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Admin-innehåll.</p>
+        </CollapsibleBody>
+      );
+      const cue = document.querySelector('[data-collapsible-cue]') as HTMLButtonElement;
+      expect(cue.tagName).toBe('BUTTON');
+      expect(cue).toHaveAttribute('aria-hidden', 'true');
+      expect(cue).toHaveAttribute('tabindex', '-1');
+      // Den tillgängliga kontrollen i komprimerat läge är PRECIS EN knapp (den övre
+      // ExpandToggle): cue-knappen får inte dyka upp som en andra knapp i a11y-trädet.
+      // getAllByRole('button') ser bara element i a11y-trädet -> aria-hidden räknas bort.
+      expect(screen.getAllByRole('button', { name: /Visa admin/i })).toHaveLength(1);
+    });
+
+    it('cue-knappen visas BARA i komprimerat + klippt läge', () => {
+      // Klipps inget (allt ryms): ingen cue (skulle vara ett falskt "mer nedanför").
+      let restore = stubBodyMeasurement(200, 100);
+      const { unmount } = render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Kort innehåll som ryms.</p>
+        </CollapsibleBody>
+      );
+      expect(document.querySelector('[data-collapsible-cue]')).toBeNull();
+      restore();
+      unmount();
+
+      // Komprimerat OCH klippt: cue:n visas (positiv kontroll).
+      restore = stubBodyMeasurement(100, 300);
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+        >
+          <p>Långt innehåll som klipps.</p>
+        </CollapsibleBody>
+      );
+      expect(document.querySelector('[data-collapsible-cue]')).toBeInTheDocument();
+      restore();
+    });
+
+    it('utfälld (klippt eller ej): ingen cue (inget att fälla ut till)', () => {
+      // Klippt men startar utfälld -> cue:n ska inte finnas (vi är redan utfällda).
+      const restore = stubBodyMeasurement(100, 300);
+      render(
+        <CollapsibleBody
+          name="admin"
+          toggleLabels={{ expand: 'Visa admin', collapse: 'Visa färre' }}
+          startExpanded
+        >
+          <p>Långt innehåll, men startar utfälld.</p>
+        </CollapsibleBody>
+      );
+      const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      expect(body.querySelector('[data-collapsible-cue]')).toBeNull();
+      restore();
+    });
+  });
+
   // T68-F1 (#136): den ÖVRE ExpandToggle gatas på SAMMA isClipped-mätning som faden.
   // Klipps inget (kort innehåll, t.ex. tomt/laddnings-/utan-rum-tillstånd som ryms inom
   // collapsedMaxHeight) ska VARKEN fade NI övre "Visa alla"-knapp visas, båda vore ett
