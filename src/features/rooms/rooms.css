@@ -583,3 +583,149 @@
     }
   }
 }
+
+/* -----------------------------------------------------------------------------
+   10. PER-MATCH KOMMENTARER på matchkorten (T77, #161). [design-frontend premium-finish]
+
+   Den HOPFÄLLDA affordansen + den UTFÄLLDA tråden UNDER matchkortet i dagens-vyn.
+   Daniel är MÅN om att kortet inte blir rörigt, så finishen vilar på två lugna idéer:
+     - HOPFÄLLD: knappen är en SEKUNDÄR fotrads-pille i exakt samma anda som reaktions-
+       radens "Reagera"-knapp (.vm-reaction-add), så reaktioner + kommentarer talar samma
+       lågmälda språk under kortet. Inget skrik, kortet förblir rent (match > reaktioner/
+       kommentar-affordans i hierarkin). En liten chevron som vrids när tråden är öppen
+       ger en FÄRG-OBEROENDE "tryck för att prata / nu öppen"-affordans (formen bär den,
+       aria-expanded bär den för skärmläsare).
+     - UTFÄLLD: en lugn LÄS-/SKRIV-panel i appens kommentars-språk. Den ÅTERANVÄNDER
+       T66:s .vm-comment-* (samma bubblor, samma egen-/annans-asymmetri, samma skriv-fält,
+       samma räknar-toner) så den känns konsekvent med rums-chatten, men packad in i en
+       egen panel med max-höjd + diskret scroll så en match med många kommentarer blir en
+       lugn, skanbar tråd, inte en vägg.
+
+   ÄGARSKAP (seam, oförändrat): senior-dev äger semantik + data-hakar i MatchComments.tsx
+   (data-match-comments-*, role/aria, etiketter, aria-expanded/-controls). Detta lager
+   STYLAR ovanpå hakarna och rör inte logiken/a11y-semantiken (samma seam som T24/T66).
+   Allt via tema-token (color-mix / var(--vm-*)), aldrig ett rått färg-beslut, så panelen
+   är trogen BÅDA teman.
+
+   KONTRAST (WCAG AA): finishen lägger INGEN ny läsbar färg. ALL text ärver T66:s redan
+   AA-mätta .vm-comment-*-toner (sektion 8: brödtext fg på egen-/annans-bubbla 13.0-17.9:1,
+   namn/tid fg-muted 5.8-6.4:1, räknar-tonerna near/over mätta, radera-hover mätt) och
+   reaktions-radens redan AA-mätta toggle-toner (sektion 9, samma .vm-reaction-add-recept:
+   fg-muted/accent på guld-4%-pill). De enda nya reglerna nedan är DEKOR (panel-yta + topp-
+   list + scrollbar + chevron-rotation + en gatad in-känsla), och dekor bär ingen text, så
+   den kan per konstruktion inte sänka någon kontrast under AA. Egen-bubblans accent-30%-
+   kant + chevronens accent-färg är samma toner som T66/T24 redan bär (ingen ny färg att mäta).
+   -------------------------------------------------------------------------- */
+
+/* CHEVRON i den hopfällda knappen: en liten roterande pil som ger affordansen en FÄRG-
+   OBEROENDE "fäll ut / nu öppen"-signal (formen bär den, inte bara färgen). Pratbubble-
+   glyfen (TSX) säger "kommentarer", chevronen säger "den här går att fälla ut". Vrids 180°
+   när knappen är öppen (aria-expanded='true'), gatad mjukt nedan. Ren dekor (aria-hidden i
+   markup via knappens text-buret budskap). Ärver knappens currentColor, så den följer
+   fg-muted -> accent på hover/öppen utan en egen färg-mätning. */
+.vm-match-comments-chevron {
+  display: inline-block;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.vm-match-comments-toggle[aria-expanded='true'] .vm-match-comments-chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-match-comments-chevron {
+    transition: transform 0.18s ease;
+  }
+}
+
+/* TRÅD-PANELEN: en lugn LÄS-/SKRIV-yta UNDER kortet. Den vilar på den varma kvällsljus-
+   ytan (en hårfin guld-skiftning över surface, samma detalj som skriv-fältet/.vm-comment-
+   input) så tråden känns som en del av snacket, inte en främmande grå ruta. En hårfin
+   guld inset-topplist (samma kvällsljus-signatur som formulären/biljetten/kupongen) läser
+   panelens överkant som en mjuk "här börjar tråden"-list, inte en hård linje. box-shadow
+   bär listen (ingen layout-påverkan, ingen CLS). Texten i panelen står på denna nästan-
+   opaka yta med T66:s redan AA-mätta toner. */
+.vm-match-comments-panel {
+  background-color: color-mix(in srgb, var(--vm-gold) 4%, var(--color-surface));
+  box-shadow: inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 20%, transparent);
+}
+
+/* DISKRET SCROLL vid många kommentarer (taskens krav: inte en vägg): listan får en
+   max-höjd och scrollar INOM panelen, med en smal, dämpad scrollbar (samma recept som
+   "vem reagerade"-popovern, .vm-reaction-authors-scroll) så scrollen känns lugn, inte en
+   grov systembar. En liten höger-luft (padding) håller bubblorna fria från scrollbaren.
+   Under tröskeln (få kommentarer) växer listan naturligt utan scroll, så en kort tråd får
+   ingen onödig scroll-ram. Ren UI-dekor (bär ingen betydelse).
+
+   (En nedre fade-mask övervägdes men valdes BORT: en mask på själva scroll-behållaren
+   tonar kanten ÄVEN när listan ryms utan scroll, vilket skulle dimma den sista bubblan i
+   en kort tråd i onödan. Den smala scrollbaren + max-höjden bär "scrolla för mer"-signalen
+   ärligt utan den bieffekten, KISS/YAGNI.) */
+.vm-match-comments-panel .vm-comment-list {
+  max-height: 17rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-fg-muted) 40%, transparent) transparent;
+}
+
+.vm-match-comments-panel .vm-comment-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vm-match-comments-panel .vm-comment-list::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--color-fg-muted) 40%, transparent);
+}
+
+/* EGEN-/ANNANS-ASYMMETRIN i tråden, ÅTERANVÄND ur T66 (sektion 8). MatchComments bär
+   data-match-comments-mine (egen seam-hake) i stället för data-comments-mine, så T66:s
+   regler (som matchar data-comments-mine) träffar inte här. Vi speglar därför EXAKT samma
+   recept mot match-haken, så match-tråden får samma chatt-rytm som rums-chatten (mina till
+   höger, en diskret accent-bubbla; andras till vänster, den lugna surface-bubblan) , en
+   sanning för "så här ser en kommentar-bubbla ut", bara två seam-attribut. INGEN ny färg:
+   accent-8%-ytan + accent-30%-kanten är T66:s redan AA-mätta egen-bubbla-toner. */
+.vm-match-comments-panel .vm-comment[data-match-comments-mine='true'] {
+  flex-direction: row-reverse;
+}
+
+.vm-match-comments-panel .vm-comment[data-match-comments-mine='true'] .vm-comment-bubble {
+  min-width: min(100%, 13rem);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+/* Hörn-asymmetrin (bubblans "svans" mot sin avatar): annans nere-vänster, egen nere-höger,
+   samma lugna chatt-detalj som T66. */
+.vm-match-comments-panel .vm-comment[data-match-comments-mine='false'] .vm-comment-bubble {
+  border-top-left-radius: var(--radius-sm);
+}
+
+.vm-match-comments-panel .vm-comment[data-match-comments-mine='true'] .vm-comment-bubble {
+  border-top-right-radius: var(--radius-sm);
+}
+
+/* DISKRET IN-KÄNSLA när tråden fälls ut: en mjuk fade + en aning nedglid FRÅN kortet, så
+   panelen "vecklar ut sig" under affordansen i stället för att bara poppa. GATAD på
+   prefers-reduced-motion (no-preference): den som bett om minskad rörelse får panelen
+   direkt i sitt vilo-läge (ingen animation alls), per WCAG 2.3.3. transform-origin uppe
+   så uppglidningen utgår från knappen, inte mitten. Bara opacity/transform rör sig (ingen
+   layout/CLS). */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-match-comments-panel {
+    transform-origin: top center;
+    animation: vm-match-comments-in 0.16s ease-out;
+  }
+
+  @keyframes vm-match-comments-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}

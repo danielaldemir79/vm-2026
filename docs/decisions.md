@@ -5,6 +5,56 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T77 (#161): per-match kommentar-trådar HOPFÄLLDA på matchkortet
+
+**Daniels val (#161, gissas inte):** per-match kommentarer, men HOPFÄLLDA så kortet inte blir rörigt.
+På dagens-vyns matchkort finns en liten "Kommentarer (N)"-affordans (0 = "Kommentera") under reaktions-
+raden (T24). Hopfälld default; tryck -> tråden fälls ut UNDER kortet (skriv + läs); tryck igen -> fäll
+ihop. Per match, per rum, realtid.
+
+**Beslut: ÅTERANVÄND room_comments-tabellen (T66) med en NULLABLE match_id-kolumn.** match_id IS NULL =
+rums-chatten (T66, oförändrad), satt = en match-tråd (T77). Migration
+`20260613144345_t77_room_comments_match_id.sql` (ADD COLUMN nullable + partiellt index
+`room_comments_room_match_created_idx (room_id, match_id, created_at) WHERE match_id IS NOT NULL`),
+applicerad LIVE via MCP. **Filen bär den FAKTISKA live-apply-versionen** `20260613144345` (bekräftad med
+`list_migrations`), inte en rund placeholder, så en fresh-replay registrerar samma version (lessons
+committad-migration-pastar-spegla-live). Verifierat live: kolumnen är nullable, de 5 befintliga rums-
+chatt-raderna fick match_id NULL (T66 oförändrad). **Varför återanvända, inte en ny tabell:** kommentarer
+ÄR samma sak (kort text per rum), bara en annan tråd-rymd; en match_id-kolumn är minsta ytan (KISS/DRY)
+och ärver T66:s CHECK (1-500) + realtids-publikation gratis. ASCII i `comment on column`-strängen är med
+FLIT (1:1 med vad MCP applicerade live, replay-trohet); migrationens kod-kommentarer har korrekt å/ä/ö.
+
+**Beslut: INGEN RLS-policy-ändring behövs.** En match-kommentar bär SAMMA room_id som rummet, och T66:s
+policyer gatar på room_id: SELECT `is_room_member(room_id)`, INSERT `is_room_member(room_id) AND user_id =
+auth.uid()`, DELETE egen rad. match_id är bara en VY-uppdelning INOM rummet, inte en ny säkerhetsgräns
+(kommentarer är inte hemliga, ingen tips-sekretess). **RLS BEVISAT LIVE (T53-playbook, role authenticated
++ request.jwt.claims, rollback/cleanup):** medlem skriver+läser match-kommentar (member_insert_ok=true,
+member_can_read=1), utomstående nekas läsa (outsider_can_read=0) OCH skriva (outsider_insert_denied=true).
+Counts oförändrade efteråt (5 total / 0 match / 5 rums-chatt), 0 leftover proof-data/funktion. Env-gatat
+integrationstest med riktiga anon-sessioner: `src/data/rooms/match-comments-rls.integration.test.ts`.
+
+**Beslut: gruppera i KLIENTEN, en hämtning + en kanal per rum (samma modell som reaktionerna T24, inte
+en hämtning/kanal per match).** `listRoomMatchComments` hämtar ALLA match-trådars rader för rummet
+(match_id IS NOT NULL); `MatchCommentsProvider` grupperar per match_id i minnet (`match-comments-aggregate.
+groupCommentsByMatch`, ren + testbar). SKILD store från rums-chatten (CommentsProvider/T66): två tråd-rymder
+på samma tabell, helt åtskilda. **T66-REGRESSIONSSKYDD:** `listRoomComments` (rums-chatten) fick ett HÅRT
+`.is('match_id', null)`-filter, annars hade match-kommentarer läckt in i rums-chatt-vyn nu när tabellen
+bär båda. Bevisat i seam-testet (rums-chatten orörd) + api-testet (filtret assertat).
+
+**Beslut: TOLERANT hook (inert fallback), inte kastande.** `useMatchCommentsStore` faller till en inert
+store (enabled=false) utan provider, EXAKT som `useReactionsStore` (T24 KA-F3), eftersom MatchComments är
+en matchkort-FOTRAD som renderas i många tester + lokalt läge utan provider. (useCommentsStore/rums-chatten
+KASTAR, men den sitter i en sektion som alltid har provider.) Realtid: egen kanal `vm2026-room-match-
+comments`, filtrerat på rummet; en rums-chatt-signal väcker den också (filtret är på rum, inte tråd) men
+re-fetchen re-filtrerar till match-trådar = ofarlig extra omhämtning.
+
+**Säker rendering (HARD, samma som T66):** kommentar-texten renderas som ren React-text-nod (escaping),
+ALDRIG dangerouslySetInnerHTML (test: taggig sträng visas bokstavligt, ingen <img> injiceras).
+
+**Design ska finputsa (rena data-hakar lämnade):** `data-match-comments`, `-toggle`, `-panel`, `-list`,
+`-item`, `-body`, `-input`, `-send`, `-count`. Balansera: hopfäll-knappens ton i reaktionsradens anda, den
+utfällda panelens yta (`.vm-match-comments-panel`), bubbel-rytmen (återanvänder `.vm-comment-*` från T66).
+
 ## 2026-06-13 , T74 (#157): se VILKA som reagerat på en match (långtryck/hover/focus -> popover)
 
 **Bakgrund (Daniels feedback):** "som usa-matchen la jag en låga och någon en applåd, men jag kan

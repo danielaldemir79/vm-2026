@@ -5,6 +5,80 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T77 (#161) per-match kommentarer hopfallda pa matchkortet , PR #162 mot develop , In Review
+
+**Branch:** `feature/T77-match-kommentarer` @ HEAD `a8eb6ed`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/162 mot `develop` (Closes #161, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T77 levererade
+
+Man kan nu kommentera per match i en hopfalld trad pa matchkortet. Tryck pa
+"Kommentarer (N)"-affordansen bredvid reaktionerna - traden faller ut under kortet med
+realtids-uppdatering, tryck igen for att falla ihop. Per match, per rum. Rums-chatten
+(T66, null match_id) ar oforandrad. RLS ärver rummets behörighet: rum-medlingen ärver
+room_comments-grinden (is_room_member), ingen ny policy.
+
+**Kedjan:**
+
+- **Senior-developer `536391e`:** NULLABLE match_id pa room_comments via live-migration
+  (icke-destruktiv ALTER ADD COLUMN + partiellt index), comments-api per-match,
+  .is null-filter pa rums-chatten, MatchComments hopfalld trad, live-RLS-bevis
+  (medlem laser/skriver, icke-medlem nekas), seam-test.
+- **Design-frontend `6cd1815`:** premium-finish pa panel och affordans - trad lugnare,
+  hopfallning ren.
+- **Lokal HOG-RISK-reviewer GODKAND.** RLS bevisad live (bada riktningarna), T66
+  oforandrad (.is match_id null bada sidor), migration honest (fil == live).
+- **F1-fix `96c2a86`:** diakritik i migrationens kolumn-kommentar (comment on column
+  strangen), fil == live.
+- **Copilot R1 `2c7301b`:** 1 a11y-fynd (aria-controls bara nar panelen ar monterad).
+- **Copilot R2 `a8eb6ed`:** 1 kommentar-typo. Exit.
+
+**Verifiering (HEAD `a8eb6ed`):** build EXIT 0, npm test 1874 grona / 49 skip,
+lint + format:check EXIT 0.
+
+**Acceptanskriterier T77:**
+- [x] AC1: Matchkortet har en hopfalld kommentars-trad per match, per rum, realtid
+- [x] AC2: Rums-chatten (T66, .is match_id null) ar oforandrad - RLS-regression skyddad
+- [x] AC3: RLS ärver rummets behörighet - oberoende reviewer verifierat live
+
+### Behover-Daniel (uppdaterat efter T77)
+
+**Befordringar (ej av T77, de tre fran T74/farre ar REDAN exekverade 2026-06-12).**
+Inga nya befordringar vantar pa godkannande fran T77.
+
+**IMPROVEMENTS.md-flagga (loggas dar av journalisten, ny fran T77):**
+vm-2026 saknar diakritik-git-hook. ascii-substitut-for-diakriter ar Forekkomst 3 i
+senior-developer.md och befordrad README-regeln galler - men ingen mekanisk vakt
+finns i vm-2026 (direkten-ryd-webb har den sedan T25). Forslag loggas i IMPROVEMENTS.md.
+
+**Kvar att besluta/agera:**
+- RLS-testrum i Supabase: star kvar pa Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- Supabase e-postmall: #81 stangt 2026-06-12 pa Daniels order.
+- **Publik-repo-go + AI-pipeline-synlighet:** Daniel bestammer nar vm-2026 kan vara
+  publikt synligt. Agent Kit far namnas som hans kvalitets-pipeline, ingen Claude-byline.
+
+### Nasta steg
+
+**Om PR #162 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 162 --merge --repo danielaldemir79/vm-2026`.
+Stang issue #161: `gh issue close 161`. Flytta kort T77 till Done pa boarden.
+
+**Om PR #162 REDAN mergad:**
+T77 klar och live pa develop. Kons HELA FEATURES-KO ar nu TOM efter T77-merge.
+Aterstende faser:
+(a) **RELEASE v1.0** - kör `/agent-kit` for att starta release-cleanup-skillen
+    (Daniel godkande "Kor releasen nu"); flode: release-cleanup-skill -> stads-scout ->
+    Daniel godkanner borttagningslista -> develop->main + tagg v1.0.
+(b) **README post-v1** - publik README klar for delning (minnesfil vm2026-readme-spec).
+(c) **Fore-publicerings-koll** - Daniel godkanner publik-go.
+Kör `/agent-kit` for att starta nasta fas.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T74 (#157) se vem som reagerat via langtryck/hover/focus , PR #160 mot develop , In Review
 
 **Branch:** `feature/T74-reaktions-avsandare` @ HEAD `9c74806`

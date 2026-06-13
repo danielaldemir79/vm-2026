@@ -73,6 +73,8 @@ const comment = (over: Partial<RoomComment> = {}): RoomComment => ({
   userId: 'u2',
   body: 'Hej gänget',
   createdAt: '2026-06-12T10:00:00Z',
+  // T77: rums-chatt-kommentarer är alltid match_id null (RoomComments är T66-rums-chatten).
+  matchId: null,
   ...over,
 });
 
