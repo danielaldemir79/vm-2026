@@ -21,6 +21,7 @@ import type { Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupScenarios } from './use-group-scenarios';
+import { useRegisterSection, SECTIONS } from '../section-nav';
 // Premium-visuella lagret (status-chips, arena-kort, väntande-tillstånd). Stylas
 // ENBART via seamens data-attribut + klass-hakar nedan, så senior-devs semantik +
 // alla tester står kvar (samma seam-princip som GroupTable/BracketView, T7/T9).
@@ -190,6 +191,8 @@ export function ScenarioView() {
   // gruppspel + inmatning). Måste renderas inuti en ResultsProvider.
   const { status, scenarios, teams, mode, error } = useGroupScenarios();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
+  // Anmäl sektionen till chip-navet (T78, #165) medan vyn är monterad.
+  useRegisterSection(SECTIONS.scenarios);
 
   return (
     <section aria-labelledby="vad-kravs-rubrik" className="flex flex-col gap-6">

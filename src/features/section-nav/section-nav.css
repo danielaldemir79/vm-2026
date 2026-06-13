@@ -1,0 +1,37 @@
+/* Sticky sektions-nav (T78, #165): den smala chip-raden under headern.
+ *
+ * Två sticky-band stackas: headern (sticky top-0 i App.tsx) och denna rad DIREKT under.
+ * top = --vm-section-nav-header-top (headerns uppmätta höjd, satt av SectionNav i JS),
+ * så raden alltid klistrar precis under headern oavsett dess faktiska höjd (varierar med
+ * skärmstorlek/typsnitt). Fallback 0 om mätningen inte hunnit (raden klistrar då högst upp
+ * en kort stund vid första render, korrigeras direkt av mätningen).
+ *
+ * z: navet ligger z-[9] (i markup) UNDER headerns z-10, så banden aldrig överlappar
+ * visuellt, headern vinner alltid. Inga magiska pixlar: bandhöjderna mäts (SectionNav).
+ *
+ * Design-frontend äger den slutgiltiga visuella behandlingen (band, chip-styling,
+ * aktiv-markering, swipe-affordans). Den här filen bär bara den funktionella stickyn +
+ * scroll-offset-kontraktet. */
+.vm-section-nav {
+  top: var(--vm-section-nav-header-top, 0px);
+}
+
+/* SCROLL-OFFSET-KONTRAKTET (det centrala, robusta greppet): varje navigerbar sektion får
+ * scroll-margin-top = de TVÅ bandens uppmätta höjd (--vm-section-nav-offset, satt av
+ * SectionNav i JS). Då landar ett chip-klicks scrollIntoView({block:'start'}) med rubriken
+ * precis UNDER raden i stället för dold bakom de två sticky-banden, utan en gissad pixel.
+ * Vi riktar mot just de åtta navigerbara sektionerna via deras befintliga rubrik-id:n
+ * (T78 lägger inte till nya id:n), så ingen ANNAN <section> får oönskad scroll-margin.
+ * En liten extra luft (8px) så rubriken andas mot raden. */
+:is(
+  section[aria-labelledby='dagens-matcher-rubrik'],
+  section[aria-labelledby='gruppspel-rubrik'],
+  section[aria-labelledby='vad-kravs-rubrik'],
+  section[aria-labelledby='slutspel-rubrik'],
+  section[aria-labelledby='predictions-heading'],
+  section[aria-labelledby='group-predictions-heading'],
+  section[aria-labelledby='bracket-predictions-heading'],
+  section[aria-labelledby='leaderboard-heading']
+) {
+  scroll-margin-top: calc(var(--vm-section-nav-offset, 0px) + 8px);
+}

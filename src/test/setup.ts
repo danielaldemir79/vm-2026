@@ -48,6 +48,42 @@ if (!window.matchMedia) {
   }));
 }
 
+// jsdom saknar IntersectionObserver (scroll-spy:n, T78) OCH ResizeObserver (sektions-
+// navets band-höjd-mätning, T78). Vi ger en inert, återanvändbar stub för båda så
+// komponenter som monterar dem inte kraschar i testmiljön. Stubbarna OBSERVERAR utan att
+// emittera (ingen scroll i jsdom), vilket är rätt default: spy-/mät-LOGIKEN testas separat
+// med en INJICERAD/kontrollerad observer-callback (use-section-spy.test.ts), så stubben
+// döljer inget beteende, den gör bara monterings-seam:et inert (samma anda som
+// matchMedia-/virtual:pwa-register-stubbarna). Enskilda tester kan ersätta global
+// IntersectionObserver med en spion när de vill driva callbacken.
+if (!('IntersectionObserver' in globalThis)) {
+  // Konstruktor-argumenten (callback/options) ignoreras medvetet, stubben emitterar
+  // aldrig. JS tar emot extra argument oavsett, så vi tar inga formella parametrar
+  // (slipper "oanvänd parameter" utan att tappa beteende). Cast:en bär typkontraktet.
+  class IntersectionObserverStub {
+    readonly root = null;
+    readonly rootMargin = '';
+    readonly thresholds: ReadonlyArray<number> = [];
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+    takeRecords(): IntersectionObserverEntry[] {
+      return [];
+    }
+  }
+  globalThis.IntersectionObserver =
+    IntersectionObserverStub as unknown as typeof IntersectionObserver;
+}
+
+if (!('ResizeObserver' in globalThis)) {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
 // EAGER motion-reduced-motion-init (T33): motion lazy-initierar sin globala
 // prefers-reduced-motion-lyssnare FÖRSTA gången useReducedMotion() anropas i en worker,
 // via window.matchMedia('(prefers-reduced-motion)').addEventListener(...). Förr körde

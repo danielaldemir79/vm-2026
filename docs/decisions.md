@@ -5,6 +5,45 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T78 (#165): sticky sektions-nav (chip-rad) med självregistrerande sektioner
+
+**Daniels val (#165):** en smal, sticky chip-rad direkt under appens befintliga header som hoppar till
+varje sektion på den långa en-sides-appen (PWA på mobil först). Återkommande krav: den får INTE bli rörig,
+hålls lean och diskret.
+
+**Beslut: chips speglar ett REGISTER, inte en hårdkodad lista , döda chips omöjliga by-construction.**
+En `SectionNavProvider` håller ett register; varje sektion anropar `useRegisterSection(SECTIONS.x)` DÄR den
+faktiskt renderar innehåll (i VYN, inte i det live-gatade skalet), och avregistrerar vid unmount. Navet
+renderar chips ur registret sorterat på `order`. **Varför register, inte DOM-scan eller statisk lista:**
+flera sektioner returnerar `null` i fixtures-/icke-live-läge (de fyra tips-/toppliste-sektionerna gatas på
+`rooms.enabled` i sina skal; tracker-vyerna daily/grupper/vad krävs/slutspel renderar alltid). En sektion
+som returnerar null monterar aldrig sin vy, så `useRegisterSection` körs aldrig, så inget chip kan peka på
+en sektion som inte finns i DOM:en. Registret gör det till en KONSTRUKTIONS-garanti i stället för en koll
+som kan glömmas. `useRegisterSection` är TOLERANT mot saknad provider (no-op), samma mönster som
+`useRoomsSync`, så vy-tester i isolation inte kräver providern.
+
+**Beslut: scroll-offset MÄTS robust, ingen magisk pixel.** Två sticky-band stackas (header sticky top-0
+z-10; navet sticky med `top` = headerns uppmätta höjd, z-[9] under headern så de aldrig överlappar).
+`SectionNav` mäter header- + nav-höjden (getBoundingClientRect + ResizeObserver) och skriver
+`--vm-section-nav-offset` (+ `--vm-section-nav-header-top`) på `<html>`. CSS sätter
+`scroll-margin-top: calc(var(--vm-section-nav-offset) + 8px)` på de åtta navigerbara sektionerna (via deras
+BEFINTLIGA rubrik-id:n, T78 lägger inte till nya id:n), så ett chip-klicks `scrollIntoView({block:'start'})`
+landar rubriken precis under raden oavsett bandens faktiska höjd (varierar med skärm/typsnitt/tema).
+
+**Beslut: scroll-spy via IntersectionObserver, aktiv = aria-current.** `useSectionSpy` observerar
+sektionerna med `rootMargin` som drar zonens topp under banden (samma uppmätta offset), markerar den nedersta
+sektion vars topp passerat raden (aria-current="true" + data-active för designern). reduced-motion: `scrollTo`
+hoppar direkt (`behavior:'auto'`) via den delade `useReducedMotion` (motion/react), annars `'smooth'` , WCAG
+2.3.3.
+
+**Beslut: rums- och admin-sektionerna hålls UTANFÖR raden** (hjälp-/arrangörsytor), per Daniels lean-krav,
+så de saknar både katalog-post i `SECTIONS` och registrerings-anrop. Etiketter korta: Idag, Grupper, Vad
+krävs, Slutspel, Match-tips, Grupp-tips, Mästare, Topplista. Tom rad (inga registrerade) -> hela navet
+renderar `null` (ingen tom sticky-list). Funktionell + tillgänglig kärna byggd här; design-frontend stylar
+mot `data-section-nav` / `data-section-chip` / `aria-current` / `--vm-section-nav-offset`.
+
+---
+
 ## 2026-06-13 , T77 (#161): per-match kommentar-trådar HOPFÄLLDA på matchkortet
 
 **Daniels val (#161, gissas inte):** per-match kommentarer, men HOPFÄLLDA så kortet inte blir rörigt.
