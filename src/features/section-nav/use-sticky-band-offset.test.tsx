@@ -27,7 +27,11 @@ function FakeSection() {
 
 const APP_HEADER_HEIGHT = 64;
 const VISIBLE_BAND_HEIGHT = 48; // det band som "syns" (rapporterar höjd)
-const HIDDEN_BAND_HEIGHT = 0; // det dolda bandet (display:none -> height 0)
+const HIDDEN_BAND_HEIGHT = 0; // det dolda bandet i prod (display:none -> height 0)
+// Höjd > 0 på det ICKE-synliga bandet för att SKILJA MAX från SUM (se det diskriminerande
+// testet nedan). Vald så att MAX(48,30)=48 != SUM(48+30)=78, alltså är 30 < VISIBLE_BAND_HEIGHT
+// och nollskilt, så de två operatorerna ger olika offset.
+const OTHER_BAND_DISTINCT_HEIGHT = 30;
 
 const proto = HTMLElement.prototype as unknown as {
   getBoundingClientRect?: () => { height: number };
@@ -39,8 +43,13 @@ let originalRect: typeof proto.getBoundingClientRect;
  * data-section-nav-mobile räknas som DOLT (0, simulerar display:none < sm är osynligt... men
  * vi väljer i stället att låta CHIP-bandet vara det dolda och MOBIL-bandet det synliga, så
  * testet bevisar att MAX plockar det synliga bandet även om det inte är det första i DOM).
+ *
+ * @param opts.visibleSelector vilket band som räknas som SYNLIGT (rapporterar VISIBLE_BAND_HEIGHT).
+ * @param opts.otherBandHeight höjden på det ANDRA (icke-synliga) bandet. Default 0 (prod-sant:
+ *   display:none ger höjd 0). Sätt > 0 för att göra MAX != SUM och därmed exercera VAL-operatorn.
  */
-function mockRects(opts: { visibleSelector: 'chip' | 'mobile' }): void {
+function mockRects(opts: { visibleSelector: 'chip' | 'mobile'; otherBandHeight?: number }): void {
+  const otherBandHeight = opts.otherBandHeight ?? HIDDEN_BAND_HEIGHT;
   proto.getBoundingClientRect = function (this: HTMLElement) {
     let height = 0;
     if (this.tagName === 'HEADER') {
@@ -50,7 +59,7 @@ function mockRects(opts: { visibleSelector: 'chip' | 'mobile' }): void {
       const isVisible =
         (opts.visibleSelector === 'mobile' && isMobile) ||
         (opts.visibleSelector === 'chip' && !isMobile);
-      height = isVisible ? VISIBLE_BAND_HEIGHT : HIDDEN_BAND_HEIGHT;
+      height = isVisible ? VISIBLE_BAND_HEIGHT : otherBandHeight;
     }
     return { height } as DOMRect;
   } as typeof proto.getBoundingClientRect;
@@ -105,6 +114,33 @@ describe('useStickyBandOffset, delad mellan chip-raden och mobil-menyn', () => {
     );
     expect(readHeaderTop()).toBe(`${APP_HEADER_HEIGHT}px`);
     expect(readOffset()).toBe(`${APP_HEADER_HEIGHT + VISIBLE_BAND_HEIGHT}px`);
+  });
+
+  // DISKRIMINERANDE fall för VAL-invarianten: offseten tar MAX över banden, INTE summan.
+  // De andra fallen mockar det icke-synliga bandet till 0, och vid 0 ger MAX(48,0), SUM(48+0) OCH
+  // "först nollskild" ALLA 48, så de kan inte skilja MAX från SUM. Här mockas det andra bandet till
+  // en NOLLSKILD höjd (30), så MAX(48,30)=48 != SUM(48+30)=78. Då rödnar testet om någon byter
+  // hookens MAX-logik mot en summa. (Prod-realistiskt är 0, men ett VAL-invariant-test ska modellera
+  // det fall där den FELAKTIGA operatorn skulle ge ett ANNAT svar.) Negativ-kontroll i handoff: MAX
+  // -> SUM-mutation i hooken gör att detta fall RÖDNAR.
+  it('offset = header + MAX(banden), INTE summan, när det andra bandet har nollskild höjd', () => {
+    mockRects({ visibleSelector: 'mobile', otherBandHeight: OTHER_BAND_DISTINCT_HEIGHT });
+    render(
+      <>
+        <header data-app-header="">App-header</header>
+        <SectionNavProvider>
+          <SectionNav />
+          <SectionNavMobile />
+          <FakeSection />
+        </SectionNavProvider>
+      </>
+    );
+    const maxOffset = APP_HEADER_HEIGHT + VISIBLE_BAND_HEIGHT; // 64 + 48 = 112 (MAX)
+    const sumOffset = APP_HEADER_HEIGHT + VISIBLE_BAND_HEIGHT + OTHER_BAND_DISTINCT_HEIGHT; // 142 (SUM)
+    expect(maxOffset).not.toBe(sumOffset); // sanity: fixturen skiljer faktiskt operatorerna åt
+    expect(readHeaderTop()).toBe(`${APP_HEADER_HEIGHT}px`);
+    expect(readOffset()).toBe(`${maxOffset}px`);
+    expect(readOffset()).not.toBe(`${sumOffset}px`);
   });
 
   it('rensar CSS-variablerna när BÅDA banden går till 0 sektioner (return null)', () => {
