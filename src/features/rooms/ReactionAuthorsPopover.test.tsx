@@ -79,4 +79,41 @@ describe('ReactionAuthorsPopover , positionering (mekanik, ej pixel)', () => {
     expect(Number.isNaN(left)).toBe(false);
     expect(left).toBeGreaterThanOrEqual(0);
   });
+
+  it('klampar top mot viewportens NEDERKANT (hög popover spiller inte ut under skärmen)', () => {
+    // Copilot PR #160: top klampades förr bara mot toppen, så en hög popover kunde
+    // hamna delvis under skärmkanten. Mocka en LÅG ankare (nära/under viewport-botten)
+    // + en HÖG popover + en liten viewport, och bevisa att top + höjd ryms inom viewporten.
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    const originalInnerHeight = window.innerHeight;
+    const POPOVER_HEIGHT = 150;
+    const VIEWPORT_H = 200;
+    HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement): DOMRect {
+      const isPopover = this.getAttribute('data-reaction-authors-popover') !== null;
+      const rect = isPopover
+        ? {
+            top: 0,
+            left: 0,
+            right: 200,
+            bottom: POPOVER_HEIGHT,
+            width: 200,
+            height: POPOVER_HEIGHT,
+          }
+        : { top: 210, left: 50, right: 80, bottom: 234, width: 30, height: 24 }; // ankare lågt
+      return { ...rect, x: rect.left, y: rect.top, toJSON: () => ({}) } as DOMRect;
+    };
+    window.innerHeight = VIEWPORT_H;
+    try {
+      renderPopover([row()]);
+      const popover = screen.getByRole('tooltip');
+      const top = parseFloat(popover.style.top);
+      // Underkanten (top + höjd) ryms inom viewporten (annars spillde popovern ut).
+      // Gamla koden gav top=52 -> 52+150=202 > 200 (overflow); nya klampar top <= 42.
+      expect(top + POPOVER_HEIGHT).toBeLessThanOrEqual(VIEWPORT_H);
+      expect(top).toBeGreaterThanOrEqual(0);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalRect;
+      window.innerHeight = originalInnerHeight;
+    }
+  });
 });

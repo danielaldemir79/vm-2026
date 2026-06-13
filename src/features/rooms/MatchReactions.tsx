@@ -129,7 +129,7 @@ function ReactionTallyButton({ tally, nameByUser, myUserId, onToggle }: Reaction
         aria-label={`${EMOJI_LABEL[tally.emoji]}, ${tally.count} ${
           tally.count === 1 ? 'reaktion' : 'reaktioner'
         }${tally.mine ? ', din reaktion' : ''}`}
-        className="vm-reaction-tally inline-flex touch-none items-center gap-1 rounded-pill border border-border px-2 py-0.5 text-sm leading-none transition-[border-color,background-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] aria-pressed:border-accent"
+        className="vm-reaction-tally inline-flex touch-manipulation items-center gap-1 rounded-pill border border-border px-2 py-0.5 text-sm leading-none transition-[border-color,background-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] aria-pressed:border-accent"
       >
         <span aria-hidden="true">{tally.emoji}</span>
         {/* Antalet är den enda TEXTEN på brickan. Färgen är single-sourcad i
