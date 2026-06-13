@@ -252,8 +252,9 @@ npm run preview    # serve the built dist/ locally
   in both light and dark themes, run against the built `dist/` (the artifact that deploys) in
   fixtures mode, so E2E needs no secrets and is deterministic. First run needs Chromium:
   `npx playwright install chromium`.
-- **Green CI gates.** GitHub Actions runs build, test and lint on every pull request. Hosting
-  builds straight from the repo on Cloudflare Pages, so no deploy tokens live in the codebase.
+- **Green CI gates.** GitHub Actions runs build, test and lint on every pull request targeting
+  `develop`. Hosting builds straight from the repo on Cloudflare Pages, so no deploy tokens live
+  in the codebase.
 
 ---
 

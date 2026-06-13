@@ -42,8 +42,15 @@ test('group stage tables', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 1000 });
   await openApp(page, { theme: 'dark' });
   const topToggle = page.locator('[data-groups-toggle][data-groups-toggle-position="top"]');
-  if (await topToggle.count()) {
+  await topToggle.waitFor();
+  // Expandera BARA om sektionen är hopfälld (toggeln erbjuder "expand" då); klicka aldrig
+  // en redan utfälld sektion (det skulle fälla ihop den). Vänta tills expansionen satt sig
+  // (toggeln flippar till "collapse") innan skärmdumpen, så vi inte fångar den mitt i.
+  if ((await topToggle.getAttribute('data-groups-toggle')) === 'expand') {
     await topToggle.click();
+    await page
+      .locator('[data-groups-toggle][data-groups-toggle-position="top"][data-groups-toggle="collapse"]')
+      .waitFor();
   }
   const heading = page.getByRole('heading', { name: 'Gruppspelet', exact: true });
   await heading.scrollIntoViewIfNeeded();
