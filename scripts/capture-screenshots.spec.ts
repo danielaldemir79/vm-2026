@@ -49,7 +49,9 @@ test('group stage tables', async ({ page }) => {
   if ((await topToggle.getAttribute('data-groups-toggle')) === 'expand') {
     await topToggle.click();
     await page
-      .locator('[data-groups-toggle][data-groups-toggle-position="top"][data-groups-toggle="collapse"]')
+      .locator(
+        '[data-groups-toggle][data-groups-toggle-position="top"][data-groups-toggle="collapse"]'
+      )
       .waitFor();
   }
   const heading = page.getByRole('heading', { name: 'Gruppspelet', exact: true });
