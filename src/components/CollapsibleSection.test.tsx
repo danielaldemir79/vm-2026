@@ -1,7 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRef } from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { CollapsibleBody, CollapsibleSection } from './CollapsibleSection';
+
+/**
+ * jsdom kör inga CSS-transitioner och saknar TransitionEvent-konstruktorn, och
+ * fireEvent.transitionEnd:s `propertyName`-init når inte fram till Reacts syntetiska
+ * event. CollapsibleBody gatar sin "släpp höjd-taket"-logik på `propertyName ===
+ * 'max-height'` (transitionend bubblar från inre element), så vi måste sätta
+ * propertyName explicit på det skapade eventet för att testa den gaten ärligt.
+ */
+function fireTransitionEnd(node: Element, propertyName: string) {
+  const event = createEvent.transitionEnd(node);
+  Object.defineProperty(event, 'propertyName', { value: propertyName, configurable: true });
+  fireEvent(node, event);
+}
 
 /**
  * jsdom ger 0 för clientHeight/scrollHeight (ingen layout), så CollapsibleBody:s
@@ -327,6 +340,117 @@ describe('CollapsibleBody (innehålls-kompressorn sektionerna använder)', () =>
         1
       );
       restore();
+    });
+  });
+
+  // T75 (#155): UTFÄLLT FÅR ALDRIG ha ett höjd-tak som klipper/överlappar innehållet.
+  // Produktionsbugg på iPhone: utfällt cap:ades till 200rem under det FELAKTIGA antagandet
+  // "200rem överstiger alltid innehållet". På en lång sektion (12 grupp-kuponger i 1 kolumn
+  // + slutspelsträd > 3200px) spillde innehållet förbi taket och nästa flex-syskon (nedre
+  // "Visa färre") lade sig vid 200rem-gränsen och överlappade sista gruppens grupptvåa-
+  // väljare. Fix: utfällt slutar på maxHeight:'none'. jsdom har ingen layout (höjder = 0),
+  // så vi testar MEKANIKEN (state -> stil), inte pixelhöjd. En regression som återinför ett
+  // permanent 200rem-tak i utfällt läge ska göra dessa tester RÖDA.
+  describe('utfällt höjd-tak släpps till none (T75, #155)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    function renderBody(extraProps?: Partial<Parameters<typeof CollapsibleBody>[0]>) {
+      render(
+        <CollapsibleBody
+          name="group-predictions"
+          toggleLabels={{ expand: 'Visa alla grupper', collapse: 'Visa färre' }}
+          {...extraProps}
+        >
+          <p>Lång sektion som inte ryms inom 200rem.</p>
+        </CollapsibleBody>
+      );
+      return document.querySelector('[data-collapsible-body]') as HTMLElement;
+    }
+
+    it('utfällning: animerbart tak (200rem) först, sedan none när öppnings-transitionen är klar', () => {
+      const body = renderBody();
+      fireEvent.click(screen.getByRole('button', { name: /Visa alla grupper/i }));
+      // Under den mjuka öppningen står ett ANIMERBART tak (200rem) så CSS kan animera
+      // max-height; `none` kan inte animeras.
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      expect(body.style.maxHeight).toBe('200rem');
+      // Öppnings-transitionen klar (max-height) -> taket släpps HELT (obegränsat), så inget
+      // efterföljande syskon kan överlappa innehållet. DETTA är regressions-pinnen: ett
+      // permanent 200rem-tak (gamla buggen) skulle lämna kvar '200rem' här och faila.
+      fireTransitionEnd(body, 'max-height');
+      expect(body.style.maxHeight).toBe('none');
+    });
+
+    it('reduced-motion: taket släpps DIREKT till none (ingen körbar transition)', () => {
+      // Reduced-motion nollar transition-duration (index.css), så onTransitionEnd kan
+      // utebli; då måste taket släppas direkt i stället för att fastna på 200rem.
+      vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+        matches: query.includes('prefers-reduced-motion'),
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+      const body = renderBody();
+      fireEvent.click(screen.getByRole('button', { name: /Visa alla grupper/i }));
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      expect(body.style.maxHeight).toBe('none');
+    });
+
+    it('startExpanded: utfälld från start har inget tak (none), inget att animera fram', () => {
+      const body = renderBody({ startExpanded: true });
+      expect(body).toHaveAttribute('data-collapsed', 'false');
+      expect(body.style.maxHeight).toBe('none');
+    });
+
+    it('komprimerat behåller höjd-klippet + overflow-hidden (oförändrat)', () => {
+      const body = renderBody({ collapsedMaxHeight: '9rem' });
+      // Default komprimerat: klippt till toppen + overflow-hidden (gradient-fadens grund).
+      expect(body).toHaveAttribute('data-collapsed', 'true');
+      expect(body.style.maxHeight).toBe('9rem');
+      expect(body.className).toContain('overflow-hidden');
+    });
+
+    it('utfällt har ALDRIG overflow-hidden (inre sidled-scroll, t.ex. slutspelsträdet, klipps ej)', () => {
+      // Slutspelsträdet har en egen overflow-x-auto INUTI kroppen. Utfällt får därför inte
+      // sätta overflow-hidden på kroppen (skulle klippa sidled-scrollen). Gäller både före
+      // och efter att höjd-taket släppts till none.
+      const body = renderBody();
+      fireEvent.click(screen.getByRole('button', { name: /Visa alla grupper/i }));
+      expect(body.className).not.toContain('overflow-hidden');
+      fireTransitionEnd(body, 'max-height');
+      expect(body.className).not.toContain('overflow-hidden');
+    });
+
+    it('ihopfällning ÅTERARMAR taket: nästa utfällning animerar från 200rem igen, inte none', () => {
+      const body = renderBody();
+      // Fäll ut + släpp taket till none.
+      fireEvent.click(screen.getByRole('button', { name: /Visa alla grupper/i }));
+      fireTransitionEnd(body, 'max-height');
+      expect(body.style.maxHeight).toBe('none');
+      // Fäll ihop via den övre toggeln.
+      const [topCollapse] = screen.getAllByRole('button', { name: /Visa färre/i });
+      fireEvent.click(topCollapse);
+      expect(body).toHaveAttribute('data-collapsed', 'true');
+      // Fäll ut IGEN: taket ska vara åter-armat (200rem), inte kvar på none, så öppningen
+      // kan animera på nytt.
+      fireEvent.click(screen.getByRole('button', { name: /Visa alla grupper/i }));
+      expect(body.style.maxHeight).toBe('200rem');
+    });
+
+    it('bubblande transitionend från inre element släpper INTE taket (gatat på max-height)', () => {
+      const body = renderBody();
+      fireEvent.click(screen.getByRole('button', { name: /Visa alla grupper/i }));
+      expect(body.style.maxHeight).toBe('200rem');
+      // En annan property (t.ex. cue-pillrets transform/box-shadow) som bubblar upp får
+      // inte råka släppa höjd-taket i förtid.
+      fireTransitionEnd(body, 'transform');
+      expect(body.style.maxHeight).toBe('200rem');
     });
   });
 });
