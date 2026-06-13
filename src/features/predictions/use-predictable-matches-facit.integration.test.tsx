@@ -38,10 +38,11 @@ const MATCH_ID = 'g-A-1';
 // så g-A-1 är default-synlig (samma dag som avspark) , inget expandera behövs.
 const NOW_AFTER_KICKOFF = new Date('2026-06-11T21:30:00.000Z');
 
-/** Fixtures-läge: tom env -> getDataSource ger den verkliga matchplanen (g-A-1..). */
-function fixturesEnv(): ImportMetaEnv {
-  return {} as ImportMetaEnv;
-}
+// Fixtures-läge: tom env -> getDataSource ger den verkliga matchplanen (g-A-1..).
+// EN delad, STABIL referens (inte en ny {} per anrop): usePredictableData har [env]
+// som effekt-dep, så en ny env-referens vid rerender skulle trigga onödig omladdning
+// och göra realtids-testet mindre isolerat. En modul-konstant håller referensen stabil.
+const FIXTURES_ENV = {} as ImportMetaEnv;
 
 /** Facit-store som bär en uppsättning officiella resultat (T42-kontexten). */
 function officialStoreWith(results: OfficialMatchResult[]): OfficialResultsStore {
@@ -100,7 +101,7 @@ function renderTipsView(opts: {
   return render(
     <OfficialResultsStoreContext.Provider value={officialStoreWith(opts.official)}>
       <PredictionsStoreContext.Provider value={predictionsStore(opts.myPredictions ?? new Map())}>
-        <PredictionsView env={fixturesEnv()} now={opts.now ?? NOW_AFTER_KICKOFF} />
+        <PredictionsView env={FIXTURES_ENV} now={opts.now ?? NOW_AFTER_KICKOFF} />
         {opts.children}
       </PredictionsStoreContext.Provider>
     </OfficialResultsStoreContext.Provider>
@@ -196,7 +197,7 @@ describe('T76 (#158): tips-kortet väver in officiellt facit (facit + poäng ren
         <PredictionsStoreContext.Provider
           value={predictionsStore(new Map([[MATCH_ID, myPrediction(MATCH_ID, 1, 0)]]))}
         >
-          <PredictionsView env={fixturesEnv()} now={NOW_AFTER_KICKOFF} />
+          <PredictionsView env={FIXTURES_ENV} now={NOW_AFTER_KICKOFF} />
         </PredictionsStoreContext.Provider>
       </OfficialResultsStoreContext.Provider>
     );
