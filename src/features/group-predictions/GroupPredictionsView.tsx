@@ -33,6 +33,7 @@ import type { GroupId } from '../../domain/types';
 // deriveTippedGroupSuggestion (T65, #119) driver "Föreslå ur mina matchtips"-knappen:
 // den räknar gruppens 1:a/2:a ur MINA match-tips (samma deriveGroupTables-härledning).
 import { TipsBracketView, deriveTippedGroupSuggestion, type MatchTipScore } from '../simulation';
+import { useRegisterSection, SECTIONS } from '../section-nav';
 
 export interface GroupPredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -46,6 +47,9 @@ export function GroupPredictionsView({
   now = new Date(),
 }: GroupPredictionsViewProps) {
   const store = useGroupPredictionsStore();
+  // Anmäl sektionen till chip-navet (T78, #165). Vyn monteras bara i live-läge (skalet
+  // gatar på rooms.enabled), så "Grupp-tips"-chipet finns bara då.
+  useRegisterSection(SECTIONS.groupPredictions);
   // MINA match-tips (samma per-rum-store som tips-vyn, hoistad i App sedan T64). De
   // driver "Föreslå ur mina matchtips"-knappen: ur dem räknas gruppens 1:a/2:a.
   const matchStore = usePredictionsStore();

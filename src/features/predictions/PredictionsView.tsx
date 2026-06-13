@@ -24,6 +24,7 @@ import { usePredictableData } from './use-predictable-matches';
 import { selectPredictableMatches } from './predictable-matches';
 import { PredictionForm } from './PredictionForm';
 import { useDeadlineTick } from './use-deadline-tick';
+import { useRegisterSection, SECTIONS } from '../section-nav';
 
 export interface PredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -39,6 +40,10 @@ export interface PredictionsViewProps {
 // läsbart, ingen konsument behöver gissa att undefined "blir" nuet/env.
 export function PredictionsView({ env = import.meta.env, now = new Date() }: PredictionsViewProps) {
   const store = usePredictionsStore();
+  // Anmäl sektionen till chip-navet (T78, #165). Vyn monteras bara i live-läge (dess skal
+  // PredictionSection gatar på rooms.enabled), så "Match-tips"-chipet finns bara då, aldrig
+  // ett dött chip i fixtures-läge.
+  useRegisterSection(SECTIONS.predictions);
   const { status, matches, teams, error } = usePredictableData(env);
 
   // Deadline-medveten re-render: låst-statusen (now >= kickoff) räknas om varje

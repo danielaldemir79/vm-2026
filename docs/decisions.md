@@ -5,6 +5,74 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T78 (#165): sticky sektions-nav (chip-rad) med självregistrerande sektioner
+
+**Daniels val (#165):** en smal, sticky chip-rad direkt under appens befintliga header som hoppar till
+varje sektion på den långa en-sides-appen (PWA på mobil först). Återkommande krav: den får INTE bli rörig,
+hålls lean och diskret.
+
+**Beslut: chips speglar ett REGISTER, inte en hårdkodad lista , döda chips omöjliga by-construction.**
+En `SectionNavProvider` håller ett register; varje sektion anropar `useRegisterSection(SECTIONS.x)` DÄR den
+faktiskt renderar innehåll (i VYN, inte i det live-gatade skalet), och avregistrerar vid unmount. Navet
+renderar chips ur registret sorterat på `order`. **Varför register, inte DOM-scan eller statisk lista:**
+flera sektioner returnerar `null` i fixtures-/icke-live-läge (de fyra tips-/toppliste-sektionerna gatas på
+`rooms.enabled` i sina skal; tracker-vyerna daily/grupper/vad krävs/slutspel renderar alltid). En sektion
+som returnerar null monterar aldrig sin vy, så `useRegisterSection` körs aldrig, så inget chip kan peka på
+en sektion som inte finns i DOM:en. Registret gör det till en KONSTRUKTIONS-garanti i stället för en koll
+som kan glömmas. `useRegisterSection` är TOLERANT mot saknad provider (no-op), samma mönster som
+`useRoomsSync`, så vy-tester i isolation inte kräver providern.
+
+**Beslut: scroll-offset MÄTS robust, ingen magisk pixel.** Två sticky-band stackas (header sticky top-0
+z-10; navet sticky med `top` = headerns uppmätta höjd, z-[9] under headern så de aldrig överlappar).
+`SectionNav` mäter header- + nav-höjden (getBoundingClientRect + ResizeObserver) och skriver
+`--vm-section-nav-offset` (+ `--vm-section-nav-header-top`) på `<html>`. CSS sätter
+`scroll-margin-top: calc(var(--vm-section-nav-offset) + 8px)` på de åtta navigerbara sektionerna (via deras
+BEFINTLIGA rubrik-id:n, T78 lägger inte till nya id:n), så ett chip-klicks `scrollIntoView({block:'start'})`
+landar rubriken precis under raden oavsett bandens faktiska höjd (varierar med skärm/typsnitt/tema).
+
+**Beslut: scroll-spy via IntersectionObserver, aktiv = aria-current.** `useSectionSpy` observerar
+sektionerna med `rootMargin` som drar zonens topp under banden (samma uppmätta offset), markerar den nedersta
+sektion vars topp passerat raden (aria-current="true" + data-active för designern). reduced-motion: `scrollTo`
+hoppar direkt (`behavior:'auto'`) via den delade `useReducedMotion` (motion/react), annars `'smooth'` , WCAG
+2.3.3.
+
+**Beslut: rums- och admin-sektionerna hålls UTANFÖR raden** (hjälp-/arrangörsytor), per Daniels lean-krav,
+så de saknar både katalog-post i `SECTIONS` och registrerings-anrop. Etiketter korta: Idag, Grupper, Vad
+krävs, Slutspel, Match-tips, Grupp-tips, Mästare, Topplista. Tom rad (inga registrerade) -> hela navet
+renderar `null` (ingen tom sticky-list). Funktionell + tillgänglig kärna byggd här; design-frontend stylar
+mot `data-section-nav` / `data-section-chip` / `aria-current` / `--vm-section-nav-offset`.
+
+**Beslut (C4, prestanda, Copilot-runda-2): contexten DELAS på frekvens, kanoniskt React-mönster.**
+Scroll-spy:n byter `activeId` ofta vid scroll. När register/unregister OCH sections/activeId låg i SAMMA
+context-värde bytte det värdet identitet vid VARJE activeId-uppdatering, så alla 8 sektions-vyer (som via
+`useRegisterSection` bara behöver register/unregister) re-renderades vid varje aktiv-sektion-byte , onödig
+scroll-jank på tunga mobil-vyer (gruppspelstabeller, slutspelsträd). Lösningen är context-splitting på
+frekvens: `SectionNavActionsContext` = `{register, unregister}` (STABIL identitet efter mount, memo:as på de
+useCallback-stabila callbacksen) som ENBART `useRegisterSection` konsumerar, och `SectionNavStateContext` =
+`{sections, activeId, scrollTo}` (byter vid sections/activeId) som ENBART `SectionNav` konsumerar. Därmed
+re-renderas sektions-vyerna inte längre av ett activeId-byte (bevisat med render-räknar-test:
+`section-nav-perf.test.tsx`), bara navet uppdaterar sitt aktiva chip. `setActiveId` exponeras inte längre via
+context (wiras direkt in i `useSectionSpy` i providern). Actions-hooken är fortsatt TOLERANT (no-op utan
+provider), state-hooken fail-loud (kastar utan provider). Källa: React-dokumentationens rekommendation att
+dela context när olika delar uppdateras i olika takt (Context + Reducer / "Scaling Up with Reducer and
+Context"), och det etablerade rooms-context/RoomsProvider-mönstret i detta repo.
+
+**Beslut (C1, Copilot-runda-1): `getBoundingClientRect` korrekt för sticky-element, inte `offsetTop`/`offsetParent`.**
+`offsetTop`/`offsetParent` traverserar layoutträdet och missar att ett sticky-element befinner sig
+i ett eget stacking-kontext vid scroll, vilket ger fel offset i Firefox och Safari. `getBoundingClientRect`
+mäter den faktiska renderade positionen mot viewporten och är korrekt för sticky-stacking på alla browsers.
+Alltid använda `getBoundingClientRect` vid mätning av sticky-band som ska offseta scroll-mål.
+
+**Beslut (C5, Copilot-runda-3): CSS-variabler rensas vid providerns unmount.**
+`--vm-section-nav-offset` och `--vm-section-nav-header-top` skrivs pa `<html>` av `SectionNavProvider`.
+Om providern unmountas (t.ex. via React.StrictMode dubbelmount eller framtida dynamisk routing) maste
+CSS-variablerna rensas (sättas till '' via `document.documentElement.style.removeProperty`) i cleanup-
+funktionen av den useEffect som skriver dem, annars lever de stale-värdena kvar och skjuter
+scroll-margin-top fel pa sektionerna. Rensningen bevisad negativt: utan den failar ett test som kontrollerar
+att variablerna är tomma efter unmount.
+
+---
+
 ## 2026-06-13 , T77 (#161): per-match kommentar-trådar HOPFÄLLDA på matchkortet
 
 **Daniels val (#161, gissas inte):** per-match kommentarer, men HOPFÄLLDA så kortet inte blir rörigt.
