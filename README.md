@@ -238,8 +238,9 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Format check | `npm run format:check` |
 
-- **1874 passing tests** across 191 test files (Vitest), with 49 tests skipped by design
-  (the live Supabase RLS integration tests, see below). Verified by running `npm test`.
+- **1867 passing tests** across 191 test files (Vitest) on a fresh clone, with 56 tests
+  skipped by design (the live Supabase RLS integration tests, which only run when Supabase
+  env is configured, see below). Verified by running `npm test`.
 - **Security proven, not assumed.** The Row Level Security model (only the admin can write
   official results; only room members can read a room; nobody can forge another user's data)
   is proven with real anonymous Supabase sessions in `*-rls.integration.test.ts`. These tests
