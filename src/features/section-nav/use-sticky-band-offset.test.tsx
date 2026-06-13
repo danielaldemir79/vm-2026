@@ -165,4 +165,35 @@ describe('useStickyBandOffset, delad mellan chip-raden och mobil-menyn', () => {
     expect(readHeaderTop()).toBe('');
     expect(readOffset()).toBe('');
   });
+
+  // C5 (Copilot #168): hooken körs från BÅDA banden och cleanup rensade tidigare ALLTID de
+  // globala CSS-variablerna. Då kunde ena instansens cleanup (unmount av ett band) nolla
+  // variablerna trots att det ANDRA bandet fortfarande finns -> glapp tills nästa mätning.
+  // Fixen rensar bara när INGET [data-section-nav]-band finns kvar i DOM (querySelectorAll-koll).
+  it('BEHÅLLER CSS-variablerna när ENA bandet unmount:as men det andra lever kvar', () => {
+    // Chip-bandet är det synliga och lever HELA testet; mobil-bandet monteras/avmonteras.
+    mockRects({ visibleSelector: 'chip' });
+    function Harness({ showMobile }: { showMobile: boolean }) {
+      return (
+        <>
+          <header data-app-header="">App-header</header>
+          <SectionNavProvider>
+            <SectionNav />
+            {showMobile ? <SectionNavMobile /> : null}
+            <FakeSection />
+          </SectionNavProvider>
+        </>
+      );
+    }
+    const { rerender } = render(<Harness showMobile />);
+    const offset = `${APP_HEADER_HEIGHT + VISIBLE_BAND_HEIGHT}px`;
+    expect(readOffset()).toBe(offset);
+
+    // Avmontera ENBART mobil-bandet. Chip-bandet (data-section-nav) finns kvar i DOM, så vid
+    // mobil-bandets cleanup är querySelectorAll('[data-section-nav]').length >= 1 -> variablerna
+    // ska BEVARAS. Utan C5-guarden (alltid removeProperty) skulle de nollas här -> testet rödnar.
+    act(() => rerender(<Harness showMobile={false} />));
+    expect(readHeaderTop()).toBe(`${APP_HEADER_HEIGHT}px`);
+    expect(readOffset()).toBe(offset);
+  });
 });

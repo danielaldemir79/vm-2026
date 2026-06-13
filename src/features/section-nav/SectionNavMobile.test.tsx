@@ -305,3 +305,29 @@ describe('SectionNavMobile, ikon-skifte-staten (hamburgare <-> kryss)', () => {
     expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
 });
+
+// C1 + C2 (Copilot #168): section-nav.css stylar mobil-menyns element via KLASS-selektorer
+// (.vm-section-menu-button/-icon/-label/-panel/-item), inte via data-attributen. Tidigare bar
+// <svg> (ikonen) och <span> (etiketten) BARA sina data-attribut, inte klassen, så CSS:en (ikon-
+// skiftets overflow/transform-box, etikettens ellips-trunkering) uteblev. data-attributen är
+// rena BETEENDE-/test-krokar; KLASSEN är styling-kontraktet. Detta test vaktar att varje element
+// faktiskt BÄR sin matchande klass, så regressionen (klass borttappad -> styling uteblir) fångas.
+describe('SectionNavMobile, CSS-klass-kontrakt (styling-krokarna matchar section-nav.css)', () => {
+  it('varje mobil-meny-element bär sin matchande .vm-section-menu-*-klass', () => {
+    renderMenu(<FakeSection section={SECTIONS.daily} />);
+    const btn = menuButton();
+    // Knapp + ikon + etikett finns i STÄNGT läge.
+    expect(btn).toHaveClass('vm-section-menu-button');
+    const icon = document.querySelector('[data-section-menu-icon]') as HTMLElement;
+    expect(icon).toHaveClass('vm-section-menu-icon'); // C1
+    const label = document.querySelector('[data-section-menu-label]') as HTMLElement;
+    expect(label).toHaveClass('vm-section-menu-label'); // C2
+
+    // Panel + rader finns först i ÖPPET läge.
+    act(() => btn.click());
+    const panel = document.querySelector('[data-section-menu-panel]') as HTMLElement;
+    expect(panel).toHaveClass('vm-section-menu-panel');
+    const item = within(panel).getByRole('button', { name: 'Idag' });
+    expect(item).toHaveClass('vm-section-menu-item');
+  });
+});

@@ -23,9 +23,11 @@
 // innehåll ändras (deps i anroparen, t.ex. chip-antal). ResizeObserver fångar bandens
 // höjdändring utan scroll-polling; faller till window 'resize' i äldre miljöer (jsdom).
 //
-// RENSAR CSS-variablerna vid unmount (C5 från T78): de bor på <html>, inte på bandet, så de
-// nollställs aldrig av sig själva. Cleanup tar bort dem. Med ett band kvar (det andra
-// banden) sätts de om direkt av det bandets effekt i samma tick, så ingen synlig glapp.
+// RENSAR CSS-variablerna när SISTA bandet försvinner (C5 från T78, härdad i T79 C4-C5): de bor
+// på <html>, inte på bandet, så de nollställs aldrig av sig själva. Eftersom BÅDA banden delar
+// hook + variabler får cleanup rensa BARA när inget [data-section-nav]-band finns kvar i DOM
+// (querySelectorAll-räkning). Annars skulle ena bandets cleanup (recompute/unmount) nolla
+// variablerna trots att det andra bandet lever -> glapp tills nästa mätning.
 
 import { useEffect, type RefObject } from 'react';
 
@@ -98,10 +100,17 @@ export function useStickyBandOffset(
     return () => {
       ro?.disconnect();
       window.removeEventListener('resize', measure);
-      // Rensa de globala CSS-variablerna (C5). Med två band kvar sätter det andra bandets
-      // effekt om dem i samma tick; vid unmount/0-band tas de bort och blir inte stale.
-      document.documentElement.style.removeProperty(HEADER_TOP_VAR);
-      document.documentElement.style.removeProperty(OFFSET_VAR);
+      // Rensa de globala CSS-variablerna BARA när INGET [data-section-nav]-band finns kvar i DOM.
+      // T79 införde TVÅ band (desktop chip-rad + mobil hamburgare-band) som DELAR denna hook och
+      // de globala variablerna. Rensade vi alltid (som tidigare) skulle ena instansens cleanup
+      // (vid recompute eller unmount) nolla variablerna trots att det ANDRA bandet fortfarande
+      // finns -> glapp/skört, scroll-margin + spy-zon tappar sin offset tills nästa mätning.
+      // Vid recompute/unmount av ENA bandet finns det andra kvar (length >= 1) -> behåll. När
+      // SISTA bandet försvinner (0 kvar) tas variablerna bort så de inte blir stale (C5, #168).
+      if (document.querySelectorAll('[data-section-nav]').length === 0) {
+        document.documentElement.style.removeProperty(HEADER_TOP_VAR);
+        document.documentElement.style.removeProperty(OFFSET_VAR);
+      }
     };
   }, [bandRef, recomputeKey]);
 }
