@@ -5,6 +5,45 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T76 (#158): tips-INMATNINGSkortet väver in officiellt facit (poäng + facit syns)
+
+**Bakgrund (produktionsbugg, Daniel-rapporterad, verifierad mot live-DB):** på tips-korten
+("Tippa matcherna") syntes varken poäng (T58) eller facit (T73) trots att officiella resultat var
+inmatade. Rotorsak: `usePredictableData` (tips-vyns underlag) laddade BARA den statiska matchplanen
+(`ds.getMatches()`), som alltid är `status: 'scheduled'` (`result: null`). Poäng-raden OCH facit-raden
+i `PredictionForm` är båda gatade på `isFinished(match)`, så de renderades ALDRIG i verkligheten,
+trots gröna isolerade tester (de matade in en `finished`-FIXTUR direkt, live-vägen gav aldrig en
+finished match , samma blinda fläck som lessons "mock-foljer-konsumenttyp" + "handoff-pastar-ett-krav-
+levererat-men-koden-wirar-aldrig-in-ytan").
+
+**Beslut:** tips-vyns matcher väver nu in det GLOBALA officiella facit på SAMMA seam som topplistan
+och live-trackern redan använder: `useOfficialResultsSync().officialResults` (T42, OfficialResults-
+Provider) + den rena `applyRoomResults(base, officialResults)` (från `features/results`). Vävningen
+sker i `usePredictableData` via `useMemo` ovanpå en separat bevarad bas (idempotent, ett ändrat/
+borttaget resultat backar korrekt), exakt som `useLeaderboardData` och `ResultsProvider` gör.
+**Varför just så (EN sanning):** `OfficialMatchResult` är strukturellt identisk med `RoomMatchResult`
+och matas redan in i `applyRoomResults` av topplistan, så ingen ny hämtning och ingen parallell
+omräkning införs , facit + poäng på tips-kortet räknas mot exakt samma källa som topplistan och
+trackern. Realtid är gratis: T42-providern prenumererar på `official_match_results` och kör en refresh
+vid admin-inmatning, så `officialResults` får en ny referens -> memon väver om -> kortet uppdateras
+utan omladdning (ingen ny prenumeration). `useOfficialResultsSync` är tolerant mot saknad provider
+(tomt facit), så isolerade tester och fixtures-läge är oförändrade.
+
+**Pinnen mot buggen:** ett LIVE-invävt test (`use-predictable-matches-facit.integration.test.tsx`)
+kör den RIKTIGA `usePredictableData` (EJ mockad) genom hela vävnings-seamen: verklig matchplan
+(fixtures, g-A-1) + ett verkligt officiellt resultat ur OfficialResults-kontexten, och bevisar att
+kortet då renderar facit + poäng. "finished" kommer ENBART ur vävningen (ingen finished-fixtur), så
+en bortkopplad väv failar rött (verifierat: utan vävningen failar 3 av 4, REGRESSION-fallet kvarstår
+grönt).
+
+**UX (tip vs facit):** de stora siffer-rutorna är användarens TIPS men lästes lätt som slutresultatet.
+Ett LÅST kort med ett eget tips får nu en omisskännlig "Ditt tips"-etikett (`data-prediction-tip-label`)
+direkt vid rutorna; facit-brickan har sin "Facit"-etikett. Funktionell struktur + rena hakar levereras
+här; design-frontend äger den slutliga visuella hierarkin (storlek/placering/mobil, balans tips vs facit).
+
+**GruppPredictions-vyn:** har INTE samma lucka , den tippar grupp-1:a/2:a och visar ett tips-härlett
+(simulerat) slutspelsträd, inte facit per match, så ingen isFinished-gatad facit-/poäng-yta att väva in.
+
 ## 2026-06-13 , T75 (#155): utfällt läge släpper höjd-taket till none (mobil-överlapp-fix)
 
 **Bakgrund (produktionsbugg, bekräftad i skärmdumpar på iPhone OCH Samsung):** den delade
