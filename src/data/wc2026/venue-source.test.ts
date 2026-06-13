@@ -21,18 +21,21 @@ import { WC2026_TEAMS } from './teams';
 import { isVenuePlaceholder } from '../../features/daily/match-display';
 
 // ============================================================================
-// KÄLLÅNKRING + KORSKOLL av VM 2026:s arenor/städer per match (T4c, #35, SPEC §5/§8).
+// KÄLLÅNKRING + KORSKOLL av VM 2026:s arenor/städer/land per match (T4c #35 + T4d #147,
+// SPEC §5/§8).
 //
 // TV-tablån (T4b) bar tid + kanal men INTE arena, så matches.ts hade en uttrycklig
 // "ej verifierad"-platshållare per match. T4c fyller arenan + värdstaden per match ur
 // FIFA:s spelschema (16 arenor i USA/Mexiko/Kanada), korskollad mot en andra oberoende
-// källa. Två kontroller gör datan trovärdig och spårbar (samma mönster som T4b/T10):
+// källa. T4d (#147) lägger till VÄRDLANDET, så venue blir "Arena, Stad, Land" (svenskt
+// landsnamn). Två kontroller gör datan trovärdig och spårbar (samma mönster som T4b/T10):
 //   1. KÄLLÅNKRING: regenerera matches.ts ur de committade källorna (tablå + arena) och
-//      kräv VÄRDE-likhet (fail loud vid minsta skillnad). Mutationstestet bevisar att
-//      låset fångar en bytt arena.
+//      kräv VÄRDE-likhet (fail loud vid minsta skillnad). Mutationstesterna bevisar att
+//      låset fångar en bytt arena OCH ett bytt värdland.
 //   2. KORSKOLL/INTEGRITET: exakt 104 arena-rader joinade på match-id, exakt 16 distinkta
-//      arenor (FIFA), inga platshållare kvar, de SPELADE matchernas arenor stämmer mot
-//      matchrapporterna (historiskt fakta), och datan är diakrit-/em-dash-ren.
+//      arenor (FIFA) fördelade 3/2/11 på Mexiko/Kanada/USA, inga platshållare kvar, de
+//      SPELADE matchernas arenor stämmer mot matchrapporterna (historiskt fakta), och
+//      datan är diakrit-/em-dash-ren.
 //
 // KÄLLOR (gissas ALDRIG): se preambeln i venue-source.txt. PRIMÄR = FIFA:s spelschema
 // (Wikipedia "2026 FIFA World Cup" + Al Jazeera per-match + Wikipedia knockout). KORSKOLL
@@ -85,12 +88,27 @@ describe('Arenor: MUTATIONSTEST (beviset att låset fångar en bytt arena)', () 
     // BARA arenan, inget annat, och bara på EN rad (g-A-1 är enda raden med just den
     // sträng-kombinationen, g-A-6 har samma arena men annan match-etikett).
     const mutated = venueSource.replace(
-      'g-A-1 | venue=Estadio Azteca, Mexico City',
-      'g-A-1 | venue=BMO Field, Toronto'
+      'g-A-1 | venue=Estadio Azteca, Mexico City, Mexiko',
+      'g-A-1 | venue=BMO Field, Toronto, Kanada'
     );
     expect(mutated).not.toBe(venueSource); // mutationen tog effekt
     const regenerated = buildMatchesFile(scheduleSource, groupOf, venueLookup(mutated));
     expect(normalizeEol(regenerated)).not.toBe(normalizeEol(committedMatches));
+  });
+
+  it('en LAND-mutation (fel värdland) gör matchplanen skild från den committade (T4d #147)', () => {
+    // T4d-specifikt: byt BARA landet på g-A-1 (Estadio Azteca ligger i Mexiko, inte USA).
+    // Bevisar att låset fångar ett fel värdland, inte bara en fel arena. Den muterade
+    // strängen är inte en av KNOWN_VENUES, så parsern fail-loud:ar redan vid bygget; vi
+    // asserterar att regenereringen KASTAR (felaktigt land slinker aldrig igenom tyst).
+    const mutated = venueSource.replace(
+      'g-A-1 | venue=Estadio Azteca, Mexico City, Mexiko',
+      'g-A-1 | venue=Estadio Azteca, Mexico City, USA'
+    );
+    expect(mutated).not.toBe(venueSource); // mutationen tog effekt
+    expect(() => buildMatchesFile(scheduleSource, groupOf, venueLookup(mutated))).toThrow(
+      /[Oo]känd arena/
+    );
   });
 
   it('utan arena-källa (ingen injektion) faller alla matcher tillbaka till platshållaren', () => {
@@ -124,12 +142,45 @@ describe('Arenor: integritet i den committade matches.ts', () => {
     expect(distinct.size).toBe(EXPECTED_VENUE_COUNT);
   });
 
-  it('arena-strängen har formen "Arena, Stad" (komma + mellanslag, ingen tom del)', () => {
+  it('de 16 arenorna fördelas på värdländerna: 3 Mexiko, 2 Kanada, 11 USA (T4d #147)', () => {
+    // T4d (#147): VM 2026 har tre värdländer. Räknar DISTINKTA arenor per land (inte
+    // matcher), så fördelningen ska vara exakt 3 (Mexiko) + 2 (Kanada) + 11 (USA) = 16.
+    // Källa: FIFA:s värdstäder-lista (Wikipedia "2026 FIFA World Cup"), se decisions.md T4d.
+    // En felmappad arena (t.ex. en mexikansk arena märkt USA) skulle rubba fördelningen.
+    const arenasByCountry = new Map<string, Set<string>>();
+    for (const venue of new Set(WC2026_MATCHES.map((m) => m.venue))) {
+      const land = venue.split(', ').at(-1) ?? '';
+      const set = arenasByCountry.get(land) ?? new Set<string>();
+      set.add(venue);
+      arenasByCountry.set(land, set);
+    }
+    expect(arenasByCountry.get('Mexiko')?.size, 'Mexiko-arenor').toBe(3);
+    expect(arenasByCountry.get('Kanada')?.size, 'Kanada-arenor').toBe(2);
+    expect(arenasByCountry.get('USA')?.size, 'USA-arenor').toBe(11);
+    // Inga andra länder än de tre värdländerna.
+    expect([...arenasByCountry.keys()].sort()).toEqual(['Kanada', 'Mexiko', 'USA']);
+  });
+
+  it('arena-strängen har formen "Arena, Stad, Land" (komma + mellanslag, ingen tom del)', () => {
+    // T4d (#147): venue blev "Arena, Stad, Land" (landet tillagt). Komma + mellanslag
+    // mellan alla tre delar, ingen del tom. Arenanamn kan självt INTE innehålla ", "
+    // (alla 16 KNOWN_VENUES är "Arena, Stad, Land"-trippler), så split(', ') ger exakt 3.
     for (const m of WC2026_MATCHES) {
       const parts = m.venue.split(', ');
-      expect(parts.length, `${m.id}: ${m.venue}`).toBe(2);
+      expect(parts.length, `${m.id}: ${m.venue}`).toBe(3);
       expect(parts[0].trim().length, `${m.id} arena-del`).toBeGreaterThan(0);
       expect(parts[1].trim().length, `${m.id} stad-del`).toBeGreaterThan(0);
+      expect(parts[2].trim().length, `${m.id} land-del`).toBeGreaterThan(0);
+    }
+  });
+
+  it('varje arena-venue slutar med ett av de tre svenska värdländerna (Mexiko/USA/Kanada)', () => {
+    // T4d (#147): VM 2026 spelas i exakt tre värdländer. Landet är sista delen i venue-
+    // strängen och skrivs på SVENSKA (appens språk). Gissa-aldrig: bara dessa tre tillåts.
+    const HOST_COUNTRIES = new Set(['Mexiko', 'USA', 'Kanada']);
+    for (const m of WC2026_MATCHES) {
+      const land = m.venue.split(', ').at(-1);
+      expect(HOST_COUNTRIES.has(land ?? ''), `${m.id}: ${m.venue}`).toBe(true);
     }
   });
 
@@ -150,11 +201,12 @@ describe('Arenor: SPELADE matcher (11-12 juni) stämmer mot matchrapporterna (hi
   // deras arenor är HISTORISKT fakta, extra lätt att korskolla mot matchrapporter.
   // Pinnar de verifierade arenorna explicit (källa: ESPN/CNN/Sky Sports/Outlook +
   // Lumen Fields egen event-sida + Seattle Sounders, se venue-source.txt + decisions T4c).
+  // Venue-strängen är "Arena, Stad, Land" sedan T4d (#147); land pinnas explicit här.
   const cases: ReadonlyArray<[string, string]> = [
-    ['g-A-1', 'Estadio Azteca, Mexico City'], // Mexiko 2-0 Sydafrika, öppningsmatchen
-    ['g-A-2', 'Estadio Akron, Zapopan'], // Sydkorea 2-1 Tjeckien
-    ['g-B-1', 'BMO Field, Toronto'], // Kanada vs Bosnien (Kanadas öppning, 12 juni)
-    ['g-D-1', 'SoFi Stadium, Inglewood'], // USA vs Paraguay (USA:s öppning, 12 juni)
+    ['g-A-1', 'Estadio Azteca, Mexico City, Mexiko'], // Mexiko 2-0 Sydafrika, öppningsmatchen
+    ['g-A-2', 'Estadio Akron, Zapopan, Mexiko'], // Sydkorea 2-1 Tjeckien
+    ['g-B-1', 'BMO Field, Toronto, Kanada'], // Kanada vs Bosnien (Kanadas öppning, 12 juni)
+    ['g-D-1', 'SoFi Stadium, Inglewood, USA'], // USA vs Paraguay (USA:s öppning, 12 juni)
   ];
 
   it.each(cases)('%s spelades på %s', (id, expectedVenue) => {
@@ -168,7 +220,7 @@ describe('Arenor: SPELADE matcher (11-12 juni) stämmer mot matchrapporterna (hi
     // Seattle Sounders, ESPN, MLSSoccer) säger Lumen Field, Seattle. Vald: Seattle.
     // Detta test pinnar att vi INTE tyst valde outliern. Se decisions.md (T4c).
     const belEgy = WC2026_MATCHES.find((m) => m.id === 'g-G-1');
-    expect(belEgy!.venue).toBe('Lumen Field, Seattle');
+    expect(belEgy!.venue).toBe('Lumen Field, Seattle, USA');
   });
 
   it('den mest använda arenan är AT&T Stadium med 9 matcher (FIFA: flest av alla venues)', () => {
@@ -181,7 +233,7 @@ describe('Arenor: SPELADE matcher (11-12 juni) stämmer mot matchrapporterna (hi
     }
     const max = Math.max(...counts.values());
     expect(max).toBe(9);
-    expect(counts.get('AT&T Stadium, Arlington')).toBe(9);
+    expect(counts.get('AT&T Stadium, Arlington, USA')).toBe(9);
   });
 });
 
@@ -191,13 +243,15 @@ describe('Arenor: parsern är strikt (fail loud på trasig rad/join)', () => {
   });
 
   it('avvisar ett ogiltigt match-id-format', () => {
-    expect(() => parseVenueRow('grupp-A-1 | venue=Estadio Azteca, Mexico City')).toThrow(
+    expect(() => parseVenueRow('grupp-A-1 | venue=Estadio Azteca, Mexico City, Mexiko')).toThrow(
       /match-id/
     );
   });
 
   it('avvisar en okänd arena (gissad/feltranskriberad arena ska inte slinka igenom)', () => {
-    expect(() => parseVenueRow('g-A-1 | venue=Camp Nou, Barcelona')).toThrow(/[Oo]känd arena/);
+    expect(() => parseVenueRow('g-A-1 | venue=Camp Nou, Barcelona, Spanien')).toThrow(
+      /[Oo]känd arena/
+    );
   });
 
   it('parseVenues kastar om start-markören saknas (trasig källa ger inte tyst noll rader)', () => {
@@ -224,7 +278,7 @@ describe('Arenor: parsern är strikt (fail loud på trasig rad/join)', () => {
     // En arena-rad vars id saknas i matchplanen (här g-A-7, som inte finns, en grupp
     // har bara 6 matcher) ska BRYTA bygget, inte tyst joinas bort. Posten konstrueras
     // direkt (förbi parsern) eftersom buildVenueTable är grinden som vaktar join:en.
-    const orphan = [{ matchId: 'g-A-7', venue: 'BMO Field, Toronto' }];
+    const orphan = [{ matchId: 'g-A-7', venue: 'BMO Field, Toronto, Kanada' }];
     expect(() => buildVenueTable(orphan, MATCH_IDS)).toThrow(/okänt match-id/);
   });
 });
