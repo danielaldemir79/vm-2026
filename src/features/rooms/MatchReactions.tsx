@@ -14,11 +14,25 @@
 // A11y: väljaren är en utfällbar grupp med riktiga <button>:ar; varje bricka/knapp har
 // ett tydligt aria-label ("Reagera med eld, 2 reaktioner, din reaktion"). aria-pressed
 // bär "min" status FÄRG-OBEROENDE (skärmläsare hör vald/ej vald utan att se markeringen).
+//
+// SE VILKA SOM REAGERAT (T74, #157): varje BRICKA är också en trigger för en popover
+// som listar VILKA (namn) som valt emojin + NÄR. Tre vägar att öppna den (touch + desktop
+// + tangentbord):
+//   - TOUCH: LÅNGTRYCK (håll ~500 ms, use-long-press) -> popover; SLÄPP -> dölj. Tröskeln
+//     skiljer ett långtryck från ett tap (som togglar reaktionen), och vi sväljer click:et
+//     som följer ett långtryck så håll-gesten inte OCKSÅ togglar (suppressNextClick).
+//   - DESKTOP: HOVER (pointerenter/leave) visar/döljer popovern.
+//   - TANGENTBORD: FOCUS (focus/blur) visar/döljer den, så den når utan touch eller mus.
+// Popovern placeras OVANFÖR brickan (fingret skymmer den inte) och klampas inom viewporten
+// (ReactionAuthorsPopover). Triggern pekar på popovern via aria-describedby (skärmläsare).
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { REACTION_EMOJIS, type ReactionEmoji } from '../../data/rooms';
 import { useReactionsStore } from './reactions-context';
-import { summaryForMatch } from './reaction-aggregate';
+import { summaryForMatch, type ReactionTally } from './reaction-aggregate';
+import { resolveReactionAuthors } from './reaction-authors';
+import { useLongPress } from './use-long-press';
+import { ReactionAuthorsPopover } from './ReactionAuthorsPopover';
 
 // Svenska namn på emojierna för skärmläsare (aria-label), så de inte läses som råa
 // kodpunkter. Speglar betydelserna i migrationen/decisions.md (T24).
@@ -36,6 +50,106 @@ const EMOJI_LABEL: Record<ReactionEmoji, string> = {
 export interface MatchReactionsProps {
   /** Matchen reaktions-raden gäller (match-id ur planen). */
   matchId: string;
+}
+
+interface ReactionTallyButtonProps {
+  /** Aggregatet för EN emoji (emoji, antal, min, reagerarna). */
+  tally: ReactionTally;
+  /** userId -> displayName (ur rummets medlemmar), för popoverns namn. */
+  nameByUser: ReadonlyMap<string, string>;
+  /** Mitt user_id (för "(du)"-markering i popovern). */
+  myUserId: string | null;
+  /** Toggla reaktionen (min -> avmarkera, annars byt till den). */
+  onToggle: (emoji: ReactionEmoji) => void;
+}
+
+/**
+ * EN reaktions-bricka (emoji + antal) som OCKSÅ är trigger för "vem reagerade"-popovern.
+ *
+ * VARFÖR egen komponent: varje bricka behöver sitt EGET ankar-ref, sin egen long-press-
+ * timer och sin egen öppen/stängd-status. Att hålla det per bricka (i stället för en
+ * delad karta i MatchReactions) gör varje bricka självständig och hooken (useLongPress)
+ * anropas på toppnivå i en komponent (regler), en per bricka.
+ *
+ * INTERAKTION (T74): klick togglar reaktionen (om det inte var ett långtryck, då sväljs
+ * click:et). Långtryck/hover/focus öppnar popovern; släpp/leave/blur stänger den.
+ */
+function ReactionTallyButton({ tally, nameByUser, myUserId, onToggle }: ReactionTallyButtonProps) {
+  const popoverId = useId();
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+  // Öppen via touch (långtryck) ELLER via hover/focus (desktop/tangentbord). Två källor
+  // sammanvägs: popovern visas om NÅGON av dem är aktiv.
+  const [hoverFocusOpen, setHoverFocusOpen] = useState(false);
+
+  // Långtryck-vägen (touch): popovern visas medan longPress.active. Ingen onLongPress-
+  // callback behövs, vi läser `active` direkt (en sanning för touch-synligheten).
+  const longPress = useLongPress({});
+
+  const open = longPress.active || hoverFocusOpen;
+
+  const handleClick = () => {
+    // Svälj click:et som följer ETT långtryck (annars hade håll-gesten också togglat
+    // reaktionen). shouldSuppressClick läser SYNKRONT (ref): ett pointerup + det click
+    // som följer i samma React-flush får rätt svar. Ett vanligt tap går igenom som vanligt.
+    if (longPress.shouldSuppressClick()) {
+      return;
+    }
+    onToggle(tally.emoji);
+  };
+
+  // Härled popover-raderna BARA när popovern är öppen (ingen onödig mappning annars).
+  const authors = open ? resolveReactionAuthors(tally.reactors, nameByUser, myUserId) : [];
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        ref={anchorRef}
+        type="button"
+        onClick={handleClick}
+        onPointerDown={longPress.handlers.onPointerDown}
+        onPointerUp={longPress.handlers.onPointerUp}
+        onPointerLeave={(e) => {
+          longPress.handlers.onPointerLeave(e);
+          setHoverFocusOpen(false);
+        }}
+        onPointerCancel={longPress.handlers.onPointerCancel}
+        onPointerEnter={(e) => {
+          // Hover öppnar popovern, men BARA för en mus/penna (hover finns inte på touch);
+          // ett touch-pointerenter ska inte öppna direkt, där äger långtrycket gesten.
+          if (e.pointerType !== 'touch') {
+            setHoverFocusOpen(true);
+          }
+        }}
+        onFocus={() => setHoverFocusOpen(true)}
+        onBlur={() => setHoverFocusOpen(false)}
+        data-reactions-tally={tally.emoji}
+        data-mine={tally.mine ? '' : undefined}
+        aria-pressed={tally.mine}
+        aria-describedby={open ? popoverId : undefined}
+        aria-label={`${EMOJI_LABEL[tally.emoji]}, ${tally.count} ${
+          tally.count === 1 ? 'reaktion' : 'reaktioner'
+        }${tally.mine ? ', din reaktion' : ''}`}
+        className="vm-reaction-tally inline-flex touch-none items-center gap-1 rounded-pill border border-border px-2 py-0.5 text-sm leading-none transition-[border-color,background-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] aria-pressed:border-accent"
+      >
+        <span aria-hidden="true">{tally.emoji}</span>
+        {/* Antalet är den enda TEXTEN på brickan. Färgen är single-sourcad i
+            rooms.css (vilo = fg-muted, min = lyft till fg), inte en text-utility
+            här, så count-tonen är EN sanning och inte en specificitets-strid. */}
+        <span className="text-xs font-semibold tabular-nums" data-reactions-count>
+          {tally.count}
+        </span>
+      </button>
+      {open && (
+        <ReactionAuthorsPopover
+          id={popoverId}
+          emoji={tally.emoji}
+          emojiLabel={EMOJI_LABEL[tally.emoji]}
+          authors={authors}
+          anchorRef={anchorRef}
+        />
+      )}
+    </span>
+  );
 }
 
 /**
@@ -83,28 +197,16 @@ export function MatchReactions({ matchId }: MatchReactionsProps) {
       className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-3"
     >
       {/* Befintliga reaktioner som brickor (emoji + antal). MIN bär aria-pressed +
-          data-mine (design-frontend tonar den), så markeringen är färg-oberoende. */}
+          data-mine (design-frontend tonar den), så markeringen är färg-oberoende. Varje
+          bricka är OCKSÅ trigger för "vem reagerade"-popovern (långtryck/hover/focus). */}
       {summary.tallies.map((t) => (
-        <button
+        <ReactionTallyButton
           key={t.emoji}
-          type="button"
-          onClick={() => handleTally(t.emoji)}
-          data-reactions-tally={t.emoji}
-          data-mine={t.mine ? '' : undefined}
-          aria-pressed={t.mine}
-          aria-label={`${EMOJI_LABEL[t.emoji]}, ${t.count} ${
-            t.count === 1 ? 'reaktion' : 'reaktioner'
-          }${t.mine ? ', din reaktion' : ''}`}
-          className="vm-reaction-tally inline-flex items-center gap-1 rounded-pill border border-border px-2 py-0.5 text-sm leading-none transition-[border-color,background-color] duration-150 outline-none hover:border-[color-mix(in_srgb,var(--color-accent)_45%,var(--color-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_55%,transparent)] aria-pressed:border-accent"
-        >
-          <span aria-hidden="true">{t.emoji}</span>
-          {/* Antalet är den enda TEXTEN på brickan. Färgen är single-sourcad i
-              rooms.css (vilo = fg-muted, min = lyft till fg), inte en text-utility
-              här, så count-tonen är EN sanning och inte en specificitets-strid. */}
-          <span className="text-xs font-semibold tabular-nums" data-reactions-count>
-            {t.count}
-          </span>
-        </button>
+          tally={t}
+          nameByUser={store.nameByUser}
+          myUserId={store.userId}
+          onToggle={handleTally}
+        />
       ))}
 
       {/* "Lägg till reaktion"-knappen: fäller ut väljaren. aria-expanded + aria-controls
