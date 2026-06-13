@@ -38,6 +38,7 @@
 // utfälld (avslöjandet, #129 punkt 11) styrs det per call-site via `startExpanded`.
 
 import {
+  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -45,6 +46,7 @@ import {
   type CSSProperties,
   type ReactNode,
   type Ref,
+  type TransitionEvent,
 } from 'react';
 import { ExpandToggle } from './ExpandToggle';
 // PREMIUM-finishen (design-lager T68): eased gradient-fade, en "det finns mer"-cue
@@ -110,6 +112,73 @@ export function CollapsibleBody({
   // när elementet har en RIKTIG höjd (clientHeight > 0), dvs i en riktig webbläsare.
   const bodyRef = useRef<HTMLDivElement>(null);
   const [isClipped, setIsClipped] = useState(true);
+
+  // UTFÄLLT FÅR ALDRIG KLIPPAS (T75, #155). Buggen: utfällt läge cap:ade höjden till
+  // ett fast tak (200rem) under antagandet "200rem överstiger alltid innehållet". Det
+  // är FALSKT för en lång sektion på smal mobil (GroupPredictionsView: 12 grupp-kuponger
+  // i 1 kolumn + ett simulerat slutspelsträd >> 3200px). När innehållet översteg taket
+  // spillde det förbi boxen (overflow:visible utfällt), men det EFTERFÖLJANDE flex-
+  // syskonet (nedre "Visa färre"-toggeln) placerades vid 200rem-gränsen och ÖVERLAPPADE
+  // det spillda innehållet (sista gruppens grupptvåa-väljare gick inte att nå på iPhone).
+  //
+  // FIX: utfällt slutar med maxHeight:'none' (obegränsat, inget syskon kan överlappa).
+  // Vi behåller ändå den mjuka öppnings-animationen: vid utfällning animeras max-height
+  // mot ett tak (200rem) så CSS-transitionen (collapsible.css, [data-collapsed='false'])
+  // glider fram, och NÄR den transitionen är klar (onTransitionEnd) flippar vi till
+  // 'none'. `none` kan inte animeras, men vid den punkten har 200rem redan nåtts visuellt,
+  // så bytet snappar inte synligt. TRE vägar sätter 'none', så taket aldrig fastnar:
+  //   1) NORMAL rörelse: onTransitionEnd (handleBodyTransitionEnd), + en FALLBACK-timer
+  //      (~450ms, i effekten nedan) som skyddsnät om eventet uteblir (avbruten transition,
+  //      bakgrundsflik, webbläsare som hoppar över den) -> T75-F1, #155.
+  //   2) reduced-motion: transition-duration nollas (index.css) -> ingen transitionend ->
+  //      effekten nedan sätter 'none' DIREKT (ingen timer behövs).
+  //   3) startExpanded: redan utfälld från start, inget tak att animera fram.
+  // expandedUnbounded=true => maxHeight:'none'; false => taket (animerbart).
+  const [expandedUnbounded, setExpandedUnbounded] = useState(startExpanded);
+
+  // Vid utfällning: släpp taket till 'none' så snart animationen är klar (eller direkt
+  // om rörelse är reducerad / transitionen inte kan köra). Vid ihopfällning: återställ
+  // till taket så NÄSTA utfällning åter kan animera från taket i stället för från 'none'.
+  useEffect(() => {
+    if (!expanded) {
+      setExpandedUnbounded(false);
+      return;
+    }
+    // Reduced-motion: ingen körbar transition -> onTransitionEnd uteblir, släpp direkt.
+    // Optional chaining: matchMedia kan saknas (icke-DOM) eller ge undefined i test.
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)')?.matches === true;
+    if (prefersReducedMotion) {
+      setExpandedUnbounded(true);
+      return;
+    }
+    // NORMAL rörelse: vi väntar på onTransitionEnd (handleBodyTransitionEnd) för den
+    // mjuka resan. MEN onTransitionEnd är inte garanterat (T75-F1, #155): eventet uteblir
+    // om öppnings-transitionen avbryts (display-byte), om sektionen fälls ut medan fliken
+    // ligger i bakgrunden (vissa webbläsare kör då ingen transition), eller om webbläsaren
+    // hoppar över den. Utan event skulle taket fastna permanent på 200rem och EXAKT
+    // produktionsbuggen #155 (innehåll spiller förbi taket, nästa syskon överlappar) komma
+    // tillbaka. FALLBACK: en timer som släpper taket ändå. 450ms = strax efter
+    // max-height-transitionens 380ms (collapsible.css, [data-collapsed='false']), så i
+    // normalfallet hinner onTransitionEnd ALLTID först och timern blir en no-op (båda sätter
+    // samma state, true). Cleanup clearar timern om `expanded` ändras (snabb ut->ihop innan
+    // den fyrar) eller komponenten unmountar, så den aldrig läcker över en ut/ihop-cykel och
+    // aldrig sätter 'none' på en sektion som hunnit fällas ihop igen.
+    const FALLBACK_RELEASE_MS = 450;
+    const fallback = setTimeout(() => setExpandedUnbounded(true), FALLBACK_RELEASE_MS);
+    return () => clearTimeout(fallback);
+  }, [expanded]);
+
+  // Öppnings-transitionen klar -> släpp höjd-taket helt (utfällt blir obegränsat).
+  // Gatat på rätt element + property: transitionend bubblar från inre element (t.ex.
+  // cue-pillrets transitions), och bara kroppens egen max-height-transition ska räknas.
+  function handleBodyTransitionEnd(event: TransitionEvent<HTMLDivElement>) {
+    if (expanded && event.target === bodyRef.current && event.propertyName === 'max-height') {
+      setExpandedUnbounded(true);
+    }
+  }
 
   useLayoutEffect(() => {
     const el = bodyRef.current;
@@ -184,16 +253,28 @@ export function CollapsibleBody({
         ref={bodyRef}
         data-collapsible-body=""
         data-collapsed={expanded ? 'false' : 'true'}
+        onTransitionEnd={handleBodyTransitionEnd}
         // KOMPRIMERAT: relative (för fadens absoluta position) + overflow-hidden (för
         // höjd-klippet). UTFÄLLT: ingen overflow-hidden, så fokus-ringar/inre scroll-
         // containrar (t.ex. slutspelsträdets sidled-scroll) aldrig klipps.
         className={expanded ? '' : 'relative overflow-hidden'}
-        // KOMPRIMERAT: klipp till "toppen". UTFÄLLT: ett stort max-height-tak (inte
-        // `none`), så CSS kan ANIMERA max-height mjukt i stället för att snappa när
-        // sektionen fälls ut (reduced-motion gör övergången momentan, index.css). Taket
-        // (200rem) överstiger alltid det faktiska innehållet, så inget klipps utfällt.
-        // Lokal literal (ingen modul-konstant) så inget värde binds eagert.
-        style={expanded ? { maxHeight: '200rem' } : { maxHeight: collapsedMaxHeight }}
+        // KOMPRIMERAT: klipp till "toppen" (collapsedMaxHeight). UTFÄLLT i TVÅ steg så
+        // höjd-taket aldrig klipper innehållet men öppningen ändå animeras (T75, #155):
+        //   1) under öppnings-transitionen: ett animerbart tak (200rem) så CSS kan
+        //      ANIMERA max-height mjukt (collapsible.css). `none` går inte att animera.
+        //   2) när transitionen är klar (expandedUnbounded, satt av onTransitionEnd /
+        //      reduced-motion-effekten): maxHeight:'none', dvs OBEGRÄNSAT. Tidigare
+        //      stod taket kvar permanent under det FELAKTIGA antagandet att 200rem
+        //      "alltid överstiger innehållet" -> en lång sektion på smal mobil (12
+        //      grupp-kuponger i 1 kolumn + slutspelsträd > 3200px) spillde förbi taket
+        //      och nästa flex-syskon (nedre toggeln) lade sig vid 200rem-gränsen och
+        //      överlappade innehållet (#155). Med 'none' kan inget syskon överlappa.
+        // Lokala literaler (ingen modul-konstant) så inga värden binds eagert.
+        style={
+          expanded
+            ? { maxHeight: expandedUnbounded ? 'none' : '200rem' }
+            : { maxHeight: collapsedMaxHeight }
+        }
       >
         {children}
         {/* "Det finns mer"-kanten i komprimerat läge, TVÅ separata lager (T68b, #136):
