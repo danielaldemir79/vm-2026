@@ -17,6 +17,7 @@
     "gen:third-place-table": "vite-node scripts/generate-third-place-table.ts",
     "gen:matches": "vite-node scripts/generate-matches.ts",
     "gen:team-profiles": "vite-node scripts/generate-team-profiles.ts",
+    "gen:venue-capacities": "vite-node scripts/generate-venue-capacities.ts",
     "gen:kickoff-seed": "vite-node scripts/generate-kickoff-seed.ts"
   },
   "dependencies": {
