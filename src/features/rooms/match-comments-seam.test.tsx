@@ -6,7 +6,7 @@
 // RIKTIGA. Detta är "byggd men ej inkopplad"-buggklassens skydd (lessons handoff-pastar-
 // ett-krav-levererat...): ett render-test på den faktiska ytan, inte ett påstående.
 //
-// PLUS: bevisar att den här provider:n RÖR rums-chatten (T66) , den hämtar bara MATCH-
+// PLUS: bevisar att den här provider:n INTE rör rums-chatten (T66) , den hämtar bara MATCH-
 // trådar (listRoomMatchComments, match_id IS NOT NULL), aldrig listRoomComments (rums-
 // chatten, match_id IS NULL), så T66-ytan är oförändrad.
 
