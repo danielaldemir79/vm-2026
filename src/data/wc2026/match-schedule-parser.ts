@@ -46,11 +46,11 @@ export const SOURCE_TIMEZONE = 'Europe/Stockholm';
 export const VENUE_UNKNOWN = 'Arena ej verifierad (egen data-punkt)';
 
 /**
- * Slår upp en verifierad arena ("Arena, Stad") för ett match-id, eller undefined om
- * matchen inte har en verifierad arena (då används VENUE_UNKNOWN). Injiceras i
- * buildMatches/buildMatchesFile så matchtablå-generatorn INTE dubblerar arena-källan
- * (samma mönster som groupOf för gruppindelningen): arena-datan bor i venue-parser.ts,
- * en sanning, korskollad i venue-source.test.ts.
+ * Slår upp en verifierad arena ("Arena, Stad, Land", värdlandet tillagt i T4d #147) för
+ * ett match-id, eller undefined om matchen inte har en verifierad arena (då används
+ * VENUE_UNKNOWN). Injiceras i buildMatches/buildMatchesFile så matchtablå-generatorn INTE
+ * dubblerar arena-källan (samma mönster som groupOf för gruppindelningen): arena-datan bor
+ * i venue-parser.ts, en sanning, korskollad i venue-source.test.ts.
  */
 export type VenueLookup = (matchId: string) => string | undefined;
 
@@ -606,9 +606,9 @@ export function buildMatchesFile(
   return `// GENERERAD FIL, redigera inte för hand. Se scripts/generate-matches.ts.
 //
 // VM 2026:s fullständiga matchplan: 72 gruppmatcher + 32 slutspelsmatcher
-// (M73-M104), med avsparkstid (UTC), svensk TV-kanal och verifierad arena/stad.
+// (M73-M104), med avsparkstid (UTC), svensk TV-kanal och verifierad arena/stad/land.
 // GENERERAD ur den committade svenska TV-tablån (tv-schedule-source.txt, tid +
-// kanal) + arena-källan (venue-source.txt, arena + stad) via den rena parsern
+// kanal) + arena-källan (venue-source.txt, arena + stad + land) via den rena parsern
 // (match-schedule-parser.ts + venue-parser.ts), och VÄRDE-LÅST mot källorna i CI
 // (match-schedule-source.test.ts + venue-source.test.ts: regenerera-och-diffa +
 // mutationstest).
@@ -625,9 +625,10 @@ export function buildMatchesFile(
 //   Lagen är ÄNNU OKÄNDA (homeTeamId/awayTeamId = null) tills seedningen (T4/T9)
 //   löst dem; positions-källan (1A/3ABCDF/W73/RU101) lever i bracket-structure.ts.
 //
-// ARENA/STAD (T4c #35, gissas ALDRIG): venue = verifierad "Arena, Stad" ur FIFA:s
-//   spelschema (16 arenor i USA/Mexiko/Kanada), korskollad mot en andra oberoende
-//   källa. Källor + en löst källavvikelse: venue-source.txt + docs/decisions.md (T4c).
+// ARENA/STAD/LAND (T4c #35 + T4d #147, gissas ALDRIG): venue = verifierad "Arena,
+//   Stad, Land" ur FIFA:s spelschema (16 arenor i USA/Mexiko/Kanada, svenskt landsnamn),
+//   korskollad mot en andra oberoende källa. Källor + en löst källavvikelse + land-
+//   mappningen: venue-source.txt + docs/decisions.md (T4c + T4d).
 
 import type { Match } from '../../domain/types';
 

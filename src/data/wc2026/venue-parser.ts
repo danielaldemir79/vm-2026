@@ -10,10 +10,12 @@
 // VARFÖR ett separat källutdrag och inte handskriven venue per match: tv-tablån
 // (T4b) bar tid + kanal men INTE arena, så matches.ts hade en uttrycklig "ej
 // verifierad"-platshållare (VENUE_UNKNOWN, gissas aldrig). T4c (#35) fyller arenan
-// per match ur FIFA:s spelschema, korskollad mot en andra oberoende källa. Datan är
-// gissningskänslig (fel arena vore en faktatabbe på en LIVE-app), så den låses mot
-// en COMMITTAD källtext med värde-likhet i CI, samma mönster som matchtablån (T4b),
-// Annexe C-tabellen (T4) och lag-profilerna (T10). Se docs/patterns.md
+// + staden per match ur FIFA:s spelschema, korskollad mot en andra oberoende källa.
+// T4d (#147) lägger till VÄRDLANDET per arena, så venue blir "Arena, Stad, Land" med
+// svenskt landsnamn. Datan är gissningskänslig (fel arena/land vore en faktatabbe på
+// en LIVE-app), så den låses mot en COMMITTAD källtext med värde-likhet i CI, samma
+// mönster som matchtablån (T4b), Annexe C-tabellen (T4) och lag-profilerna (T10). Se
+// docs/patterns.md
 // "gissningskanslig-data-genereras-ur-auktoritativ-kalla-med-validerande-generator".
 //
 // KÄLLOR (gissas ALDRIG): se preambeln i venue-source.txt.
@@ -31,33 +33,37 @@ export const SOURCE_START_MARKER = 'VENUES';
 const FIELD_SEPARATOR = ' | ';
 
 /**
- * De 16 KÄNDA arena-strängarna ("Arena, Stad"), kanonisk form. Varje rad i källan
+ * De 16 KÄNDA arena-strängarna ("Arena, Stad, Land"), kanonisk form. Varje rad i källan
  * MÅSTE ange exakt en av dessa (annars är det en gissad/feltranskriberad arena, fail
  * loud). Källhänvisad mot FIFA:s 16-arenor-lista (Wikipedia "2026 FIFA World Cup") +
  * korskoll (se venue-source.txt). Arenanamn = det ETABLERADE namnet (matchrapporter +
  * Match.venue-exemplet i domain/types.ts), kommun = den FAKTISKA kommunen (ESPN/
  * Wikipedia), inte FIFA:s sponsor-fria turneringsnamn. Se docs/decisions.md (T4c).
  *
+ * VÄRDLANDET (T4d #147) är entydigt ur arenans värdstad: 3 arenor i Mexiko, 2 i Kanada,
+ * 11 i USA (FIFA:s värdstäder-lista, Wikipedia "2026 FIFA World Cup"). Svenskt landsnamn
+ * ("Mexiko"/"USA"/"Kanada"), appens språk. Se docs/decisions.md (T4d) för land-mappningen.
+ *
  * Detta är en sluten white-list, INTE en gissning: en rad vars venue inte finns här
  * stoppar genereringen, så ett stavfel eller en hittepå-arena aldrig smyger in.
  */
 export const KNOWN_VENUES: ReadonlySet<string> = new Set([
-  'Estadio Azteca, Mexico City',
-  'Estadio Akron, Zapopan',
-  'Estadio BBVA, Guadalupe',
-  'BMO Field, Toronto',
-  'BC Place, Vancouver',
-  'MetLife Stadium, East Rutherford',
-  'AT&T Stadium, Arlington',
-  'SoFi Stadium, Inglewood',
-  'Arrowhead Stadium, Kansas City',
-  "Levi's Stadium, Santa Clara",
-  'NRG Stadium, Houston',
-  'Lincoln Financial Field, Philadelphia',
-  'Mercedes-Benz Stadium, Atlanta',
-  'Lumen Field, Seattle',
-  'Hard Rock Stadium, Miami Gardens',
-  'Gillette Stadium, Foxborough',
+  'Estadio Azteca, Mexico City, Mexiko',
+  'Estadio Akron, Zapopan, Mexiko',
+  'Estadio BBVA, Guadalupe, Mexiko',
+  'BMO Field, Toronto, Kanada',
+  'BC Place, Vancouver, Kanada',
+  'MetLife Stadium, East Rutherford, USA',
+  'AT&T Stadium, Arlington, USA',
+  'SoFi Stadium, Inglewood, USA',
+  'Arrowhead Stadium, Kansas City, USA',
+  "Levi's Stadium, Santa Clara, USA",
+  'NRG Stadium, Houston, USA',
+  'Lincoln Financial Field, Philadelphia, USA',
+  'Mercedes-Benz Stadium, Atlanta, USA',
+  'Lumen Field, Seattle, USA',
+  'Hard Rock Stadium, Miami Gardens, USA',
+  'Gillette Stadium, Foxborough, USA',
 ]);
 
 /** Antalet arenor VM 2026 spelas i (FIFA: 16 i USA/Mexiko/Kanada). Korskolls-grind. */
@@ -70,7 +76,7 @@ export const EXPECTED_MATCH_ROWS = 104;
 export interface ParsedVenueRow {
   /** matches.ts:s stabila match-id (join-nyckel), t.ex. "g-A-1" eller "M104". */
   matchId: string;
-  /** Arena + värdstad, "Arena, Stad" (en av KNOWN_VENUES). */
+  /** Arena + värdstad + värdland, "Arena, Stad, Land" (en av KNOWN_VENUES). */
   venue: string;
 }
 
