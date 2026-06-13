@@ -141,12 +141,17 @@ function TeamSide({
         {/* FIFA-ranking, BARA när den finns (tyst annars, ingen "FIFA #undefined").
             Till skillnad från resultatets mitt-rad är rankingen INTE redan med i kortets
             a11y-namn, så den hålls LÄSBAR för skärmläsare (inget aria-hidden): en
-            SR-användare hör "Mexiko, FIFA #14". font-normal + fg-muted gör den diskret;
-            design-frontend balanserar slutgiltig vikt/placering ovanpå data-haken. */}
+            SR-användare hör "Mexiko, FIFA #14".
+            BALANS (design-frontend, T4e): lugn + symmetrisk under båda lagnamnen,
+            tabular-nums så siffran sitter still och talar SAMMA sekundär-metadata-språk
+            som tiden + resultatet (tabular-nums, fg-muted). font-normal + fg-muted +
+            den lilla graden gör den diskret så den aldrig konkurrerar med lagnamnet,
+            flaggan eller tipps-kontrollen. fg-muted är redan AA-mätt i båda teman
+            (tokens.css sektion 0), ingen ny färg. */}
         {ranking !== null ? (
           <span
             data-fifa-ranking=""
-            className="text-[0.625rem] font-normal uppercase tracking-wide text-fg-muted"
+            className="text-[0.625rem] font-normal uppercase tracking-wide tabular-nums text-fg-muted"
           >
             {ranking}
           </span>
@@ -371,19 +376,27 @@ export function MatchCard({
         ) : null}
         {/* Arena visas BARA om den är verifierad. Platshållaren ("Arena ej
             verifierad", #35) visas inte som om den vore data; den döljs här tills
-            riktig arena-data finns. Åskådarkapaciteten (T4e #149) visas DISKRET efter
-            arena-/stadsnamnet ("Arena, Stad, Land (80 824 platser)") när den finns, tyst
-            annars. data-venue-capacity är design-/test-haken; design-frontend balanserar
-            hur diskret den ska vara (t.ex. egen rad vs inline) på mobil. */}
+            riktig arena-data finns.
+            BALANS (design-frontend, T4e #149): arena-namnet ("Arena, Stad, Land") är
+            redan långt; att glua kapaciteten inline efter det ("... Mexiko (80 824 platser)")
+            sprängde raden till två rader på 360/344 och läste rörigt (en löpande sträng).
+            Vi lägger därför kapaciteten på en EGEN, lugn rad UNDER arena-namnet, så
+            arenan skannas rent och kapaciteten är ett tydligt SEKUNDÄRT komplement, inte
+            en del av samma textsjok. Den hålls extra diskret (en grad mindre, fg-muted),
+            så den aldrig konkurrerar med arena-namnet. items-baseline gör att "Arena"-
+            etiketten linjerar med arena-namnets FÖRSTA rad även när dd:n blir tvårads.
+            data-venue-capacity + fg-muted (redan AA-mätt, ingen ny färg) är oförändrade. */}
         {showVenue ? (
-          <div className="flex items-center gap-1">
+          <div className="flex items-baseline gap-1">
             <dt className="font-semibold">Arena</dt>
-            <dd>
-              {match.venue}
+            <dd className="min-w-0">
+              <span>{match.venue}</span>
               {venueCapacity !== null ? (
-                <span data-venue-capacity="" className="text-fg-muted">
-                  {' '}
-                  ({venueCapacity})
+                <span
+                  data-venue-capacity=""
+                  className="block text-[0.6875rem] leading-tight text-fg-muted"
+                >
+                  {venueCapacity}
                 </span>
               ) : null}
             </dd>
