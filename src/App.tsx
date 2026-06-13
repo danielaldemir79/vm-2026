@@ -115,8 +115,15 @@ function AppShell() {
         />
 
         {/* Header: wordmark + tema-toggle. Frostat glas-band (tema-troget via
-          color-mix mot --color-surface), sticky så toggle alltid är nåbar. */}
-        <header className="sticky top-0 z-10 border-b border-border backdrop-blur-md">
+          color-mix mot --color-surface), sticky så toggle alltid är nåbar.
+          data-app-header = den STABILA, entydiga kroken SectionNav mäter höjden mot
+          (T78, F1): appen har många <header>-element (sektionsvyer, dialoger), så en
+          ren document.querySelector('header') skulle binda mätningen till det FÖRSTA i
+          DOM-ordning, en ordnings-tillfällighet en framtida banner/portal kan bryta. */}
+        <header
+          data-app-header=""
+          className="sticky top-0 z-10 border-b border-border backdrop-blur-md"
+        >
           <div
             className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-8"
             style={{ backgroundColor: 'color-mix(in srgb, var(--color-surface) 70%, transparent)' }}

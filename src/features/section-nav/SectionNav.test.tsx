@@ -161,3 +161,88 @@ describe('SectionNav, klick scrollar till rätt mål', () => {
     expect(within(nav).getByRole('button', { name: 'Idag' })).not.toHaveAttribute('aria-current');
   });
 });
+
+describe('SectionNav, offset-mätning binder till APP-headern (F1)', () => {
+  // measure() sätter --vm-section-nav-header-top = headerns höjd och --vm-section-nav-offset
+  // = header + nav på <html>. Det bevisar VILKEN <header> mätningen läste. Vi mockar
+  // getBoundingClientRect så varje element rapporterar en distinkt höjd och verifierar att
+  // mätningen tar APP-headerns höjd, inte en FRÄMRE dummy-headers, även när dummyn ligger
+  // FÖRE app-headern i DOM:en (en ren document.querySelector('header') hade tagit dummyn).
+  const DUMMY_HEADER_HEIGHT = 999; // främre, FEL <header> (utan app-kroken)
+  const APP_HEADER_HEIGHT = 64; // den rätta app-headern (data-app-header)
+  const NAV_HEIGHT = 40; // sektions-navets eget band
+
+  const proto = HTMLElement.prototype as unknown as {
+    getBoundingClientRect?: () => { height: number };
+  };
+  let originalRect: typeof proto.getBoundingClientRect;
+
+  beforeEach(() => {
+    originalRect = proto.getBoundingClientRect;
+    // Höjd per element-roll: app-header-kroken -> app-höjd, övriga <header> -> dummy-höjd,
+    // sektions-navet -> nav-höjd. Allt annat 0 (jsdom-default).
+    proto.getBoundingClientRect = function (this: HTMLElement) {
+      let height = 0;
+      if (this.tagName === 'HEADER') {
+        height = this.hasAttribute('data-app-header') ? APP_HEADER_HEIGHT : DUMMY_HEADER_HEIGHT;
+      } else if (this.hasAttribute('data-section-nav')) {
+        height = NAV_HEIGHT;
+      }
+      return { height } as DOMRect;
+    } as typeof proto.getBoundingClientRect;
+  });
+  afterEach(() => {
+    proto.getBoundingClientRect = originalRect;
+    // Städa CSS-variablerna mellan testen så ingen läcker mätning.
+    document.documentElement.style.removeProperty('--vm-section-nav-header-top');
+    document.documentElement.style.removeProperty('--vm-section-nav-offset');
+  });
+
+  it('mäter mot app-headern även när ett ANNAT <header> ligger FÖRE den i DOM:en', () => {
+    // En dummy-<header> FÖRE provider/nav i dokument-ordning (t.ex. en framtida banner/portal).
+    render(
+      <>
+        <header>Banner utan app-kroken</header>
+        <header data-app-header="">App-header</header>
+        <SectionNavProvider>
+          <SectionNav />
+          <FakeSection section={SECTIONS.daily} />
+        </SectionNavProvider>
+      </>
+    );
+
+    // header-top = APP-headerns höjd (64), INTE dummyns (999). Det bevisar att selektorn
+    // band mätningen till data-app-header, inte den FÖRSTA <header> i DOM-ordning.
+    const headerTop = document.documentElement.style.getPropertyValue(
+      '--vm-section-nav-header-top'
+    );
+    expect(headerTop).toBe(`${APP_HEADER_HEIGHT}px`);
+    expect(headerTop).not.toBe(`${DUMMY_HEADER_HEIGHT}px`);
+
+    // offset = app-header + nav (64 + 40 = 104), också mot app-headern, inte dummyn.
+    const offset = document.documentElement.style.getPropertyValue('--vm-section-nav-offset');
+    expect(offset).toBe(`${APP_HEADER_HEIGHT + NAV_HEIGHT}px`);
+  });
+
+  it('faller säkert till 0 höjd när ingen app-header finns (bara nav-höjden räknas)', () => {
+    // Ingen <header data-app-header> alls (bara en dummy som INTE ska matchas).
+    render(
+      <>
+        <header>Bara en dummy, ingen app-header</header>
+        <SectionNavProvider>
+          <SectionNav />
+          <FakeSection section={SECTIONS.daily} />
+        </SectionNavProvider>
+      </>
+    );
+
+    // Saknad app-header -> headerHeight ?? 0, så header-top = 0 (samma säkra fallback som
+    // förr), och offset = bara nav-höjden. Mätningen tar ALDRIG dummyns 999.
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-header-top')).toBe(
+      '0px'
+    );
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-offset')).toBe(
+      `${NAV_HEIGHT}px`
+    );
+  });
+});
