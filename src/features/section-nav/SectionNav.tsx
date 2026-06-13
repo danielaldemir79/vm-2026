@@ -84,6 +84,13 @@ export function SectionNav() {
     return () => {
       ro?.disconnect();
       window.removeEventListener('resize', measure);
+      // Rensa de globala CSS-variablerna (C5): de bor på <html>, inte på navet, så de
+      // överlever annars unmount och nollställs aldrig. Med deps [sections.length] kör
+      // cleanup -> measure i samma tick vid antals-ändring (rensas + sätts om direkt, ingen
+      // synlig glapp), men vid unmount eller 0 sektioner (return null) körs bara cleanup, så
+      // de tas bort och blir inte kvar som stale offset/header-top vid en senare mount.
+      document.documentElement.style.removeProperty('--vm-section-nav-header-top');
+      document.documentElement.style.removeProperty('--vm-section-nav-offset');
     };
   }, [sections.length]);
 

@@ -245,4 +245,66 @@ describe('SectionNav, offset-mätning binder till APP-headern (F1)', () => {
       `${NAV_HEIGHT}px`
     );
   });
+
+  it('rensar CSS-variablerna från <html> vid unmount (C5, inget globalt DOM-läckage)', () => {
+    // measure() sätter variablerna vid mount (getBoundingClientRect mockad i beforeEach), så
+    // de finns FÖRE unmount. C5: effektens cleanup måste ta bort dem igen, annars ligger en
+    // stale offset/header-top kvar på <html> och förgiftar en senare mount eller ett senare test.
+    const { unmount } = render(
+      <>
+        <header data-app-header="">App-header</header>
+        <SectionNavProvider>
+          <SectionNav />
+          <FakeSection section={SECTIONS.daily} />
+        </SectionNavProvider>
+      </>
+    );
+
+    // Sanity: mätningen satte faktiskt ett värde, annars bevisar rensningen ingenting.
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-header-top')).toBe(
+      `${APP_HEADER_HEIGHT}px`
+    );
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-offset')).toBe(
+      `${APP_HEADER_HEIGHT + NAV_HEIGHT}px`
+    );
+
+    act(() => {
+      unmount();
+    });
+
+    // Efter unmount ska BÅDA variablerna vara borta (getPropertyValue ger tom sträng).
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-header-top')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-offset')).toBe('');
+  });
+
+  it('rensar CSS-variablerna när navet går till 0 sektioner (return null)', () => {
+    // När alla sektioner avregistreras renderar SectionNav null. Effekten kör då för
+    // sections.length === 0: cleanup tar bort variablerna och measure sätter dem inte om
+    // (navRef.current är null när navet inte renderas). C5: ingen stale offset blir kvar.
+    function Harness({ showSection }: { showSection: boolean }) {
+      return (
+        <>
+          <header data-app-header="">App-header</header>
+          <SectionNavProvider>
+            <SectionNav />
+            {showSection ? <FakeSection section={SECTIONS.daily} /> : null}
+          </SectionNavProvider>
+        </>
+      );
+    }
+    const { rerender } = render(<Harness showSection />);
+
+    // Med en sektion närvarande satte mätningen variablerna.
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-offset')).toBe(
+      `${APP_HEADER_HEIGHT + NAV_HEIGHT}px`
+    );
+
+    // Ta bort sektionen -> sections.length blir 0 -> navet returnerar null.
+    act(() => {
+      rerender(<Harness showSection={false} />);
+    });
+
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-header-top')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--vm-section-nav-offset')).toBe('');
+  });
 });
