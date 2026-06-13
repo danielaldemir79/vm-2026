@@ -5,6 +5,33 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T75 (#155): utfällt läge släpper höjd-taket till none (mobil-överlapp-fix)
+
+**Bakgrund (produktionsbugg, bekräftad i skärmdumpar på iPhone OCH Samsung):** den delade
+komprimerings-primitiven `CollapsibleBody` (T68) cap:ade i UTFÄLLT läge höjden till ett fast tak
+(`maxHeight: '200rem'`, dvs 3200px) under det FELAKTIGA antagandet "200rem överstiger alltid
+innehållet". Det är falskt på smal mobil: en utfälld sektion i 1 kolumn (t.ex. GroupPredictionsView
+med 12 grupp-kuponger + simulerat slutspelsträd) blir >> 3200px. Innehållet spillde då förbi boxen
+(overflow:visible utfällt) men det EFTERFÖLJANDE flex-syskonet (nedre "Visa färre"-toggeln) OCH allt
+efter sektionen placerades vid 200rem-gränsen och ÖVERLAPPADE det spillda innehållet (sista gruppens
+grupptvåa-väljare gick inte att nå). Desktop (3 kolumner, kortare) rymdes under 3200px, därför "bara
+mobil". Drabbade alla sektioner som använder CollapsibleBody.
+
+**Beslut:** utfällt läge slutar nu på `maxHeight: 'none'` (obegränsat, inget syskon kan överlappa).
+Den mjuka öppnings-animationen behålls via TVÅ steg: (1) vid utfällning animeras max-height mot ett
+animerbart tak (200rem) så CSS-transitionen (`collapsible.css`, `[data-collapsed='false']`) glider
+fram (`none` går inte att animera); (2) när öppnings-transitionen är klar (`onTransitionEnd` gatad på
+`event.target === bodyRef.current && propertyName === 'max-height'`) flippas `expandedUnbounded` till
+true -> `maxHeight: 'none'`. Reduced-motion nollar transition-duration (`index.css`) så transitionend
+kan utebli; då sätts `none` direkt via en effekt som läser `prefers-reduced-motion`. Vid ihopfällning
+åter-armas taket (200rem) så nästa utfällning kan animera på nytt.
+**Varför just så:** korrekthet (inget överlapp) utan att offra den premium-känsla T68 byggde. `none`
+direkt utan tak vore enklare men förlorar öppnings-animationen; permanent tak (gamla buggen) klipper.
+Komprimerat läge är helt oförändrat (höjd-klipp + overflow-hidden + gradient-fade + cue), och utfällt
+sätter aldrig overflow-hidden, så slutspelsträdets inre sidled-scroll (overflow-x-auto i BracketView,
+inuti kroppen) klipps inte. Mekaniken (state -> stil) är test-täckt i CollapsibleSection.test.tsx; en
+regression som återinför ett permanent 200rem-tak i utfällt gör de testerna röda.
+
 ## 2026-06-13 , T72 (#151): grupp- + champion-tips låses PLATT efter omgång 1 (ersätter 21/6)
 
 **Daniels beslut 2026-06-13 (källa, gissas inte):** "ändra så gruppspel tippning och mästerskap
