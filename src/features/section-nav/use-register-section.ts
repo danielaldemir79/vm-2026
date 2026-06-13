@@ -20,21 +20,24 @@ import type { SectionDescriptor } from './section-labels';
  * Registrera en sektion i navet medan komponenten är monterad. Avregistrerar vid
  * unmount. No-op utan en SectionNavProvider (tolerant).
  *
- * `section` förväntas vara en stabil konstant-referens (en post ur SECTIONS), så
- * effekten inte kör om i onödan. Vi läser fälten i deps för säkerhets skull om en
- * anropare ändå skickar in ett nytt objekt per render.
+ * KRITISKT: deps är de stabila PRIMITIVERNA (id/label/order), ALDRIG `section`-objektets
+ * referens. En anropare får skicka ett nytt litteral-objekt per render (`useRegisterSection({
+ * id, label, order })`); hade `section` legat i deps skulle effekten kört om varje render,
+ * och eftersom `register` gör en setState i providern -> re-render -> nytt litteral -> effekt
+ * igen, blir det en oändlig render-loop. Vi rekonstruerar därför descriptorn INNE i effekten
+ * ur primitiverna, så effekt-kroppen inte refererar den instabila `section`-referensen och
+ * exhaustive-deps är nöjd med bara primitiverna.
  */
 export function useRegisterSection(section: SectionDescriptor): void {
   const store = useContext(SectionNavContext);
   const register = store?.register;
   const unregister = store?.unregister;
+  const { id, label, order } = section;
   useEffect(() => {
     if (!register || !unregister) {
       return;
     }
-    register(section);
-    return () => unregister(section.id);
-    // Fälten (inte objekt-referensen) i deps: stabilt även om anroparen skickar ett
-    // nytt litteral-objekt per render. register/unregister är stabila (useCallback).
-  }, [register, unregister, section.id, section.label, section.order, section]);
+    register({ id, label, order });
+    return () => unregister(id);
+  }, [register, unregister, id, label, order]);
 }
