@@ -173,14 +173,21 @@ export function SectionNavMobile() {
           ref={buttonRef}
           type="button"
           data-section-menu-button=""
+          // data-section-menu-open speglar open-flaggan som en REN STYLING-krok (semantiken
+          // bär aria-expanded, oförändrat). CSS läser den för det visuella öppet-läget
+          // (band-koppling, accent-värme) och för ikon-skiftet hamburgare -> kryss.
+          data-section-menu-open={open ? 'true' : undefined}
           aria-haspopup="true"
           aria-expanded={open}
           aria-controls={panelId}
           onClick={() => setOpen((v) => !v)}
           className="vm-section-menu-button font-display"
         >
-          {/* Hamburgare-ikon (aria-hidden: knappens tillgängliga namn bär texten). Tre
-            streck i en enkel SVG; design-frontend får byta ikon-behandling fritt. */}
+          {/* Hamburgare/kryss-ikon (aria-hidden: knappens tillgängliga namn bär betydelsen,
+            ikonen är ren dekoration). Tre INDIVIDUELLA streck i stället för ett path: i öppet
+            läge transformeras topp-/botten-strecket till ett kryss (X) och mitt-strecket
+            tonas ut, helt i CSS (gatad på reduced-motion). Skiftet bär ingen a11y-betydelse,
+            knappens aria-expanded + dess namn ("Sektioner: <aktiv>") är sanningen. */}
           <svg
             data-section-menu-icon=""
             aria-hidden="true"
@@ -192,7 +199,9 @@ export function SectionNavMobile() {
             strokeWidth="1.6"
             strokeLinecap="round"
           >
-            <path d="M2 4h12M2 8h12M2 12h12" />
+            <line data-icon-bar="top" x1="2" y1="4" x2="14" y2="4" />
+            <line data-icon-bar="mid" x1="2" y1="8" x2="14" y2="8" />
+            <line data-icon-bar="bottom" x1="2" y1="12" x2="14" y2="12" />
           </svg>
           <span data-section-menu-label="">{buttonLabel}</span>
         </button>
