@@ -22,10 +22,10 @@ export default defineConfig({
   // Build + serve the dist, same as the E2E config, so the shots are of the real
   // deployable artifact. We FORCE fixtures mode by passing the Supabase env vars
   // empty to the build/preview process: the data-source gate treats empty/missing
-  // VITE_SUPABASE_* as "not configured" and falls back to fixtures. Without this the
-  // build would inherit a developer's shell VITE_SUPABASE_* and could accidentally
-  // produce live-mode (non-deterministic) screenshots. (A local .env.local with real
-  // values still takes precedence in Vite's env loading, so regenerate without one.)
+  // VITE_SUPABASE_* as "not configured" and falls back to fixtures. These explicit
+  // process.env values WIN over a developer's shell vars AND over a local .env.local
+  // (Vite's loadEnv lets prefixed process.env override .env files), so fixtures mode
+  // is guaranteed regardless of the developer's environment.
   webServer: {
     command: `npm run build && npm run preview -- --port ${PREVIEW_PORT} --strictPort`,
     url: BASE_URL,
