@@ -457,7 +457,13 @@ export function PredictionForm({
                   data-tip-result=""
                   data-tip-points={points.points}
                   data-tip-point-type={points.type}
-                  className={`vm-tip-result inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none ${TIP_BADGE_CLASS_BY_TYPE[points.type]}`}
+                  // mt-1 ger poäng-raden en aning mer luft FRÅN facit-raden ovanför (utöver
+                  // kolumnens gap-1.5) så de tre beats:en (Ditt tips -> facit -> poäng) läser
+                  // i en lugn hierarki: facit är "domen", poängen "din skörd". Utan den extra
+                  // luften tävlar de två brickorna i exakt-fallet, där BÅDA är samma solida
+                  // guld (.vm-reveal-actual + .vm-coupon-mine delar guld-yta/ink); separationen
+                  // gör att facit läses som den labelade domen och poängen som följd-belöningen.
+                  className={`vm-tip-result mt-1 inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none ${TIP_BADGE_CLASS_BY_TYPE[points.type]}`}
                 >
                   {/* FÄRG-OBEROENDE markör-glyf (bock/halv-cirkel/kryss), samma form-familj
                       som facit-avslöjandets markör. Ritas via CSS ::before per
