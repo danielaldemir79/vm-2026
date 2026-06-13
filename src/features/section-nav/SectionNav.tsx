@@ -18,12 +18,15 @@
 // så den aldrig tar plats i ett läge där inget finns att hoppa till.
 
 import { useEffect, useRef } from 'react';
-import { useSectionNavStore } from './section-nav-context';
+import { useSectionNavState } from './section-nav-context';
 import { useActiveChipScroll } from './use-active-chip-scroll';
 import './section-nav.css';
 
 export function SectionNav() {
-  const { sections, activeId, scrollTo } = useSectionNavStore();
+  // Navet (och bara navet) konsumerar STATE-ytan: sections/activeId/scrollTo. Den byter
+  // referens vid activeId-byte, men det är bara DEN här komponenten som re-renderas av det
+  // (C4), inte de 8 sektions-vyerna (de läser actions-ytan via useRegisterSection).
+  const { sections, activeId, scrollTo } = useSectionNavState();
   const navRef = useRef<HTMLElement>(null);
 
   // Håll det aktiva chip:et synligt i den horisontella raden: när scroll-spy:n byter aktiv
