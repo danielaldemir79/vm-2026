@@ -148,6 +148,124 @@
   outline-offset: 2px;
 }
 
+/* =============================================================================
+   MOBIL HAMBURGARE-MENY (T79, #167). På mobil (< sm) ersätter den här menyn chip-raden:
+   en kompakt knapp som öppnar en panel med ALLA sektioner vertikalt, så man inte missar
+   sektioner bakom en sidled-swipe (Daniels T78-feedback). LEAN per Daniels krav: ett
+   diskret band + en lugn panel, inte en andra header. Den FUNKTIONELLA + tillgängliga
+   baslinjen bor här; design-frontend äger den slutgiltiga visuella behandlingen (ikon,
+   panel-form, animation) och stylar mot de stabila data-krokarna.
+   ============================================================================= */
+
+/* Bandet ärver det frostade glas-receptet + sticky-top + skiljelinjen från .vm-section-nav
+   (gemensam med chip-raden), så inget dupliceras. Inget extra behövs på .vm-section-nav-mobile
+   i baslinjen; klassen finns som en stabil krok för design-frontend. */
+
+/* MENY-KNAPPEN: en lugn pill i appens etablerade pill-form (samma radie/typsnitt som chipsen
+   och .vm-install-pill), med hamburgare-ikonen + aktiv-etiketten. Diskret i vila (fg-muted
+   på opak surface, det README-mätta AA-paret), texten klarnar vid hover, samma affordans-
+   språk som chipsen. */
+.vm-section-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding: 0.3rem 0.8rem;
+  font-size: 0.8125rem;
+  line-height: 1.1rem;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.vm-section-menu-button:hover {
+  color: var(--color-fg);
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+}
+
+/* Aktiv-etiketten kan bli lång (långt sektionsnamn): trunkera med ellips i stället för att
+   knuffa knappen utanför bandet. Ikonen behåller sin storlek (shrink-0). */
+.vm-section-menu-icon {
+  flex-shrink: 0;
+}
+
+.vm-section-menu-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* PANELEN: en opak yta-bricka under knappen som listar sektionerna. Opak (--color-surface,
+   inte glas) så texten står mot en mätt surface-kontrast. Skugga + kant ger den lyft från
+   innehållet. Den ligger i bandets flöde (inte position:absolute) så den knuffar innehållet
+   nedåt i stället för att överlappa det, robust utan en magisk positionering. */
+.vm-section-menu-panel {
+  border-top: 1px solid color-mix(in srgb, var(--color-accent) 10%, var(--color-border));
+  background-color: var(--color-surface);
+  box-shadow: 0 8px 24px -12px color-mix(in srgb, var(--color-fg) 30%, transparent);
+}
+
+/* MENY-RADERNA: fullbredds-knappar, generös tap-yta (>= 44px hög med padding) för touch.
+   Diskret i vila, hover klarnar texten. Den AKTIVA raden bär appens accent (samma --color-
+   accent / --color-accent-fg som chipsens aktiva läge, AA-mätt), så scroll-spy-värdet är
+   omisskännligt även för en färgblind användare (aria-current bär a11y-sanningen). */
+.vm-section-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  background-color: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vm-section-menu-item:hover {
+  color: var(--color-fg);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.vm-section-menu-item[data-active='true'],
+.vm-section-menu-item[data-active='true']:hover {
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+/* Den delade accent-fokusringen (EXAKT samma som chipsen / appens kontroller): synligt
+   tangentbordsfokus (WCAG 2.4.7), oavsett tema. Inset-offset på raderna så ringen inte
+   klipps av panelens kant. */
+.vm-section-menu-button:focus-visible,
+.vm-section-menu-item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+/* PANEL-ÖPPNING: en lugn in-tonning + liten nedglidning, GATAD på reduced-motion (WCAG
+   2.3.3, samma policy som hela appen). Vid prefers-reduced-motion sätts ingen animation, så
+   panelen bara dyker upp. Bara opacity/transform animeras (ingen layout), så CLS är noll. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-section-menu-panel {
+    animation: vm-section-menu-open 0.18s ease-out;
+  }
+  @keyframes vm-section-menu-open {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
 /* SCROLL-OFFSET-KONTRAKTET (det centrala, robusta greppet): varje navigerbar sektion får
  * scroll-margin-top = de TVÅ bandens uppmätta höjd (--vm-section-nav-offset, satt av
  * SectionNav i JS). Då landar ett chip-klicks scrollIntoView({block:'start'}) med rubriken
