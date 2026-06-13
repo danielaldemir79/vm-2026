@@ -24,7 +24,7 @@ import { useDayTheme } from './use-day-theme';
 import { useTodayKey } from './use-today-key';
 import { localDateKey } from './group-matches-by-day';
 import { MatchCard } from './MatchCard';
-import { MatchReactions } from '../rooms';
+import { MatchReactions, MatchComments } from '../rooms';
 import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favorite-team';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
@@ -391,16 +391,24 @@ export function DailyMatchesView() {
                     transition={{ ...transitions.smooth, delay: Math.min(i * 0.04, 0.32) }}
                     className="h-full"
                   >
-                    {/* Reaktions-raden (T24, #24) injiceras som fotrad i LIST-korten
-                        (matchkorten där snacket händer). MatchReactions självhider när
-                        reaktions-lagret är inaktivt (lokalt läge / inget aktivt rum), så
-                        ett kort utan rum ser ut precis som förr. Hero-kortet ovanför får
-                        ingen reaktions-rad: matchen visas ändå i listan här, så vi undviker
-                        två reaktions-ytor för samma match (KISS, decisions.md T24). */}
+                    {/* Fotraden i LIST-korten (matchkorten där snacket händer): reaktions-
+                        raden (T24, #24) + den HOPFÄLLDA kommentar-affordansen (T77, #161),
+                        i samma anda, per match, per rum. Båda självhider när sitt lager är
+                        inaktivt (lokalt läge / inget aktivt rum), så ett kort utan rum ser
+                        ut precis som förr. Hero-kortet ovanför får ingen fotrad: matchen
+                        visas ändå i listan här, så vi undviker två snack-ytor för samma
+                        match (KISS, decisions.md T24/T77). Kommentarerna ligger UNDER
+                        reaktionsraden, hopfällda default så kortet inte blir rörigt (Daniel
+                        mån om det). */}
                     <MatchCard
                       match={match}
                       teamsById={teamsById}
-                      footer={<MatchReactions matchId={match.id} />}
+                      footer={
+                        <>
+                          <MatchReactions matchId={match.id} />
+                          <MatchComments matchId={match.id} />
+                        </>
+                      }
                       favorite={matchHasFavorite(
                         favoriteTeamId,
                         match.homeTeamId,

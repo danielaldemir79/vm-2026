@@ -16,7 +16,7 @@ Bara **delad, muterbar** state ligger i Supabase:
 | `match_kickoffs` (T15) | Referensdata: matchernas avsparkstider, deadline-låsets klocka. |
 | `group_predictions` (T16) | Pool-tips: gissad 1:a + 2:a per grupp (A till L). |
 | `bracket_predictions` (T16) | Slutspels-tips: vem går vidare per slot + VM-vinnaren. |
-| `room_comments` (T66) | Korta kommentarer per rum (medlemmar snackar match, live). |
+| `room_comments` (T66 + T77) | Korta kommentarer (medlemmar snackar, live). match_id NULL = rums-chatt (T66), satt = en match-tråd (T77). |
 | `room_reactions` (T24) | Emoji-reaktioner på matcher per rum (en per användare+match, live). |
 
 **Statisk turneringsdata (lag, grupper, spelschema) stannar i klient-bundlen.**
@@ -180,6 +180,26 @@ payloadens rad-data): `src/data/realtime/realtime-subscriptions.test.ts`.
 **Migration-historik (T18):** applicerad 1:1 från den committade filen via
 `apply_migration`; `list_migrations` visar `t18_realtime_publication` med version
 `20260612072518` (samma stämpel som filnamnet, ingen drift).
+
+## T77 (#161): per-match kommentar-trådar (room_comments.match_id)
+
+Migrationen `t77_room_comments_match_id` lägger en NULLABLE `match_id`-kolumn på den
+befintliga `room_comments` (T66) + ett partiellt index
+`room_comments_room_match_created_idx (room_id, match_id, created_at) WHERE match_id IS NOT NULL`.
+**match_id IS NULL = rums-chatten (T66, oförändrad), satt = en match-tråd (T77).** ICKE-
+DESTRUKTIVT (bara ADD COLUMN nullable + index); de 5 befintliga rums-chatt-raderna fick
+match_id NULL (verifierat live). **INGEN RLS-policy-ändring:** en match-kommentar bär
+samma `room_id`, så T66:s room_id-gatade policyer (SELECT `is_room_member`, INSERT
+`is_room_member AND user_id=auth.uid()`, DELETE egen rad) gäller redan båda tråd-rymderna,
+match_id är ingen ny säkerhetsgräns (kommentarer är inte hemliga). Tabellen ligger redan i
+`supabase_realtime` (T66), så match-trådar får realtid gratis. Bevisat live (role
+authenticated + JWT-claims, rollback/cleanup): medlem skriver+läser, utomstående nekas
+läsa OCH skriva; counts oförändrade efteråt (5/0/5), inga leftover. Klient-spegel:
+`src/data/rooms/comments-api.ts` (`listRoomMatchComments`, `addComment` med matchId).
+
+**Migration-historik (T77):** den committade FILEN bär den FAKTISKA live-apply-versionen
+`20260613144345` (bekräftad med `list_migrations`), namn + innehåll 1:1 = fresh-replaybar
+till samma version (ingen placeholder-drift).
 
 ## Migrationer
 

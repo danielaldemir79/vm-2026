@@ -12,10 +12,23 @@ export {
 // T52 (#91): kopiera mina tips mellan rum (UI-kontroll + ren rapport-sammanfattning).
 export { CopyTipsControl } from './CopyTipsControl';
 export { summarizeCopyReport } from './copy-report-summary';
-// T66 (#121): kommentarer i rummet (provider + UI + store-kontrakt).
+// T66 (#121): rums-chatten (provider + UI + store-kontrakt).
 export { CommentsProvider, type CommentsProviderProps } from './CommentsProvider';
 export { RoomComments } from './RoomComments';
 export { useCommentsStore, type CommentsStore, type CommentsStatus } from './comments-context';
+// T77 (#161): per-match kommentar-trådar (provider + UI + store + gruppering).
+export { MatchCommentsProvider, type MatchCommentsProviderProps } from './MatchCommentsProvider';
+export { MatchComments, type MatchCommentsProps } from './MatchComments';
+export {
+  useMatchCommentsStore,
+  type MatchCommentsStore,
+  type MatchCommentsStatus,
+} from './match-comments-context';
+export {
+  groupCommentsByMatch,
+  threadForMatch,
+  type MatchCommentThread,
+} from './match-comments-aggregate';
 // T24 (#24): emoji-reaktioner på matcher i rummet (provider + UI + store + aggregering).
 export { ReactionsProvider, type ReactionsProviderProps } from './ReactionsProvider';
 export { MatchReactions, type MatchReactionsProps } from './MatchReactions';
