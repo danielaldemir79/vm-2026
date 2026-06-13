@@ -38,11 +38,10 @@ const TEAMS: Team[] = [
 const GROUPS: Group[] = [
   { id: 'A', teamIds: ['mex', 'rsa'] },
   { id: 'B', teamIds: ['can', 'bih'] },
-  // Grupp G bär här ett SYNTETISKT sent ankare (g-G-1 = 23/6, EFTER den nya fasta
-  // söndagstiden 21/6): GREATEST behåller dess senare ankare (FÖRKORTA ALDRIG), så den
-  // är öppen längre än A/B. Vaktar förkorta-aldrig-grenen i vyn oberoende av det
-  // verkliga schemat (T67: alla riktiga gruppankare ligger 11-17/6, dvs FÖRE 21/6, så
-  // alla riktiga grupper landar på 21/6 , men regeln, inte datat, är garantin).
+  // Grupp G bär här ett SYNTETISKT sent ankare (g-G-1 = 23/6). Under T72:s PLATTA modell
+  // låses G vid SAMMA platta tid (17/6 20:00Z) som A/B , dess egna senare ankare styr inte
+  // längre. Vaktar att vyn inte tyst återinför per-grupp-fönster oberoende av indata
+  // (alla riktiga gruppankare ligger 11-17/6, g-L-1 ÄR maxet, men regeln, inte datat, är garantin).
   { id: 'G', teamIds: ['sui', 'nor'] },
 ];
 
@@ -61,9 +60,9 @@ function gmatch(id: string, kickoff: string): Match {
 }
 
 const MATCHES: Match[] = [
-  gmatch('g-A-1', '2026-06-11T19:00:00.000Z'), // tidig -> T67 förlänger till 21/6 21:59Z
-  gmatch('g-B-1', '2026-06-12T19:00:00.000Z'), // tidig -> förlängs
-  gmatch('g-G-1', '2026-06-23T19:00:00.000Z'), // SYNTETISKT sent -> behåller eget ankare (23/6)
+  gmatch('g-A-1', '2026-06-11T19:00:00.000Z'), // tidig -> T72 platt deadline (17/6 20:00Z)
+  gmatch('g-B-1', '2026-06-12T19:00:00.000Z'), // tidig -> platt deadline
+  gmatch('g-G-1', '2026-06-23T19:00:00.000Z'), // SYNTETISKT sent -> platt deadline ändå (T72)
 ];
 
 function store(partial: Partial<GroupPredictionsStore>): GroupPredictionsStore {
@@ -150,26 +149,30 @@ describe('GroupPredictionsView', () => {
     expect(screen.getByText(/3 grupper öppna att tippa/)).toBeInTheDocument();
   });
 
-  it('PER-GRUPP-LÅS (T67): tidig grupp A LÅST efter söndagen, sen grupp G ÖPPEN', () => {
-    // 22/6 08:00: A:s FÖRLÄNGDA deadline (21/6 21:59Z) passerad -> låst. G:s SYNTETISKT
-    // sena ankare (23/6 19:00) ej passerat -> öppen. Bevisar att G INTE drogs ner till
-    // söndagen (förkorta aldrig), oberoende av det verkliga schemat.
-    renderView(store({}), new Date('2026-06-22T08:00:00Z'));
+  it('PLATT LÅS (T72): efter den platta tiden är ALLA grupper LÅSTA samtidigt (även sen G)', () => {
+    // 18/6 08:00: den platta pool-deadlinen (17/6 20:00Z) passerad -> BÅDE A och G låsta.
+    // Skillnaden mot T67: G:s syntetiska sena ankare (23/6) styr INTE längre, alla grupper
+    // delar EN platt låspunkt (omgång 1 spelad). Inga grupper öppna -> öppen-räknaren
+    // renderas inte alls (vyns guard openCount > 0).
+    renderView(store({}), new Date('2026-06-18T08:00:00Z'));
     const aForm = document.querySelector('[data-group-id="A"]');
+    const gForm = document.querySelector('[data-group-id="G"]');
     expect(aForm?.querySelector('[data-group-prediction-lock]')).not.toBeNull();
-    expect(screen.getByText(/1 grupp öppen att tippa/)).toBeInTheDocument();
+    expect(gForm?.querySelector('[data-group-prediction-lock]')).not.toBeNull();
+    expect(screen.queryByText(/öppna att tippa/)).toBeNull();
+    expect(screen.queryByText(/öppen att tippa/)).toBeNull();
   });
 
-  it('AC#3 DEADLINE (T67): öppen tidig grupp visar den FÖRLÄNGDA söndagen, låst grupp inte', () => {
-    // 13/6 (mellan g-A-1 och söndagen): grupp A är ÖPPEN igen och dess deadline-rad ska
-    // visa den FÖRLÄNGDA tiden (söndag 21/6 23:59 svensk = 21:59Z), inte den gamla 11/6.
+  it('AC#3 DEADLINE (T72): öppen tidig grupp visar den PLATTA tiden, låst grupp inte', () => {
+    // 13/6 (mellan g-A-1 och den platta tiden): grupp A är ÖPPEN igen och dess deadline-rad
+    // ska visa den PLATTA tiden (onsdag 17/6 22:00 svensk = 20:00Z), inte den gamla 11/6.
     renderView(store({}), new Date('2026-06-13T08:00:00Z'));
     const aForm = document.querySelector('[data-group-id="A"]')!; // nu öppen (reopen)
     const aNotice = aForm.querySelector('[data-deadline-notice]');
     expect(aNotice).not.toBeNull();
-    expect(aNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-21T21:59:00.000Z');
+    expect(aNotice!.getAttribute('data-deadline-iso')).toBe('2026-06-17T20:00:00.000Z');
     expect(aNotice).toHaveTextContent(/Tippningen låses/);
-    expect(aNotice).toHaveTextContent(/söndag 21 juni kl 23:59/);
+    expect(aNotice).toHaveTextContent(/onsdag 17 juni kl 22:00/);
   });
 
   it('EN LADDNING: turneringsdatan laddas exakt en gång, den tips-härledda vyn får den injicerad', () => {
@@ -237,8 +240,8 @@ describe('GroupPredictionsView', () => {
   });
 
   it('FÖRSLAG: en LÅST grupp har ingen förslags-knapp', () => {
-    // 22/6 08:00: grupp A är låst (förlängda söndagen 21/6 passerad). Även med ett komplett
-    // match-tips på g-A-1 ska A:s formulär INTE ha någon förslags-knapp (låst).
+    // 22/6 08:00: grupp A är låst (den platta pool-deadlinen 17/6 20:00Z passerad). Även med
+    // ett komplett match-tips på g-A-1 ska A:s formulär INTE ha någon förslags-knapp (låst).
     renderView(
       store({}),
       new Date('2026-06-22T08:00:00Z'),
