@@ -8,9 +8,10 @@
  *   - en diskret höjd-transition mellan komprimerat och utfällt,
  *   - allt tema-medvetet (fadeTo styr bakytan) och reduced-motion-gatat.
  *
- * Stylas ENBART via senior-devs befintliga data-hakar (data-collapsible,
- * -body, -fade, -cue, data-collapsed) + nya rena klass-hakar, så all semantik +
- * alla tester står oförändrade.
+ * Stylas ENBART via data-hakarna (data-collapsible, -body, -fade, -cue,
+ * data-collapsed), så semantiken bärs av CollapsibleSection.tsx, inte av CSS:en.
+ * (T68b gjorde cue:n klickbar i .tsx och la till tester för den; detta CSS-lager
+ * rör bara utseendet på data-collapsible-cue, ingen logik eller a11y-semantik.)
  */
 
 /* KROPPEN: en diskret höjd-transition vid UTFÄLLNING, så toppen inte SNAPPAR fram
@@ -110,7 +111,8 @@
   transition:
     background-color 200ms ease,
     border-color 200ms ease,
-    box-shadow 200ms ease;
+    box-shadow 200ms ease,
+    transform 200ms ease;
   /* Lugn "andnings"-rörelse så cue:n drar ögat (SPEC §7-ton), aldrig stökig. */
   animation: vm-collapse-cue 2.4s ease-in-out infinite;
 }
@@ -135,6 +137,11 @@
   /* Följer samma andnings-rörelse som pillret under den, så glyf + platta rör
      sig som en enhet. z-index så chevron ligger ÖVER ::after-plattan. */
   z-index: 1;
+  /* transform-transition så hover-lyftet/active-nedtrycket GLIDER mjukt i takt med
+     pillret (::after), i stället för att chevronen hoppar. Under andnings-
+     animationen styr keyframen transform; transitionen gäller vid hover/active då
+     animationen är av. */
+  transition: transform 200ms ease;
   animation: vm-collapse-cue 2.4s ease-in-out infinite;
 }
 
