@@ -7,11 +7,20 @@
 // man matar aldrig in straffar här och det finns ingen status-väljare, och efter
 // avspark är formuläret LÅST.
 //
-// LÅST + AVGJORD (T58 + T73): på ett låst kort visas "Ditt tips", och när matchen
+// LÅST + AVGJORD (T58 + T73 + T76): på ett låst kort visas "Ditt tips", och när matchen
 // är AVGJORD fylls kortet på med (a) FACIT, det rätta slutresultatet + ev. straffar
 // (T73, formatScore/formatPenalties, delad sanning med matchkortet + avslöjande-vyn),
 // och (b) POÄNGEN man fick, om man tippade (T58, härledd ur score.ts via myMatchPoints,
 // EN poäng-källa). Facit visas oavsett om man tippade; poäng-raden kräver ett eget tips.
+//
+// VISUELL HIERARKI tips vs facit (T76, #158, Daniels feedback 2026-06-13): de stora
+// siffer-rutorna är användarens GISSNING men lästes lätt som slutresultatet. Därför är
+// hierarkin på ett AVGJORT kort omvänd så det FAKTISKA utfallet väger tyngst: FACIT
+// lyfts överst i låst-blocket som ett dominant block (pokal-eyebrow med appens etablerade
+// "Facit"-ord + stort guld-tal), tips-rutorna krymper (ett låst minne, inte ett blickfång) och
+// bär en omisskännlig "Ditt tips"-etikett (biljett-eyebrow, par till pokalen). Ögat möter
+// alltså resultatet först, gissningen tydligt etiketterad efteråt. På ett EJ avgjort kort
+// (inget facit) behåller rutorna full storlek , då är tipset fortfarande huvudsaken.
 //
 // VISUELL DESIGN (design-frontend-agentens lager, T15): en EGEN identitet , en
 // TIPS-KUPONG. Resultatinmatningen är "arenan/scoreboarden" (grön pitch); tips-
@@ -48,6 +57,14 @@ const FIELD_BASE =
 // display-siffra. w-16 (64px) är den fasta rut-bredden som håller kolumnerna i linje
 // kort för kort (samma #39-invariant), så ett långt lagnamn aldrig knuffar rutorna.
 const SCORE_INPUT = `${FIELD_BASE} h-12 w-16 px-2 text-center font-display text-[1.375rem] font-bold leading-none tabular-nums`;
+
+// Score-rutan på ett AVGJORT kort (T76, #158, Daniels feedback): där är rutorna ett
+// LÅST minne av ditt tips, inte ett blickfång. Det STORA tipset (h-12, 1.375rem) lästes
+// lätt som slutresultatet, fast facit ovanför är det faktiska utfallet. På ett avgjort
+// kort krymper vi därför tips-rutan (h-9, 0.9375rem) så facit-brickan väger tyngre i
+// hierarkin. Säkert att krympa: rutan är då DISABLED (locked), så 44px-touch-målet
+// (WCAG 2.5.5) gäller inte en inaktiv kontroll. Samma fält-bas (fokus/kant/färg) i övrigt.
+const SCORE_INPUT_DECIDED = `${FIELD_BASE} h-9 w-16 px-2 text-center font-display text-[0.9375rem] font-bold leading-none tabular-nums`;
 
 // Lag-etiketten: avsiktlig ellipsis (truncate), dämpad ton + tight tracking så ett
 // kapat namn läses som DESIGN, inte tryckfel. Fullt namn via title + labelns text.
@@ -227,6 +244,32 @@ function CouponTicketIcon() {
 }
 
 /**
+ * Pokal-ikonen (facit-läget): en liten pokal. Ren dekoration (aria-hidden), facit-
+ * rubrikens text ("Facit") bär betydelsen. Skild glyf från kupong-biljetten
+ * (Tips-/Ditt tips-eyebrow:n): biljett = din gissning, pokal = det faktiska utfallet,
+ * så ögat skiljer de två rubrikerna på ikonen redan innan det läser orden.
+ */
+function CouponTrophyIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* Pokal-skål med två öron (handtag), fot och bas. */}
+      <path d="M4.5 2.5h7v3a3.5 3.5 0 0 1-7 0z" />
+      <path d="M4.5 3.5H3a1.5 1.5 0 0 0 0 3h1.6M11.5 3.5H13a1.5 1.5 0 0 1 0 3h-1.6" />
+      <path d="M8 9v2.5M6 13.5h4M6.5 13.5l.4-2h2.2l.4 2" />
+    </svg>
+  );
+}
+
+/**
  * Hänglås-ikonen (låst-läget): ett stängt hänglås. Ren dekoration (aria-hidden);
  * låst-etikettens text bär betydelsen åt skärmläsaren. Får en lugn engångs-puls
  * via .vm-coupon-lock-icon (nollad vid reducerad rörelse).
@@ -274,6 +317,13 @@ export function PredictionForm({
   // inte avgjord), samma ärlighet som poängen. Gatat på isFinished ENSAMT (inte current):
   // facit är publikt och visas även för den som inte hann tippa.
   const facit = matchFacit(match);
+
+  // AVGJORT kort = facit finns (matchen är spelad färdig). Driver den visuella
+  // hierarki-vändningen (T76): på ett avgjort kort är FACIT det dominanta utfallet,
+  // tips-rutorna är ett nedtonat, tydligt etiketterat minne av gissningen. På ett
+  // ej avgjort (kommande/pågående) kort finns inget facit att jämföra mot, så där
+  // behåller rutorna sin fulla storlek (tipset är fortfarande huvudsaken).
+  const decided = facit !== null;
 
   // Seeda fälten från mitt nuvarande tips (redigera = se det jag tippat).
   const [homeGoals, setHomeGoals] = useState<string>(current ? String(current.homeGoals) : '');
@@ -383,102 +433,133 @@ export function PredictionForm({
             kontext) från ifyllnads-zonen (mål-rutorna). Ren dekoration (aria-hidden). */}
         <div aria-hidden="true" className="vm-coupon-tear -mx-0.5 rounded-pill" />
 
-        {/* LÅST-etikett: visas tydligt efter avspark. POSITIV inramning , "låst vid
-            avspark" är spelets rättvisa (alla tippar blint), inte en frustration.
-            data-prediction-lock är haken för design-frontend. aria-describedby
-            kopplar den till fälten så en skärmläsare får veta varför fälten är
-            inaktiva. Hänglås-ikon + dämpad guld-yta gör låsningen elegant. */}
+        {/* LÅST-BLOCKET (efter avspark): en kolumn med (1) FACIT överst som dominant
+            block, (2) den nedtonade låst-förklaringen + poäng-raden. Hela kolumnen visas
+            bara när matchen är låst. */}
         {locked ? (
-          <div
-            id={lockId}
-            data-prediction-lock=""
-            className="m-0 flex items-start gap-2.5 rounded-md border border-[color-mix(in_srgb,var(--vm-gold)_28%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_7%,var(--color-bg))] px-3 py-2.5"
-          >
-            <span className="mt-0.5 shrink-0 text-warning">
-              <CouponLockIcon />
-            </span>
-            <div className="m-0 flex flex-col gap-1.5">
-              <p className="m-0 text-[0.8125rem] font-semibold leading-snug text-fg">
-                Tipset är låst, matchen har sparkat igång.{' '}
-                <span className="font-medium text-fg-muted">
-                  Låst vid avspark, så alla tippar blint, det är spelets rättvisa.
-                </span>{' '}
-                {current ? (
-                  <span className="whitespace-nowrap">
-                    Ditt tips: {current.homeGoals}–{current.awayGoals}.
-                  </span>
-                ) : (
-                  <span className="text-fg-muted">Du hann inte tippa.</span>
-                )}
-              </p>
-
-              {/* FACIT-RADEN (T73, Daniels feedback 2026-06-13): på en AVGJORD match visas
-                  det RÄTTA slutresultatet, TYDLIGT skilt från "Ditt tips" ovanför, så man ser
-                  hur matchen faktiskt slutade (inte bara vad man gissade). Ordet "Facit" + den
-                  solida guld-brickan (.vm-reveal-actual) är SAMMA språk som avslöjande-vyns
-                  facit-tal, så facit läser likadant överallt (#99, ingen ny visuell vokabulär,
-                  ingen ny kontrast-mätning, AA-bevisad coupon-ink på guld). Talet (formatScore)
-                  + ev. straffarna (formatPenalties) är delade sanningar med matchkortet. Visas
-                  BARA när facit finns (matchen avgjord), oavsett om jag tippade. data-tip-facit
-                  / -facit-penalties = stabila hakar för design + test. design-frontend
-                  balanserar placering/storlek mot poäng-raden + mobil. */}
-              {facit ? (
-                <p
-                  data-tip-facit=""
-                  data-tip-facit-score={facit.score}
-                  className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] leading-snug"
-                >
-                  <span className="text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-fg-muted">
-                    Facit
-                  </span>
+          <div className="m-0 flex flex-col gap-2.5">
+            {/* FACIT-BLOCKET (T73 + T76, Daniels feedback 2026-06-13): på ett AVGJORT
+                kort är det FAKTISKA utfallet (facit) det viktigaste, inte gissningen. Förut
+                var facit en liten pill UNDER låst-texten medan tips-rutorna nedanför var det
+                stora blickfånget, så man läste tipset som resultatet. Nu lyfter vi facit
+                ÖVERST i låst-blocket, med appens etablerade "Facit"-rubrik (pokal-ikon) + ett
+                STORT guld-tal, så ögat möter det riktiga utfallet FÖRST. Samma solida guld-
+                bricka (.vm-reveal-actual) + samma tal-sanningar (formatScore/-Penalties) som
+                förut, bara framlyft och förstorat , ingen ny visuell vokabulär, ingen ny
+                kontrast (coupon-ink på solid guld, AA-mätt 10.90:1 mörkt / 5.03:1 ljust).
+                Hakarna (data-tip-facit / -score / -result / -penalties) är oförändrade. */}
+            {facit ? (
+              <div
+                data-tip-facit=""
+                data-tip-facit-score={facit.score}
+                className="flex flex-col gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--vm-gold)_32%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_9%,var(--color-bg))] px-3 py-2.5"
+              >
+                {/* "Facit" är appens etablerade ord för det faktiska utfallet (matchkortet
+                    + avslöjande-vyn, #99 en sanning), så vi behåller termen, inte ett nytt
+                    ord. Dominansen kommer av POSITIONEN (överst), det stora guld-talet,
+                    pokal-ikonen och den egna inramade ytan, inte av en omdöpning. */}
+                <span className="flex items-center gap-1.5 font-display text-[0.625rem] font-bold uppercase leading-none tracking-[0.2em] text-warning">
+                  <CouponTrophyIcon />
+                  Facit
+                </span>
+                <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <span
                     data-tip-facit-result=""
-                    className="vm-reveal-actual inline-flex items-center rounded-pill px-2.5 py-0.5 text-sm tabular-nums"
+                    className="vm-reveal-actual inline-flex items-center rounded-pill px-3 py-1 font-display text-[1.375rem] leading-none tabular-nums"
                   >
                     {facit.score}
                   </span>
                   {facit.penalties ? (
-                    <span data-tip-facit-penalties="" className="text-[0.75rem] text-fg-muted">
+                    <span data-tip-facit-penalties="" className="text-[0.8125rem] text-fg-muted">
                       {facit.penalties}
                     </span>
                   ) : null}
-                </p>
-              ) : null}
-
-              {/* POÄNG-RADEN (T58 krav 1): på en AVGJORD match jag tippade visas poängen
-                  + VARFÖR direkt på tips-kortet ("+3 · Exakt resultat" / "+1 · Rätt kryss"
-                  / "0 · Miss"). Härlett ur SAMMA poäng-väg som topplistan (scorePrediction
-                  + matchPointLabel, en sanning, ingen ny beräkning). Visas BARA när points
-                  finns: en pågående låst match ger inget (T55, inga gissade poäng), och en
-                  match jag inte tippade ger inget (ingen "0 Miss" för den som inte var med).
-                  data-tip-points/-point-type = stabila hakar för design + test. */}
-              {points ? (
-                <span
-                  data-tip-result=""
-                  data-tip-points={points.points}
-                  data-tip-point-type={points.type}
-                  // mt-1 ger poäng-raden en aning mer luft FRÅN facit-raden ovanför (utöver
-                  // kolumnens gap-1.5) så de tre beats:en (Ditt tips -> facit -> poäng) läser
-                  // i en lugn hierarki: facit är "domen", poängen "din skörd". Utan den extra
-                  // luften tävlar de två brickorna i exakt-fallet, där BÅDA är samma solida
-                  // guld (.vm-reveal-actual + .vm-coupon-mine delar guld-yta/ink); separationen
-                  // gör att facit läses som den labelade domen och poängen som följd-belöningen.
-                  className={`vm-tip-result mt-1 inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none ${TIP_BADGE_CLASS_BY_TYPE[points.type]}`}
-                >
-                  {/* FÄRG-OBEROENDE markör-glyf (bock/halv-cirkel/kryss), samma form-familj
-                      som facit-avslöjandets markör. Ritas via CSS ::before per
-                      data-tip-point-type (.vm-tip-result, tokens.css §10), så glyfen är REN
-                      dekor som aldrig hamnar i textContent (poäng-talet förblir radens
-                      första tecken). VARFÖR-ordet bär betydelsen i text. */}
-                  <span className="tabular-nums">{formatPointDelta(points.points)}</span>
-                  <span aria-hidden="true" className="opacity-60">
-                    ·
-                  </span>
-                  <span>{points.reason}</span>
                 </span>
-              ) : null}
+              </div>
+            ) : null}
+
+            {/* LÅST-FÖRKLARINGEN: visas tydligt efter avspark. POSITIV inramning , "låst vid
+                avspark" är spelets rättvisa (alla tippar blint), inte en frustration. På ett
+                AVGJORT kort är detta nu UNDERORDNAT slutresultatet ovanför (mindre/lugnare
+                yta) , det är kontext, inte rubrik. data-prediction-lock är haken. aria-
+                describedby kopplar den till fälten så en skärmläsare får veta varför fälten
+                är inaktiva. Hänglås-ikon + dämpad guld-yta gör låsningen elegant. Det egna
+                "Ditt tips: X-Y" står kvar i texten som en SNABB sammanfattning bredvid de
+                etiketterade rutorna nedan (en sanning, samma tal). */}
+            <div
+              id={lockId}
+              data-prediction-lock=""
+              className="m-0 flex items-start gap-2.5 rounded-md border border-[color-mix(in_srgb,var(--vm-gold)_22%,var(--color-border))] bg-[color-mix(in_srgb,var(--vm-gold)_5%,var(--color-bg))] px-3 py-2.5"
+            >
+              <span className="mt-0.5 shrink-0 text-warning">
+                <CouponLockIcon />
+              </span>
+              <div className="m-0 flex flex-col gap-1.5">
+                <p className="m-0 text-[0.8125rem] font-semibold leading-snug text-fg">
+                  Tipset är låst, matchen har sparkat igång.{' '}
+                  <span className="font-medium text-fg-muted">
+                    Låst vid avspark, så alla tippar blint, det är spelets rättvisa.
+                  </span>{' '}
+                  {current ? (
+                    <span className="whitespace-nowrap">
+                      Ditt tips: {current.homeGoals}–{current.awayGoals}.
+                    </span>
+                  ) : (
+                    <span className="text-fg-muted">Du hann inte tippa.</span>
+                  )}
+                </p>
+
+                {/* POÄNG-RADEN (T58 krav 1): på en AVGJORD match jag tippade visas poängen
+                    + VARFÖR direkt på tips-kortet ("+3 · Exakt resultat" / "+1 · Rätt kryss"
+                    / "0 · Miss"). Härlett ur SAMMA poäng-väg som topplistan (scorePrediction
+                    + matchPointLabel, en sanning, ingen ny beräkning). Visas BARA när points
+                    finns: en pågående låst match ger inget (T55, inga gissade poäng), och en
+                    match jag inte tippade ger inget (ingen "0 Miss" för den som inte var med).
+                    Den läses som "din skörd" av slutresultatet ovanför.
+                    data-tip-points/-point-type = stabila hakar för design + test. */}
+                {points ? (
+                  <span
+                    data-tip-result=""
+                    data-tip-points={points.points}
+                    data-tip-point-type={points.type}
+                    className={`vm-tip-result mt-0.5 inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 font-display text-[0.75rem] font-bold leading-none ${TIP_BADGE_CLASS_BY_TYPE[points.type]}`}
+                  >
+                    {/* FÄRG-OBEROENDE markör-glyf (bock/halv-cirkel/kryss), samma form-familj
+                        som facit-avslöjandets markör. Ritas via CSS ::before per
+                        data-tip-point-type (.vm-tip-result, tokens.css §10), så glyfen är REN
+                        dekor som aldrig hamnar i textContent (poäng-talet förblir radens
+                        första tecken). VARFÖR-ordet bär betydelsen i text. */}
+                    <span className="tabular-nums">{formatPointDelta(points.points)}</span>
+                    <span aria-hidden="true" className="opacity-60">
+                      ·
+                    </span>
+                    <span>{points.reason}</span>
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
+        ) : null}
+
+        {/* "DITT TIPS"-etiketten (T76, #158, Daniels feedback): de stora siffer-rutorna
+            nedan är ANVÄNDARENS TIPS, men på ett LÅST kort lästes de lätt som slutresultatet.
+            En tydlig, omisskännlig etikett DIREKT vid tips-rutorna gör distinktionen glasklar:
+            rutorna = ditt tips, facit-blocket ovanför = det faktiska utfallet. Etiketten är ett
+            tydligt PAR till facit-rubriken: samma eyebrow-form (versal + spärrad
+            + guld-warning-ton + en liten ikon), men med kupong-BILJETTEN i stället för
+            pokalen, så ögat skiljer "din gissning" från "det faktiska utfallet" på ikonen.
+            Visas bara när matchen är LÅST OCH jag tippade (på ett öppet kort ramar
+            "Tips"-eyebrow:n + spar-knappen redan in att man fyller i sitt tips; en otippad
+            låst match har inga siffror i rutorna att etikettera). data-prediction-tip-label
+            = stabil hake (oförändrad). */}
+        {locked && current ? (
+          <p
+            data-prediction-tip-label=""
+            className="m-0 flex items-center gap-1.5 font-display text-[0.625rem] font-bold uppercase leading-none tracking-[0.2em] text-warning"
+          >
+            <CouponTicketIcon />
+            Ditt tips
+          </p>
         ) : null}
 
         {/* Score-grid (SAMMA #39-struktur som resultatinmatningen, fast bredd). */}
@@ -556,7 +637,7 @@ export function PredictionForm({
               onChange={(e) => edit(setHomeGoals)(e.target.value)}
               aria-invalid={error ? true : undefined}
               aria-describedby={describedBy}
-              className={SCORE_INPUT}
+              className={decided ? SCORE_INPUT_DECIDED : SCORE_INPUT}
             />
           </div>
 
@@ -567,7 +648,11 @@ export function PredictionForm({
               decisions.md). 50/50-mix ger karaktären utan att sänka läsbarheten. */}
           <span
             aria-hidden="true"
-            className="order-1 self-end pb-3 font-display text-[0.6875rem] font-semibold uppercase tracking-[0.18em] sm:order-2 sm:self-center sm:pb-0"
+            // pb håller "mot" lodrätt centrerad mot inmatningsrutan på mobil (items-end
+            // botten-justerar kolumnen). Rutan är lägre på ett avgjort kort (h-9 i stället
+            // för h-12, T76), så bottenmarginalen följer med (pb-2 -> ~mitten av h-9) så
+            // avdelaren inte hamnar för högt över de krympta rutorna. På sm centreras allt.
+            className={`order-1 self-end font-display text-[0.6875rem] font-semibold uppercase tracking-[0.18em] sm:order-2 sm:self-center sm:pb-0 ${decided ? 'pb-2' : 'pb-3'}`}
             style={{ color: 'color-mix(in srgb, var(--color-warning) 50%, var(--color-fg-muted))' }}
           >
             mot
@@ -604,7 +689,7 @@ export function PredictionForm({
               onChange={(e) => edit(setAwayGoals)(e.target.value)}
               aria-invalid={error ? true : undefined}
               aria-describedby={describedBy}
-              className={SCORE_INPUT}
+              className={decided ? SCORE_INPUT_DECIDED : SCORE_INPUT}
             />
           </div>
         </div>
