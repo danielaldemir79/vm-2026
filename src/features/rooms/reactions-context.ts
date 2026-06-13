@@ -31,6 +31,14 @@ export interface ReactionsStore {
   /** Den inloggades user_id (null tills känt), så UI:t vet vilken bricka som är "min". */
   userId: string | null;
   /**
+   * VISNINGSNAMN per user_id (T74, #157): ur det aktiva rummets medlemmar (room_members),
+   * så "vem reagerade"-popovern kan visa namn i stället för råa id:n. EN sanning för
+   * "userId -> namn" (samma karta RoomComments bygger), buren på reaktions-storen så
+   * MatchReactions inte behöver en EGEN koppling till rums-storen. En reagerare som
+   * lämnat rummet saknas i kartan -> UI:t faller till "Tidigare medlem" (reaction-authors).
+   */
+  nameByUser: ReadonlyMap<string, string>;
+  /**
    * Sätt ELLER byt min reaktion på en match (upsert). Kastar vid fel (UI fångar + visar).
    */
   react: (matchId: string, emoji: ReactionEmoji) => Promise<void>;
@@ -51,6 +59,7 @@ const INERT_REACTIONS_STORE: ReactionsStore = {
   error: null,
   byMatch: new Map(),
   userId: null,
+  nameByUser: new Map(),
   react: async () => {},
   removeReaction: async () => {},
 };

@@ -13,6 +13,8 @@ import { createContext, useContext } from 'react';
 import type { RoomMatchResult, RoomMember, RoomResultInput, RoomSummary } from '../../data/rooms';
 import type { CopyReport } from '../../data/predictions';
 
+export type { RoomMember };
+
 /** Laddningstillstånd för rums-lagret (samma vokabulär som results-storen). */
 export type RoomsStatus = 'loading' | 'ready' | 'error';
 
@@ -112,6 +114,13 @@ export interface RoomsSync {
    * rader som är "mina" (visa radera-knapp) UTAN en ny koppling till hela rums-storen.
    */
   userId: string | null;
+  /**
+   * Det aktiva rummets medlemmar (tomt utan rum). Bärs på synk-seamen (T74, #157) så
+   * reaktions-lagret kan mappa en reaktions user_id -> displayName ("vem reagerade"-
+   * popovern) UTAN en ny koppling till hela rums-storen, samma motiv som userId (T66).
+   * EN sanning för "userId -> namn" är room_members; vi återanvänder den, ingen ny källa.
+   */
+  members: RoomMember[];
 }
 
 /** Inert rums-synk: inget aktivt rum, inga delade resultat, spar är en no-op. */
@@ -121,6 +130,7 @@ const INERT_ROOMS_SYNC: RoomsSync = {
   saveResult: async () => {},
   tipsRefreshNonce: 0,
   userId: null,
+  members: [],
 };
 
 /**
@@ -146,5 +156,6 @@ export function useRoomsSync(): RoomsSync {
     saveResult: store.saveResult,
     tipsRefreshNonce: store.tipsRefreshNonce,
     userId: store.userId,
+    members: store.members,
   };
 }

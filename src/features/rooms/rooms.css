@@ -480,3 +480,17 @@
 .vm-reaction-option[data-mine] {
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
+
+/* "VEM REAGERADE"-POPOVERN (T74, #157): senior-devs Tailwind ger redan position (fixed
+   + viewport-klampade left/top via JS), surface-raised, border, radie, skugga och z-index.
+   Här bara en hårfin inre topp-högdager (samma kvällsljus som pickern) så popovern läser
+   som ett svävande lager ovanför brickan. design-frontend FINPUTSAR utseendet (pil mot
+   ankaret, in-animation gatad av reduced-motion, ev. tätare typografi) UTAN att röra
+   positionerings-logiken (JS) eller a11y-hakarna (role=tooltip + aria-describedby).
+   Ren dekor (box-shadow staplad på Tailwinds raised-skugga); texten (namn + tid) bär
+   betydelsen och håller AA på surface-raised (samma yta som pickern, redan mätt). */
+.vm-reaction-authors {
+  box-shadow:
+    var(--vm-shadow-raised),
+    inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 14%, transparent);
+}
