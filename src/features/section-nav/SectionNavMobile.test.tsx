@@ -68,9 +68,11 @@ describe('SectionNavMobile, panel öppnar/stänger + aria-kontrakt', () => {
   it('togglar aria-expanded och binder aria-controls till panelens id', () => {
     renderMenu(<FakeSection section={SECTIONS.daily} />);
     const btn = menuButton();
-    // Stängd: aria-expanded=false, ingen panel.
+    // Stängd: aria-expanded=false, ingen panel. aria-controls får INTE vara satt, panelen är
+    // inte monterad och en IDREF dit vore ogiltig ARIA (C6, Copilot-runda-2 #168).
     expect(btn).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('[data-section-menu-panel]')).toBeNull();
+    expect(btn).not.toHaveAttribute('aria-controls');
 
     act(() => btn.click());
 
@@ -81,10 +83,11 @@ describe('SectionNavMobile, panel öppnar/stänger + aria-kontrakt', () => {
     expect(btn.getAttribute('aria-controls')).toBe((panel as HTMLElement).id);
     expect((panel as HTMLElement).id).toBeTruthy();
 
-    // Klick igen stänger.
+    // Klick igen stänger: aria-controls faller bort igen (ingen monterad panel att peka på).
     act(() => btn.click());
     expect(btn).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('[data-section-menu-panel]')).toBeNull();
+    expect(btn).not.toHaveAttribute('aria-controls');
   });
 
   it('listar ALLA registrerade sektioner som rader (samma registry-sanning, inga döda rader)', () => {

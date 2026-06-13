@@ -181,7 +181,11 @@ export function SectionNavMobile() {
           data-section-menu-open={open ? 'true' : undefined}
           aria-haspopup="true"
           aria-expanded={open}
-          aria-controls={panelId}
+          // aria-controls sätts BARA när panelen faktiskt är monterad (open). I stängt läge
+          // renderas ingen panel, så en IDREF dit vore ogiltig ARIA (pekar på ett element som
+          // inte finns i DOM) och kan förvirra hjälpmedel. aria-expanded bär stängt/öppet-
+          // tillståndet oavsett (C6, Copilot-runda-2 #168).
+          aria-controls={open ? panelId : undefined}
           onClick={() => setOpen((v) => !v)}
           className="vm-section-menu-button font-display"
         >
