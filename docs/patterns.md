@@ -15,7 +15,8 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 1. **Problemet:** ett val ska vara unikt per användare och "omgång" (svensk kalenderdag), och dagen
    måste härledas SERVER-SIDE ur en referens (en match-avspark), inte tas emot från klienten (som kan
-   ljuga om vilken dag valet gäller). Exempel: joker-matchen (T19), en per dag.
+   ljuga om vilken dag valet gäller). Exempel: joker-matchen (T19, en per dag, borttagen i T71, men
+   recepten lämnas kvar då DB-mönstret är generellt återanvändbart).
 2. **Materialisera dagen i en `date`-kolumn + PK på `(user_id, ..., dag)`.** PK:n ÄR regeln: en andra
    rad samma dag krockar (upsert byter i stället för att skapa två).
 3. **Fyll dagen med en BEFORE INSERT/UPDATE-TRIGGER, inte en GENERERAD kolumn.** En generated-kolumn
@@ -29,7 +30,8 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
    `is_room_member`), så "när låser/avslöjas det" är EN sanning som inte kan drifta.
 6. **BEVISA en-per-dag + lås med riktiga roller (DO-block) FÖRE klient-koden:** två refs SAMMA dag ->
    andra NEKAD av PK (upsert byter, 1 rad); ett lås-test med manipulerad kickoff -> NEKAD efter avspark.
-   Källa: T19 (#19), `room_jokers` + `match_joker_day` + `room_jokers_set_day`-triggern.
+   Källa: T19 (#19), `room_jokers` + `match_joker_day` + `room_jokers_set_day`-triggern (joker-
+   feature borttagen i T71, men DB-objekten + detta recept består).
 
 ### admin-aggregat-rpc-laser-over-rumsgranser-utan-att-lacka-hemliga-tips (Supabase, VM 2026)
 

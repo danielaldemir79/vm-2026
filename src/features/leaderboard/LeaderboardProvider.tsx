@@ -20,12 +20,10 @@ import {
   listRoomPredictions,
   listRoomGroupPredictions,
   listRoomBracketPredictions,
-  listRoomJokers,
   isMatchLocked,
   type Prediction,
   type GroupPrediction,
   type BracketPrediction,
-  type RoomJoker,
 } from '../../data/predictions';
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
 import { isSupabaseConfigured, LIVE_READY } from '../../data';
@@ -43,16 +41,14 @@ import {
   type LeaderboardStore,
 } from './leaderboard-context';
 
-/** Rummets RLS-synliga tips (alla tre typer) + joker-val, råladdade per rum. */
+/** Rummets RLS-synliga tips (alla tre typer), råladdade per rum. */
 interface RoomPredictions {
   match: Prediction[];
   group: GroupPrediction[];
   bracket: BracketPrediction[];
-  /** Joker-val (T19): RLS släpper bara egna + redan-avslöjade (efter avspark). */
-  jokers: RoomJoker[];
 }
 
-const EMPTY_PREDICTIONS: RoomPredictions = { match: [], group: [], bracket: [], jokers: [] };
+const EMPTY_PREDICTIONS: RoomPredictions = { match: [], group: [], bracket: [] };
 
 /** Inre laddningstillstånd bara för tips-laddningen (vävs med data-statusen nedan). */
 type PredictionsStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -159,19 +155,18 @@ export function LeaderboardProvider({
       setPredictionsStatus('loading');
       setPredictionsError(null);
     }
-    // Ladda rummets RLS-synliga tips för ALLA tre typer + joker-valen parallellt. RLS
-    // gör att vi bara får egna + redan-avslöjade rader (sekretessen är server-side).
+    // Ladda rummets RLS-synliga tips för ALLA tre typer parallellt. RLS gör att vi bara
+    // får egna + redan-avslöjade rader (sekretessen är server-side).
     Promise.all([
       listRoomPredictions(supabase, activeRoomId),
       listRoomGroupPredictions(supabase, activeRoomId),
       listRoomBracketPredictions(supabase, activeRoomId),
-      listRoomJokers(supabase, activeRoomId),
     ])
-      .then(([match, group, bracket, jokers]) => {
+      .then(([match, group, bracket]) => {
         if (token !== loadTokenRef.current) {
           return; // föråldrat svar (nyare rumsbyte hann starta), kasta tyst
         }
-        setPredictions({ match, group, bracket, jokers });
+        setPredictions({ match, group, bracket });
         setPredictionsStatus('ready');
         loadedRoomIdRef.current = activeRoomId;
       })
@@ -227,13 +222,9 @@ export function LeaderboardProvider({
     [data.teams, data.groups, data.matches]
   );
 
-  // Gruppera tipsen + joker-valen per medlem (userId) för aggregeringen. Jokrarna
-  // samlas i en Set per medlem (jokerMatchIds), som scoreMember dubblar match-poängen
-  // mot (T19). Bara RLS-synliga joker-rader når hit (egna + avslöjade), så en medlems
-  // joker-Set kan strukturellt bara innehålla det som får ses, samma sekretess som tipsen.
+  // Gruppera tipsen per medlem (userId) för aggregeringen.
   const predictionsByUser = useMemo(() => {
     const byUser = new Map<string, MemberPredictions>();
-    const jokersByUser = new Map<string, Set<string>>();
     const ensure = (userId: string): MemberPredictions => {
       let entry = byUser.get(userId);
       if (!entry) {
@@ -250,17 +241,6 @@ export function LeaderboardProvider({
     }
     for (const p of predictions.bracket) {
       (ensure(p.userId).bracketPredictions as BracketPrediction[]).push(p);
-    }
-    for (const j of predictions.jokers) {
-      let set = jokersByUser.get(j.userId);
-      if (!set) {
-        set = new Set<string>();
-        jokersByUser.set(j.userId, set);
-      }
-      set.add(j.matchId);
-      // Säkerställ att medlemmen finns i byUser även om hen BARA har en joker
-      // (osannolikt, men då ska jokern ändå bäras), och knyt Set:en till posten.
-      ensure(j.userId).jokerMatchIds = set;
     }
     return byUser;
   }, [predictions]);
@@ -294,8 +274,8 @@ export function LeaderboardProvider({
 
   // AKTUELL användares STREAK + MÄRKEN (T19, #99-stil): härledd ur SAMMA tips + den
   // delade matchlistan (deriveMemberBadges), ingen DB. Samma gate som selfBreakdown
-  // (identitet OCH egen rad finns). Joker-OBEROENDE: en streak/skräll är en bedrift
-  // oavsett joker, så vi matar match-tipsen + matcherna + lagen, inte jokrarna.
+  // (identitet OCH egen rad finns). Bedöms på RÅ match-poäng: vi matar match-tipsen
+  // + matcherna + lagen.
   const selfBadges = useMemo(() => {
     if (rooms.userId === null) {
       return null;
@@ -310,8 +290,7 @@ export function LeaderboardProvider({
   // AKTUELL användares PERSONLIGA STATISTIK (T23, #23): träffsäkerhet + exakt/utfall/
   // miss-räkning + bästa call, härledd ur SAMMA score.ts-poängväg som topplistan över
   // den delade matchlistan (derivePersonalStats), ingen omräkning, ingen DB. Samma gate
-  // som selfBreakdown/selfBadges (identitet OCH egen rad finns). JOKER-MEDVETEN bästa
-  // call: vi matar medlemmens egna joker-set (samma set scoreMember dubblar poäng mot).
+  // som selfBreakdown/selfBadges (identitet OCH egen rad finns).
   const selfStats = useMemo(() => {
     if (rooms.userId === null) {
       return null;
@@ -320,7 +299,7 @@ export function LeaderboardProvider({
     if (mine === undefined) {
       return null;
     }
-    return derivePersonalStats(mine.matchPredictions, data.matches, mine.jokerMatchIds);
+    return derivePersonalStats(mine.matchPredictions, data.matches);
   }, [rooms.userId, predictionsByUser, data.matches]);
 
   const store: LeaderboardStore = useMemo(

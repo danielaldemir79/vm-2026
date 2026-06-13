@@ -25,18 +25,14 @@
 //    hellre tyst än en falsk 0 %, samma fail-safe som deriveSelfSummary).
 //  * EXAKTA / RÄTT UTFALL / MISS = antalet avgjorda tips per poäng-TYP, klassade
 //    med pointTypeOf (samma exakt/utfall/miss-beslut som scorePrediction, en regel).
-//    Dessa räknas på det OBOOSTADE utfallet: en joker ändrar poäng-TYNGDEN, inte
-//    HUR MÅNGA exakta/utfall medlemmen prickat (samma val som topplistans exactHits).
-//  * BÄSTA CALL (bestCall) = det ENSKILDA avgjorda match-tips som gav HÖGST poäng,
-//    JOKER-MEDVETET (en joker DUBBLAR poängen, JOKER_MULTIPLIER), så en dubblad exakt
-//    (6p) slår en oboostad exakt (3p). Bara tips som gav poäng (> 0) kan vara bästa
-//    call; gav inget tips poäng är bestCall null. Vid lika poäng vinner den TIDIGASTE
-//    matchen (kickoff), en stabil, deterministisk regel så bästa call inte "flaxar".
+//  * BÄSTA CALL (bestCall) = det ENSKILDA avgjorda match-tips som gav HÖGST poäng. Bara
+//    tips som gav poäng (> 0) kan vara bästa call; gav inget tips poäng är bestCall null.
+//    Vid lika poäng vinner den TIDIGASTE matchen (kickoff), en stabil, deterministisk
+//    regel så bästa call inte "flaxar".
 
 import type { Match } from '../../domain/types';
 import type { Prediction } from '../../data/predictions';
 import { pointTypeOf, scorePrediction, type MatchPointType } from '../../data/predictions';
-import { JOKER_MULTIPLIER } from './aggregate-scores';
 
 /** Identitet för bästa call: vilken match + vad tippet gav, så UI:t kan visa den. */
 export interface BestCall {
@@ -50,10 +46,8 @@ export interface BestCall {
   kickoff: string;
   /** Poäng-typen tippet gav (exact/outcome), driver "varför"-etiketten i UI:t. */
   pointType: MatchPointType;
-  /** Poängen tippet faktiskt gav, JOKER-MEDVETET (dubblad om matchen var joker). */
+  /** Poängen tippet faktiskt gav. */
   points: number;
-  /** Var matchen medlemmens joker (poängen dubblades)? Driver en joker-markering i UI:t. */
-  joker: boolean;
 }
 
 /** Aktuell användares personliga tips-statistik, härledd ur match-tipsen + facit. */
@@ -71,35 +65,31 @@ export interface PersonalStats {
    * medlemmen inte har NÅGOT avgjort tips än (ingen kvot att visa, hellre tyst än 0).
    */
   accuracy: number | null;
-  /** Bästa enskilda call (högst poäng-satta tips, joker-medvetet), eller null. */
+  /** Bästa enskilda call (högst poäng-satta tips), eller null. */
   bestCall: BestCall | null;
 }
 
-/** Ett avgjort, tippat match-tips med sin poäng-typ + boostade poäng. Internt arbets-form. */
+/** Ett avgjort, tippat match-tips med sin poäng-typ + poäng. Internt arbets-form. */
 interface DecidedTip {
   matchId: string;
   homeTeamId: string | null;
   awayTeamId: string | null;
   kickoff: string;
   pointType: MatchPointType;
-  /** OBOOSTAD poäng (0/1/3), för exakt/utfall/miss-räkningen. */
-  basePoints: number;
-  /** JOKER-MEDVETEN poäng (base × JOKER_MULTIPLIER om joker), för bästa call. */
-  boostedPoints: number;
-  joker: boolean;
+  /** Poäng (0/1/3) tippet gav, för exakt/utfall/miss-räkningen + bästa call. */
+  points: number;
 }
 
 /**
  * Bygg listan av medlemmens AVGJORDA, TIPPADE match-tips, var och en med sin poäng-
- * typ + obooostad/boostad poäng. Bara matcher som BÅDE är 'finished' OCH medlemmen
- * tippade ingår (en otippad eller oavgjord match är inte ett tips i statistiken).
- * Speglar buildFinishedTips i derive-badges.ts (samma urvalsregel + samma score.ts-
- * funktioner), men bär poäng-TYPEN + joker-boosten som statistiken behöver.
+ * typ + poäng. Bara matcher som BÅDE är 'finished' OCH medlemmen tippade ingår (en
+ * otippad eller oavgjord match är inte ett tips i statistiken). Speglar buildFinishedTips
+ * i derive-badges.ts (samma urvalsregel + samma score.ts-funktioner), men bär poäng-TYPEN
+ * som statistiken behöver.
  */
 function buildDecidedTips(
   matchPredictions: readonly Prediction[],
-  matches: readonly Match[],
-  jokerMatchIds: ReadonlySet<string>
+  matches: readonly Match[]
 ): DecidedTip[] {
   const predByMatchId = new Map(matchPredictions.map((p) => [p.matchId, p]));
   const tips: DecidedTip[] = [];
@@ -112,42 +102,35 @@ function buildDecidedTips(
       continue; // medlemmen tippade inte denna match
     }
     const predicted = { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals };
-    const basePoints = scorePrediction(predicted, match.result);
-    const joker = jokerMatchIds.has(match.id);
     tips.push({
       matchId: match.id,
       homeTeamId: match.homeTeamId,
       awayTeamId: match.awayTeamId,
       kickoff: match.kickoff,
       pointType: pointTypeOf(predicted, match.result),
-      basePoints,
-      // Joker dubblar poängen (samma regel som scoreMember i aggregate-scores). En
-      // miss (0p) × multiplikatorn är fortfarande 0, så en joker på ett feltips
-      // påverkar aldrig bästa call (ingen vinst, ingen straff).
-      boostedPoints: joker ? basePoints * JOKER_MULTIPLIER : basePoints,
-      joker,
+      points: scorePrediction(predicted, match.result),
     });
   }
   return tips;
 }
 
 /**
- * Välj bästa call: det avgjorda tips som gav HÖGST joker-medveten poäng (> 0). Vid
- * lika poäng vinner den TIDIGASTE matchen (kickoff), en stabil regel så bästa call
- * är deterministisk och inte beror på inmatnings-/iterations-ordning. Returnerar
- * null om inget tips gav poäng (alla missar / inga avgjorda tips).
+ * Välj bästa call: det avgjorda tips som gav HÖGST poäng (> 0). Vid lika poäng vinner
+ * den TIDIGASTE matchen (kickoff), en stabil regel så bästa call är deterministisk och
+ * inte beror på inmatnings-/iterations-ordning. Returnerar null om inget tips gav poäng
+ * (alla missar / inga avgjorda tips).
  */
 function pickBestCall(tips: readonly DecidedTip[]): BestCall | null {
   let best: DecidedTip | null = null;
   for (const tip of tips) {
-    if (tip.boostedPoints <= 0) {
+    if (tip.points <= 0) {
       continue; // bara tips som gav poäng kan vara bästa call
     }
     if (
       best === null ||
-      tip.boostedPoints > best.boostedPoints ||
+      tip.points > best.points ||
       // Lika poäng: tidigast kickoff vinner (stabil, deterministisk tiebreak).
-      (tip.boostedPoints === best.boostedPoints &&
+      (tip.points === best.points &&
         new Date(tip.kickoff).getTime() < new Date(best.kickoff).getTime())
     ) {
       best = tip;
@@ -162,15 +145,14 @@ function pickBestCall(tips: readonly DecidedTip[]): BestCall | null {
     awayTeamId: best.awayTeamId,
     kickoff: best.kickoff,
     pointType: best.pointType,
-    points: best.boostedPoints,
-    joker: best.joker,
+    points: best.points,
   };
 }
 
 /**
- * Härled aktuell användares personliga tips-statistik ur hens match-tips, den delade
- * matchlistan (officiellt facit invävt) och hens joker-val. REN: samma indata
- * topplistan + märkena redan har, samma score.ts-poängväg (ingen omräkning), ingen DB.
+ * Härled aktuell användares personliga tips-statistik ur hens match-tips och den delade
+ * matchlistan (officiellt facit invävt). REN: samma indata topplistan + märkena redan
+ * har, samma score.ts-poängväg (ingen omräkning), ingen DB.
  *
  * EDGE-FALL (alla rena, inga kast): inga tips alls -> 0 avgjorda, accuracy null,
  * bestCall null. Tips men inga avgjorda matcher än -> samma. Alla missar -> accuracy 0,
@@ -178,15 +160,12 @@ function pickBestCall(tips: readonly DecidedTip[]): BestCall | null {
  *
  * @param matchPredictions  medlemmens match-tips (T15).
  * @param matches           den DELADE matchlistan (officiellt facit invävt), facit-källan.
- * @param jokerMatchIds     medlemmens joker-matcher (T19), för joker-medveten bästa call.
- *                          Valfri: utelämnad = inga jokrar (bakåtkompatibelt).
  */
 export function derivePersonalStats(
   matchPredictions: readonly Prediction[],
-  matches: readonly Match[],
-  jokerMatchIds: ReadonlySet<string> = new Set<string>()
+  matches: readonly Match[]
 ): PersonalStats {
-  const tips = buildDecidedTips(matchPredictions, matches, jokerMatchIds);
+  const tips = buildDecidedTips(matchPredictions, matches);
 
   let exactHits = 0;
   let outcomeHits = 0;
