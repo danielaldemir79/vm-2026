@@ -12,6 +12,20 @@
 
 import { REACTION_EMOJIS, type ReactionEmoji, type RoomReaction } from '../../data/rooms';
 
+/**
+ * EN reagerare på EN emoji: vem (userId) + när (createdAt). Namnet slås INTE upp här
+ * (aggregeringen är ren och vet inget om medlemslistan); UI-lagret (MatchReactions)
+ * mappar userId -> displayName via rum-medlemmarna när popovern "vem reagerade" visas
+ * (T74, #157). Att hålla namn-uppslaget utanför aggregeringen håller EN sanning för
+ * "userId -> namn" (room_members), aggregeringen behöver bara identiteten + tiden.
+ */
+export interface ReactionReactor {
+  /** Reagerarens user_id (mappas till displayName i UI:t). */
+  userId: string;
+  /** ISO-tidsstämpel för när reaktionen sattes (created_at). */
+  createdAt: string;
+}
+
 /** Aggregatet för EN emoji på EN match: emojin, antalet, och om den är MIN. */
 export interface ReactionTally {
   emoji: ReactionEmoji;
@@ -19,6 +33,12 @@ export interface ReactionTally {
   count: number;
   /** Är detta MIN valda emoji på matchen? (då markeras knappen som aktiv). */
   mine: boolean;
+  /**
+   * VILKA som valt denna emoji (T74, #157), sorterade ÄLDST FÖRST (createdAt stigande),
+   * stabilt vid lika tid (userId som sekundär nyckel). `reactors.length === count`.
+   * UI:t visar dessa i popovern "vem reagerade", med namn + tid.
+   */
+  reactors: ReactionReactor[];
 }
 
 /** Allt UI:t behöver för EN match: brickorna (>0) + min valda emoji + totalen. */
@@ -52,41 +72,61 @@ export function aggregateReactionsByMatch(
   reactions: readonly RoomReaction[],
   myUserId: string | null
 ): Map<string, MatchReactionSummary> {
-  // Per match: en räknare per emoji + min valda emoji.
-  const counts = new Map<string, Map<ReactionEmoji, number>>();
+  // Per match: per emoji de RÅA reagerarna (vem + när), + min valda emoji. Räkningen
+  // härleds ur reaktor-listans längd (en sanning), så count och reactors aldrig kan
+  // drifta isär (T74: popovern visar exakt de personer count räknar).
+  const reactors = new Map<string, Map<ReactionEmoji, ReactionReactor[]>>();
   const mine = new Map<string, ReactionEmoji>();
 
   for (const r of reactions) {
     if (!(REACTION_EMOJIS as readonly string[]).includes(r.emoji)) {
       continue; // okänd emoji (kan inte hända via CHECK), räkna inte
     }
-    let perEmoji = counts.get(r.matchId);
+    let perEmoji = reactors.get(r.matchId);
     if (perEmoji === undefined) {
-      perEmoji = new Map<ReactionEmoji, number>();
-      counts.set(r.matchId, perEmoji);
+      perEmoji = new Map<ReactionEmoji, ReactionReactor[]>();
+      reactors.set(r.matchId, perEmoji);
     }
-    perEmoji.set(r.emoji, (perEmoji.get(r.emoji) ?? 0) + 1);
+    const list = perEmoji.get(r.emoji);
+    const reactor: ReactionReactor = { userId: r.userId, createdAt: r.createdAt };
+    if (list === undefined) {
+      perEmoji.set(r.emoji, [reactor]);
+    } else {
+      list.push(reactor);
+    }
     if (myUserId !== null && r.userId === myUserId) {
       mine.set(r.matchId, r.emoji);
     }
   }
 
   const result = new Map<string, MatchReactionSummary>();
-  for (const [matchId, perEmoji] of counts) {
+  for (const [matchId, perEmoji] of reactors) {
     const myEmoji = mine.get(matchId) ?? null;
     // Visnings-ordning = REACTION_EMOJIS-ordning (stabil), bara emojier med count > 0.
     const tallies: ReactionTally[] = [];
     let total = 0;
     for (const emoji of REACTION_EMOJIS) {
-      const count = perEmoji.get(emoji) ?? 0;
-      if (count > 0) {
-        tallies.push({ emoji, count, mine: myEmoji === emoji });
-        total += count;
+      const list = perEmoji.get(emoji);
+      if (list !== undefined && list.length > 0) {
+        // Reagerarna sorteras ÄLDST FÖRST (createdAt stigande), userId som stabil
+        // sekundär nyckel vid exakt lika tid, så popover-ordningen är deterministisk
+        // (lärdomen: ett ordnings-beroende val ger instabil UI; här är den explicit).
+        const sorted = [...list].sort(byCreatedAtThenUser);
+        tallies.push({ emoji, count: sorted.length, mine: myEmoji === emoji, reactors: sorted });
+        total += sorted.length;
       }
     }
     result.set(matchId, { matchId, tallies, myEmoji, total });
   }
   return result;
+}
+
+/** Sortera reagerare: äldst först (createdAt stigande), userId som stabil sekundär nyckel. */
+function byCreatedAtThenUser(a: ReactionReactor, b: ReactionReactor): number {
+  if (a.createdAt !== b.createdAt) {
+    return a.createdAt < b.createdAt ? -1 : 1;
+  }
+  return a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0;
 }
 
 /**

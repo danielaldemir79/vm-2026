@@ -7,7 +7,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 // ResultEntryForm-testerna): fireEvent.click + act räcker för dessa klick-flöden.
 import { MatchReactions } from './MatchReactions';
 import type { ReactionsStore } from './reactions-context';
-import type { MatchReactionSummary } from './reaction-aggregate';
+import type { MatchReactionSummary, ReactionReactor, ReactionTally } from './reaction-aggregate';
+import type { ReactionEmoji } from '../../data/rooms';
 
 // Driv komponenten via en mockad store (vi testar UI:t, inte providern). useReactionsStore
 // returnerar vår fejk-store; summaryForMatch är ren och körs mot fejkens byMatch.
@@ -23,10 +24,28 @@ function makeStore(over: Partial<ReactionsStore> = {}): ReactionsStore {
     error: null,
     byMatch: new Map(),
     userId: 'me',
+    nameByUser: new Map(),
     react: vi.fn().mockResolvedValue(undefined),
     removeReaction: vi.fn().mockResolvedValue(undefined),
     ...over,
   };
+}
+
+/**
+ * Bygg en ReactionTally med reagerare. Default: `count` syntetiska reagerare (u0, u1...),
+ * äldst-först, så popover-rader finns att visa i T74-testerna. `reactors` kan överstyras.
+ */
+function tally(
+  emoji: ReactionEmoji,
+  count: number,
+  mine: boolean,
+  reactors?: ReactionReactor[]
+): ReactionTally {
+  const fallback: ReactionReactor[] = Array.from({ length: count }, (_, i) => ({
+    userId: `u${i}`,
+    createdAt: `2026-06-12T10:0${i}:00Z`,
+  }));
+  return { emoji, count, mine, reactors: reactors ?? fallback };
 }
 
 function summary(over: Partial<MatchReactionSummary> = {}): MatchReactionSummary {
@@ -61,10 +80,7 @@ describe('MatchReactions , aggregat-räkning', () => {
           summary({
             myEmoji: '🔥',
             total: 3,
-            tallies: [
-              { emoji: '⚽', count: 1, mine: false },
-              { emoji: '🔥', count: 2, mine: true },
-            ],
+            tallies: [tally('⚽', 1, false), tally('🔥', 2, true)],
           }),
         ],
       ]),
@@ -106,10 +122,7 @@ describe('MatchReactions , reagera', () => {
           summary({
             myEmoji: '⚽',
             total: 2,
-            tallies: [
-              { emoji: '⚽', count: 1, mine: true },
-              { emoji: '🔥', count: 1, mine: false },
-            ],
+            tallies: [tally('⚽', 1, true), tally('🔥', 1, false)],
           }),
         ],
       ]),
@@ -133,7 +146,7 @@ describe('MatchReactions , reagera', () => {
           summary({
             myEmoji: '🔥',
             total: 1,
-            tallies: [{ emoji: '🔥', count: 1, mine: true }],
+            tallies: [tally('🔥', 1, true)],
           }),
         ],
       ]),
@@ -156,7 +169,7 @@ describe('MatchReactions , reagera', () => {
           summary({
             myEmoji: '🔥',
             total: 1,
-            tallies: [{ emoji: '🔥', count: 1, mine: true }],
+            tallies: [tally('🔥', 1, true)],
           }),
         ],
       ]),
@@ -191,5 +204,169 @@ describe('MatchReactions , reagera', () => {
     await waitFor(() =>
       expect(screen.getByText('RLS nekade')).toHaveAttribute('data-reactions-error')
     );
+  });
+});
+
+describe('MatchReactions , se VILKA som reagerat (T74, #157)', () => {
+  // En match med 🔥 från två personer (en känd, en okänd = lämnat rummet) + namn-uppslag.
+  function fireStore() {
+    return makeStore({
+      userId: 'me',
+      nameByUser: new Map([
+        ['u1', 'Daniel'],
+        ['me', 'Jag Själv'],
+      ]),
+      byMatch: new Map([
+        [
+          'g-A-1',
+          summary({
+            myEmoji: '🔥',
+            total: 2,
+            tallies: [
+              tally('🔥', 2, true, [
+                { userId: 'u1', createdAt: '2026-06-12T10:00:00Z' },
+                { userId: 'me', createdAt: '2026-06-12T10:05:00Z' },
+              ]),
+            ],
+          }),
+        ],
+      ]),
+    });
+  }
+
+  it('långtryck (håll förbi tröskeln) visar popovern med VILKA som reagerat', () => {
+    vi.useFakeTimers();
+    try {
+      store.current = fireStore();
+      render(<MatchReactions matchId="g-A-1" />);
+      const tallyBtn = screen.getByRole('button', { name: /het match, 2 reaktioner/ });
+
+      // Ingen popover före hållet.
+      expect(screen.queryByRole('tooltip')).toBeNull();
+
+      act(() => {
+        fireEvent.pointerDown(tallyBtn);
+        vi.advanceTimersByTime(500); // tröskeln nådd -> popover
+      });
+
+      const popover = screen.getByRole('tooltip');
+      expect(popover).toBeInTheDocument();
+      // Namnen syns (en känd medlem + jag), inte råa user-id:n.
+      expect(within(popover).getByText('Daniel')).toBeInTheDocument();
+      expect(within(popover).getByText(/Jag Själv/)).toBeInTheDocument();
+      // aria-describedby knyter brickan till popovern (skärmläsare).
+      expect(tallyBtn).toHaveAttribute('aria-describedby', popover.id);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('släpper man fingret (pointerup) försvinner popovern', () => {
+    vi.useFakeTimers();
+    try {
+      store.current = fireStore();
+      render(<MatchReactions matchId="g-A-1" />);
+      const tallyBtn = screen.getByRole('button', { name: /het match, 2 reaktioner/ });
+
+      act(() => {
+        fireEvent.pointerDown(tallyBtn);
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+      act(() => fireEvent.pointerUp(tallyBtn));
+      expect(screen.queryByRole('tooltip')).toBeNull(); // dold igen
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ett LÅNGTRYCK togglar INTE reaktionen (click efter långtryck sväljs)', () => {
+    vi.useFakeTimers();
+    try {
+      const s = fireStore();
+      store.current = s;
+      render(<MatchReactions matchId="g-A-1" />);
+      const tallyBtn = screen.getByRole('button', { name: /het match, 2 reaktioner/ });
+
+      act(() => {
+        fireEvent.pointerDown(tallyBtn);
+        vi.advanceTimersByTime(500); // blev ett långtryck
+        fireEvent.pointerUp(tallyBtn);
+        fireEvent.click(tallyBtn); // click:et som följer ett långtryck
+      });
+      // Håll-gesten ska bara VISA vilka, inte avmarkera/byta reaktionen.
+      expect(s.removeReaction).not.toHaveBeenCalled();
+      expect(s.react).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ett vanligt TAP (släpp före tröskeln) togglar reaktionen som förr, ingen popover', () => {
+    vi.useFakeTimers();
+    try {
+      const s = fireStore();
+      store.current = s;
+      render(<MatchReactions matchId="g-A-1" />);
+      const tallyBtn = screen.getByRole('button', { name: /het match, 2 reaktioner/ });
+
+      act(() => {
+        fireEvent.pointerDown(tallyBtn);
+        vi.advanceTimersByTime(150); // släpp tidigt = tap
+        fireEvent.pointerUp(tallyBtn);
+        fireEvent.click(tallyBtn);
+      });
+      expect(screen.queryByRole('tooltip')).toBeNull();
+      // 🔥 är min -> tap avmarkerar (removeReaction), precis som utan T74.
+      expect(s.removeReaction).toHaveBeenCalledWith('g-A-1');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('FOCUS på brickan visar popovern (tangentbord/desktop, utan touch)', () => {
+    store.current = fireStore();
+    render(<MatchReactions matchId="g-A-1" />);
+    const tallyBtn = screen.getByRole('button', { name: /het match, 2 reaktioner/ });
+
+    act(() => fireEvent.focus(tallyBtn));
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    act(() => fireEvent.blur(tallyBtn));
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  it('HOVER (pointerenter mus) visar popovern, pointerleave döljer', () => {
+    store.current = fireStore();
+    render(<MatchReactions matchId="g-A-1" />);
+    const tallyBtn = screen.getByRole('button', { name: /het match, 2 reaktioner/ });
+
+    act(() => fireEvent.pointerEnter(tallyBtn, { pointerType: 'mouse' }));
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    act(() => fireEvent.pointerLeave(tallyBtn));
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  it('en reagerare som LÄMNAT rummet visas som "Tidigare medlem" (fallback)', () => {
+    store.current = makeStore({
+      userId: 'me',
+      nameByUser: new Map(), // ingen medlem känd
+      byMatch: new Map([
+        [
+          'g-A-1',
+          summary({
+            total: 1,
+            tallies: [
+              tally('🎉', 1, false, [{ userId: 'ghost', createdAt: '2026-06-12T10:00:00Z' }]),
+            ],
+          }),
+        ],
+      ]),
+    });
+    render(<MatchReactions matchId="g-A-1" />);
+    act(() => fireEvent.focus(screen.getByRole('button', { name: /fira, 1 reaktion/ })));
+    expect(within(screen.getByRole('tooltip')).getByText('Tidigare medlem')).toBeInTheDocument();
   });
 });

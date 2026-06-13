@@ -56,6 +56,10 @@ function Probe({ matchId = 'g-A-1' }: { matchId?: string }) {
       <span data-testid="total">{s.total}</span>
       <span data-testid="mine">{s.myEmoji ?? ''}</span>
       <span data-testid="error">{store.error ?? ''}</span>
+      {/* T74: namn-uppslaget storen exponerar (userId -> displayName), serialiserat. */}
+      <span data-testid="names">
+        {[...store.nameByUser.entries()].map(([id, name]) => `${id}=${name}`).join(',')}
+      </span>
       <button onClick={() => void store.react(matchId, '🔥')}>react-fire</button>
       <button onClick={() => void store.react(matchId, '⚽')}>react-ball</button>
       <button onClick={() => void store.removeReaction(matchId)}>remove</button>
@@ -103,6 +107,18 @@ describe('ReactionsProvider , laddning + aggregering', () => {
     renderProvider();
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('error'));
     expect(screen.getByTestId('error').textContent).toBe('nätfel');
+  });
+
+  it('bygger nameByUser-kartan ur medlemmarna (T74: userId -> displayName)', async () => {
+    api.listRoomReactions.mockResolvedValue([]);
+    renderProvider({
+      members: [
+        { userId: 'u1', displayName: 'Daniel' },
+        { userId: 'u2', displayName: 'Elin' },
+      ],
+    });
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(screen.getByTestId('names').textContent).toBe('u1=Daniel,u2=Elin');
   });
 });
 

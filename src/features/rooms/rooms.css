@@ -480,3 +480,106 @@
 .vm-reaction-option[data-mine] {
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
+
+/* "VEM REAGERADE"-POPOVERN (T74, #157): senior-devs Tailwind ger redan position (fixed
+   + viewport-klampade left/top via JS), surface-raised, border, radie, skugga och z-index.
+   design-frontend FINPUTSAR utseendet (pil mot ankaret, diskret in-känsla gatad av
+   reduced-motion, max-höjd + lugn scroll vid många namn) UTAN att röra positionerings-
+   logiken (JS) eller a11y-hakarna (role=tooltip + aria-describedby). Texten (namn + tid)
+   bär betydelsen och håller AA på surface-raised (samma yta som pickern, redan mätt i T24).
+
+   POSITION: popovern måste tillåta sin nedåt-pil att sticka ut under kanten, så den får
+   `position` (ärver fixed från Tailwind) + en stapel-kontext. Pilen är absolut-placerad
+   mot popoverns underkant. */
+.vm-reaction-authors {
+  /* En hårfin inre topp-högdager (samma kvällsljus som pickern) så popovern läser som
+     ett svävande lager ovanför brickan. Ren dekor (box-shadow staplad på Tailwinds
+     raised-skugga). */
+  box-shadow:
+    var(--vm-shadow-raised),
+    inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 14%, transparent);
+}
+
+/* PILEN mot ankar-brickan: en liten triangel på popoverns NEDERKANT, centrerad, så det
+   är tydligt att listan hör till brickan strax under. Byggd av två staplade triangel-
+   pseudo-element: den UNDRE (::before) i kant-färg, den ÖVRE (::after) i surface-raised,
+   1px kortare, så pilen får samma hårfina kant + fyllning som popover-kroppen (en
+   sömlös "tunga" ur kortet, inte en lös flik). Ren dekor (aria-hidden), bär ingen text.
+   Centrerad på popovern: i normalfallet (reaktions-raden nära innehållets mitt) är
+   popovern centrerad över ankaret, så pilen pekar rakt på brickan. Vid en hård klamp mot
+   skärmkanten kan ankaret hamna en bit vid sidan av pilen, men pilen läser ändå tydligt
+   som "den här listans pekare nedåt mot brickan", och positionerings-logiken (JS) rörs ej. */
+.vm-reaction-authors-arrow {
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  width: 14px;
+  height: 7px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.vm-reaction-authors-arrow::before,
+.vm-reaction-authors-arrow::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Undre triangel = kant-färgen (samma som popoverns border). */
+.vm-reaction-authors-arrow::before {
+  top: 0;
+  border-width: 7px 7px 0 7px;
+  border-color: var(--color-border) transparent transparent transparent;
+}
+
+/* Övre triangel = fyllningen (surface-raised), 1px upp + 1px smalare, så kant-triangeln
+   bara lämnar en hårfin rand runt fyllningen (matchar popover-kroppens 1px-kant). */
+.vm-reaction-authors-arrow::after {
+  top: -1px;
+  left: 1px;
+  border-width: 6px 6px 0 6px;
+  border-color: var(--color-surface-raised) transparent transparent transparent;
+}
+
+/* DISKRET SCROLL vid många namn: en smal, dämpad scrollbar (Firefox + WebKit/Blink) så
+   list-scrollen känns lugn, inte en grov systembar. Bär ingen betydelse (ren UI-dekor). */
+.vm-reaction-authors-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-fg-muted) 40%, transparent) transparent;
+}
+
+.vm-reaction-authors-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vm-reaction-authors-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--color-fg-muted) 40%, transparent);
+}
+
+/* DISKRET IN-KÄNSLA: en mjuk fade + en aning uppglid/skala FRÅN underkanten (mot ankaret),
+   så popovern "vecklar ut sig" ur brickan i stället för att bara poppa. GATAD på
+   prefers-reduced-motion (no-preference): den som bett om minskad rörelse får popovern
+   direkt i sitt vilo-läge (ingen animation alls), per WCAG 2.3.3. transform-origin nere
+   så skalningen utgår från pilen/ankaret, inte mitten. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-reaction-authors-in {
+    transform-origin: bottom center;
+    animation: vm-reaction-authors-in 0.14s ease-out;
+  }
+
+  @keyframes vm-reaction-authors-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
