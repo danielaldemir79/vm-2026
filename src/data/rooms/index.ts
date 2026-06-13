@@ -22,9 +22,11 @@ export {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
 } from './room-code';
-// T66 (#121): kommentarer i rummet (lista, skriv, radera egen).
+// T66 (#121): rums-chatten (lista, skriv, radera egen).
+// T77 (#161): match-trådar på samma tabell (listRoomMatchComments = match_id IS NOT NULL).
 export {
   listRoomComments,
+  listRoomMatchComments,
   addComment,
   deleteMyComment,
   COMMENT_MAX_LEN,

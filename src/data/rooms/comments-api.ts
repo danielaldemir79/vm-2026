@@ -1,9 +1,17 @@
-// Kommentar-API (T66, #121): den typade klient-ytan mot rummets kommentarer.
+// Kommentar-API (T66, #121 + T77, #161): den typade klient-ytan mot rummets kommentarer.
 //
 // ANSVAR (tunt, en sak): översätt UI:ts kommentar-operationer (lista, skriv, radera
 // egen) till Supabase-anrop och PROJICERA raderna till en klient-vänlig form. Härleder
 // formen ur DB-typerna (supabase-types.ts), inte ur en konsument-typ, så en schema-drift
 // blir ett kompileringsfel (lärdomen mock-foljer-konsumenttyp-doljer-mappnings-drift).
+//
+// TVÅ TRÅD-RYMDER PÅ SAMMA TABELL (T77): room_comments.match_id skiljer
+//   match_id IS NULL  = RUMS-CHATTEN (T66, en tråd per rum), och
+//   match_id = '<id>' = en MATCH-TRÅD (T77, en tråd per match i rummet).
+// listRoomComments (rums-chatten) filtrerar HÅRT på match_id IS NULL så den ALDRIG drar
+// in match-kommentarer (T66-ytan oförändrad). listRoomMatchComments hämtar ALLA match-
+// trådars rader för ett rum (match_id IS NOT NULL); providern grupperar per match i minnet
+// (samma modell som reaktionerna: en hämtning + en kanal per rum, inte en per match).
 //
 // VISNINGSNAMN: kommentaren bär BARA user_id (ingen denormaliserad display_name,
 // migrations-beslutet). Klienten slår upp namnet i medlemslistan den redan har
@@ -38,6 +46,12 @@ export interface RoomComment {
   body: string;
   /** ISO-tidsstämpel (created_at). UI:t formaterar den lokalt. */
   createdAt: string;
+  /**
+   * T77 (#161): vilken match-tråd kommentaren hör till, eller null = rums-chatten (T66).
+   * match-id ur den statiska planen (samma form som RoomReaction.matchId). Providern
+   * grupperar match-trådar på detta fält.
+   */
+  matchId: string | null;
 }
 
 /** Kasta ett begripligt fel ur ett Supabase-fel (fail loud, svensk text). */
@@ -46,8 +60,13 @@ function fail(operation: string, message: string): never {
 }
 
 /**
- * Hämta ett rums kommentarer i tidsordning (ÄLDST först, nyast sist = chatt-konvention,
- * nyaste längst ner). RLS: bara medlemmar får rader (utomstående får tom lista, inte fel).
+ * Hämta RUMS-CHATTENS kommentarer (T66, match_id IS NULL) i tidsordning (ÄLDST först,
+ * nyast sist = chatt-konvention). RLS: bara medlemmar får rader (utomstående får tom
+ * lista, inte fel).
+ *
+ * HÅRT match_id IS NULL-filter (T77): nu när tabellen OCKSÅ bär match-trådar måste rums-
+ * chatten utesluta dem, annars hade match-kommentarerna läckt in i rums-chatt-vyn (T66-
+ * regressionen). `.is('match_id', null)` är just det filtret.
  */
 export async function listRoomComments(
   client: VmSupabaseClient,
@@ -55,11 +74,35 @@ export async function listRoomComments(
 ): Promise<RoomComment[]> {
   const { data, error } = await client
     .from('room_comments')
-    .select('id, user_id, body, created_at')
+    .select('id, user_id, body, created_at, match_id')
     .eq('room_id', roomId)
+    .is('match_id', null)
     .order('created_at', { ascending: true });
   if (error) {
     fail('Hämta kommentarer', error.message);
+  }
+  return (data ?? []).map(projectComment);
+}
+
+/**
+ * Hämta ALLA MATCH-TRÅDARS kommentarer i ett rum (T77, match_id IS NOT NULL) i
+ * tidsordning. Providern grupperar per match_id i minnet (samma modell som reaktionerna:
+ * EN hämtning + EN realtidskanal per rum, inte en per match). RLS: bara medlemmar får
+ * rader (utomstående får tom lista, inte fel). Tidsordningen gäller globalt; per match-
+ * tråd är ordningen bevarad eftersom grupperingen är stabil.
+ */
+export async function listRoomMatchComments(
+  client: VmSupabaseClient,
+  roomId: string
+): Promise<RoomComment[]> {
+  const { data, error } = await client
+    .from('room_comments')
+    .select('id, user_id, body, created_at, match_id')
+    .eq('room_id', roomId)
+    .not('match_id', 'is', null)
+    .order('created_at', { ascending: true });
+  if (error) {
+    fail('Hämta match-kommentarer', error.message);
   }
   return (data ?? []).map(projectComment);
 }
@@ -70,6 +113,10 @@ export async function listRoomComments(
  * DB:ns default auth.uid() (vi skickar den inte), RLS kräver medlemskap. Returnerar
  * den sparade kommentaren (projicerad) så UI:t kan spegla in den optimistiskt.
  *
+ * TRÅD-VAL (T77): matchId default null = RUMS-CHATTEN (T66, oförändrad). Sätt matchId
+ * för att skriva i en MATCH-TRÅD. RLS gatar på room_id för båda (oförändrat), match_id
+ * är bara vilken tråd raden tillhör.
+ *
  * KASTAR (fail loud) vid tom/för lång text (klient-validering) ELLER ett RLS-/DB-
  * avslag (icke-medlem, CHECK-brott): en kommentar som inte gick in ska SYNAS som ett
  * fel, aldrig tyst svälja.
@@ -77,7 +124,8 @@ export async function listRoomComments(
 export async function addComment(
   client: VmSupabaseClient,
   roomId: string,
-  body: string
+  body: string,
+  matchId: string | null = null
 ): Promise<RoomComment> {
   const trimmed = body.trim();
   if (trimmed.length === 0) {
@@ -91,13 +139,16 @@ export async function addComment(
   const row: Database['public']['Tables']['room_comments']['Insert'] = {
     room_id: roomId,
     body: trimmed,
+    // match_id null = rums-chatt (T66), satt = match-tråd (T77). Vi skickar ALLTID med
+    // det explicit (null inkluderat) så insertens tråd-tillhörighet är otvetydig.
+    match_id: matchId,
     // user_id UTELÄMNAS med flit: DB:ns default auth.uid() + RLS:s with check binder
     // den till den inloggade, så avsändaren aldrig kan förfalskas från klienten.
   };
   const { data, error } = await client
     .from('room_comments')
     .insert(row)
-    .select('id, user_id, body, created_at')
+    .select('id, user_id, body, created_at, match_id')
     .single();
   if (error) {
     fail('Skriv kommentar', error.message);
@@ -119,12 +170,13 @@ export async function deleteMyComment(client: VmSupabaseClient, commentId: strin
 
 /** Projicera en DB-rad till den klient-vänliga RoomComment-formen. */
 function projectComment(
-  row: Pick<CommentRow, 'id' | 'user_id' | 'body' | 'created_at'>
+  row: Pick<CommentRow, 'id' | 'user_id' | 'body' | 'created_at' | 'match_id'>
 ): RoomComment {
   return {
     id: row.id,
     userId: row.user_id,
     body: row.body,
     createdAt: row.created_at,
+    matchId: row.match_id,
   };
 }
