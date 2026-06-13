@@ -28,6 +28,7 @@ import {
   removeMyReaction,
   upsertMyReaction,
   type ReactionEmoji,
+  type RoomMember,
   type RoomReaction,
 } from '../../data/rooms';
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
@@ -59,6 +60,12 @@ export interface ReactionsProviderProps {
    * (useRoomsSync.userId), så UI:t vet vilken bricka som är "min".
    */
   userId?: string | null;
+  /**
+   * Injicerbar medlemslista (testbarhet). Default = rooms-synk-seamen
+   * (useRoomsSync.members), så "vem reagerade"-popovern (T74) kan mappa user_id ->
+   * displayName utan en egen koppling till rums-storen.
+   */
+  members?: RoomMember[];
 }
 
 export function ReactionsProvider({
@@ -68,12 +75,14 @@ export function ReactionsProvider({
   client,
   activeRoomId: activeRoomIdProp,
   userId: userIdProp,
+  members: membersProp,
 }: ReactionsProviderProps) {
-  // Aktivt rum + egen identitet ur rooms-synk-seamen (samma seam tips-lagret läser),
-  // om inte explicit injicerat (test). Hook anropas ovillkorligt (regler).
+  // Aktivt rum + egen identitet + medlemmar ur rooms-synk-seamen (samma seam tips-lagret
+  // läser), om inte explicit injicerat (test). Hook anropas ovillkorligt (regler).
   const roomsSync = useRoomsSync();
   const activeRoomId = activeRoomIdProp !== undefined ? activeRoomIdProp : roomsSync.activeRoomId;
   const userId = userIdProp !== undefined ? userIdProp : roomsSync.userId;
+  const members = membersProp !== undefined ? membersProp : roomsSync.members;
 
   // Live kräver BÅDE env OCH live-flaggan (samma tvåstegs-gate som datalagret).
   const liveConfigured = isSupabaseConfigured(env) && liveReady;
@@ -236,6 +245,17 @@ export function ReactionsProvider({
   // min identitet ändras, inte vid varje render.
   const byMatch = useMemo(() => aggregateReactionsByMatch(reactions, userId), [reactions, userId]);
 
+  // VISNINGSNAMN per user_id (T74, #157): byggs ur det aktiva rummets medlemmar
+  // (room_members, EN sanning, samma karta RoomComments bygger). Buren på storen så
+  // "vem reagerade"-popovern kan slå namn utan en egen koppling till rums-storen.
+  const nameByUser = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of members) {
+      map.set(m.userId, m.displayName);
+    }
+    return map;
+  }, [members]);
+
   const store: ReactionsStore = useMemo(
     () => ({
       enabled,
@@ -243,10 +263,11 @@ export function ReactionsProvider({
       error,
       byMatch,
       userId,
+      nameByUser,
       react,
       removeReaction,
     }),
-    [enabled, status, error, byMatch, userId, react, removeReaction]
+    [enabled, status, error, byMatch, userId, nameByUser, react, removeReaction]
   );
 
   return <ReactionsStoreContext.Provider value={store}>{children}</ReactionsStoreContext.Provider>;

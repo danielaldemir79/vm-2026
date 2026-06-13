@@ -25,4 +25,8 @@ export {
   summaryForMatch,
   type MatchReactionSummary,
   type ReactionTally,
+  type ReactionReactor,
 } from './reaction-aggregate';
+// T74 (#157): se VILKA som reagerat (långtryck/hover/focus -> popover med namn + tid).
+export { useLongPress, LONG_PRESS_THRESHOLD_MS } from './use-long-press';
+export { resolveReactionAuthors, type ReactionAuthorRow } from './reaction-authors';

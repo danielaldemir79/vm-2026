@@ -5,6 +5,44 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T74 (#157): se VILKA som reagerat på en match (långtryck/hover/focus -> popover)
+
+**Bakgrund (Daniels feedback):** "som usa-matchen la jag en låga och någon en applåd, men jag kan
+inte se vem den andra är." Reaktionsraden (T24) visade bara emoji + ANTAL, aldrig VEM eller NÄR.
+
+**Beslut (interaktion): en bricka kan öppna en "vem reagerade"-popover på TRE vägar.**
+- TOUCH: LÅNGTRYCK (håll förbi tröskeln) -> popover; SLÄPP (pointerup/leave/cancel) -> dölj.
+- DESKTOP: HOVER (pointerenter mus/penna) visar, pointerleave döljer.
+- TANGENTBORD/a11y: FOCUS visar, blur döljer.
+Mekaniken bor i en återanvändbar `useLongPress`-hook (pointer events, skiljer tap från långtryck,
+sväljer click:et efter ett långtryck så håll-gesten inte OCKSÅ togglar reaktionen).
+
+**Beslut (long-press-tröskel): 500 ms.** **Källa/varför:** 500 ms är standard-tröskeln för
+long-press på touch , Android `ViewConfiguration.getLongPressTimeout()` är 400-500 ms (default 500),
+iOS long-press ~500 ms. Daniel skrev "efter några sekunder", men flera sekunder vore segt på en
+match-rad; 500 ms är tillräckligt långt för att inte trigga på ett vanligt tap men kort nog att
+kännas direkt. Tröskeln är en namngiven konstant (`LONG_PRESS_THRESHOLD_MS`) + injicerbar för test.
+
+**Beslut (placering): popovern ligger OVANFÖR brickan och klampas inom viewporten.** **Varför:**
+Daniels krav "det måste visas så fingret inte blockar infot" , popovern läggs ovanför ankaret
+(position fixed, underkant strax över brickan) och klampas horisontellt/vertikalt inom skärmen
+(ingen overflow utanför viewporten). Funktionell positionering (getBoundingClientRect + klamp i
+useLayoutEffect) ägs av senior-dev; design-frontend finputsar utseendet (pil, in-animation gatad av
+reduced-motion) UTAN att röra positionerings-logiken eller a11y-hakarna (role=tooltip + aria-describedby).
+
+**Beslut (namn-källa): userId -> displayName slås upp i room_members.** EN sanning (samma karta
+RoomComments + topplistan använder), buren på reaktions-storen (`nameByUser`) via rooms-synk-seamens
+nya `members`-fält (samma motiv som userId, T66), så MatchReactions inte behöver en egen koppling till
+rums-storen. En reagerare som lämnat rummet faller till "Tidigare medlem" (samma fallback som RoomComments).
+
+**RLS (verifierat, read-only mot live 2026-06-13):** SELECT-policyn `room_reactions_select_member` har
+`qual = is_room_member(room_id)` UTAN user_id-filter , en rumsmedlem får läsa ALLA medlemmars rader
+(user_id + created_at) i rummet. Att visa författare (vem + när) för andra medlemmar är alltså tillåtet.
+Stämmer med T24-beslutet "reaktioner är PUBLIKA inom rummet" (ingen före-avspark-döljning). INGEN ny
+skrivyta lades till, RLS rördes inte.
+
+---
+
 ## 2026-06-13 , T76 (#158): tips-INMATNINGSkortet väver in officiellt facit (poäng + facit syns)
 
 **Bakgrund (produktionsbugg, Daniel-rapporterad, verifierad mot live-DB):** på tips-korten

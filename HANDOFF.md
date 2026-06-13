@@ -5,6 +5,75 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T74 (#157) se vem som reagerat via langtryck/hover/focus , PR #160 mot develop , In Review
+
+**Branch:** `feature/T74-reaktions-avsandare` @ HEAD `9c74806`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/160 mot `develop` (Closes #157, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T74 levererade
+
+Man kan nu trycka langt pa en reaktions-emoji (eller hovra/fokusera pa desktop) for att se
+vilka rumsmedlemmar som reagerat pa en match. En popover dyker upp ovanfor fingret med namn
+(displayName eller email-prefix) och tid for varje reaktion. RLS tillater rumsmedlemmar lasa
+reaktions-forfataren (user_id + created_at -> profil). Reaktioner ar inte hemliga tips.
+
+**Kedjan:**
+
+- **Senior-developer `56cc264`:** long-press-hook (200 ms, touchstart/touchend/touchcancel),
+  forfattar-harledning ur room_reactions (user_id -> profiles.display_name/email), ReactionPopover
+  ovanfor fingret. RLS verifierad: rumsmedlemmar far lasa forfataren.
+- **Design-frontend `7d8ba42`:** speech-bubble-pil (tva staplade triangel-pseudo-element),
+  max-hojd + intern scroll, in-kansla via scale+opacity-animation.
+- **Lokal reviewer GODKAND.** RLS live, F1 (touch-manipulation) och F2 (popover-botten-klamp)
+  disponerade som F1/F2 pa Copilot R1.
+- **Copilot R1 `36104fc`:** F1 popover-botten-klamp mot viewport, F2 touch-manipulation CSS.
+- **Copilot R2 `1fcf945`:** F3 pointerLeave-stanger bara om inte fokuserad (a11y: hover+focus
+  lever parallellt), F4-F5 tva kommentar-rattelser.
+- **Copilot R3 `9c74806`:** F6 popover-position perf - authors.length i deps + guardad setPos.
+  0 fynd kvar. Exit.
+
+**Verifiering (HEAD `9c74806`):** build EXIT 0, npm test ~1836 grona, lint + format:check EXIT 0.
+Branch rebaserades pa develop (decisions.md-konflikt lost, bada ADR-poster behalles).
+
+**Acceptanskriterier T74:**
+- [x] AC1: Langtryck/hover/focus pa en reaktion visar vilka som reagerat (namn + tid)
+- [x] AC2: RLS tillater rumsmedlemmar lasa reaktions-forfataren
+- [x] AC3: Popover ovanfor fingret, pil, max-hojd, in-kansla - Copilot R1-R3 exit, 0 olostta fynd
+
+### Behover-Daniel (uppdaterat efter T74)
+
+**Befordringar: REDAN GODKANDA + EXEKVERADE 2026-06-12** (se T76-blocket nedan).
+Inga nya befordringar vantar pa godkannande.
+
+**Kvar att besluta/agera:**
+- RLS-testrum i Supabase: star kvar pa Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- Supabase e-postmall: #81 stangt 2026-06-12 pa Daniels order.
+- **Publik-repo-go + AI-pipeline-synlighet:** Daniel bestammer nar vm-2026 kan vara publikt
+  synligt. Agent Kit far namnas som hans kvalitets-pipeline, ingen Claude-byline.
+
+### Nasta steg
+
+**Om PR #160 ANNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 160 --merge --repo danielaldemir79/vm-2026`.
+Stang issue #157: `gh issue close 157`. Flytta kort T74 till Done pa boarden.
+Kolla om PR:ar #159 eller aldre behover mergas i ordningen aldst -> nyast fore #160.
+
+**Om PR #160 REDAN mergad:**
+T74 klar och live pa develop. Kon efter T74:
+(a) **T77** - per-match-kommentarer hopfallda (Daniels val: matchkort visar reaktioner +
+    "Kommentarer (N)"-knapp som faller ut trad; atervand T66 kommentars-infra keyed per
+    match_id+room_id; ev. nullable match_id-kolumn pa room_comments via migration + RLS-bevis; HARD).
+(b) **RELEASE v1.0** - develop -> main, tagg v1.0.
+(c) **README post-v1** - publik README klar for delning (minnesfil vm2026-readme-spec).
+(d) **Fore-publicerings-koll** - Daniel godkanner publik-go.
+Kor `/agent-kit` for att starta nasta task.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T76 (#158) tips-korten väver in facit + tip-vs-facit-hierarki , PR #159 mot develop , KLAR
 
 **Branch:** `fix/T76-tips-kort-facit` @ HEAD `163b071`
