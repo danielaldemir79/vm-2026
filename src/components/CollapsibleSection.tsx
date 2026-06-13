@@ -125,9 +125,14 @@ export function CollapsibleBody({
   // Vi behåller ändå den mjuka öppnings-animationen: vid utfällning animeras max-height
   // mot ett tak (200rem) så CSS-transitionen (collapsible.css, [data-collapsed='false'])
   // glider fram, och NÄR den transitionen är klar (onTransitionEnd) flippar vi till
-  // 'none'. Reduced-motion nollar transition-duration (index.css), så transitionend kan
-  // utebli, då sätter vi 'none' direkt via effekten nedan. `none` kan inte animeras, men
-  // vid den punkten har 200rem redan nåtts visuellt, så bytet snappar inte synligt.
+  // 'none'. `none` kan inte animeras, men vid den punkten har 200rem redan nåtts visuellt,
+  // så bytet snappar inte synligt. TRE vägar sätter 'none', så taket aldrig fastnar:
+  //   1) NORMAL rörelse: onTransitionEnd (handleBodyTransitionEnd), + en FALLBACK-timer
+  //      (~450ms, i effekten nedan) som skyddsnät om eventet uteblir (avbruten transition,
+  //      bakgrundsflik, webbläsare som hoppar över den) -> T75-F1, #155.
+  //   2) reduced-motion: transition-duration nollas (index.css) -> ingen transitionend ->
+  //      effekten nedan sätter 'none' DIREKT (ingen timer behövs).
+  //   3) startExpanded: redan utfälld från start, inget tak att animera fram.
   // expandedUnbounded=true => maxHeight:'none'; false => taket (animerbart).
   const [expandedUnbounded, setExpandedUnbounded] = useState(startExpanded);
 
@@ -147,8 +152,23 @@ export function CollapsibleBody({
       window.matchMedia('(prefers-reduced-motion: reduce)')?.matches === true;
     if (prefersReducedMotion) {
       setExpandedUnbounded(true);
+      return;
     }
-    // Annars väntar vi på onTransitionEnd (handleBodyTransitionEnd) för den mjuka resan.
+    // NORMAL rörelse: vi väntar på onTransitionEnd (handleBodyTransitionEnd) för den
+    // mjuka resan. MEN onTransitionEnd är inte garanterat (T75-F1, #155): eventet uteblir
+    // om öppnings-transitionen avbryts (display-byte), om sektionen fälls ut medan fliken
+    // ligger i bakgrunden (vissa webbläsare kör då ingen transition), eller om webbläsaren
+    // hoppar över den. Utan event skulle taket fastna permanent på 200rem och EXAKT
+    // produktionsbuggen #155 (innehåll spiller förbi taket, nästa syskon överlappar) komma
+    // tillbaka. FALLBACK: en timer som släpper taket ändå. 450ms = strax efter
+    // max-height-transitionens 380ms (collapsible.css, [data-collapsed='false']), så i
+    // normalfallet hinner onTransitionEnd ALLTID först och timern blir en no-op (båda sätter
+    // samma state, true). Cleanup clearar timern om `expanded` ändras (snabb ut->ihop innan
+    // den fyrar) eller komponenten unmountar, så den aldrig läcker över en ut/ihop-cykel och
+    // aldrig sätter 'none' på en sektion som hunnit fällas ihop igen.
+    const FALLBACK_RELEASE_MS = 450;
+    const fallback = setTimeout(() => setExpandedUnbounded(true), FALLBACK_RELEASE_MS);
+    return () => clearTimeout(fallback);
   }, [expanded]);
 
   // Öppnings-transitionen klar -> släpp höjd-taket helt (utfällt blir obegränsat).
