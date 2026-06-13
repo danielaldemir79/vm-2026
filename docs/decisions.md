@@ -41,6 +41,29 @@ portal-baserad helskärms-dialog (fixed inset-0 z-50); hamburgare-menyn är ett 
 nedfälld panel i bandets flöde (knuffar innehåll, överlappar inte), så Modal hade varit fel form. A11y-
 semantiken (Escape/fokus-in-och-retur/fokus-fälla) följer ändå samma kontrakt.
 
+**Beslut (C4, Copilot-runda-1): scroll-spy observerar ALLA band, inte bara det forsta.**
+`useSectionSpy` anropade `querySelectorAll('[data-section-nav]')` men implementationen hade en
+bugg: mock i testet fyrade `emitResize` oavsett om bandet faktiskt observerades, vilket dolde
+att bara forsta bandet observerades. Fixt: observern byggs om med `querySelectorAll` och ett
+tvabands-harness-test verifierar att hogjdandring i mobil-bandet (panel oppnas) triggar om-
+byggnad av observern med ny rootMargin. Negativ-kontroll bekraftad: querySelector-revert
+(bara ett band) rodnar bada C4-testerna. Utan fixen: stale rootMargin pa mobil-bandet vid
+panel-oppning, scroll-spy uppfattar knappt att aktiv sektion byts.
+
+**Beslut (C5, Copilot-runda-1): CSS-var-cleanup ar VILLKORAD pa att inga band kvar i DOM.**
+Bada banden skriver samma `--vm-section-nav-offset` via `useStickyBandOffset`. Vid unmount
+av ett band (t.ex. ResizeObserver-recompute) rensades variablerna alltid - vilket nollade
+offseten medan det andra bandet levde. Fix: rensa bara nar `document.querySelectorAll
+('[data-section-nav]').length === 0` (inget band kvar). Negativ-kontroll: alltid-rensa-revert
+rodnar testet som verifierar att variablerna behalles efter ett bands unmount.
+
+**Beslut (C6, Copilot-runda-2): aria-controls villkorad pa att panelen ar monterad.**
+Hamburgare-knappen bar `aria-controls` som pekade pa panelens id. Panelen renderas bara nar
+menyn ar oppen (open === true); i stangt lage ar IDREF:en ogiltig (pekar pa ett omonterat
+element). Fix: `aria-controls={open ? panelId : undefined}`. `aria-expanded` (alltid
+satt) och `aria-haspopup` barer knappens tillstand oforandrat. Kontrakt-testet skarptes:
+aria-controls ska SAKNAS i stangt lage och peka pa panelens id i oppet lage.
+
 ---
 
 ## 2026-06-13 , T78 (#165): sticky sektions-nav (chip-rad) med självregistrerande sektioner
