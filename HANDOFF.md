@@ -5,6 +5,85 @@ chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifr
 
 ---
 
+## RESUME-HERE , 2026-06-13 , T73 (#153) facit + poäng på avgjorda tips-kort , PR #154 mot develop , KLAR
+
+**Branch:** `feature/T73-facit-pa-kort` @ HEAD `485dcd7`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/154 mot `develop` (Closes #153, state: OPEN)
+**Live preview:** vm-2026.pages.dev
+
+### Vad T73 + T75 levererade
+
+**T75 - AKUT mobil-överlapp-fix (REDAN MERGAD, LIVE):**
+CollapsibleBody (delad primitiv från T68) cappade utfällt läge till `maxHeight: 200rem` utan
+`overflow-hidden`. Långt mobilinnehåll spillde ut och nästa syskon ("Visa färre" + nästa sektion)
+överlappade synligt. Fix: utfällt läge släpper taket till `maxHeight: 'none'` (via `onTransitionEnd`,
+direkt vid `reduced-motion`/`startExpanded`, + fallback-timer 450 ms som skydd mot om
+`onTransitionEnd` inte avfyras). Mergad expedierat utan egen journalist - dokumenteras här.
+
+- senior-dev `af55c25`: kärnfixen (utfällt -> none)
+- senior-dev `8982db7`: F1-härdning (fallback-timer + act()-skydd i test)
+- design-frontend: verifierat på 4 sektioner mobil
+- lokal reviewer: GODKÄND
+- **Merge-SHA `9fae17d`** (PR #156, Closes #155, mergad 2026-06-13, LIVE på develop)
+
+**T73 - facit + poäng på avgjorda tips-kort:**
+Avgjorda match-tips visar nu facit (verkligt utfall) och poäng (matchat/straffat/noll) via
+delade `formatScore`/`formatPenalties` gatat på `isFinished`. Poängberäkningen fanns sedan T58;
+T73 kopplar in presentationslagret.
+
+- senior-dev `c61f941`: facit + straffar via delade funktioner, isFinished-gating
+- design-frontend `b46dc5f`: balansera facit/poäng-layout
+- lokal reviewer: GODKÄND
+- Copilot R1 `485dcd7`: 2 triviala fynd (kommentar-drift + explicit null i test-assertion),
+  dirigentfix applicerad, Copilot R2: 0 fynd, exit
+
+**Verifiering (HEAD `485dcd7`):** build EXIT 0, npm test grön, lint + format:check EXIT 0.
+
+**Acceptanskriterier T73:**
+- [x] AC1: Avgjorda tips-kort visar facit (verkligt utfall) och poäng
+- [x] AC2: Delade formatScore/formatPenalties, isFinished-gating
+- [x] AC3: Bygger grönt, lint rent, reviewad (lokal panel + Copilot R1-R2 exit), inga olösta fynd
+
+**Acceptanskriterier T75:**
+- [x] AC1: Utfällt CollapsibleBody släpper maxHeight-taket till none
+- [x] AC2: Reduced-motion och startExpanded-läget hanteras korrekt (direkt utan transition)
+- [x] AC3: Fallback-timer 450 ms skyddar mot utebliven onTransitionEnd
+- [x] AC4: Bygger grönt, testas grönt, designverifierat på mobil
+
+### Behöver-Daniel (uppdaterat efter T73/T75)
+
+**Befordringar (väntar på godkännande - beordrade 2026-06-12, INTE exekverade än):**
+- Kommentar-pastar Förekomst 8: agent-regel för senior-developer.
+- Uttömmande-test Förekomst 3: agent-regel för reviewer.
+- Pastar-filer-saknas Förekomst 4 (journalist): agent-regel för journalist.
+
+**Kvar att besluta/agera:**
+- RLS-testrum i Supabase: stands kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+- **Publik-repo-go + AI-pipeline-synlighet:** Daniel beslutar när vm-2026 kan vara publikt synligt.
+  Agent Kit får nämnas som hans kvalitets-pipeline, ingen Claude-byline, ingen Co-authored-by.
+
+### Nästa steg
+
+**Om PR #154 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 154 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #153: `gh issue close 153`. Flytta kort T73 till Done på boarden.
+Kolla om PR:ar #152 eller äldre behöver mergas i ordningen ältst -> nyast före #154.
+
+**Om PR #154 REDAN mergad:**
+T73 klar och live på develop. Kön efter T73/T75:
+(a) **T74** - se VEM som reagerat via långtryck (room_reactions user_id + created_at ->
+    displayName, popover ovanför fingret, RLS tillåter läsa reaktions-författare, a11y
+    hover/focus-väg; reaktioner är inte hemliga tips).
+(b) **RELEASE v1.0** - develop -> main, tagg v1.0.
+(c) **README post-v1** - publik README klar för delning (minnesfil vm2026-readme-spec).
+(d) **Före-publicerings-koll** - Daniel godkänner publik-go.
+Kör `/agent-kit` för att starta nästa task.
+
+---
+
 ## RESUME-HERE , 2026-06-13 , T72 (#151) lås grupp- + champion-tips efter omgång 1 , PR #152 mot develop , KLAR
 
 **Branch:** `feature/T72-deadline-omgang1` @ HEAD `600af35`
