@@ -5,6 +5,41 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-13 , T4d (#147): värdland tillagt i venue-strängen ("Arena, Stad, Land")
+
+**Bakgrund (Daniels feedback 2026-06-13, #147):** matchkortet visade "Arena, Stad" (T4c, #35). Daniel
+bad: "kan du få med land bredvid arena och stad också." venue-strängen blir nu "Arena, Stad, Land" med
+SVENSKT landsnamn, och landet syns automatiskt i UI:t (MatchCard renderar `match.venue` rakt).
+
+**Beslut (källåkrat, samma mönster som T4c, gissas ALDRIG):** Landet läggs till i gold source
+(`venue-source.txt`) per rad, in i `KNOWN_VENUES`-white-listen (`venue-parser.ts`), och matches.ts
+regenereras (`npm run gen:matches`), så BARA venue-fältet ändras (id/kickoff/lag/stage byte-identiska,
+diff-verifierat: 104 venue-rader + den genererade fil-headern). Inget handskrivet i matches.ts.
+
+**Land-mappning (källa: FIFA:s värdstäder-lista, Wikipedia "2026 FIFA World Cup").** VM 2026 spelas i
+tre värdländer; landet är ENTYDIGT ur arenans redan källåkrade värdstad (T4c), så ingen ny gissning görs,
+det härleds en-till-en ur kommunen. Fördelning: 3 arenor i Mexiko, 2 i Kanada, 11 i USA (= 16). Svenska
+landsnamn ("Mexiko"/"USA"/"Kanada"), appens språk (kommunnamnen behålls på engelska/spanska som T4c, ingen
+etablerad svensk exonym finns för dem; landet har det):
+
+| Värdland (svenskt namn) | Arenor |
+|---|---|
+| Mexiko | Estadio Azteca (Mexico City), Estadio Akron (Zapopan), Estadio BBVA (Guadalupe) |
+| Kanada | BMO Field (Toronto), BC Place (Vancouver) |
+| USA | MetLife Stadium (East Rutherford), AT&T Stadium (Arlington), SoFi Stadium (Inglewood), Arrowhead Stadium (Kansas City), Levi's Stadium (Santa Clara), NRG Stadium (Houston), Lincoln Financial Field (Philadelphia), Mercedes-Benz Stadium (Atlanta), Lumen Field (Seattle), Hard Rock Stadium (Miami Gardens), Gillette Stadium (Foxborough) |
+
+**Lås (CI):** `venue-source.test.ts` regenererar-och-diffar matches.ts mot källorna (oförändrat lås, nu MED
+land), och har nya/uppdaterade tester: venue-formen är "Arena, Stad, Land" (split(', ') ger 3 delar),
+varje venue slutar på ett av de tre svenska värdländerna, land-fördelningen är exakt 3/2/11 över de 16
+distinkta arenorna, och ETT land-mutationstest (byt Mexiko -> USA på Estadio Azteca) bevisar att låset
+fångar ett fel värdland (fail-loud okänd arena), utöver det befintliga arena-mutationstestet.
+
+**UI:** ingen UI-ändring behövdes, venue är en sträng som MatchCard renderar rakt, så landet syns
+automatiskt. Den längre raden ("Arena, Stad, Land") bör design dubbelkolla på mobil (360px) så den inte
+bryter matchkortets layout, se HANDOFF.
+
+---
+
 ## 2026-06-13 , T71 (#145): joker-tillägget BORTTAGET (poängen blir en enkel summa)
 
 **Beslut: ta bort hela joker-tillägget, BARA jokern.** Daniels beslut 2026-06-13: "ta bort joker

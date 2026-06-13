@@ -139,7 +139,7 @@ interface MatchBase {
   awayTeamId: string | null;
   /** Avsparkstid i ISO 8601 (UTC), formateras lokalt i UI:t. */
   kickoff: string;
-  /** Arena/stad, t.ex. "MetLife Stadium, East Rutherford". */
+  /** Arena, stad och värdland, t.ex. "MetLife Stadium, East Rutherford, USA". */
   venue: string;
   /** Svensk TV-kanal (SPEC §4), valfri tills data-tasken fyllt den. */
   tvChannel?: string;
