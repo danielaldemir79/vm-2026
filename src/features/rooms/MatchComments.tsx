@@ -148,7 +148,10 @@ export function MatchComments({ matchId }: MatchCommentsProps) {
         onClick={() => setOpen((v) => !v)}
         data-match-comments-toggle=""
         aria-expanded={open}
-        aria-controls={panelId}
+        // aria-controls BARA när panelen faktiskt är monterad (open): tråd-panelen
+        // renderas villkorligt, och en IDREF till ett orenderat id är ogiltig ARIA
+        // (samma mönster som GetStartedDialog-flikarna, Copilot PR #162).
+        aria-controls={open ? panelId : undefined}
         className={BTN_TOGGLE}
       >
         <span aria-hidden="true" className="text-sm leading-none">
