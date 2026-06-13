@@ -25,8 +25,9 @@ export {
 // (#69 kryss-noten: aldrig "Rätt vinnare" på ett oavgjort).
 export { matchPointLabel } from './match-point-label';
 
-// T53 (#95): pool-tipsens FÖRLÄNGDA deadline (grupp + champion) , delad sanning för
-// fasta söndagstiden + GREATEST-regeln, speglar RLS-helpers (klient + DB en sanning).
+// T53 (#95) -> T72 (#151): pool-tipsens deadline (grupp + champion) , delad sanning för
+// den PLATTA omgång-1-tiden (alla grupp- + champion-tips låses vid samma instant), speglar
+// RLS-helpers (klient + DB en sanning).
 export { POOL_EXTENDED_DEADLINE_ISO, applyExtendedDeadline } from './prediction-deadline';
 
 // T16 (#16): pool-bonus-poängsättning (grupp- + bracket-tips).

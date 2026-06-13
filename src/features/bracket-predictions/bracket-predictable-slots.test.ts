@@ -125,9 +125,9 @@ describe('selectPredictableBracket', () => {
     expect(slots.find((s) => s.slotId === 'M74')!.locked).toBe(false);
   });
 
-  it('CHAMPION (T67): alla lag som val, deadline = FÖRLÄNGD till fasta söndagstiden', () => {
-    // g-A-1 (11/6) ligger FÖRE fasta tiden, så champion FÖRLÄNGS: GREATEST(g-A-1, fast)
-    // = fasta tiden (21/6 21:59Z). decisions.md T67.
+  it('CHAMPION (T72): alla lag som val, deadline = den PLATTA pool-deadlinen (omgång 1 spelad)', () => {
+    // Champion låses vid den platta pool-deadlinen (17/6 20:00Z = omgång 1 spelad),
+    // oavsett g-A-1:s egen avspark. decisions.md T72.
     const result = selectPredictableBracket(
       bracket([]),
       TEAMS,
@@ -167,9 +167,10 @@ describe('selectPredictableBracket', () => {
     ]);
   });
 
-  it('CHAMPION (T67): ÖPPEN igen efter turneringsstart, fram till fasta tiden (reopen)', () => {
-    // Efter g-A-1 (11/6 16:00, turneringen startad) men före fasta tiden (21/6): champion ska
-    // vara ÖPPEN igen (de som inte hann före premiären får tippa VM-vinnare t.o.m. söndag).
+  it('CHAMPION (T72): ÖPPEN igen efter turneringsstart, fram till den platta tiden (reopen)', () => {
+    // Efter g-A-1 (11/6 16:00, turneringen startad) men före den platta tiden (17/6 20:00):
+    // champion ska vara ÖPPEN igen (de som inte hann före premiären får tippa VM-vinnare
+    // tills omgång 1 är spelad).
     const result = selectPredictableBracket(
       bracket([]),
       TEAMS,
@@ -179,16 +180,16 @@ describe('selectPredictableBracket', () => {
     expect(result.champion.locked).toBe(false);
   });
 
-  it('CHAMPION-LÅS (T67): GRÄNS , öppen sekunden före fasta tiden, låst exakt på den', () => {
+  it('CHAMPION-LÅS (T72): GRÄNS , öppen sekunden före den platta tiden, låst exakt på den', () => {
     const oneSecBefore = selectPredictableBracket(
       bracket([]),
       TEAMS,
       MATCHES,
-      new Date('2026-06-21T21:58:59.000Z')
+      new Date('2026-06-17T19:59:59.000Z')
     );
     expect(oneSecBefore.champion.locked).toBe(false);
 
-    // Exakt på fasta tiden (now === deadline): låst, samma riktning som server-RLS.
+    // Exakt på den platta tiden (now === deadline): låst, samma riktning som server-RLS.
     const atDeadline = selectPredictableBracket(
       bracket([]),
       TEAMS,
@@ -198,25 +199,25 @@ describe('selectPredictableBracket', () => {
     expect(atDeadline.champion.locked).toBe(true);
   });
 
-  it('T67: en match-SLOT förlängs ALDRIG (behåller sin EGEN avspark, inte fasta tiden)', () => {
-    // Konstruerat: en slot vars avspark ligger FÖRE fasta tiden. Om koden av misstag
-    // förlängde SLOTS (den ska bara förlänga champion) skulle deadlinen bli fasta tiden.
-    // Bevis: slottens deadlineIso = dess EGNA avspark, och den är LÅST efter den (inte
-    // öppen till söndagen). Detta vaktar att förlängningen INTE läckte in på slot-grenen.
+  it('T72: en match-SLOT förlängs ALDRIG (behåller sin EGEN avspark, inte den platta tiden)', () => {
+    // Konstruerat: en slot vars avspark ligger FÖRE den platta tiden. Om koden av misstag
+    // förlängde SLOTS (den ska bara förlänga champion) skulle deadlinen bli den platta tiden.
+    // Bevis: slottens deadlineIso = dess EGNA avspark, och den är LÅST efter den (inte öppen
+    // till omgång-1-tiden). Detta vaktar att förlängningen INTE läckte in på slot-grenen.
     const earlySlotMatches: Match[] = [
       kickoffMatch('g-A-1', '2026-06-11T16:00:00.000Z'),
-      kickoffMatch('M73', '2026-06-12T16:00:00.000Z'), // före fasta tiden (hypotetiskt)
+      kickoffMatch('M73', '2026-06-12T16:00:00.000Z'), // före den platta tiden (hypotetiskt)
     ];
     const state = bracket([bracketMatch('M73', 'round-of-32', 'bra', 'arg')]);
     const result = selectPredictableBracket(
       state,
       TEAMS,
       earlySlotMatches,
-      new Date('2026-06-13T00:00:00.000Z') // efter slot-avspark, före fasta tiden
+      new Date('2026-06-13T00:00:00.000Z') // efter slot-avspark, före den platta tiden
     );
     const slot73 = result.rounds.flatMap((r) => r.slots).find((s) => s.slotId === 'M73')!;
     expect(slot73.deadlineIso).toBe('2026-06-12T16:00:00.000Z'); // EGEN avspark, ej förlängd
-    expect(slot73.locked).toBe(true); // låst vid sin egen avspark, inte öppen till söndag
+    expect(slot73.locked).toBe(true); // låst vid sin egen avspark, inte öppen till omgång-1-tiden
   });
 
   it('FAIL-SAFE: en slot vars deadline-match saknas behandlas som låst', () => {
