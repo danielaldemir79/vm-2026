@@ -148,11 +148,19 @@ function TeamSide({
             som tiden + resultatet (tabular-nums, fg-muted). font-normal + fg-muted +
             den lilla graden gör den diskret så den aldrig konkurrerar med lagnamnet,
             flaggan eller tipps-kontrollen. fg-muted är redan AA-mätt i båda teman
-            (tokens.css sektion 0), ingen ny färg. */}
+            (tokens.css sektion 0), ingen ny färg.
+            INGEN uppercase (medvetet, design-frontend): den längre etiketten
+            "FIFA-ranking #NN" blir VERSALT + tracking-wide 88px bred och rymdes inte i
+            den speglade lag-kolumnen på vikbar 344px (uppmätt: kolumnen är 84px), så
+            siffran "#NN" radbröts till en EGEN rad och lämnade just det viktigaste
+            (rankings-talet) ensamt på rad två. Gemen form gör samma text 79px (ryms med
+            marginal) så den sitter på EN lugn rad även på 344px. tracking-wide behålls
+            (matchar tiden/märkets sekundär-metadata-ton). Texten är oförändrad
+            ("FIFA-ranking #14") så test-hakarna (getByText) + a11y håller. */}
         {ranking !== null ? (
           <span
             data-fifa-ranking=""
-            className="text-[0.625rem] font-normal uppercase tracking-wide tabular-nums text-fg-muted"
+            className="text-[0.625rem] font-normal tracking-wide tabular-nums text-fg-muted"
           >
             {ranking}
           </span>
