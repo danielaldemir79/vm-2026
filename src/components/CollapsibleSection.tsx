@@ -218,25 +218,27 @@ export function CollapsibleBody({
               className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
               style={{ '--vm-fade-to': fadeTo } as CSSProperties}
             />
-            {/* CHEVRON-CUE-KNAPPEN: en RIKTIG <button> så mus/touch kan klicka på den
-                pil man dras till och faktiskt fälla ut (Daniels feedback 2026-06-13:
-                "man vill klicka på pilen men inget händer"). Pillret + chevron-glyfen
-                ritas av collapsible.css via [data-collapsible-cue] (flyttade hit från
-                fadens pseudo-element).
+            {/* CHEVRON-CUE:N: ett icke-fokuserbart <div> med onClick, så mus/touch kan
+                klicka på den pil man dras till och faktiskt fälla ut (Daniels feedback
+                2026-06-13: "man vill klicka på pilen men inget händer"). Pillret +
+                chevron-glyfen ritas av collapsible.css via [data-collapsible-cue]
+                (flyttade hit från fadens pseudo-element).
 
-                A11Y-VAL (aria-hidden + tabIndex=-1), motiverat i docs/decisions.md
-                (T68b): den ÖVRE ExpandToggle är redan den tillgängliga kontrollen
-                (aria-expanded/-controls, fokuserbar, etiketterad). Den här knappen är
-                en REN mus/touch-affordans som SPEGLAR den, så vi stänger den ur
-                a11y-trädet (aria-hidden) och ur tab-ordningen (tabIndex=-1). Annars
-                skulle skärmläsar-/tangentbordsanvändare få TVÅ kontroller med samma
-                syfte (redundans/förvirring). Tangentbord + skärmläsare når toppknappen.
-                Bär --vm-fade-to så pillrets ton matchar bakytan som faden, och en egen
-                stabil hak (data-collapsible-cue) för styling/test. */}
-            <button
-              type="button"
+                A11Y-VAL (icke-fokuserbart div + aria-hidden), motiverat i
+                docs/decisions.md (T68b): den ÖVRE ExpandToggle är redan den tillgängliga
+                kontrollen (aria-expanded/-controls, fokuserbar, etiketterad). Cue:n är en
+                REN mus/touch-affordans som SPEGLAR den, så vi stänger den ur a11y-trädet
+                (aria-hidden) och låter den vara ett ofokuserbart element. VARFÖR ett div
+                och inte en <button>: aria-hidden på ett FOKUSERBART element (en button kan
+                ta fokus vid klick även med tabIndex=-1) är ogiltig ARIA och trippar
+                axe-regeln aria-hidden-focus (Copilot, PR #143). Ett div är inte
+                fokuserbart, så aria-hidden är giltigt och cue:n hålls helt ur a11y-trädet
+                utan att bli en andra kontroll (redundans/förvirring). Tangentbord +
+                skärmläsare når toppknappen. Bär --vm-fade-to så pillrets ton matchar
+                bakytan som faden, och en egen stabil hak (data-collapsible-cue) för
+                styling/test. */}
+            <div
               aria-hidden="true"
-              tabIndex={-1}
               data-collapsible-cue=""
               onClick={toggle}
               className="absolute bottom-0 left-1/2 h-9 w-12 -translate-x-1/2 cursor-pointer"

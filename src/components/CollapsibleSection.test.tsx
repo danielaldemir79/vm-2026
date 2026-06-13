@@ -180,17 +180,17 @@ describe('CollapsibleBody (innehålls-kompressorn sektionerna använder)', () =>
         </CollapsibleBody>
       );
       const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
-      // Default komprimerat: cue-knappen finns vid klipp-kanten.
-      const cue = body.querySelector('[data-collapsible-cue]') as HTMLButtonElement;
-      expect(cue).toBeInTheDocument();
-      fireEvent.click(cue);
+      // Default komprimerat: cue:n finns vid klipp-kanten.
+      const cue = body.querySelector('[data-collapsible-cue]');
+      expect(cue).not.toBeNull();
+      fireEvent.click(cue as Element);
       // Efter klick: utfälld, precis som om man klickat den övre expandera-knappen.
       expect(body).toHaveAttribute('data-collapsed', 'false');
       // Och cue:n är borta (inget mer att "fälla ut" till i utfällt läge).
       expect(body.querySelector('[data-collapsible-cue]')).toBeNull();
     });
 
-    it('cue-knappen är aria-hidden + tabIndex=-1 (inte en andra SR-/tab-kontroll)', () => {
+    it('cue:n är ett icke-fokuserbart aria-hidden div (inte en andra SR-/tab-kontroll)', () => {
       render(
         <CollapsibleBody
           name="admin"
@@ -199,12 +199,16 @@ describe('CollapsibleBody (innehålls-kompressorn sektionerna använder)', () =>
           <p>Admin-innehåll.</p>
         </CollapsibleBody>
       );
-      const cue = document.querySelector('[data-collapsible-cue]') as HTMLButtonElement;
-      expect(cue.tagName).toBe('BUTTON');
+      const cue = document.querySelector('[data-collapsible-cue]');
+      expect(cue).not.toBeNull();
+      // Ett DIV, inte en button: aria-hidden på ett fokuserbart element (en button kan
+      // ta fokus vid klick även med tabIndex=-1) är ogiltig ARIA och trippar axe-regeln
+      // aria-hidden-focus (Copilot, PR #143). Ett div är inte fokuserbart, så aria-hidden
+      // är giltigt och cue:n hålls helt ur a11y-trädet utan att bli en andra kontroll.
+      expect(cue?.tagName).toBe('DIV');
       expect(cue).toHaveAttribute('aria-hidden', 'true');
-      expect(cue).toHaveAttribute('tabindex', '-1');
       // Den tillgängliga kontrollen i komprimerat läge är PRECIS EN knapp (den övre
-      // ExpandToggle): cue-knappen får inte dyka upp som en andra knapp i a11y-trädet.
+      // ExpandToggle): cue:n får inte dyka upp som en andra knapp i a11y-trädet.
       // getAllByRole('button') ser bara element i a11y-trädet -> aria-hidden räknas bort.
       expect(screen.getAllByRole('button', { name: /Visa admin/i })).toHaveLength(1);
     });
