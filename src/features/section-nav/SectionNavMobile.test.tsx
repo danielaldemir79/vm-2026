@@ -270,3 +270,38 @@ describe('SectionNavMobile, rad-klick scrollar + stänger', () => {
     expect(row).toHaveAttribute('data-section-menu-item');
   });
 });
+
+describe('SectionNavMobile, ikon-skifte-staten (hamburgare <-> kryss)', () => {
+  // data-section-menu-open är en REN styling-krok (design-lager): den driver ikon-skiftet
+  // (hamburgare -> kryss) och knappens öppet-läge i CSS. Semantiken bär aria-expanded; det
+  // här testet vaktar att styling-kroken speglar open-staten exakt, så CSS-skiftet aldrig
+  // kan hamna ur synk med panelens verkliga tillstånd. Tre individuella streck (data-icon-bar)
+  // ersatte det tidigare path:et så de kan roteras till ett kryss; testet vaktar att de finns.
+
+  it('saknar data-section-menu-open i STÄNGT läge och sätter "true" i ÖPPET', () => {
+    renderMenu(<FakeSection section={SECTIONS.daily} />);
+    const btn = menuButton();
+    // Stängd från start: kroken är inte satt (undefined -> attributet utelämnas).
+    expect(btn).not.toHaveAttribute('data-section-menu-open');
+
+    act(() => btn.click());
+    // Öppen: styling-kroken speglar open + är i synk med aria-expanded.
+    expect(btn).toHaveAttribute('data-section-menu-open', 'true');
+    expect(btn).toHaveAttribute('aria-expanded', 'true');
+
+    act(() => btn.click());
+    // Stängd igen: kroken faller bort (ikonen återgår till hamburgare i CSS).
+    expect(btn).not.toHaveAttribute('data-section-menu-open');
+    expect(btn).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('ikonen har tre individuella streck (data-icon-bar) för kryss-rotationen', () => {
+    renderMenu(<FakeSection section={SECTIONS.daily} />);
+    const icon = document.querySelector('[data-section-menu-icon]') as HTMLElement;
+    expect(icon).not.toBeNull();
+    const bars = icon.querySelectorAll('[data-icon-bar]');
+    expect(bars).toHaveLength(3);
+    // Strecken är aria-hidden via svg:ns aria-hidden (ikonen bär ingen a11y-betydelse).
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+  });
+});
