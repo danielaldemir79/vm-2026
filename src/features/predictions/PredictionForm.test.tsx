@@ -204,6 +204,50 @@ describe('PredictionForm (tips-inmatning, #39-formspråk)', () => {
     );
     expect(screen.getByText(/Du hann inte tippa/)).toBeInTheDocument();
   });
+
+  // "DITT TIPS"-etiketten (T76, #158): de stora siffer-rutorna är användarens tips, så
+  // ett LÅST kort med ett tips märker rutorna omisskännligt "Ditt tips" (skilt från
+  // facit-brickan). En OTIPPAD låst match har inga siffror att märka -> ingen etikett.
+  it('LÅST med tips: en omisskännlig "Ditt tips"-etikett märker siffer-rutorna', () => {
+    render(
+      <PredictionForm
+        match={MATCH}
+        teamsById={teamsById}
+        current={{ homeGoals: 2, awayGoals: 1 }}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    const label = document.querySelector('[data-prediction-tip-label]');
+    expect(label).not.toBeNull();
+    expect(label).toHaveTextContent(/Ditt tips/i);
+  });
+
+  it('LÅST utan tips: ingen "Ditt tips"-etikett (inga siffror att märka)', () => {
+    render(
+      <PredictionForm
+        match={MATCH}
+        teamsById={teamsById}
+        current={null}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    expect(document.querySelector('[data-prediction-tip-label]')).toBeNull();
+  });
+
+  it('ÖPPET kort: ingen "Ditt tips"-etikett (Tips-eyebrow + spar-knapp ramar redan in)', () => {
+    render(
+      <PredictionForm
+        match={MATCH}
+        teamsById={teamsById}
+        current={{ homeGoals: 2, awayGoals: 1 }}
+        locked={false}
+        onSubmit={vi.fn()}
+      />
+    );
+    expect(document.querySelector('[data-prediction-tip-label]')).toBeNull();
+  });
 });
 
 // POÄNG-RADEN på tips-kortet (T58 krav 1, #99): på en AVGJORD match jag tippade visas

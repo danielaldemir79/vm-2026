@@ -481,6 +481,25 @@ export function PredictionForm({
           </div>
         ) : null}
 
+        {/* "DITT TIPS"-etiketten (T76, #158, Daniels feedback): de stora siffer-rutorna
+            nedan är ANVÄNDARENS TIPS, men på ett LÅST kort (där facit-brickan ovanför är
+            framträdande) lästes de lätt som slutresultatet. En tydlig, omisskännlig etikett
+            DIREKT vid tips-rutorna gör distinktionen glasklar: rutorna = ditt tips, brickan
+            ovanför = facit. Visas bara när matchen är LÅST OCH jag tippade (på ett öppet kort
+            ramar "Tips"-eyebrow:n + spar-knappen redan in att man fyller i sitt tips; en
+            otippad låst match har inga siffror i rutorna att etikettera).
+            data-prediction-tip-label = stabil hake; design-frontend äger den slutliga
+            visuella hierarkin (tips vs facit, storlek/placering/mobil), detta ger den
+            funktionella strukturen + en rimlig bas. */}
+        {locked && current ? (
+          <p
+            data-prediction-tip-label=""
+            className="m-0 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-fg-muted"
+          >
+            Ditt tips
+          </p>
+        ) : null}
+
         {/* Score-grid (SAMMA #39-struktur som resultatinmatningen, fast bredd). */}
         <div
           data-prediction-card-body=""
