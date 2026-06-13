@@ -29,6 +29,24 @@ function finishedMatch(homeGoals: number, awayGoals: number): Match {
   return { ...MATCH, status: 'finished', result: { homeGoals, awayGoals } };
 }
 
+/**
+ * En AVGJORD slutspelsmatch som gick på STRAFFAR: oavgjort i ordinarie tid + ett
+ * straff-resultat (facit-raden ska då visa straffarna separat, T73).
+ */
+function penaltyMatch(
+  homeGoals: number,
+  awayGoals: number,
+  penalties: { homeGoals: number; awayGoals: number }
+): Match {
+  return {
+    ...MATCH,
+    stage: 'round-of-16',
+    groupId: null,
+    status: 'finished',
+    result: { homeGoals, awayGoals, penalties },
+  };
+}
+
 /** Samma match men PÅGÅENDE (live): låst men inget facit, ska aldrig ge en poäng-rad. */
 const LIVE_MATCH: Match = { ...MATCH, status: 'live', result: null };
 
@@ -296,5 +314,121 @@ describe('PredictionForm , poäng-rad på avgjord match (T58, #99)', () => {
       expect(tipResult()).toHaveAttribute('data-tip-points', String(expected));
       unmount();
     }
+  });
+});
+
+// FACIT-RADEN på tips-kortet (T73, Daniels feedback 2026-06-13): på en AVGJORD match
+// visas det RÄTTA slutresultatet (+ ev. straffar), tydligt skilt från "Ditt tips".
+// Fokus: facit syns + rätt tal, straffar vid straff-avgjord match, INGET facit på en
+// pågående/kommande låst match (oförändrat beteende), och facit visas även för den som
+// inte tippade (publikt resultat). Talet är härlett ur formatScore (delad sanning), inte
+// hårdkodat i vyn.
+describe('PredictionForm , facit på avgjord match (T73)', () => {
+  /** Hämta facit-elementet (eller null), så test inte beror på exakt text-form. */
+  const facitRow = () => document.querySelector('[data-tip-facit]');
+
+  it('AVGJORD match: visar facit (det rätta slutresultatet) skilt från Ditt tips', () => {
+    // Facit 2-1, mitt tips 0-3: båda ska synas, var för sig (facit != tips).
+    render(
+      <PredictionForm
+        match={finishedMatch(2, 1)}
+        teamsById={teamsById}
+        current={{ homeGoals: 0, awayGoals: 3 }}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    const facit = facitRow();
+    expect(facit).not.toBeNull();
+    // Facit-talet kommer ur formatScore (delad sanning), bevisat via data-haken + texten.
+    expect(facit).toHaveAttribute('data-tip-facit-score', '2-1');
+    expect(facit).toHaveTextContent('Facit');
+    expect(facit).toHaveTextContent('2-1');
+    // Mitt tips står kvar SEPARAT (facit ersätter aldrig "Ditt tips").
+    expect(screen.getByText(/Ditt tips: 0–3/)).toBeInTheDocument();
+  });
+
+  it('STRAFF-AVGJORD match: facit visar straffarna separat från ordinarie resultatet', () => {
+    // 1-1 i ordinarie, avgjord 5-4 på straffar (slutspel). Facit ska visa BÅDA.
+    render(
+      <PredictionForm
+        match={penaltyMatch(1, 1, { homeGoals: 5, awayGoals: 4 })}
+        teamsById={teamsById}
+        current={{ homeGoals: 1, awayGoals: 1 }}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    const facit = facitRow();
+    expect(facit).not.toBeNull();
+    expect(facit).toHaveAttribute('data-tip-facit-score', '1-1');
+    expect(facit).toHaveTextContent('1-1');
+    // Straff-tillägget (formatPenalties) syns separat, så slutspels-facit inte är tvetydigt.
+    // Explicit null när facit saknas (inte undefined via ?.), så assertionen failar ärligt
+    // om facit-raden uteblir i stället för att passera på undefined !== null.
+    const penalties = facit ? facit.querySelector('[data-tip-facit-penalties]') : null;
+    expect(penalties).not.toBeNull();
+    expect(penalties).toHaveTextContent('5-4 på straffar');
+  });
+
+  it('AVGJORD utan straffar: inget straff-tillägg (gruppspel/avgjort i ordinarie)', () => {
+    render(
+      <PredictionForm
+        match={finishedMatch(3, 0)}
+        teamsById={teamsById}
+        current={{ homeGoals: 2, awayGoals: 0 }}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    const facit = facitRow();
+    expect(facit).toHaveTextContent('3-0');
+    expect(facit?.querySelector('[data-tip-facit-penalties]')).toBeNull();
+  });
+
+  it('OTIPPAD avgjord match: facit visas ändå (resultatet är publikt), men ingen poäng-rad', () => {
+    render(
+      <PredictionForm
+        match={finishedMatch(2, 1)}
+        teamsById={teamsById}
+        current={null}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    // Facit syns för den som inte hann tippa (man vill ändå se hur det gick).
+    expect(facitRow()).toHaveAttribute('data-tip-facit-score', '2-1');
+    expect(screen.getByText(/Du hann inte tippa/)).toBeInTheDocument();
+    // Men ingen poäng-rad (ingen "0 Miss" för den som inte var med, T58-ärlighet bevarad).
+    expect(document.querySelector('[data-tip-result]')).toBeNull();
+  });
+
+  it('PÅGÅENDE (live) låst match: INGET facit (matchen är inte avgjord, gissa aldrig)', () => {
+    render(
+      <PredictionForm
+        match={LIVE_MATCH}
+        teamsById={teamsById}
+        current={{ homeGoals: 2, awayGoals: 1 }}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/Ditt tips: 2–1/)).toBeInTheDocument();
+    expect(facitRow()).toBeNull();
+  });
+
+  it('LÅST men inte avgjord (scheduled, kant-fall): inget facit, kortet oförändrat', () => {
+    // En scheduled match kan vara locked i UI:t på deadline-sekunden innan status hinner
+    // flippa. Inget facit ska visas (result === null), beteendet är oförändrat.
+    render(
+      <PredictionForm
+        match={MATCH}
+        teamsById={teamsById}
+        current={{ homeGoals: 1, awayGoals: 0 }}
+        locked={true}
+        onSubmit={vi.fn()}
+      />
+    );
+    expect(facitRow()).toBeNull();
   });
 });
