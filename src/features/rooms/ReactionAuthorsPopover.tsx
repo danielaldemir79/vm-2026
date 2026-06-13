@@ -18,6 +18,14 @@
 // A11y (icke-touch + skärmläsare): role="tooltip" + ett stabilt id som triggern pekar
 // på via aria-describedby (sätts i MatchReactions). Innehållet är riktig text (namn +
 // <time>), inte bara visuellt, så en skärmläsare läser upp vilka som reagerat.
+//
+// VISUELL FINISH (design-frontend, T74 finputs): popovern får en liten PIL/pekare mot
+// ankar-brickan (`.vm-reaction-authors-arrow`, aria-hidden dekor) så det är tydligt
+// vilken reaktion listan gäller, en diskret in-känsla (`.vm-reaction-authors-in`,
+// keyframes i rooms.css GATAD på prefers-reduced-motion), och en MAX-HÖJD + lugn scroll
+// på själva listan när många reagerat, så popovern aldrig växer sig så hög att den
+// skymmer ankar-brickan eller blir rörig. Rubriken ligger UTANFÖR scroll-ytan (alltid
+// synlig), bara namn-raderna scrollar. Inget av detta rör positionerings-LOGIKEN (JS).
 
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { avatarHueFromId, initialsFromName } from './member-avatar';
@@ -108,7 +116,7 @@ export function ReactionAuthorsPopover({
       role="tooltip"
       data-reaction-authors-popover=""
       data-reaction-authors-emoji={emoji}
-      className="vm-reaction-authors fixed z-50 max-w-[min(16rem,calc(100vw-1rem))] rounded-card border border-border bg-surface-raised p-2.5 text-left shadow-[var(--vm-shadow-raised)]"
+      className="vm-reaction-authors vm-reaction-authors-in fixed z-50 max-w-[min(16rem,calc(100vw-1rem))] rounded-card border border-border bg-surface-raised p-2.5 text-left shadow-[var(--vm-shadow-raised)]"
       style={{ left: `${pos.left}px`, top: `${pos.top}px` }}
     >
       <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
@@ -124,7 +132,15 @@ export function ReactionAuthorsPopover({
           Ingen har reagerat med den här emojin.
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5" data-reaction-authors-list>
+        // MAX-HÖJD + lugn scroll: vid många reagerande växer popovern inte obegränsat
+        // (skulle annars klampas mot skärmtoppen och skymma ankar-brickan). ~5,5 rader
+        // syns, resten scrollas, så listan förblir kompakt och aldrig rörig. Rubriken
+        // ovanför scrollar inte med (alltid synlig). overscroll-contain hindrar att
+        // scrollen läcker till sidan bakom på touch.
+        <ul
+          className="vm-reaction-authors-scroll flex max-h-[11.5rem] flex-col gap-1.5 overflow-y-auto overscroll-contain"
+          data-reaction-authors-list
+        >
           {authors.map((author) => {
             const hue = avatarHueFromId(author.userId);
             return (
@@ -156,6 +172,10 @@ export function ReactionAuthorsPopover({
           })}
         </ul>
       )}
+      {/* PIL mot ankar-brickan: en liten pekare på popoverns underkant, centrerad, så det
+          är tydligt vilken reaktion listan gäller (popovern ligger ovanför brickan). Ren
+          dekor (aria-hidden), bär ingen text; formen + fyllningen bor i rooms.css. */}
+      <span aria-hidden="true" className="vm-reaction-authors-arrow" />
     </div>
   );
 }
