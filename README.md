@@ -64,6 +64,16 @@ Plus en uppsättning informationsskärmar runt båda.
 - **Matchkort** komprimerar informationen visuellt i stället för en textrad: lagens emblem,
   TV-kanalen som en badge, omgången, och på varje kort **arenan (arena, stad, land) med dess
   kapacitet** och lagens **FIFA-ranking**.
+- **Livescore direkt på kortet.** Under pågående matcher berikas varje matchkort med en live-panel:
+  en mjukt tickande matchklocka (status-styrd och paus-säker, visar "Paus" under uppehåll, "45+"
+  eller "90+" vid tavlans gräns, "Slut" när matchen är klar, aldrig en påhittad tid), live-ställning,
+  målskyttar med assist, gula och röda kort samt byten. Allt direkt synligt utan att klicka.
+- **"Visa mer" (utfällbar statistik och laguppställning).** En tydlig expandera-knapp fäller ut
+  full matchstatistik (bollinnehav, skott, hörnor, offside och fler nyckeltal som jämförelse-staplar)
+  samt laguppställning och formationer för varje lag, bakom ett ärligt löfte: knappen visas bara
+  när det faktiskt finns data att visa.
+- **Bläddringsbar historik.** Live-datan sparas permanent och fryses när en match är klar. Man kan
+  bläddra tillbaka dagar efteråt och se statistik och målskyttar, inte bara för pågående matcher.
 - **Gruppspelet, 12 grupper (A till L).** Live-uträknade tabeller (poäng, spelade, målskillnad,
   gjorda/insläppta mål) som uppdateras i samma stund ett resultat matas in. Tabellerna är
   härledda, lagras aldrig dubbelt.
@@ -83,6 +93,11 @@ Plus en uppsättning informationsskärmar runt båda.
   (sanningskällan som tabeller, träd och poäng läser från) kan bara skrivas av admin. Det är
   framtvingat på serversidan av Postgres Row Level Security, inte bara dolt i gränssnittet, och
   det bevisas med riktiga sessioner i integrationstester.
+- **Auto-facit med manuell override.** När en match avslutas skrivs slutresultatet automatiskt som
+  officiellt facit i tävlingen. Men admins manuella inmatning är alltid sista ordet: auto-facit fyller
+  bara tomt och uppdaterar bara sina egna automatiska rader. En manuellt inmatad rad rörs aldrig av
+  automatiken (varje resultat har en källa, och manuell vinner alltid). Det är en deklarativ SQL-regel,
+  inte bara ett löfte i koden.
 
 ### Tipsspel
 
@@ -224,7 +239,10 @@ npm run preview    # serve the built dist/ locally
   driva.
 - **Fixtures-först med miljö-grind.** All kod byggs och testas mot typade fixtures; en enda grind
   växlar till live-Supabase via miljövariabler utan att ändra något anropsställe. Det är vad som
-  lät hela appen byggas och testas före, och oberoende av, något backend-konto.
+  lät hela appen byggas och testas före, och oberoende av, något backend-konto. Livekortet renderas
+  mot bundlad exempeldata i fixtures-läge; i live-läge läses datan ur Supabase (publik läsning,
+  realtidsuppdaterad) som matas av en budget-medveten schemalagd edge-funktion mot ett gratis
+  fotbolls-data-API (100 anrop per dag, kostnadsfritt).
 - **En scroll-sida, ingen router.** Varje sektion renderas på sidan; vendor-kodsplittning (React,
   Motion, Supabase) håller den initiala laddningen lätt.
 
@@ -240,7 +258,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Formatkontroll | `npm run format:check` |
 
-- **1918 passerande tester** över 200 testfiler (Vitest) på en färsk klon, med 56 tester som
+- **2106 passerande tester** över 217 testfiler (Vitest) på en färsk klon, med 56 tester som
   hoppas över med flit (live-Supabase RLS-integrationstesterna, som bara körs när Supabase-env
   är konfigurerat, se nedan). Verifierat genom att köra `npm test`.
 - **Säkerhet bevisad, inte antagen.** Row Level Security-modellen (bara admin kan skriva
