@@ -1,4 +1,4 @@
-# Besluts-logg (VM 2026)
+﻿# Besluts-logg (VM 2026)
 
 Varför bakom större design-beslut (lätt ADR). Nyaste överst. En rad per beslut räcker ofta,
 skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där det hjälper.
@@ -5614,11 +5614,21 @@ från matchresultat + tips) + **fixtures-först** (typad fixtures-data, miljö-g
 **Varför:** Gör den kritiska FIFA-treeplats-seedningen (SPEC §5) testbar och säker, och låter hela
 appen byggas innan Supabase-kontot finns. Fixtures-mönstret är bevisat i Agent Kit-playbooken.
 
-**Beslut (T80, C2 #169):** Matchens status visas på varje rad i admin-resultatlistan, och de
-svenska status-etiketterna (scheduled -> "Ej spelad", live -> "Pågår", finished -> "Färdigspelad")
-bor i EN sanning (MATCH_STATUS_LABEL i AdminResultEntry.tsx) som både formulärets status-väljare och
-rad-stödinfon läser från.
-**Varför:** Issue #169 + PR-spec kräver status på raden (särskilt för att hitta "Pågår"-matcher i den
-långa listan). En delad map i stället för dubbel-hårdkodning hindrar att etiketterna glider isär.
-Live markeras färg-OBEROENDE (ordet "Pågår" bär betydelsen, accent-ton bara förstärkning, WCAG 1.4.1),
-och status är en SKILD dimension från den gröna klar-sealen (en match kan vara Pågår OCH ha facit).
+---
+
+## 2026-06-14 , T80 (#169): admin match-lista med grön klar-markering
+
+**Beslut (T80, skarv-signal):** Den gröna "klar"-markeringen härleds ur om matchens ID finns SOM NYCKEL i `officialResults`-samlingen, inte ur `m.status === 'finished'`.
+**Varför:** `status === 'finished'` är en härledd bieffekt av invävningslogiken - om invävningen har ett kantfall (match med facit men status != 'finished') missar markeringen dessa rader tyst. `officialResults` är källan; att kontrollera MEDLEMSKAPET i den samlingen är immun mot statusdrift.
+
+**Beslut (T80, C1 #169):** Varje rad i admin-resultatlistan bär ett självbeskrivande `aria-label` ("Frankrike vs Argentina - Grupp A - Ej spelad") i stället för ett generiskt rollnamn.
+**Varför:** Copilot C1 flaggade att en skärmläsare som läser raderna i listan inte kan skilja dem åt utan ett unikt namn per rad. Självbeskrivande aria-label baserat på matchdata ger unikheten och gör navigationen förståelig utan visuell kontext.
+
+**Beslut (T80, C2 #169):** Matchens status visas på varje rad i admin-resultatlistan, och de svenska status-etiketterna (scheduled -> "Ej spelad", live -> "Pågår", finished -> "Färdigspelad") bor i EN sanning (MATCH_STATUS_LABEL i AdminResultEntry.tsx) som både formulärets status-väljare och rad-stödinfon läser från.
+**Varför:** Issue #169 + PR-spec kräver status på raden (särskilt för att hitta "Pågår"-matcher i den långa listan). En delad map i stället för dubbel-hårdkodning hindrar att etiketterna glider isär. Live markeras färg-OBEROENDE (ordet "Pågår" bär betydelsen, accent-ton bara förstärkning, WCAG 1.4.1), och status är en SKILD dimension från den gröna klar-sealen (en match kan vara Pågår OCH ha facit).
+
+**Beslut (T80, C3 #169):** aria-label på varje rad byggs av faktiska lagnamnslabels (samma strängar som visas i `<span>`-elementen), inte av matchobjektets råfältvärden.
+**Varför:** WCAG 2.5.3 label-in-name kräver att det tillgängliga namnet INNEHÅLLER den synliga texten. Om aria-label byggs av råfältvärden (team_code, team_id) och den synliga texten hämtas från en separat förberäknad label kan de drifta isär. Att återanvända exakt samma label-sträng för aria-label och synlig text garanterar att label-in-name aldrig kan brytas.
+
+**Beslut (T80, C4 #169):** Tester för admin-resultatlistan asserterar mot textContent och roll+namn, inte mot CSS-klass-närvaro.
+**Varför:** CSS-klassen (.truncate, .bg-green-500) är ett implementationsdetalj som kan byta namn utan att beteendet ändras. textContent och roll+namn är beteende-kontraktet - de rödnar när det användaren faktiskt ser/hör ändras.

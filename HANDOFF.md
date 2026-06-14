@@ -1,10 +1,98 @@
-# HANDOFF , VM 2026
+﻿# HANDOFF , VM 2026
 
 Var projektet står just nu. Nyaste överst. Bryggan mellan sessioner: disken är sanningen,
 chatten är kladdpapper. En tom session ska kunna återskapa hela läget härifrån + boarden.
 
 ---
 
+## RESUME-HERE , 2026-06-14 , T80 (#169) admin match-lista med grön klar-markering , PR #170 mot develop , In Review
+
+**Branch:** `feature/T80-admin-resultatlista` @ HEAD `dea8d73`
+**PR:** https://github.com/danielaldemir79/vm-2026/pull/170 mot `develop` (Closes #169, state: OPEN)
+**Issue:** https://github.com/danielaldemir79/vm-2026/issues/169
+**Live preview:** vm-2026.pages.dev
+
+### Vad T80 levererade
+
+Dropdown ersatt med synlig match-lista i admin-resultat-vyn. Grön klar-markering härledd ur
+officialResults-MEDLEMSKAP (inte m.status==='finished', som missade icke-finished match med facit
+- latent bugg fixad). Fyra entydiga lägen (vald x klar). AA-mätt båda teman. Copilot-loopen
+körde 4 rundor, alla trivial, inga strukturella, exit nådd (alla trådar resolved).
+
+**Kedjan:**
+
+- **Senior-developer `5ab0cea`:** dropdown -> synlig match-lista, grön/klar-markering ur
+  officialResults-MEDLEMSKAP, skarv-bevisad.
+- **Design-frontend `290c29c`:** premium-finish, fyra entydiga lägen (vald x klar), AA-mätt
+  båda teman.
+- **Reviewer F2 (kommentar/kod-drift 14% vs 16% i tokens.css) åtgärdad `c1d257e`:** reviewer
+  redo, inga blockerare.
+- **Copilot R1 -> `efcdb87`:** C1 aria-label självbeskrivande per rad.
+- **Copilot R2 -> `835a3dd`:** C2 visa matchstatus på raden, delad MATCH_STATUS_LABEL-map.
+- **Copilot R3 -> `9ea1fd1`:** C3 återanvänd härledda lagnamn för synlig etikett (label-in-name).
+- **Copilot R4 -> `dea8d73`:** C4 asserta test mot textContent, inte .truncate-klass.
+- **Copilot R4:** exit nådd (monoton, inga strukturella fynd kvar, alla trådar resolved).
+
+**Verifiering (HEAD `dea8d73`):** build EXIT 0, npm test 1986/0/0 (junit-auktoritativt), lint +
+format:check EXIT 0.
+
+**Acceptanskriterier T80 (#169):**
+- [x] AC1: Synlig match-lista (inte dropdown) i admin-resultat-vyn
+- [x] AC2: Grön klar-markering härledd ur officialResults-MEDLEMSKAP (skarv-bevisad)
+- [x] AC3: Fyra entydiga lägen (vald x klar), AA-mätt båda teman
+- [x] AC4: Build/lint/format rent, Copilot R1-R4 exit (alla trivial), inga olösta fynd
+
+### Vad dirigenten gör nu
+
+1. Merga PR #170: `gh pr merge 170 --merge --repo danielaldemir79/vm-2026`
+2. Stäng issue #169: `gh issue close 169`
+3. Flytta kort T80 till Done på boarden
+4. Live-verifiera på vm-2026.pages.dev (admin-vyn, grön klar-markering)
+5. Kör sedan för-publicerings-kollen (se "Nästa steg" nedan)
+
+### Behöver-Daniel (uppdaterat efter T80)
+
+**Befordrings-kandidater från T80 (Daniels godkännande krävs):**
+- Inga nya 3+-flaggor. Se nedan under "Nästa steg" för flaggade IMPROVEMENTS-kandidater.
+
+**För-publicering (Daniel godkänt 2026-06-13/14, "Tona bort AI-spår, sen publik"):**
+Nästa steg efter T80-merge är för-publicerings-kollen. Dirigenten ansvarar:
+1. Historik-omskrivning: ta bort 348 Co-Authored-By Claude-rader + CLAUDE.md/HANDOFF.md ur
+   historiken (git filter-repo). Sanera SPEC.md. Tona ner README-noten. BEHÅLL decisions.md
+   och patterns.md per Daniels val.
+2. Gör repot publikt på Daniels go.
+
+**Cache-drift (känd/AKUT):** plugin-cachen har gamla T1/T3-lärdomar som källan saknar. De
+2026-06-13/14-befordrade topp-reglerna (negativ-kontroll, fixtures-först, mät-på-riktigt,
+bevisa-skarven, regenerera-bevisar-ej-sanning) är committade i agent-kit-källan men inte
+deployade till cachen förrän rescue+sync görs.
+
+**Kvar att besluta/agera:**
+- Supabase e-postmall #81: stängt 2026-06-12 på Daniels order.
+- RLS-testrum i Supabase: står kvar på Daniels uttryckliga beslut (2026-06-12 15:18).
+- TWA/Play-kontot: se docs/twa-guide.md.
+- #39-F1 (post-VM-vy): pinnad, ej byggd.
+- T16b-slot-tippbarhet-ur-sim: pinnad.
+
+**IMPROVEMENTS-kandidater flaggade av journalist (T80):**
+- **".gitignore saknar test-results*.xml"** (senior-devs förslag): junit-output kan råka
+  committas om en agent glömmer att städa. Config-hygien-kandidat till IMPROVEMENTS.md.
+  Journalist rör inte .gitignore (docs-only); dirigenten hanterar vid godkännande.
+
+### Nästa steg
+
+**Om PR #170 ÄNNU INTE mergad:**
+Dirigenten har fullmakt. Merga: `gh pr merge 170 --merge --repo danielaldemir79/vm-2026`.
+Stäng issue #169: `gh issue close 169`. Flytta kort T80 till Done på boarden.
+Kör sedan för-publicerings-kollen (historik-omskrivning + publik-go på Daniels order).
+
+**Om PR #170 REDAN mergad:**
+T80 klar och live på develop. Kör för-publicerings-kollen direkt: git filter-repo på
+historiken (Co-Authored-By Claude + CLAUDE.md/HANDOFF.md bort), sanera SPEC.md, tona ner
+README-noten. Lägg fram för Daniels go på att göra repot offentligt.
+Kör `/agent-kit` för att starta för-publicerings-kollen.
+
+---
 ## RESUME-HERE , 2026-06-13 , T79 (#167) responsiv sektions-nav (hamburgare pa mobil) , PR #168 mot develop , In Review
 
 **Branch:** `feature/T79-responsiv-nav` @ HEAD `12836e0`
