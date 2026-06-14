@@ -36,6 +36,7 @@ import eventsRaw from './__fixtures__/events-rich.json?raw';
 import statisticsRaw from './__fixtures__/statistics-rich.json?raw';
 import lineupsRaw from './__fixtures__/lineups-rich.json?raw';
 import finishedRaw from './__fixtures__/fixture-finished-ft.json?raw';
+import aetPenRaw from './__fixtures__/fixture-aet-pen.json?raw';
 
 /** Parsa en committad sample-fil (text -> typat råsvar). En sanning för fixtures-källan. */
 function parseRaw<T>(raw: string): RawApiResponse<T> {
@@ -48,6 +49,14 @@ export const eventsResponse = parseRaw<RawEvent>(eventsRaw);
 export const statisticsResponse = parseRaw<RawStatisticsResponse>(statisticsRaw);
 export const lineupsResponse = parseRaw<RawLineupResponse>(lineupsRaw);
 export const finishedResponse = parseRaw<RawFixtureResponse>(finishedRaw);
+
+/**
+ * Riktigt straffavgjort slutspelssvar (Argentina-Frankrike, VM-finalen 2022,
+ * status PEN). GULD-KÄLLA för facit-regeln: goals 3-3 (aggregat efter förlängning,
+ * exkl. straffar), fulltime 2-2, extratime 1-1, penalty 4-2. Bevisar att facit
+ * kommer ur `goals` (3-3), inte ur `score.extratime` (1-1).
+ */
+export const aetPenResponse = parseRaw<RawFixtureResponse>(aetPenRaw);
 
 /** Live-ögonblicksbilder för fixtures-läget (Nederländerna-Japan, en pågående VM-match). */
 export const fixtureLiveSnapshots: LiveMatchSnapshot[] = parseLiveFixtures(liveAllResponse);
@@ -63,3 +72,10 @@ export const fixtureLiveLineups: LiveLineup[] = parseLineups(lineupsResponse);
 
 /** Ett facit (slutresultat) för fixtures-läget, ur ett id-uppslag på en avgjord match. */
 export const fixtureFinalResult: FinalResult = parseFinalResult(finishedResponse);
+
+/**
+ * Ett straffavgjort facit för fixtures-läget (Argentina-Frankrike 2022): slutresultat
+ * 3-3 ur `goals`, straffar 4-2, decidedBy 'penalties'. Kör guld-källan genom den
+ * riktiga parsern, så fixturen är aktiv (inte död test-data) och vaktas mot form-drift.
+ */
+export const fixturePenaltyResult: FinalResult = parseFinalResult(aetPenResponse);

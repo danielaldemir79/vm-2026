@@ -115,7 +115,9 @@ export interface LiveLineup {
 /**
  * Det avgjorda facit-resultatet ur ett fixtures?id-svar. `decidedBy` säger HUR
  * matchen avgjordes så konsumenten inte behöver gissa om penalty-fältet gäller.
- * Mål-fälten är ordinarie+ev. förlängning (score.fulltime, ev. + extratime).
+ * Mål-fälten är det AUKTORITATIVA slutresultatet ur API:ts `goals`-fält, redan
+ * aggregerat (ordinarie + ev. förlängning) men EXKLUSIVE straffar , rätt för FT,
+ * AET och PEN (källhänvisat i parse-live.ts, gissas aldrig).
  */
 export interface FinalResult {
   apiFixtureId: number;

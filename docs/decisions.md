@@ -5,6 +5,29 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-14 , Livescore facit: slutresultatet kommer ur `goals`, ALDRIG ur `score.extratime` (korrigering)
+
+`parseFinalResult` (parse-live.ts) härleder en avgjord matchs facit ur API-Footballs `goals`-fält,
+inte ur `score.extratime`. Detta korrigerar en tidigare bugg där AET-grenen ersatte slutresultatet
+med `score.extratime` (och ett tidigare antagande i memory att extratime var KUMULATIVT).
+
+**Källhänvisad facit-regel (gissas aldrig, verifierad mot RIKTIG data 2026-06-14):**
+
+- `goals.home/away` = det AUKTORITATIVA slutresultatet, redan aggregerat (ordinarie + ev.
+  förlängning) men EXKLUSIVE straffar. Rätt för ALLA fall: FT (goals = fulltime), AET
+  (goals = fulltime + extratime) och PEN (goals = aggregatet före straffläggningen).
+- `score.extratime` = ENDAST de mål som gjordes UNDER förlängningsperioden (30 min), additivt,
+  ALDRIG det kumulativa slutresultatet. Får aldrig användas som facit.
+- `score.penalty` = straffläggningen separat (bärs i `FinalResult.penalties` vid PEN).
+- `decidedBy` härleds ur status: PEN -> 'penalties', AET -> 'extra-time', annars 'regulation'.
+
+**Källa:** probe mot riktiga 2022-VM-slutspelssvar (5 fångade straff-/förlängningsmatcher).
+Guld-fixturen `__fixtures__/fixture-aet-pen.json` är ett oförändrat API-svar för
+Argentina-Frankrike (VM-finalen 2022, status PEN): `goals` 3-3, `fulltime` 2-2, `extratime` 1-1,
+`penalty` 4-2. Den gamla koden hade skrivit 1-1 (bara extratime) som facit i stället för 3-3,
+vilket hade korrumperat slutspels-facit. Ett diskriminerande test (et != ft != goals) rödnar om
+extratime- eller fulltime-buggen återinförs (negativ-kontroll körd och bekräftad).
+
 ## 2026-06-14 , Livescore Bit 1: API-Football status-mappning + lag-brygga (källhänvisade, gissas aldrig)
 
 Livescore-featurens datakälla är API-Football (api-sports.io). Bit 1 är den rena kärnan

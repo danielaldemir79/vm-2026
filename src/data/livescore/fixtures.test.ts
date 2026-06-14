@@ -8,6 +8,7 @@ import {
   fixtureFinalResult,
   fixtureLiveEvents,
   fixtureLiveLineups,
+  fixturePenaltyResult,
   fixtureLiveSnapshots,
   fixtureLiveStatistics,
 } from './fixtures';
@@ -41,5 +42,13 @@ describe('livescore fixtures-läge (committad data ur verkliga svar)', () => {
     expect(fixtureFinalResult.homeGoals).toBe(6);
     expect(fixtureFinalResult.awayGoals).toBe(2);
     expect(fixtureFinalResult.decidedBy).toBe('regulation');
+  });
+
+  it('ger ett straffavgjort facit (Arg-Fra 2022: 3-3, straffar 4-2) ur guld-källan', () => {
+    // Slutresultatet kommer ur goals (3-3), inte ur extratime (1-1), och straffarna bärs separat.
+    expect(fixturePenaltyResult.homeGoals).toBe(3);
+    expect(fixturePenaltyResult.awayGoals).toBe(3);
+    expect(fixturePenaltyResult.decidedBy).toBe('penalties');
+    expect(fixturePenaltyResult.penalties).toEqual({ homeGoals: 4, awayGoals: 2 });
   });
 });

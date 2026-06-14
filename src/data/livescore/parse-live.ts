@@ -294,10 +294,23 @@ export function parseLineups(payload: RawApiResponse<RawLineupResponse>): LiveLi
 /**
  * Parsa facit (slutresultat) ur ett `fixtures?id`-svar. Förväntar EXAKT en post
  * (ett id-uppslag), och att matchen är avgjord (status finished). Härleder
- * decidedBy + mål-fälten ur score-blocket , gissar aldrig.
+ * slutresultatet + decidedBy ur svaret , gissar aldrig.
  *
- * KÄLLA för "hur ett resultat avgörs" (score-blocket): API-Football fixtures
- * score (fulltime/extratime/penalty), formen bekräftad i de fångade svaren.
+ * KÄLLHÄNVISAD facit-regel (gissas ALDRIG, korrigerad mot RIKTIG data 2026-06-14):
+ *   - `goals.home/away` = det AUKTORITATIVA slutresultatet, redan aggregerat
+ *     (ordinarie + ev. förlängning), EXKLUSIVE straffar. Rätt för ALLA fall: FT
+ *     (goals = fulltime), AET (goals = fulltime + extratime) och PEN (goals =
+ *     aggregatet före straffläggningen). Det är detta fält facit kommer från.
+ *   - `score.extratime` = endast de mål som gjordes UNDER förlängningsperioden
+ *     (30 min), ALDRIG det kumulativa slutresultatet. Får ALDRIG användas som facit
+ *     (en tidigare bugg gjorde det och skrev t.ex. 1-1 i stället för 3-3 på
+ *     Argentina-Frankrike, vilket hade korrumperat slutspels-facit).
+ *   - `score.penalty` = straffläggningen separat (bärs i `penalties` vid PEN).
+ *   - `decidedBy` härleds ur status: PEN -> 'penalties', AET -> 'extra-time',
+ *     annars 'regulation'.
+ * KÄLLA: probe mot riktiga 2022-VM-slutspelssvar (5 fångade matcher,
+ *   `__fixtures__/fixture-aet-pen.json` = Argentina-Frankrike: goals 3-3, ft 2-2,
+ *   et 1-1, pen 4-2). Se docs/decisions.md 2026-06-14.
  */
 export function parseFinalResult(payload: RawApiResponse<RawFixtureResponse>): FinalResult {
   const responses = requireResponseArray(payload, 'parseFinalResult');
@@ -319,23 +332,14 @@ export function parseFinalResult(payload: RawApiResponse<RawFixtureResponse>): F
   const decidedBy: FinalResult['decidedBy'] =
     short === 'PEN' ? 'penalties' : short === 'AET' ? 'extra-time' : 'regulation';
 
-  // Ordinarie+ev. förlängning: fulltime är obligatoriskt för en avgjord match;
-  // vid AET adderar API:t förlängningsmålen i extratime-fältet.
-  const ft = r.score.fulltime;
-  if (typeof ft.home !== 'number' || typeof ft.away !== 'number') {
-    throw new Error(`Fixture ${r.fixture.id}: avgjord match saknar score.fulltime.`);
+  // `goals` är facit för ALLA avgjorda fall (se docstringen). Det är obligatoriskt
+  // på en avgjord match; saknas det är svaret trasigt (fail loud, gissa aldrig).
+  const goals = r.goals;
+  if (typeof goals.home !== 'number' || typeof goals.away !== 'number') {
+    throw new Error(`Fixture ${r.fixture.id}: avgjord match saknar goals.home/away (facit).`);
   }
-  let homeGoals = ft.home;
-  let awayGoals = ft.away;
-  if (decidedBy === 'extra-time') {
-    // Vid AET bär fulltime ställningen efter 90 min; extratime tillägget. Summan
-    // är slutresultatet. Saknas extratime (vissa svar) faller vi till fulltime.
-    const et = r.score.extratime;
-    if (typeof et.home === 'number' && typeof et.away === 'number') {
-      homeGoals = et.home;
-      awayGoals = et.away;
-    }
-  }
+  const homeGoals = goals.home;
+  const awayGoals = goals.away;
 
   let penalties: FinalResult['penalties'] = null;
   if (decidedBy === 'penalties') {

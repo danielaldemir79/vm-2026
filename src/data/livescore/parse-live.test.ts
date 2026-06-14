@@ -14,6 +14,7 @@ import {
   toUtcIso,
 } from './parse-live';
 import {
+  aetPenResponse,
   eventsResponse,
   finishedResponse,
   lineupsResponse,
@@ -300,7 +301,54 @@ describe('parseFinalResult: facit ur fixtures?id (avgjord match)', () => {
     expect(() => parseFinalResult(liveAllResponse)).toThrow(/är inte avgjord/);
   });
 
-  it('härleder decidedBy=penalties och bär straffresultat för en PEN-match', () => {
+  // DISKRIMINERANDE facit-test mot RIKTIG data (Argentina-Frankrike, VM-finalen 2022).
+  // goals 3-3 (aggregat efter förlängning, exkl. straffar) != extratime 1-1 != fulltime
+  // 2-2 , så testet RÖDNAR om någon återinför extratime-buggen (homeGoals=et.home=1) eller
+  // fulltime-buggen (homeGoals=ft.home=2) i stället för facit ur goals (3).
+  it('läser facit ur goals (3-3), INTE extratime (1-1), för en RIKTIG straffmatch (Arg-Fra 2022)', () => {
+    const result = parseFinalResult(aetPenResponse);
+    expect(result.apiFixtureId).toBe(979139);
+    expect(result.homeGoals).toBe(3); // goals.home (facit), inte extratime.home (1) el. fulltime.home (2)
+    expect(result.awayGoals).toBe(3); // goals.away (facit), inte extratime.away (1) el. fulltime.away (2)
+    expect(result.decidedBy).toBe('penalties');
+    expect(result.penalties).toEqual({ homeGoals: 4, awayGoals: 2 }); // straffarna separat
+  });
+
+  // DISKRIMINERANDE AET-test (syntetisk): goals 3-1 != extratime 2-0 != fulltime 1-1, alla
+  // tre olika, så en återinförd extratime-bugg (homeGoals=et.home=2) eller fulltime-bugg
+  // (homeGoals=ft.home=1) ger ett ANNAT svar än det rätta (goals 3-1) och rödnar testet.
+  it('läser facit ur goals för en AET-match (förlängning, inga straffar) , inte extratime', () => {
+    const aet = {
+      get: 'fixtures',
+      results: 1,
+      errors: [],
+      response: [
+        {
+          fixture: {
+            id: 11,
+            date: '2026-07-05T20:00:00+00:00',
+            timestamp: 1,
+            status: { long: 'Match Finished', short: 'AET', elapsed: 120, extra: null },
+          },
+          teams: { home: { id: 1, name: 'A' }, away: { id: 2, name: 'B' } },
+          goals: { home: 3, away: 1 }, // facit: aggregat efter förlängning
+          score: {
+            halftime: { home: 0, away: 0 },
+            fulltime: { home: 1, away: 1 }, // ställning efter 90 min
+            extratime: { home: 2, away: 0 }, // ENBART förlängningsmålen (additivt)
+            penalty: { home: null, away: null },
+          },
+        },
+      ],
+    } as unknown as RawApiResponse<RawFixtureResponse>;
+    const result = parseFinalResult(aet);
+    expect(result.decidedBy).toBe('extra-time');
+    expect(result.homeGoals).toBe(3); // goals (3), inte extratime (2) el. fulltime (1)
+    expect(result.awayGoals).toBe(1); // goals (1), inte extratime (0) el. fulltime (1)
+    expect(result.penalties).toBeNull(); // inga straffar i en AET-match
+  });
+
+  it('härleder decidedBy=penalties och bär straffresultat för en (syntetisk) PEN-match', () => {
     const pen = {
       get: 'fixtures',
       results: 1,
@@ -314,7 +362,7 @@ describe('parseFinalResult: facit ur fixtures?id (avgjord match)', () => {
             status: { long: 'Penalties', short: 'PEN', elapsed: 120, extra: null },
           },
           teams: { home: { id: 1, name: 'A' }, away: { id: 2, name: 'B' } },
-          goals: { home: 1, away: 1 },
+          goals: { home: 2, away: 2 }, // facit: aggregat före straffar (1-1 ft + 1-1 et)
           score: {
             halftime: { home: 0, away: 0 },
             fulltime: { home: 1, away: 1 },
@@ -327,7 +375,34 @@ describe('parseFinalResult: facit ur fixtures?id (avgjord match)', () => {
     const result = parseFinalResult(pen);
     expect(result.decidedBy).toBe('penalties');
     expect(result.penalties).toEqual({ homeGoals: 4, awayGoals: 3 });
-    expect(result.homeGoals).toBe(1); // ordinarie+förlängning, inte straffarna
+    expect(result.homeGoals).toBe(2); // goals (aggregat), inte straffarna (4) el. enbart et (1)
+  });
+
+  it('fail loud när en avgjord match saknar goals (facit)', () => {
+    const noGoals = {
+      get: 'fixtures',
+      results: 1,
+      errors: [],
+      response: [
+        {
+          fixture: {
+            id: 13,
+            date: '2026-07-01T20:00:00+00:00',
+            timestamp: 1,
+            status: { long: 'Match Finished', short: 'FT', elapsed: 90, extra: null },
+          },
+          teams: { home: { id: 1, name: 'A' }, away: { id: 2, name: 'B' } },
+          goals: { home: null, away: null },
+          score: {
+            halftime: { home: 0, away: 0 },
+            fulltime: { home: null, away: null },
+            extratime: { home: null, away: null },
+            penalty: { home: null, away: null },
+          },
+        },
+      ],
+    } as unknown as RawApiResponse<RawFixtureResponse>;
+    expect(() => parseFinalResult(noGoals)).toThrow(/saknar goals/);
   });
 
   it('fail loud när id-uppslaget inte gav exakt en post', () => {
