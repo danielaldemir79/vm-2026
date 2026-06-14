@@ -71,6 +71,16 @@ interface AdminMatchRowProps {
 function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMatchRowProps) {
   const day = formatDayShort(localDateKey(match.kickoff));
   const time = formatKickoffTime(match.kickoff);
+  // SJÄLV-beskrivande tillgängligt namn per rad (T80, Copilot C1): listans
+  // aria-labelledby ("Match") namnger BARA <ul>, så när man tabbar mellan rad-
+  // knapparna kan ett hjälpmedel tappa kontrollkontexten. Ett explicit aria-label
+  // per knapp gör varje rad ensamt begriplig: "Match: <hemma> mot <borta>" + klar-
+  // status (resultatet om sparat, annars "ej inmatad"). De synliga lagnamnen ingår
+  // i namnet, så aria-label och synlig text inte motsäger varandra (WCAG 2.5.3
+  // label-in-name); klar-statusen speglar samma färg-oberoende seal-text (1.4.1).
+  const home = teamName(match.homeTeamId);
+  const away = teamName(match.awayTeamId);
+  const statusLabel = entered ? enteredLabel(match) : 'ej inmatad';
   return (
     <button
       type="button"
@@ -79,6 +89,7 @@ function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMa
       data-selected={selected ? '' : undefined}
       data-entered={entered ? '' : undefined}
       aria-pressed={selected}
+      aria-label={`Match: ${home} mot ${away}, ${statusLabel}`}
       onClick={() => onSelect(match.id)}
       className="vm-admin-match-row flex w-full items-center justify-between gap-3 rounded-input px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
     >

@@ -402,6 +402,27 @@ describe('AdminResultEntry, synlig match-lista (T80)', () => {
     expect(rowFor('g-A-1').hasAttribute('data-selected')).toBe(false);
   });
 
+  // Copilot C1 (a11y): varje rad-knapp har ett SJÄLV-beskrivande tillgängligt namn
+  // (aria-label), så ett hjälpmedel ger kontrollkontexten ("Match" + lagen + klar-
+  // status) när man tabbar mellan rader, utan att förlita sig på listans aria-
+  // labelledby. Vi hittar knapparna VIA deras roll+namn (det skärmläsaren hör), inte
+  // via data-attribut. teamName-mocken ger raw id:n (mex/kor, esp/ger).
+  it('varje rad-knapp har ett självbeskrivande namn (Match + lagen + klar-status)', () => {
+    adminMatchesState.matches = [FINISHED_WITH_RESULT, GROUP_B];
+    // Bara g-A-1 har ett sparat officiellt resultat (2-1).
+    adminMatchesState.officialResultIds = new Set(['g-A-1']);
+    renderSection(officialStore({ isAdmin: true }));
+
+    // Formen "Match: <hemma> mot <borta>" + status, så raden är ensamt begriplig.
+    const entered = screen.getByRole('button', { name: /Match: mex mot kor/ });
+    // Inmatad rad bär resultatet (klar-status), färg-oberoende i namnet (WCAG 1.4.1).
+    expect(entered).toHaveAttribute('aria-label', 'Match: mex mot kor, Klar 2-1');
+
+    // Ej-inmatad rad säger uttryckligen "ej inmatad" (skild från den klara raden).
+    const plain = screen.getByRole('button', { name: /Match: esp mot ger, ej inmatad/ });
+    expect(plain).toHaveAttribute('aria-label', 'Match: esp mot ger, ej inmatad');
+  });
+
   // LIVE-uppdatering (härledd state, ingen stale): när officialResultIds växer (vad
   // saveOfficialResult -> store.results -> useOfficialResultsSync ger) blir raden grön
   // utan extra synk. Vi simulerar storens uppdatering via en re-render av mocken.
