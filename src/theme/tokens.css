@@ -2343,8 +2343,9 @@ body {
   border-left-color: var(--color-success);
 }
 
-/* KLAR + HOVER: en aning djupare grön tint (14%) på hover, fortfarande långt över
-   AA (fg 11.37/14.73). Listen ligger kvar grön. */
+/* KLAR + HOVER: en aning djupare grön tint (16%) på hover, fortfarande långt över
+   AA (fg 10.91 mörkt / 14.30 ljust, node-uträknat ur token-hex i srgb). Listen
+   ligger kvar grön. */
 .vm-admin-match-row[data-entered]:not([data-selected]):hover {
   background-color: color-mix(in srgb, var(--color-success) 16%, var(--color-surface));
 }
