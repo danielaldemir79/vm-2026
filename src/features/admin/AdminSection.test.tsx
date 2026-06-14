@@ -11,10 +11,16 @@ import type { VmSupabaseClient } from '../../data/supabase-browser';
 import type { Match } from '../../domain/types';
 
 // Mocka matchplan-laddningen så admin-inmatningen har matcher utan att slå mot
-// getDataSource (vi testar UI-logiken: validering, save, gating).
+// getDataSource (vi testar UI-logiken: validering, save, gating, listans markeringar).
+//
+// officialResultIds är den AUKTORITATIVA "inmatad"-signalen (T80, #169): match-id:n
+// med ett SPARAT officiellt resultat. Vi styr den per test för att bevisa skarven
+// (en match MED resultat blir grön/klar-markerad, en UTAN inte), HÄRLEDD ur samma
+// officialResults som vävs in, inte ur m.status === 'finished'.
 const adminMatchesState = vi.hoisted(() => ({
   status: 'ready' as 'loading' | 'ready' | 'error',
   matches: [] as Match[],
+  officialResultIds: new Set<string>(),
   error: null as string | null,
 }));
 vi.mock('./use-admin-matches', () => ({
@@ -59,6 +65,48 @@ const KNOCKOUT: Match = {
   result: null,
 };
 
+// En andra gruppmatch, så T80-listans markeringar kan bevisas DISKRIMINERANDE
+// (en rad grön, en annan inte) i stället för "alla ser likadana ut".
+const GROUP_B: Match = {
+  id: 'g-B-1',
+  stage: 'group',
+  groupId: 'B',
+  homeTeamId: 'esp',
+  awayTeamId: 'ger',
+  kickoff: '2026-06-12T18:00:00Z',
+  venue: 'Y',
+  status: 'scheduled',
+  result: null,
+};
+
+// En match med ett invävt FINISHED-resultat (efter applyRoomResults), så klar-
+// etiketten kan bevisas bära resultatet ("Klar 2-1").
+const FINISHED_WITH_RESULT: Match = {
+  id: 'g-A-1',
+  stage: 'group',
+  groupId: 'A',
+  homeTeamId: 'mex',
+  awayTeamId: 'kor',
+  kickoff: '2026-06-11T18:00:00Z',
+  venue: 'X',
+  status: 'finished',
+  result: { homeGoals: 2, awayGoals: 1 },
+};
+
+// En slutspelsmatch utan kända lag (TBD): parity med dropdownen, ska INTE dyka upp
+// i listan (bara entriable matcher där båda lag är kända kan väljas).
+const TBD_KNOCKOUT: Match = {
+  id: 'M999',
+  stage: 'round-of-16',
+  groupId: null,
+  homeTeamId: null,
+  awayTeamId: null,
+  kickoff: '2026-07-10T18:00:00Z',
+  venue: 'Z',
+  status: 'scheduled',
+  result: null,
+};
+
 function roomsStore(): RoomsStore {
   return { enabled: true } as unknown as RoomsStore;
 }
@@ -87,6 +135,16 @@ function renderSection(official: OfficialResultsStore) {
   );
 }
 
+// T80 (#169): matchen väljs nu genom att klicka dess rad i den synliga listan
+// (inte en dropdown). Klicka raden med givet match-id, fail-loud om den saknas.
+function selectMatchRow(matchId: string) {
+  const row = document.querySelector(`[data-admin-match-row][data-match-id="${matchId}"]`);
+  if (!row) {
+    throw new Error(`selectMatchRow: ingen rad med match-id "${matchId}" i listan.`);
+  }
+  fireEvent.click(row);
+}
+
 // T48 (#81): den dolda arrangörs-ingången styrs av URL-fragmentet `#arrangor`.
 // Helpers för att slå PÅ/AV det i jsdom (location.hash) så test driver synligheten.
 function setOrganizerHash() {
@@ -99,6 +157,7 @@ function clearOrganizerHash() {
 beforeEach(() => {
   adminMatchesState.status = 'ready';
   adminMatchesState.matches = [FINISHED_GROUP];
+  adminMatchesState.officialResultIds = new Set<string>();
   adminMatchesState.error = null;
   authState.requestError = null;
   clearOrganizerHash();
@@ -179,7 +238,7 @@ describe('AdminResultEntry, save mot global facit', () => {
     const save = vi.fn(async () => {});
     renderSection(officialStore({ isAdmin: true, saveOfficialResult: save }));
 
-    fireEvent.change(screen.getByLabelText('Match'), { target: { value: 'g-A-1' } });
+    selectMatchRow('g-A-1');
     fireEvent.change(screen.getByLabelText('Mål hemma'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('Mål borta'), { target: { value: '1' } });
     // status default 'finished'
@@ -201,7 +260,7 @@ describe('AdminResultEntry, save mot global facit', () => {
     adminMatchesState.matches = [KNOCKOUT];
     renderSection(officialStore({ isAdmin: true }));
 
-    fireEvent.change(screen.getByLabelText('Match'), { target: { value: 'M73' } });
+    selectMatchRow('M73');
     fireEvent.change(screen.getByLabelText('Mål hemma'), { target: { value: '01' } });
     fireEvent.change(screen.getByLabelText('Mål borta'), { target: { value: '1' } });
 
@@ -213,7 +272,7 @@ describe('AdminResultEntry, save mot global facit', () => {
     const save = vi.fn(async () => {});
     renderSection(officialStore({ isAdmin: true, saveOfficialResult: save }));
 
-    fireEvent.change(screen.getByLabelText('Match'), { target: { value: 'g-A-1' } });
+    selectMatchRow('g-A-1');
     fireEvent.change(screen.getByLabelText('Mål hemma'), { target: { value: '-1' } });
     fireEvent.change(screen.getByLabelText('Mål borta'), { target: { value: '0' } });
     await act(async () => {
@@ -230,7 +289,7 @@ describe('AdminResultEntry, save mot global facit', () => {
     });
     renderSection(officialStore({ isAdmin: true, saveOfficialResult: save }));
 
-    fireEvent.change(screen.getByLabelText('Match'), { target: { value: 'g-A-1' } });
+    selectMatchRow('g-A-1');
     fireEvent.change(screen.getByLabelText('Mål hemma'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Mål borta'), { target: { value: '0' } });
     await act(async () => {
@@ -238,6 +297,136 @@ describe('AdminResultEntry, save mot global facit', () => {
     });
 
     expect(await screen.findByText(/icke-admin nekas/i)).toBeInTheDocument();
+  });
+});
+
+// T80 (#169): den synliga match-listan ersätter dropdownen. Daniel ser raderna och
+// vilka han matat in (grön + bock + text), och kan välja en rad med tangentbordet.
+describe('AdminResultEntry, synlig match-lista (T80)', () => {
+  function rows() {
+    return Array.from(document.querySelectorAll('[data-admin-match-row]'));
+  }
+  function rowFor(matchId: string): HTMLElement {
+    const el = document.querySelector<HTMLElement>(
+      `[data-admin-match-row][data-match-id="${matchId}"]`
+    );
+    if (!el) {
+      throw new Error(`rowFor: ingen rad med match-id "${matchId}".`);
+    }
+    return el;
+  }
+
+  it('renderar en rad per entriable match (en riktig button, tangentbords-navigerbar)', () => {
+    adminMatchesState.matches = [FINISHED_GROUP, GROUP_B];
+    renderSection(officialStore({ isAdmin: true }));
+
+    const buttons = rows();
+    expect(buttons).toHaveLength(2);
+    // Riktiga <button>-element (inte div:ar): fokuserbara/aktiverbara via tangentbord.
+    for (const b of buttons) {
+      expect(b.tagName).toBe('BUTTON');
+    }
+  });
+
+  it('döljer en TBD-match (okända lag), parity med dropdownen (bara entriable)', () => {
+    adminMatchesState.matches = [FINISHED_GROUP, TBD_KNOCKOUT];
+    renderSection(officialStore({ isAdmin: true }));
+
+    expect(rows()).toHaveLength(1);
+    expect(document.querySelector('[data-admin-match-row][data-match-id="M999"]')).toBeNull();
+  });
+
+  // BEVISA SKARVEN (befordrad topp-regel): markeringen styrs av officialResults-
+  // MEDLEMSKAP, inte m.status. En match MED resultat blir grön/klar, en UTAN inte.
+  it('grön/klar bara på raden med sparat officiellt resultat (skarven, BÅDA fallen)', () => {
+    adminMatchesState.matches = [FINISHED_WITH_RESULT, GROUP_B];
+    // Bara g-A-1 har ett sparat officiellt resultat.
+    adminMatchesState.officialResultIds = new Set(['g-A-1']);
+    renderSection(officialStore({ isAdmin: true }));
+
+    // MED resultat: grön klar-markering (data-attribut), bock-ikon + text som bär
+    // resultatet (färg-oberoende, WCAG 1.4.1), och raden bär data-entered.
+    const entered = rowFor('g-A-1');
+    expect(entered.querySelector('[data-admin-match-entered]')).not.toBeNull();
+    expect(entered.hasAttribute('data-entered')).toBe(true);
+    expect(entered.textContent).toMatch(/Klar 2-1/);
+
+    // UTAN resultat: ingen klar-markering, ingen data-entered (negativ kontroll i UI:t).
+    const plain = rowFor('g-B-1');
+    expect(plain.querySelector('[data-admin-match-entered]')).toBeNull();
+    expect(plain.hasAttribute('data-entered')).toBe(false);
+  });
+
+  // Skarvens edge: ett officiellt resultat sparat med status 'live' gör INTE matchens
+  // status 'finished' (applyRoomResults nollar målen), men matchen ÄR inmatad. Bara
+  // officialResults-medlemskap fångar det. Detta är just felet m.status-signalen gör.
+  it('grön/klar även när matchen inte är finished men har officiellt resultat (live)', () => {
+    const liveEntered: Match = { ...GROUP_B, status: 'live', result: null };
+    adminMatchesState.matches = [liveEntered];
+    adminMatchesState.officialResultIds = new Set(['g-B-1']);
+    renderSection(officialStore({ isAdmin: true }));
+
+    const row = rowFor('g-B-1');
+    // Medlem i officialResults -> klar-markerad, trots status 'live' (inte 'finished').
+    expect(row.querySelector('[data-admin-match-entered]')).not.toBeNull();
+    expect(row.hasAttribute('data-entered')).toBe(true);
+    // Ingen finished-result att visa, så bara "Klar" (utan siffror).
+    expect(row.textContent).toMatch(/Klar(?!\s*\d)/);
+  });
+
+  it('klick på en rad väljer matchen (formuläret speglar den, save får rätt matchId)', async () => {
+    const save = vi.fn(async () => {});
+    adminMatchesState.matches = [FINISHED_GROUP, GROUP_B];
+    renderSection(officialStore({ isAdmin: true, saveOfficialResult: save }));
+
+    fireEvent.click(rowFor('g-B-1'));
+    fireEvent.change(screen.getByLabelText('Mål hemma'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Mål borta'), { target: { value: '0' } });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Spara officiellt resultat'));
+    });
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ matchId: 'g-B-1' }));
+  });
+
+  it('vald rad är markerad med aria-pressed (de andra inte)', () => {
+    adminMatchesState.matches = [FINISHED_GROUP, GROUP_B];
+    renderSection(officialStore({ isAdmin: true }));
+
+    fireEvent.click(rowFor('g-B-1'));
+    expect(rowFor('g-B-1').getAttribute('aria-pressed')).toBe('true');
+    expect(rowFor('g-B-1').hasAttribute('data-selected')).toBe(true);
+    // Den ovalda raden är inte markerad.
+    expect(rowFor('g-A-1').getAttribute('aria-pressed')).toBe('false');
+    expect(rowFor('g-A-1').hasAttribute('data-selected')).toBe(false);
+  });
+
+  // LIVE-uppdatering (härledd state, ingen stale): när officialResultIds växer (vad
+  // saveOfficialResult -> store.results -> useOfficialResultsSync ger) blir raden grön
+  // utan extra synk. Vi simulerar storens uppdatering via en re-render av mocken.
+  it('raden blir grön när officialResultIds uppdateras (live, härledd ur storen)', () => {
+    adminMatchesState.matches = [GROUP_B];
+    adminMatchesState.officialResultIds = new Set<string>();
+    const store = officialStore({ isAdmin: true });
+    const { rerender } = renderSection(store);
+
+    // Före: inget sparat resultat -> ingen markering.
+    expect(rowFor('g-B-1').querySelector('[data-admin-match-entered]')).toBeNull();
+
+    // Storen uppdateras (resultat sparat): officialResultIds innehåller nu matchen.
+    adminMatchesState.officialResultIds = new Set(['g-B-1']);
+    rerender(
+      <RoomsStoreContext.Provider value={roomsStore()}>
+        <OfficialResultsStoreContext.Provider value={store}>
+          <AdminSection surface={(children) => <div>{children}</div>} />
+        </OfficialResultsStoreContext.Provider>
+      </RoomsStoreContext.Provider>
+    );
+
+    // Efter: samma rad är nu grön/klar-markerad (härledd, ingen stale state).
+    expect(rowFor('g-B-1').querySelector('[data-admin-match-entered]')).not.toBeNull();
+    expect(rowFor('g-B-1').hasAttribute('data-entered')).toBe(true);
   });
 });
 

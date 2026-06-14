@@ -23,6 +23,20 @@ export interface AdminMatchesData {
   matches: Match[];
   /** Uppslag Team.id -> visningsnamn (för en läsbar match-etikett). */
   teamName: (id: string | null) => string;
+  /**
+   * Match-id:n som har ett SPARAT officiellt resultat (facit), den AUKTORITATIVA
+   * "inmatad"-signalen för admin-listans grön-/klar-markering (T80, #169).
+   *
+   * VARFÖR officialResults-MEDLEMSKAP, inte `m.status === 'finished'` (skarv-beslut):
+   * `m.status === 'finished'` är en HÄRLEDD effekt av invävningen och stämmer BARA
+   * för ett resultat som sparats med status 'finished'. Admin kan spara ett officiellt
+   * resultat med status 'live'/'scheduled' (statusväljaren tillåter alla tre), och då
+   * nollar applyRoomResults -> toEntry målen och matchens status blir INTE 'finished',
+   * fast resultatet ÄR inmatat. Medlemskap i officialResults är därför den enda sanningen
+   * för "matchen har ett sparat officiellt resultat". (Dagens dropdown-text "(inmatad)"
+   * använder felaktigt finished-signalen och missar därmed icke-finished facit.)
+   */
+  officialResultIds: ReadonlySet<string>;
   error: string | null;
 }
 
@@ -64,6 +78,15 @@ export function useAdminMatches(env: ImportMetaEnv = import.meta.env): AdminMatc
     [baseMatches, officialResults]
   );
 
+  // HÄRLEDD ur EXAKT samma officialResults som vävs in ovan (en sanning, ingen
+  // separat state att synka): så fort ett resultat sparas (saveOfficialResult ->
+  // store.results -> useOfficialResultsSync) re-deriveras detta set och listans
+  // grön-status uppdateras direkt, utan reload (T80 live-uppdatering, #169).
+  const officialResultIds = useMemo(
+    () => new Set(officialResults.map((r) => r.matchId)),
+    [officialResults]
+  );
+
   const nameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const t of teams) {
@@ -77,5 +100,5 @@ export function useAdminMatches(env: ImportMetaEnv = import.meta.env): AdminMatc
     [nameById]
   );
 
-  return { status, matches, teamName, error };
+  return { status, matches, teamName, officialResultIds, error };
 }

@@ -15,6 +15,7 @@
 import { useId, useMemo, useState, type FormEvent } from 'react';
 import type { Match, MatchStatus } from '../../domain/types';
 import { validateResultEntry, type ResultEntry } from '../results';
+import { formatKickoffTime, formatDayShort, localDateKey, stageLabel } from '../daily';
 import { useOfficialResultsStore } from '../official-results';
 import { useAdminMatches } from './use-admin-matches';
 import { AdminStats } from './AdminStats';
@@ -26,6 +27,87 @@ function toGoal(value: string): number | null {
   }
   const n = Number(value);
   return Number.isNaN(n) ? null : n;
+}
+
+/**
+ * KLAR-texten för en rad med ett sparat officiellt resultat (T80, #169). Bär
+ * resultatet när matchen är 'finished' (t.ex. "Klar 2-1"), annars bara "Klar"
+ * (ett officiellt resultat kan sparas med status live/scheduled, då finns inget
+ * mål-resultat att visa). Den TEXTUELLA delen av den färg-oberoende klar-markeringen
+ * (WCAG 1.4.1): grön + bock-ikon räcker inte ensamt, texten bär samma information.
+ */
+function enteredLabel(match: Match): string {
+  if (match.status === 'finished') {
+    return `Klar ${match.result.homeGoals}-${match.result.awayGoals}`;
+  }
+  return 'Klar';
+}
+
+interface AdminMatchRowProps {
+  match: Match;
+  teamName: (id: string | null) => string;
+  selected: boolean;
+  /** Har matchen ett SPARAT officiellt resultat? (auktoritativ signal, se use-admin-matches.) */
+  entered: boolean;
+  onSelect: (id: string) => void;
+}
+
+/**
+ * En rad i den synliga match-listan (T80, #169): en riktig <button> (tangentbords-
+ * navigerbar) som väljer matchen. `aria-pressed` markerar den valda raden (toggle-
+ * knapp-mönstret, hjälpmedel läser upp vald/ej vald). En rad med sparat officiellt
+ * resultat bär en grön KLAR-markering MED bock-ikon + text (aldrig färg ensam,
+ * WCAG 1.4.1). Stabila data-attribut (data-admin-match-row, data-selected,
+ * data-entered) så design-frontend kan polera utseendet utan att röra strukturen.
+ */
+function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMatchRowProps) {
+  const day = formatDayShort(localDateKey(match.kickoff));
+  const time = formatKickoffTime(match.kickoff);
+  return (
+    <button
+      type="button"
+      data-admin-match-row=""
+      data-match-id={match.id}
+      data-selected={selected ? '' : undefined}
+      data-entered={entered ? '' : undefined}
+      aria-pressed={selected}
+      onClick={() => onSelect(match.id)}
+      className={`flex w-full items-center justify-between gap-3 rounded-input px-3 py-2 text-left ${
+        selected ? 'bg-accent/15 ring-1 ring-accent' : 'hover:bg-surface-raised'
+      } ${entered ? 'border-l-4 border-success' : 'border-l-4 border-transparent'}`}
+    >
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-sm font-medium">
+          {teamName(match.homeTeamId)} - {teamName(match.awayTeamId)}
+        </span>
+        <span className="text-xs text-fg-muted">
+          {stageLabel(match)} · {day} {time}
+        </span>
+      </span>
+      {entered ? (
+        // Grön KLAR-markering: bock-ikon (dekorativ, aria-hidden) + text. Texten bär
+        // informationen, så markeringen inte vilar på färg ensam (WCAG 1.4.1).
+        <span
+          data-admin-match-entered=""
+          className="flex shrink-0 items-center gap-1 text-xs font-semibold text-success"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3.5 8.5l3 3 6-7" />
+          </svg>
+          {enteredLabel(match)}
+        </span>
+      ) : null}
+    </button>
+  );
 }
 
 export function AdminResultEntry() {
@@ -41,7 +123,7 @@ export function AdminResultEntry() {
   const [errors, setErrors] = useState<string[]>([]);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
 
-  const selectId = useId();
+  const listLabelId = useId();
   const homeId = useId();
   const awayId = useId();
   const statusId = useId();
@@ -73,6 +155,14 @@ export function AdminResultEntry() {
     Number.isInteger(awayGoal) &&
     homeGoal === awayGoal;
   const showPenalties = isKnockout && status === 'finished' && isTie;
+
+  // Välj en match ur listan. Samma state-effekt som dropdownens onChange hade
+  // (sätt selectedId + rensa fel/bekräftelse), så formuläret nedanför speglar valet.
+  const selectMatch = (id: string) => {
+    setSelectedId(id);
+    setErrors([]);
+    setSavedMsg(null);
+  };
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -146,29 +236,34 @@ export function AdminResultEntry() {
         </div>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
+          {/* SYNLIG, scrollbar match-lista (T80, #169): Daniels uttryckliga val (inte
+              en dropdown), så han ser var i den långa listan (104 matcher) han är.
+              Varje rad är en riktig <button> som väljer matchen (tangentbords-navigerbar,
+              vald rad markerad med aria-pressed). En rad med ett SPARAT officiellt resultat
+              får en grön KLAR-markering MED bock-ikon + text (resultatet), aldrig färg
+              ensam (WCAG 1.4.1). Markeringen är HÄRLEDD ur data.officialResultIds (samma
+              sanning som vävs in), så den uppdateras direkt när ett resultat sparas. */}
           <div className="flex flex-col gap-1">
-            <label htmlFor={selectId} className="text-sm font-medium">
+            <span id={listLabelId} className="text-sm font-medium">
               Match
-            </label>
-            <select
-              id={selectId}
-              value={selectedId}
-              data-admin-entry-match=""
-              onChange={(e) => {
-                setSelectedId(e.target.value);
-                setErrors([]);
-                setSavedMsg(null);
-              }}
-              className="rounded-input border border-border bg-surface px-3 py-2"
+            </span>
+            <ul
+              data-admin-entry-match-list=""
+              aria-labelledby={listLabelId}
+              className="flex max-h-80 flex-col gap-1 overflow-y-auto rounded-input border border-border bg-surface p-1"
             >
-              <option value="">Välj en match…</option>
               {entriable.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {data.teamName(m.homeTeamId)} - {data.teamName(m.awayTeamId)}
-                  {m.status === 'finished' ? ' (inmatad)' : ''}
-                </option>
+                <li key={m.id}>
+                  <AdminMatchRow
+                    match={m}
+                    teamName={data.teamName}
+                    selected={m.id === selectedId}
+                    entered={data.officialResultIds.has(m.id)}
+                    onSelect={selectMatch}
+                  />
+                </li>
               ))}
-            </select>
+            </ul>
           </div>
 
           <div className="flex gap-3">
