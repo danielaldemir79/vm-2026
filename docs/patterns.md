@@ -9,6 +9,36 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### rå-api-kuvert-i-jsonb-projiceras-genom-kall-parsern-med-per-blob-isolering (VM 2026)
+
+**Recept (en DB-rad med RÅA externa svar i jsonb -> klient-modell, utan att gissa formen och utan att
+en trasig blob släcker hela vyn):**
+
+1. **Lagra de RÅA externa svaren som HELA kuvert** (här API-Footballs `RawApiResponse`: `{ get, results,
+   response, errors, ... }`) i jsonb-kolumner, och PARSA dem på LÄS-sidan med EXAKT samma rena parser som
+   redan finns (här Bit 1:s `parseEvents`/`parseStatistics`/`parseLineups`), aldrig en andra parser. En
+   sanning för parsningen; en schema-drift fångas av tsc eftersom klient-modellen härleds ur DB-typerna +
+   parser-utdata, inte ur en konsument-typ (lärdomen `mock-foljer-konsumenttyp`).
+2. **KÄLLHÄNVISA blobbens form (HARD), gissa den ALDRIG.** Vilken form en lagrad blob har (helt kuvert vs
+   uppackad array) är en lättgissad regel som styr en hel gren, så bekräfta den mot (a) det som SKRIVER
+   (pollaren/producenten), (b) det som LÄSER (parsern), och (c) en committad sample-fil , och skriv det i
+   en inline-kommentar + en `decisions.md`-rad (lärdomen `lattgissad-domanregel-styr-otestad-gren`).
+3. **Per-blob fail-safe, inte allt-eller-inget.** En liten `parseBlob(blob, parse, what)`: `null` -> `[]`
+   (saknas naturligt), giltigt kuvert -> parserns utdata, TRASIG blob (parsern kastar) -> `console.warn`
+   (fail-loud, inte tyst) + `[]` för JUST den sektionen. Så en trasig delblob (events) släcker aldrig
+   grannarna (statistik/lineups) eller resten av kortet (status/ställning/klocka). Fail loud men aldrig krasch.
+4. **BEVISA skarven mot KÄLLANS form, inte en handskriven konsument-form.** Mata in de COMMITTADE RÅA
+   sample-svaren (?raw + `JSON.parse`, samma väg som `fixtures.ts`) som DB-blobbar i testet, så testet kör
+   den faktiska källa->klient-mappningen (lärdomen `bevisa-skarven`). Lägg ett test där en trasig blob
+   bevisas isolerad (grannarna oskadda) , negativ-kontrollera genom att ta bort try/catch och se de
+   testerna RÖDNA.
+
+**Varför:** En tabell som speglar ett externt API i jsonb är exakt den klass där formen lätt gissas fel
+och en trasig blob lätt kan krascha hela vyn. Att parsa med källans egen parser + per-blob-isolering +
+källhänvisad form ger en robust, drift-säker läsning. Återanvänds av livescore Bit 3b (UI:t konsumerar
+`LiveData`) och alla framtida "lagra rått externt svar"-tasks. Källa: T81 (`src/data/livescore/live-read.ts`
++ `live-read.test.ts`, blobbens kuvert-form källhänvisad i `decisions.md` 2026-06-15).
+
 ### server-harledd-dag-via-before-trigger-for-en-per-omgang-PK (Supabase, VM 2026)
 
 **Recept (upprätthåll "EN rad per användare och kalenderdag" STRUKTURELLT, oförfalskbart):**

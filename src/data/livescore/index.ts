@@ -54,3 +54,16 @@ export {
   fixtureLiveSnapshots,
   fixtureLiveStatistics,
 } from './fixtures';
+
+// Bit 3a: klient-läs-lager (DB-rad -> klient-modell, gate-medveten + fixtures-först).
+export {
+  getLiveData,
+  getLiveDataForMatch,
+  listLiveData,
+  projectLiveData,
+  fixtureLiveData,
+} from './live-read';
+export type { LiveData } from './live-read';
+
+// Bit 3a: realtids-prenumeration på match_live_data + klock-brygga (re-sync mot push).
+export { liveClockFor, liveDataSubscription, MATCH_LIVE_DATA_TABLE } from './live-realtime';

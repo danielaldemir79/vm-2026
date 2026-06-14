@@ -5,6 +5,53 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , Livescore Bit 3a (T81): klient-läs-lager + realtime för live-data
+
+Bit 3a är LÄS-sidan (ingen UI än, det är Bit 3b/design-frontend): hämta `match_live_data` ur
+Supabase och projicera till en klient-vänlig modell (`LiveData`) via Bit 1:s parsers, plus en
+realtids-prenumeration + en klock-brygga, så Bit 3b kan rendera ett livekort direkt.
+
+**Beslut (KÄLLHÄNVISAD seam-regel, gissas ALDRIG): de jsonb-blobbarna (events/statistics/lineups) i
+`match_live_data` är HELA API-Football-svar (`RawApiResponse`-KUVERT: `{ get, results, response,
+errors, ... }`), inte bara `response`-arrayen.** Detta är den farligaste raden i hela Bit 3a (en gren
+vars korrekthet helt avgörs av blobbens form), så den källverifieras i stället för att gissas:
+- **Källa 1 (det pollaren SKRIVER):** `supabase/functions/livescore-poller/index.ts` rad 176-178
+  skriver `(rich as { events?: unknown }).events ?? null` direkt ur API-Football-svaret, dvs hela
+  kuvertet, inte en uppackad array.
+- **Källa 2 (det Bit 1:s parsers TAR):** `parseEvents`/`parseStatistics`/`parseLineups` i
+  `parse-live.ts` anropar `requireResponseArray(payload, ...)` som läser `payload.response` +
+  `payload.errors`, dvs de förväntar sig KUVERTET. Direktivet bekräftar samma kontrakt ("EXAKT samma
+  form som Bit 1:s parsers tar").
+- **Källa 3 (de committade sample-svaren):** `__fixtures__/events-rich.json` m.fl. har nycklarna
+  `{ get, parameters, errors, results, paging, response }` (verifierat 2026-06-15) , dvs kuvert-formen.
+  `live-read.test.ts` matar in DE RÅA sample-svaren som DB-blobbar (?raw, samma väg som fixtures.ts),
+  så testet bevisar skarven mot KÄLLANS form, inte en handskriven konsument-form (lärdomen
+  mock-foljer-konsumenttyp + bevisa-skarven).
+
+Därför kör `projectLiveData` blobben genom Bit 1:s parser. Tre fall: `null` (vanligt, live=all bär
+inte rika blobbar förrän freeze) -> tom sektion; giltigt kuvert -> parserns utdata; TRASIG blob ->
+fail-loud-logg i konsolen + tom sektion PER blob (en trasig events-blob släcker aldrig hela
+livekortet, status/ställning/klocka lever vidare). Ingen tyst maskering, men aldrig krasch (Daniels krav).
+
+**Beslut: två lager (samma som data-source.ts/supabase-client.ts).** `listLiveData(client)` /
+`projectLiveData(row)` är rena/klient-tagande (testbara med mock-klient, exakt som
+official-results-api.ts), och `getLiveData(env)` är den gate-medvetna ingången: live-läge ->
+Supabase, fixtures-läge -> Bit 1:s committade live-fixtures (fixtures-först, renderbart utan backend).
+
+**Beslut: klockan re-synkar via Bit 1:s `computeClock`, byggs inte om.** `liveClockFor(data, now)`
+översätter bara `LiveData` -> `computeClock(status, elapsedMinute, lastSyncedAt, now)`. computeClock
+tickar redan FRÅN `lastSyncedAt`, så varje realtids-push (ny `elapsed_minute` + `last_synced_at`)
+re-synkar klockan mot sanningen, ingen drift. Fail-safe: saknad/oparsbar `last_synced_at` -> `now`
+som bas (0 min sedan sync, ingen gissad tick-startpunkt, ingen NaN).
+
+**Migration (dirigenten applicerar): `20260615120000_t81_match_live_data_realtime.sql`** lägger
+`match_live_data` i `supabase_realtime`-publikationen. Verifierat read-only mot prod 2026-06-15 att
+tabellen INTE redan låg i publikationen (annars hade ADD TABLE gett ett fel). NB (lärdomen
+committad-migration-pastar-spegla-live): fil-versionen `...120000` är en placeholder, den FAKTISKA
+live-apply-versionen sätts när dirigenten kör den, repo == live-historik gäller först efter apply.
+
+---
+
 ## 2026-06-14 , Livescore Bit 2 (T80): Supabase-backend (persisterad live-data, auto-facit-lås, budget-gate)
 
 Bit 2 ger livescore-featuren sin server-sida: en pollare (edge function) som under turneringen
