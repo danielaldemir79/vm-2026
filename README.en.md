@@ -239,7 +239,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Format check | `npm run format:check` |
 
-- **1867 passing tests** across 191 test files (Vitest) on a fresh clone, with 56 tests
+- **1918 passing tests** across 200 test files (Vitest) on a fresh clone, with 56 tests
   skipped by design (the live Supabase RLS integration tests, which only run when Supabase
   env is configured, see below). Verified by running `npm test`.
 - **Security proven, not assumed.** The Row Level Security model (only the admin can write
