@@ -5,6 +5,34 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-14 , Livescore Bit 1: API-Football status-mappning + lag-brygga (källhänvisade, gissas aldrig)
+
+Livescore-featurens datakälla är API-Football (api-sports.io). Bit 1 är den rena kärnan
+(parsers, match-identitet, poll-planerare, klock-logik) byggd och bevisad mot RIKTIGA fångade
+API-svar, committade oförändrade i form under `src/data/livescore/__fixtures__/` (inga
+hemligheter, bara request-headern bar nyckeln). Två regler här gissas aldrig och är källhänvisade
+så de kan BEKRÄFTAS mot källan, inte jagas:
+
+**Beslut: status-mappning `fixture.status.short` -> normaliserad `LiveStatus`** (parse-live.ts,
+`STATUS_BY_SHORT`). live = 1H/2H/ET; paused = HT/BT/P/SUSP/INT; finished = FT/AET/PEN; scheduled =
+NS/TBD; postponed = PST/CANC/ABD/AWD/WO; en okänd kod -> 'unknown' (fail-safe, ALDRIG 'live').
+**Källa (korsverifierad 2026-06-14):** API-Football v3 fixtures-status, mot två oberoende källor
+(API-Football "How to save calls"-guiden + Sportmonks/pilflo api-sports-status-listor), eftersom
+api-football.com/documentation-v3 svarar 403 mot automatisk hämtning. **Varför P klassas som
+paused (inte live):** Daniels spec listar uttryckligen "FRYS under paus (HT, BT, P, SUSP, INT)",
+matchklockan ska stå still under straffläggning, inte ticka (vattenpaus-oron).
+
+**Beslut: lag-brygga API-Football team-id -> appens lag-id** (team-bridge.ts,
+`WC2026_API_TEAM_BRIDGE`). Medvetet OFULLSTÄNDIG i Bit 1: bara lag vars API-id faktiskt setts i
+de fångade svaren seedas (Nederländerna 1118, Japan 12 ur live-all-svaret fixtures?league=1&live=all;
+England 10, Iran 22 ur 2022-fixturen 855735). **Varför numeriskt id, inte namn:** API-Footballs
+team-id är stabila mellan säsonger, namn skiljer mellan källor ("Netherlands"/"Nederländerna").
+**Full 48-lags-brygga kompletteras före go-live** (Bit 2 fyller på ur live=all under turneringen,
+där varje VM-lags id dyker upp verifierbart). `resolveAppMatch` blockeras inte av luckan: okända
+lag ger 'unresolved', aldrig en gissad koppling. Täckningen är testbar via `resolveMatchCoverage`.
+Match-identitet kräver BÅDE lag-paret (via bryggan) OCH kickoff inom ett 2 h-fönster (UTC), så
+g-F-1 (ned-jpn) löses mot den fångade live-matchen.
+
 ## 2026-06-13 , T79 (#167): responsiv sektions-nav (hamburgare-meny på mobil, chip-rad på desktop)
 
 **Daniels feedback på T78:** på mobil kunde man LÄTT MISSA sektioner eftersom chip-raden är swipe-bar i
