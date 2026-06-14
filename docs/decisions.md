@@ -5613,3 +5613,12 @@ val), så Fas 1 byggs ordentligt, inte som en minimal snabb-deploy.
 från matchresultat + tips) + **fixtures-först** (typad fixtures-data, miljö-gating till live Supabase).
 **Varför:** Gör den kritiska FIFA-treeplats-seedningen (SPEC §5) testbar och säker, och låter hela
 appen byggas innan Supabase-kontot finns. Fixtures-mönstret är bevisat i Agent Kit-playbooken.
+
+**Beslut (T80, C2 #169):** Matchens status visas på varje rad i admin-resultatlistan, och de
+svenska status-etiketterna (scheduled -> "Ej spelad", live -> "Pågår", finished -> "Färdigspelad")
+bor i EN sanning (MATCH_STATUS_LABEL i AdminResultEntry.tsx) som både formulärets status-väljare och
+rad-stödinfon läser från.
+**Varför:** Issue #169 + PR-spec kräver status på raden (särskilt för att hitta "Pågår"-matcher i den
+långa listan). En delad map i stället för dubbel-hårdkodning hindrar att etiketterna glider isär.
+Live markeras färg-OBEROENDE (ordet "Pågår" bär betydelsen, accent-ton bara förstärkning, WCAG 1.4.1),
+och status är en SKILD dimension från den gröna klar-sealen (en match kan vara Pågår OCH ha facit).

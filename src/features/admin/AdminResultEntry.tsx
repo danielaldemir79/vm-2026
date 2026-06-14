@@ -20,6 +20,23 @@ import { useOfficialResultsStore } from '../official-results';
 import { useAdminMatches } from './use-admin-matches';
 import { AdminStats } from './AdminStats';
 
+/**
+ * Svenska etiketter för matchens status (T80, #169). EN SANNING: både status-väljaren
+ * i formuläret (<select data-admin-entry-status>) OCH stödinfo-texten på varje match-rad
+ * läser härifrån, så etiketterna aldrig glider isär (en match heter "Pågår" på exakt ett
+ * sätt i hela vyn). Etiketterna är arrangörens svenska för de tre MatchStatus-värdena.
+ */
+const MATCH_STATUS_LABEL: Record<MatchStatus, string> = {
+  scheduled: 'Ej spelad',
+  live: 'Pågår',
+  finished: 'Färdigspelad',
+};
+
+/** Etiketten för en matchs status (slår upp i MATCH_STATUS_LABEL, en sanning). */
+function matchStatusLabel(status: MatchStatus): string {
+  return MATCH_STATUS_LABEL[status];
+}
+
 /** Tolka ett inmatningsfält till number | null (tomt -> null, så validering kan se "tomt"). */
 function toGoal(value: string): number | null {
   if (value.trim() === '') {
@@ -71,16 +88,24 @@ interface AdminMatchRowProps {
 function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMatchRowProps) {
   const day = formatDayShort(localDateKey(match.kickoff));
   const time = formatKickoffTime(match.kickoff);
+  // Matchens status (scheduled/live/finished) som svensk etikett. SKILD dimension
+  // från klar-sealen nedan: en match kan vara "Pågår" OCH ha ett inmatat live-resultat
+  // (då både "Pågår" här och grön KLAR-seal). Stödinfo på raden, så Daniel ser vilka
+  // matcher som rullar nu i den långa listan (C2, #169). Samma etikett som formulärets
+  // status-väljare (matchStatusLabel, en sanning).
+  const status = matchStatusLabel(match.status);
+  const isLive = match.status === 'live';
   // SJÄLV-beskrivande tillgängligt namn per rad (T80, Copilot C1): listans
   // aria-labelledby ("Match") namnger BARA <ul>, så när man tabbar mellan rad-
   // knapparna kan ett hjälpmedel tappa kontrollkontexten. Ett explicit aria-label
-  // per knapp gör varje rad ensamt begriplig: "Match: <hemma> mot <borta>" + klar-
-  // status (resultatet om sparat, annars "ej inmatad"). De synliga lagnamnen ingår
-  // i namnet, så aria-label och synlig text inte motsäger varandra (WCAG 2.5.3
-  // label-in-name); klar-statusen speglar samma färg-oberoende seal-text (1.4.1).
+  // per knapp gör varje rad ensamt begriplig: "Match: <hemma> mot <borta>" +
+  // status-etiketten (Pågår/Ej spelad/Färdigspelad) + klar-status (resultatet om
+  // sparat, annars "ej inmatad"). De synliga lagnamnen ingår i namnet, så aria-label
+  // och synlig text inte motsäger varandra (WCAG 2.5.3 label-in-name); status och
+  // klar-statusen läses upp (1.4.1, betydelsen bärs av text, inte färg).
   const home = teamName(match.homeTeamId);
   const away = teamName(match.awayTeamId);
-  const statusLabel = entered ? enteredLabel(match) : 'ej inmatad';
+  const enteredText = entered ? enteredLabel(match) : 'ej inmatad';
   return (
     <button
       type="button"
@@ -89,7 +114,7 @@ function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMa
       data-selected={selected ? '' : undefined}
       data-entered={entered ? '' : undefined}
       aria-pressed={selected}
-      aria-label={`Match: ${home} mot ${away}, ${statusLabel}`}
+      aria-label={`Match: ${home} mot ${away}, ${status}, ${enteredText}`}
       onClick={() => onSelect(match.id)}
       className="vm-admin-match-row flex w-full items-center justify-between gap-3 rounded-input px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
     >
@@ -98,7 +123,19 @@ function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMa
           {teamName(match.homeTeamId)} - {teamName(match.awayTeamId)}
         </span>
         <span className="text-xs text-fg-muted">
-          {stageLabel(match)} · {day} {time}
+          {stageLabel(match)} · {day} {time} ·{' '}
+          {/* Matchens status som lugn stödinfo (samma stödinfo-stil som stage/dag).
+              "Pågår"/live görs urskiljbart UTAN att luta på färg ensam (WCAG 1.4.1):
+              ORDET "Pågår" bär betydelsen och får extra vikt (font-semibold) + en lugn
+              accent-ton som FÖRSTÄRKNING, aldrig den enda signalen. Skild från klar-
+              sealen (en match kan vara Pågår + Klar samtidigt). */}
+          <span
+            data-admin-match-status=""
+            data-status={match.status}
+            className={isLive ? 'font-semibold text-accent' : undefined}
+          >
+            {status}
+          </span>
         </span>
       </span>
       {entered ? (
@@ -329,9 +366,11 @@ export function AdminResultEntry() {
               onChange={(e) => setStatus(e.target.value as MatchStatus)}
               className="rounded-input border border-border bg-surface px-3 py-2"
             >
-              <option value="scheduled">Ej spelad</option>
-              <option value="live">Pågår</option>
-              <option value="finished">Färdigspelad</option>
+              {/* Etiketterna kommer från MATCH_STATUS_LABEL (en sanning), så väljaren
+                  och stödinfo-texten på match-raderna aldrig glider isär (C2, #169). */}
+              <option value="scheduled">{matchStatusLabel('scheduled')}</option>
+              <option value="live">{matchStatusLabel('live')}</option>
+              <option value="finished">{matchStatusLabel('finished')}</option>
             </select>
           </div>
 

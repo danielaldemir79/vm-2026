@@ -403,24 +403,92 @@ describe('AdminResultEntry, synlig match-lista (T80)', () => {
   });
 
   // Copilot C1 (a11y): varje rad-knapp har ett SJÄLV-beskrivande tillgängligt namn
-  // (aria-label), så ett hjälpmedel ger kontrollkontexten ("Match" + lagen + klar-
-  // status) när man tabbar mellan rader, utan att förlita sig på listans aria-
-  // labelledby. Vi hittar knapparna VIA deras roll+namn (det skärmläsaren hör), inte
-  // via data-attribut. teamName-mocken ger raw id:n (mex/kor, esp/ger).
-  it('varje rad-knapp har ett självbeskrivande namn (Match + lagen + klar-status)', () => {
+  // (aria-label), så ett hjälpmedel ger kontrollkontexten ("Match" + lagen + matchens
+  // status + klar-status) när man tabbar mellan rader, utan att förlita sig på listans
+  // aria-labelledby. Vi hittar knapparna VIA deras roll+namn (det skärmläsaren hör),
+  // inte via data-attribut. teamName-mocken ger raw id:n (mex/kor, esp/ger).
+  it('varje rad-knapp har ett självbeskrivande namn (Match + lagen + status + klar-status)', () => {
     adminMatchesState.matches = [FINISHED_WITH_RESULT, GROUP_B];
     // Bara g-A-1 har ett sparat officiellt resultat (2-1).
     adminMatchesState.officialResultIds = new Set(['g-A-1']);
     renderSection(officialStore({ isAdmin: true }));
 
-    // Formen "Match: <hemma> mot <borta>" + status, så raden är ensamt begriplig.
+    // Formen "Match: <hemma> mot <borta>, <status>, <klar-status>", så raden är ensamt
+    // begriplig. FINISHED_WITH_RESULT är 'finished' -> "Färdigspelad".
     const entered = screen.getByRole('button', { name: /Match: mex mot kor/ });
-    // Inmatad rad bär resultatet (klar-status), färg-oberoende i namnet (WCAG 1.4.1).
-    expect(entered).toHaveAttribute('aria-label', 'Match: mex mot kor, Klar 2-1');
+    // Inmatad rad bär status + resultatet (klar-status), färg-oberoende i namnet (1.4.1).
+    expect(entered).toHaveAttribute('aria-label', 'Match: mex mot kor, Färdigspelad, Klar 2-1');
 
-    // Ej-inmatad rad säger uttryckligen "ej inmatad" (skild från den klara raden).
-    const plain = screen.getByRole('button', { name: /Match: esp mot ger, ej inmatad/ });
-    expect(plain).toHaveAttribute('aria-label', 'Match: esp mot ger, ej inmatad');
+    // Ej-inmatad rad säger status + uttryckligen "ej inmatad". GROUP_B är 'scheduled'
+    // -> "Ej spelad" (skild från den klara raden).
+    const plain = screen.getByRole('button', { name: /Match: esp mot ger/ });
+    expect(plain).toHaveAttribute('aria-label', 'Match: esp mot ger, Ej spelad, ej inmatad');
+  });
+
+  // C2 (#169, PR-spec): varje rad visar matchens status (scheduled/live/finished) som
+  // lugn stödinfo med EXAKT samma svenska etiketter som formulärets status-väljare
+  // (en sanning, MATCH_STATUS_LABEL). Särskilt viktigt: "Pågår"-matcher ska gå att
+  // hitta i den långa listan. Status är en SKILD dimension från klar-sealen.
+  it('varje rad visar matchens status-etikett (Pågår/Ej spelad/Färdigspelad)', () => {
+    // Tre matcher med olika status och ENTYDIGA id:n, så vi kan slå upp varje rad.
+    // En 'finished'-match KRÄVER ett resultat (Match är en diskriminerad union på
+    // status), därför inget naivt spread från en scheduled fixture.
+    const liveMatch: Match = { ...GROUP_B, status: 'live' }; // g-B-1
+    const finishedMatch: Match = {
+      ...KNOCKOUT,
+      status: 'finished',
+      result: { homeGoals: 1, awayGoals: 0 },
+    }; // M73
+    adminMatchesState.matches = [FINISHED_GROUP, liveMatch, finishedMatch];
+    renderSection(officialStore({ isAdmin: true }));
+
+    // scheduled -> "Ej spelad" (FINISHED_GROUP har status 'scheduled').
+    const scheduled = rowFor('g-A-1').querySelector('[data-admin-match-status]');
+    expect(scheduled).not.toBeNull();
+    expect(scheduled).toHaveTextContent('Ej spelad');
+    expect(scheduled).toHaveAttribute('data-status', 'scheduled');
+
+    // live -> "Pågår" (poängen: hitta pågående match i den långa listan).
+    const live = rowFor('g-B-1').querySelector('[data-admin-match-status]');
+    expect(live).toHaveTextContent('Pågår');
+    expect(live).toHaveAttribute('data-status', 'live');
+
+    // finished -> "Färdigspelad".
+    const finished = rowFor('M73').querySelector('[data-admin-match-status]');
+    expect(finished).toHaveTextContent('Färdigspelad');
+    expect(finished).toHaveAttribute('data-status', 'finished');
+  });
+
+  // C2: status-etiketten på raden är EXAKT densamma som formulärets status-väljare
+  // (en sanning). Bevisar att de inte är dubbel-hårdkodade var för sig.
+  it('rad-status och formulärets status-väljare delar samma etiketter (en sanning)', () => {
+    const liveMatch: Match = { ...GROUP_B, status: 'live' };
+    adminMatchesState.matches = [liveMatch];
+    renderSection(officialStore({ isAdmin: true }));
+
+    // Radens "Pågår".
+    const rowStatus = rowFor('g-B-1').querySelector('[data-admin-match-status]');
+    expect(rowStatus).toHaveTextContent('Pågår');
+
+    // Väljarens option-etiketter (samma källa). Alla tre ska matcha exakt.
+    const select = document.querySelector('[data-admin-entry-status]');
+    expect(select).not.toBeNull();
+    const optionTexts = Array.from(select!.querySelectorAll('option')).map((o) => o.textContent);
+    expect(optionTexts).toEqual(['Ej spelad', 'Pågår', 'Färdigspelad']);
+  });
+
+  // C2 NEGATIV-KONTROLL (befordrad topp-regel): tas status-renderingen bort ska detta
+  // test rödna. Vi asserterar att status-elementet FINNS och bär etiketten; försvinner
+  // renderingen faller assertionen. (Dubbleras avsiktligt skilt från happy-testet så
+  // grinden är entydig: ingen status på raden -> rött.)
+  it('NEGATIV-KONTROLL: status-elementet finns på raden och bär live-etiketten "Pågår"', () => {
+    const liveMatch: Match = { ...GROUP_B, status: 'live' };
+    adminMatchesState.matches = [liveMatch];
+    renderSection(officialStore({ isAdmin: true }));
+
+    const statusEl = rowFor('g-B-1').querySelector('[data-admin-match-status]');
+    expect(statusEl).not.toBeNull();
+    expect(statusEl).toHaveTextContent('Pågår');
   });
 
   // LIVE-uppdatering (härledd state, ingen stale): när officialResultIds växer (vad
