@@ -32,7 +32,7 @@ export { KICKOFF_MATCH_WINDOW_MS, resolveAppMatch, resolveMatchCoverage } from '
 export type { CoverageReport, CoverageRow, MatchResolution } from './resolve-match';
 
 // Lag-brygga (API-team-id <-> app-lag-id, källhänvisad).
-export { resolveAppTeamId, WC2026_API_TEAM_BRIDGE } from './team-bridge';
+export { resolveApiTeamId, resolveAppTeamId, WC2026_API_TEAM_BRIDGE } from './team-bridge';
 
 // Budget-medveten poll-planerare.
 export { ACTIVE_WINDOW_MINUTES, planPolls } from './poll-budget';

@@ -1,0 +1,127 @@
+/* PREMIUM-FINISH för livekortet (Bit 3b). Stylar ENBART via data-/klass-hakarna i
+ * LiveMatchCard.tsx, så semantiken (region, aria, ExpandToggle) bärs av TSX:en, inte
+ * av CSS:en. Allt token-drivet (ingen rå hex utom de redan AA-mätta status-tokens),
+ * tema-medvetet (följer [data-theme] via variablerna) och reduced-motion-gatat.
+ *
+ * VISUELL TON (SPEC §7, "arena i kvällsljus"): livekortet är ett upphöjt fält PÅ
+ * matchkortet med en diskret accent-glöd i kanten, så det läses som "här lever matchen
+ * just nu" utan att skrika. Samma grön/guld-mästerskapsspråk som resten av appen. */
+
+/* SJÄLVA KORTET: en upphöjd yta med en subtil accent-ton i kant + bakgrund, så det
+ * skiljer sig från matchkortets bas-yta men hör tydligt ihop med den. color-mix mot
+ * tokens => följer temat, ingen rå färg. */
+[data-live-card] {
+  border-color: color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface-raised));
+}
+
+/* En pågående match får en aning starkare accent-kant (lever just nu); en avslutad
+ * faller till en lugn, neutral ton (historik, inte "nu"). */
+[data-live-card][data-live-status='live'],
+[data-live-card][data-live-status='paused'] {
+  border-color: color-mix(in srgb, var(--color-accent) 38%, var(--color-border));
+}
+
+[data-live-card][data-live-status='finished'] {
+  border-color: color-mix(in srgb, var(--color-fg) 12%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-fg) 3%, var(--color-surface-raised));
+}
+
+/* KLOCK-CHIPPET: en kompakt bricka. Texten är fg (AA-mätt brödtext i båda teman),
+ * ytan en svag accent-tint , ingen text-på-svag-färg-fälla (texten är full fg). */
+[data-live-clock] {
+  color: var(--color-fg);
+  background-color: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+}
+
+/* LIVE-/SLUT-etiketten: färg-oberoende (texten bär betydelsen). Live = solid accent-
+ * bricka med accent-fg-ink (AA-mätt token-par, samma som appens primär-knapp). Slut/
+ * övrigt = en lugn neutral bricka. */
+[data-live-badge='live'] {
+  color: var(--color-accent-fg);
+  background-color: var(--color-accent);
+}
+
+[data-live-badge='finished'],
+[data-live-badge='other'] {
+  color: var(--color-fg-muted);
+  background-color: color-mix(in srgb, var(--color-fg) 8%, var(--color-surface));
+  border: 1px solid var(--color-border);
+}
+
+/* PULSANDE LIVE-PUNKT: accent-färgad, andas bara när klockan FAKTISKT tickar
+ * (vm-live-card-dot-ticking sätts av TSX:en på 'ticking'). Samma vm-pulse-keyframe +
+ * idé som dagshero:ns .vm-live-dot (DRY, keyframen bor i index.css). I paus/övertid
+ * (live men inte tickande) är punkten stilla, så rörelsen ärligt = "tiden går nu". */
+[data-live-card] .vm-live-card-dot {
+  background-color: var(--color-accent);
+}
+
+[data-live-card] .vm-live-card-dot-ticking {
+  animation: vm-pulse 2s ease-in-out infinite;
+}
+
+/* MÅL-IKONEN: en gnutta accent-skuggning så ett mål drar ögat (förstärkning, glyfen
+ * + texten bär betydelsen). */
+[data-live-card] .vm-live-icon-goal {
+  filter: saturate(1.1);
+}
+
+/* KORT-PIPS (gult/rött): en liten rektangel i kort-form. Färgerna är de AA-mätta
+ * status-tokens (warning = guld/amber, danger = korall), så de läses som "gult/rött
+ * kort" även för den som scannar färg. Texten ("gult/rött kort") bär ändå betydelsen
+ * (färg-oberoende), pip:en är cue. */
+[data-live-card] .vm-live-card-pip {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.85rem;
+  border-radius: 0.15rem;
+  transform: translateY(0.1rem);
+}
+
+[data-live-card] .vm-live-card-pip-yellow {
+  background-color: var(--color-warning);
+}
+
+[data-live-card] .vm-live-card-pip-red {
+  background-color: var(--color-danger);
+}
+
+/* STATISTIK-STAPELN: hemma-segmentet bär accent, borta en neutral fg-ton, så
+ * övervikten syns i en blick. Spåret är en svag yt-ton. Talen ovanför bär de exakta
+ * värdena (stapeln är aria-hidden), så stapelns färger behöver inte nå text-AA. */
+[data-live-card] .vm-live-stat-bar {
+  background-color: color-mix(in srgb, var(--color-fg) 8%, var(--color-surface));
+}
+
+[data-live-card] .vm-live-stat-bar-home {
+  background-color: color-mix(in srgb, var(--color-accent) 70%, var(--color-surface));
+}
+
+[data-live-card] .vm-live-stat-bar-away {
+  background-color: color-mix(in srgb, var(--color-fg-muted) 55%, var(--color-surface));
+}
+
+/* FORMATIONS-BRICKAN: en kompakt token-driven pill. fg-text (AA) på en svag accent-tint. */
+[data-live-card] .vm-live-formation {
+  color: var(--color-fg);
+  background-color: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 26%, var(--color-border));
+}
+
+/* AVBYTAR-DETALJEN: en synlig fokus-/hover-cue på summary (det är en riktig
+ * interaktiv kontroll, så fokus-synligheten måste bevaras, WCAG 2.4.7). */
+[data-live-card] .vm-live-subs-summary:hover {
+  color: var(--color-accent);
+}
+
+/* REDUCED MOTION (WCAG 2.3.3): punkten slutar pulsa men behåller sin FÄRG, så live-
+ * läget fortfarande syns , bara rörelsen tas bort, aldrig informationen. (Den globala
+ * regeln i index.css nollar transition/animation svepande; detta är en explicit,
+ * tydlig spegling så avsikten är läsbar här på elementet.) */
+@media (prefers-reduced-motion: reduce) {
+  [data-live-card] .vm-live-card-dot-ticking {
+    animation: none;
+  }
+}

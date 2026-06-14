@@ -20,6 +20,7 @@ import { useMemo } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { useDailyMatches } from './use-daily-matches';
+import { useLiveData } from './use-live-data';
 import { useDayTheme } from './use-day-theme';
 import { useTodayKey } from './use-today-key';
 import { localDateKey } from './group-matches-by-day';
@@ -167,6 +168,13 @@ export function DailyMatchesView() {
   // om dagens match rör laget). Tolerant hook (ingen provider -> null), så vyn fungerar
   // oförändrat utan favoritlags-providern. Markeringen är ren visning, ingen data-yta.
   const { favoriteTeamId } = useFavoriteTeam();
+
+  // LIVE-DATA (Bit 3b, #181): persisterad live-data per match-id, färsk via realtid.
+  // Berikar varje matchkort med ett livekort när det FINNS live-data (pågående ELLER
+  // avslutad/frusen match), faller annars tillbaka till kortets vanliga utseende. I
+  // fixtures-läge bär hooken den committade demo-matchen (re-nycklad till app-match-id),
+  // så livekortet syns utan backend. byMatchId är referens-stabil tills datan ändras.
+  const { byMatchId: liveByMatchId } = useLiveData();
 
   // Dynamiskt DAGS-TEMA (T8): härled en subtil, deterministisk accent-hue ur den
   // valda dagens lag och lägg den som en CSS-variabel + stabilt data-attribut på
@@ -407,6 +415,7 @@ export function DailyMatchesView() {
                     <MatchCard
                       match={match}
                       teamsById={teamsById}
+                      liveData={liveByMatchId.get(match.id) ?? null}
                       footer={
                         <>
                           <MatchReactions matchId={match.id} />
