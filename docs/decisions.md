@@ -5,6 +5,52 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , Livescore pollare-v2: full lag-brygga + skarv-fix + auto-mappning + robust facit-fångst
+
+Gör livescore-pollaren fullt autonom för HELA turneringen och fixar skarv-buggen Bit 3a fann.
+
+**Beslut (KÄLLHÄNVISAD lag-brygga, gissas ALDRIG): full 48/48 app-lag-id -> API-Football team-id.**
+Ersätter Bit 1:s medvetet ofullständiga 4-lags-brygga i BÅDE `src/data/livescore/team-bridge.ts`
+(`WC2026_API_TEAM_BRIDGE`) OCH dess Deno-mirror `supabase/functions/_shared/livescore-core.ts`
+(`API_TEAM_BRIDGE`). 46 av 48 är CODE-matchade mot riktig API-Football-data; cuw (Curaçao) + cod
+(DR Kongo) har en API-kod-avvikelse men är ENTYDIGA (enda national-laget med det namnet, verifierat).
+**Källa:** API-Footballs national-team-id, framtaget via `teams?search=<lag>&national=true` +
+FIFA-trebokstavskod-match (appens lag-id = gemen FIFA-kod), cuw/cod via entydigt namn, 2026-06-15.
+Bryggan definieras app->API (så en oavsiktlig dubblett blir ett objekt-litteral-fel), den omvända
+API->app härleds en gång. Täcknings-/bijektions-test (48 unika API-id <-> 48 unika app-id) +
+invers-rundtur vaktar den. Mirror synk-märkt mot src.
+
+**Beslut: SKARV-FIX , kuvert-linda de lagrade blobbarna vid freeze.** Pollaren sparade tidigare
+`events: rich.events ?? null` (BARA arrayen ur fixtures?id), men läs-lagrets parsers (Bit 1:s
+parseEvents/parseStatistics/parseLineups) vill ha API:ts KUVERT-form `{ response: [...], errors: [] }`
+(requireResponseArray läser payload.response/.errors). Skarv-buggen gjorde att en frusen match hade
+visats UTAN events/statistik/laguppställning. Fix: `shapeFrozenBlobs` (ren modul `freeze-shape.ts` +
+mirror) lindar varje inline-array i ett kuvert vid lagring, så producent-form == konsument-form.
+**Verifierat mot riktig data:** `fixtures?id=<id>` returnerar events/statistics/lineups INLINE som
+arrayer på response[0] (`__fixtures__/fixture-aet-pen.json`: 35 events/2 statistics/2 lineups), så
+inga separata endpoint-anrop behövs (sparar 3 API-anrop). Skarv-test kör producent-form ->
+läs-lagrets parser och bevisar full rik utdata; negativ-kontroll (gamla nakna arrayen) ger tomt.
+
+**Beslut: AUTO-MAPPNING , självseedande fixture_match_map via inbäddad matchplan.** En live-fixture
+som saknar rad i fixture_match_map auto-resolveras (`resolveFixtureToMatch`, ren + mirror): gruppmatch
+via OMVÄND brygga (API-id -> app-id) + lag-par (oavsett hemma/borta) + kickoff inom 2h; slutspel (båda
+lag okända) via UNIK exakt kickoff. Exakt en träff -> insert; noll/flera/ett-känt-ett-okänt ->
+unresolved (gissa ALDRIG en koppling). Den kompakta planen (match_id + kickoff + lag-par) bäddas in i
+edge-funktionen (`supabase/functions/_shared/embedded-match-plan.ts`), GENERERAD ur matches.ts och
+VÄRDE-LÅST i CI (`match-plan.test.ts`: regenerera-och-diffa + mutationstest), samma källåkrings-mönster
+som kickoff-seed. **Viktig regel:** är BARA ETT lag känt är det en seedad match vars koppling inte kan
+bekräftas via bryggan -> unresolved (mappa aldrig på enbart tid när ett lag är känt, då kunde fel
+match mappas).
+
+**Beslut: ROBUST FACIT-FÅNGST , missa aldrig ett slutresultat.** Varje tick, EFTER live=all, väljer
+`selectFreezeChecks` (ren + mirror) de MAPPADE matcher vars kickoff passerat (inom ett 4h bak-fönster)
+och som ÄNNU INTE är frysta, och gör ett fixtures?id per styck för att härleda + frysa facit. Fångar
+g-F-1-buggen (en match som faller ur live=all mellan tick innan FT sågs). Budget-gatat (facit högst
+prio, spräck aldrig 100/dag) + kapat per tick (MAX_ROBUST_FREEZE_CHECKS_PER_TICK). Freeze-vägen är EN
+delad helper (`freezeFacit`) för både live=all- och robust-vägen, så facit-regeln + kuvert-lindningen
+är en sanning. Robust-vägen hoppar tyst-säkert en match som ännu inte är avgjord (deriveFacit
+fail-loud:ar bara på faktiskt avgjorda, vi statuskollar först).
+
 ## 2026-06-15 , Livescore Bit 3a (T81): klient-läs-lager + realtime för live-data
 
 Bit 3a är LÄS-sidan (ingen UI än, det är Bit 3b/design-frontend): hämta `match_live_data` ur

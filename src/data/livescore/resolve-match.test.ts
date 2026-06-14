@@ -73,27 +73,27 @@ describe('resolveAppMatch: koppla API-fixture till appmatch', () => {
   });
 });
 
-describe('resolveMatchCoverage: testbar täckningsrapport', () => {
-  it('rapporterar alla appmatcher och hur många bryggan kan lösa i dag', () => {
+describe('resolveMatchCoverage: testbar täckningsrapport (full 48/48-brygga)', () => {
+  it('rapporterar alla appmatcher; med full brygga är ALLA gruppmatcher bryggbara', () => {
     const report = resolveMatchCoverage();
     expect(report.totalMatches).toBe(WC2026_MATCHES.length);
     expect(report.rows).toHaveLength(WC2026_MATCHES.length);
-    // Bit 1 seedar ned/jpn/eng/irn. Bryggbara matcher = de vars BÅDA lag finns i
-    // bryggan. ned+jpn möts i g-F-1, så minst en match ska vara bryggbar nu.
-    expect(report.bridgeableMatches).toBeGreaterThanOrEqual(1);
+    // Med full brygga är bryggbara matcher exakt de med seedade lag = de 72 grupp-
+    // matcherna (slutspel M73-M104 har null lag tills seedat).
+    const groupMatchCount = WC2026_MATCHES.filter((m) => m.stage === 'group').length;
+    expect(report.bridgeableMatches).toBe(groupMatchCount);
   });
 
-  it('markerar g-F-1 (ned vs jpn) som bryggbar (båda lagen seedade)', () => {
+  it('markerar g-F-1 (ned vs jpn) som bryggbar', () => {
     const report = resolveMatchCoverage();
     const gF1 = report.rows.find((r) => r.appMatchId === 'g-F-1');
     expect(gF1?.bridgeable).toBe(true);
   });
 
-  it('markerar en match med ett oseedat lag som EJ bryggbar (full brygga kommer i Bit 2)', () => {
+  it('markerar g-A-1 (mex vs rsa) som bryggbar nu (full brygga, var ej bryggbar i Bit 1)', () => {
     const report = resolveMatchCoverage();
-    // g-A-1 (mex vs rsa): inget av lagen är seedat i Bit 1 -> ej bryggbar.
     const gA1 = report.rows.find((r) => r.appMatchId === 'g-A-1');
-    expect(gA1?.bridgeable).toBe(false);
+    expect(gA1?.bridgeable).toBe(true);
   });
 
   it('markerar slutspelsmatcher (oseedade lag, null) som EJ bryggbara', () => {

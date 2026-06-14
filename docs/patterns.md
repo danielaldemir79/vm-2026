@@ -39,6 +39,46 @@ källhänvisad form ger en robust, drift-säker läsning. Återanvänds av lives
 `LiveData`) och alla framtida "lagra rått externt svar"-tasks. Källa: T81 (`src/data/livescore/live-read.ts`
 + `live-read.test.ts`, blobbens kuvert-form källhänvisad i `decisions.md` 2026-06-15).
 
+### ren-logik-i-src-speglad-till-edge-funktion-med-bevisad-producent-konsument-skarv (VM 2026)
+
+**Recept (en edge-funktion (Deno) delar PUR domän-logik med klienten utan att kunna importera src/, och
+en producent (pollaren) skriver exakt den form en konsument (läs-lagret) tar):**
+
+1. **Lägg logiken som RENA, testbara funktioner i `src/data/...`** (ingen IO, ingen Date.now, ingen
+   Deno-global): t.ex. kuvert-lindning (`freeze-shape.ts`), auto-mappning (`fixture-map-resolver.ts`),
+   urval (`freeze-selection.ts`). De enhetstestas i Vitest mot riktiga fångade svar. Edge-funktionen
+   förblir TUNN (`@ts-nocheck`, bara IO + orkestrering), all gissningskänslig logik bor i de testade
+   rena funktionerna.
+2. **SPEGLA dem MINIMALT till `supabase/functions/_shared/<core>.ts`** (Deno deployar bara
+   functions-trädet, kan inte importera src/). Mirror-filen är EXAKT samma logik + källhänvisning,
+   SYNK-MÄRKT i båda riktningarna ("ändras den ena MÅSTE den andra"). Behandla dem som medvetna kopior,
+   inte två sanningar.
+3. **VERIFIERA mirror-paritet behavioralt** (mirror typas inte av app-grafen): bundla `_shared`-filen med
+   esbuild (vite-beroende, kör via `vite-node`) till ESM och kör samma in->ut-assertion som src-testet
+   (ned/jpn -> g-F-1, envelope-form, urval). Fångar en copy-divergens som annars bara setts i prod.
+   `data:`-import av den base64-bundlade koden räcker, ingen fil behöver skrivas.
+4. **DELA data via en GENERERAD inbäddad fil, värde-låst** (samma recept som
+   `gissningskanslig-data-genereras...`): den kompakta planen (`embedded-match-plan.ts`) genereras ur
+   matches.ts (EN sanning), emittas i Prettier-stil, och `match-plan.test.ts` regenererar-och-diffar +
+   mutationstestar mot den committade filen, så pollarens data aldrig kan drifta från klient-bundlen.
+5. **BEVISA PRODUCENT->KONSUMENT-SKARVEN, inte bara happy-path** (lärdomen bevisa-skarven): ta ett RIKTIGT
+   källsvar, kör det genom PRODUCENT-formningen (`shapeFrozenBlobs`) OCH KONSUMENTENS parser
+   (`projectLiveData`) i samma test, och bevisa full rik utdata. Lägg en NEGATIV-KONTROLL med den GAMLA
+   (buggiga) formen (naken array) som bevisar TOMT, så testet skiljer rätt form från fel (och en mutation
+   som tar bort lindningen rödnar happy-path-testet, verifierat).
+6. **GISSA ALDRIG en koppling i auto-mappningen.** Resolvern returnerar bara `resolved` vid EXAKT en
+   entydig träff; tvetydigt/saknat/ett-känt-ett-okänt -> `unresolved` (loggas + hoppas). En seedad match
+   (minst ett lag känt) mappas ALDRIG på enbart tid, bara via lag-par + kickoff; bara en helt oseedad
+   slutspelsmatch (båda lag okända) får matchas på unik exakt kickoff.
+
+**Varför:** En autonom backend-pollare behöver samma källhänvisade domän-logik som klienten, men Deno
+kan inte importera src/. Ren logik i src + minimal synk-märkt mirror + behavioral paritets-koll +
+genererad värde-låst delad data ger en sanning per regel utan drift, och ett skarv-test (producent ->
+konsument med en negativ-kontroll) fångar just den klass av bugg (lagrad form != parsad form) som annars
+bara syns live. Återanvänds av alla framtida edge-funktioner som delar logik/data med klienten. Källa:
+livescore pollare-v2 (`src/data/livescore/{freeze-shape,fixture-map-resolver,freeze-selection,match-plan}.ts`
++ tester, `supabase/functions/_shared/{livescore-core,embedded-match-plan}.ts`, decisions.md 2026-06-15).
+
 ### server-harledd-dag-via-before-trigger-for-en-per-omgang-PK (Supabase, VM 2026)
 
 **Recept (upprätthåll "EN rad per användare och kalenderdag" STRUKTURELLT, oförfalskbart):**

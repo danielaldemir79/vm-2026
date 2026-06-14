@@ -18,7 +18,8 @@
     "gen:matches": "vite-node scripts/generate-matches.ts",
     "gen:team-profiles": "vite-node scripts/generate-team-profiles.ts",
     "gen:venue-capacities": "vite-node scripts/generate-venue-capacities.ts",
-    "gen:kickoff-seed": "vite-node scripts/generate-kickoff-seed.ts"
+    "gen:kickoff-seed": "vite-node scripts/generate-kickoff-seed.ts",
+    "gen:embedded-match-plan": "vite-node scripts/generate-embedded-match-plan.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",
