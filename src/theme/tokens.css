@@ -2260,6 +2260,132 @@ body {
   max-height: 14rem;
 }
 
+/* FACIT-INMATNINGENS MATCH-LISTA, premium-finish (T80b, issue #169). [VÄRDE]
+   -----------------------------------------------------------------------------
+   IDENTITET: den synliga listan över alla 104 matcher där Daniel matar in det
+   officiella facit. Det är ett VERKTYG, inte en scen, så tonen är tät och
+   utilitär, men ska ändå kännas som appens premium-familj (samma surface-fond,
+   samma accent-fokusring, samma färg-oberoende solid-bricka-form som "Klar"-
+   chippen). Daniels två mål styr designen: (1) snabbt SE vad som är inmatat
+   (grön klar-rad), (2) snabbt se VAR i den långa listan han står (vald-rad).
+
+   FYRA ENTYDIGA LÄGEN (taskens kärna): en rad kan vara vald och/eller klar.
+   - EJ-vald + EJ-klar: lugn vilo-rad (transparent vänsterkant, surface-fond).
+   - EJ-vald + KLAR:    grön TINT-fond + solid grön vänster-list + grön KLAR-
+                        seal (bock + "Klar X-Y"). Grönt = "facit sparat".
+   - VALD  + EJ-klar:   accent-RING runt raden + accent vänster-list + accent-
+                        tint. Ringen = "den här redigerar jag nu".
+   - VALD  + KLAR:      accent-RINGEN (vald) ligger UTANPÅ den gröna tinten
+                        (klar). De två signalerna lever i SKILDA kanaler (ring =
+                        vald, grön seal/list = klar) så de aldrig förväxlas: man
+                        ser direkt att raden både är vald OCH har ett sparat facit.
+
+   FÄRG-OBEROENDE (WCAG 1.4.1): "klar" bärs INTE av grön färg ensam, utan av
+   bock-IKONEN + "Klar"-TEXTEN i en solid seal; "vald" bärs av aria-pressed +
+   ringen (en form, inte bara en ton). En färgblind/gråskale-läsare skiljer
+   lägena på form + text, inte hue.
+
+   KONTRAST-VAKT (mätt empiriskt mot token-hex per tema, alfa-komposit över
+   list-fonden = surface, scripts saknas men värdena är node-uträknade, BÅDA
+   teman, normal-text-tröskel 4.5:1):
+   - KLAR-seal: ink (--vm-on-success) på SOLID --vm-success = 9.97:1 mörkt /
+     5.47:1 ljust (samma AA-proven solid-bricka som "Klar"-chippen T11, DRY).
+   - Lagnamn (fg) på grön 12%-tint över surface: 11.97:1 mörkt / 15.19:1 ljust.
+   - Stödinfo (fg-muted) på grön 12%-tint: 5.89:1 mörkt / 5.53:1 ljust.
+   - Lagnamn (fg) på accent 15%-tint (vald): 10.98:1 mörkt / 14.50:1 ljust.
+   - Stödinfo (fg-muted) på accent 15%-tint (vald): 5.40:1 mörkt / 5.28:1 ljust.
+   - Hover (surface-raised): fg 12.66/17.91, fg-muted 6.23/6.52.
+   Grön/accent-färg används ALDRIG som text på en grön/accent-tint (den kända
+   guld/token-på-tint-AA-fällan): all KLAR-text står antingen i den solida sealen
+   (ink-på-solid) eller som fg/fg-muted, aldrig success-grön text på grön tint.
+
+   RÖRELSE (lessons reduced-motion): bara lugna FÄRG-/box-shadow-övergångar på
+   hover/val, ingen transform/layout-rörelse, så ingen reduced-motion-grind bryts.
+   -------------------------------------------------------------------------- */
+
+/* LISTANS scroll-container: max-höjd + intern scroll håller 104 rader täta utan
+   att svälla sidan (samma KISS-grepp som .vm-admin-scroll, men listan har redan
+   en max-h-80 i markup; här bara overscroll-disciplinen så en uttömd inre scroll
+   inte "läcker" till sidans scroll på touch/mobil). */
+.vm-admin-match-list {
+  overscroll-behavior: contain;
+}
+
+/* RADEN: en lugn vilo-rad. Hårfin transparent vänster-list (4px) håller plats så
+   layouten inte hoppar när klar/vald-listen tänds (ingen CLS). Min-höjd 44px =
+   bekväm tap-target även på mobil (WCAG 2.5.5/AAA-andan). Bara färg-övergångar. */
+.vm-admin-match-row {
+  min-height: 44px;
+  border-left: 4px solid transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-admin-match-row {
+    transition:
+      background-color 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease;
+  }
+}
+
+/* HOVER (bara på icke-vald rad, så hover inte tävlar med vald-tinten): en lugn
+   surface-raised-lyft, appens etablerade rad-hover. */
+.vm-admin-match-row:not([data-selected]):hover {
+  background-color: var(--color-surface-raised);
+}
+
+/* KLAR (data-entered): grön TINT-fond + solid grön vänster-list. Tinten är låg
+   (12%) så lagnamnet (fg) behåller 11.97:1 mörkt / 15.19:1 ljust. Vänster-listen
+   är SOLID grön (success) = en tydlig "facit sparat"-flagga i listans vänsterkant,
+   skanbar nedför hela kolumnen. */
+.vm-admin-match-row[data-entered] {
+  background-color: color-mix(in srgb, var(--color-success) 12%, var(--color-surface));
+  border-left-color: var(--color-success);
+}
+
+/* KLAR + HOVER: en aning djupare grön tint (14%) på hover, fortfarande långt över
+   AA (fg 11.37/14.73). Listen ligger kvar grön. */
+.vm-admin-match-row[data-entered]:not([data-selected]):hover {
+  background-color: color-mix(in srgb, var(--color-success) 16%, var(--color-surface));
+}
+
+/* VALD (data-selected): accent-RING (box-shadow, ingen layout/CLS) + accent-tint
+   + accent vänster-list. Ringen är den PRIMÄRA "vald"-signalen och ligger som en
+   1.5px inset accent-ram runt HELA raden, en annan KANAL än klar-grönt. */
+.vm-admin-match-row[data-selected] {
+  background-color: color-mix(in srgb, var(--color-accent) 15%, var(--color-surface));
+  border-left-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+}
+
+/* VALD + KLAR: ringen (vald) ligger UTANPÅ, men vänster-listen byts till grön
+   (klar) så "facit sparat"-flaggan inte tappas under accent-listen, och fonden
+   blandar accent-tint med en grön ton så BÅDA tillstånden syns (accent-ring =
+   vald, grön list + grön seal = klar). Tinten (success 10% över accent 12% över
+   surface) node-uträknad på den faktiska blandade hex:en, BÅDA teman: lagnamn
+   (fg) 9.65:1 mörkt / 13.33:1 ljust, stödinfo (fg-muted) 4.75:1 mörkt / 4.85:1
+   ljust (värsta yta, alla >= 4.5 = AA normal text). */
+.vm-admin-match-row[data-selected][data-entered] {
+  background-color: color-mix(
+    in srgb,
+    var(--color-success) 10%,
+    color-mix(in srgb, var(--color-accent) 12%, var(--color-surface))
+  );
+  border-left-color: var(--color-success);
+}
+
+/* KLAR-SEALEN: den färg-oberoende solid-bricka-formen (bock-ikon + "Klar"-text på
+   en SOLID success-yta med mätt ink, DRY mot .vm-get-started-done-seal / "Klar"-
+   chippen T11). Ink-på-solid håller AA oavsett tint i raden bakom (opak bricka).
+   Texten bär informationen, bocken förstärker; markeringen vilar aldrig på färg. */
+.vm-admin-match-entered {
+  background-color: var(--color-success);
+  color: var(--vm-on-success);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.28),
+    0 1px 2px rgb(0 0 0 / 0.16);
+}
+
 /* =============================================================================
    24. DEMO-DATA-CHIPPET, "det här är exempel-data, inte facit" (T29, issue #48
    + T56-review F4).

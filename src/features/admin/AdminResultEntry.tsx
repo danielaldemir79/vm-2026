@@ -58,7 +58,15 @@ interface AdminMatchRowProps {
  * knapp-mönstret, hjälpmedel läser upp vald/ej vald). En rad med sparat officiellt
  * resultat bär en grön KLAR-markering MED bock-ikon + text (aldrig färg ensam,
  * WCAG 1.4.1). Stabila data-attribut (data-admin-match-row, data-selected,
- * data-entered) så design-frontend kan polera utseendet utan att röra strukturen.
+ * data-entered) så design-frontend poler utseendet via .vm-admin-match-row i
+ * tokens.css (§23, fyra entydiga lägen + AA-mätta tinter) utan att röra strukturen.
+ *
+ * VISUELL FINISH (T80b): de fyra lägena (vald x klar) lever i SKILDA kanaler så de
+ * aldrig förväxlas: accent-RING = vald (den jag redigerar nu), grön vänster-list +
+ * grön KLAR-seal = klar (facit sparat). En rad kan vara båda, då ligger ringen
+ * utanpå den gröna tinten. Färg-, tint- och seal-recepten + alla uppmätta kontrast-
+ * tal bor i tokens.css §23 (en sanning per värde). Fokus-ringen är appens etablerade
+ * focus-visible-accent-ring (samma recept som övriga interaktiva ytor).
  */
 function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMatchRowProps) {
   const day = formatDayShort(localDateKey(match.kickoff));
@@ -72,9 +80,7 @@ function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMa
       data-entered={entered ? '' : undefined}
       aria-pressed={selected}
       onClick={() => onSelect(match.id)}
-      className={`flex w-full items-center justify-between gap-3 rounded-input px-3 py-2 text-left ${
-        selected ? 'bg-accent/15 ring-1 ring-accent' : 'hover:bg-surface-raised'
-      } ${entered ? 'border-l-4 border-success' : 'border-l-4 border-transparent'}`}
+      className="vm-admin-match-row flex w-full items-center justify-between gap-3 rounded-input px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)]"
     >
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-sm font-medium">
@@ -85,11 +91,13 @@ function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMa
         </span>
       </span>
       {entered ? (
-        // Grön KLAR-markering: bock-ikon (dekorativ, aria-hidden) + text. Texten bär
-        // informationen, så markeringen inte vilar på färg ensam (WCAG 1.4.1).
+        // Grön KLAR-seal: bock-ikon (dekorativ, aria-hidden) + text på en SOLID
+        // success-yta med mätt ink (.vm-admin-match-entered, §23). Texten bär
+        // informationen, så markeringen aldrig vilar på färg ensam (WCAG 1.4.1),
+        // och ink-på-solid håller AA oavsett radens tint bakom (opak bricka).
         <span
           data-admin-match-entered=""
-          className="flex shrink-0 items-center gap-1 text-xs font-semibold text-success"
+          className="vm-admin-match-entered inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-semibold"
         >
           <svg
             aria-hidden="true"
@@ -250,7 +258,7 @@ export function AdminResultEntry() {
             <ul
               data-admin-entry-match-list=""
               aria-labelledby={listLabelId}
-              className="flex max-h-80 flex-col gap-1 overflow-y-auto rounded-input border border-border bg-surface p-1"
+              className="vm-admin-match-list flex max-h-80 flex-col gap-1 overflow-y-auto rounded-input border border-border bg-surface p-1"
             >
               {entriable.map((m) => (
                 <li key={m.id}>
