@@ -240,7 +240,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Formatkontroll | `npm run format:check` |
 
-- **1867 passerande tester** över 191 testfiler (Vitest) på en färsk klon, med 56 tester som
+- **1918 passerande tester** över 200 testfiler (Vitest) på en färsk klon, med 56 tester som
   hoppas över med flit (live-Supabase RLS-integrationstesterna, som bara körs när Supabase-env
   är konfigurerat, se nedan). Verifierat genom att köra `npm test`.
 - **Säkerhet bevisad, inte antagen.** Row Level Security-modellen (bara admin kan skriva
