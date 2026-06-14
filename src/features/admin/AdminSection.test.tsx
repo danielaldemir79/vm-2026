@@ -428,8 +428,12 @@ describe('AdminResultEntry, synlig match-lista (T80)', () => {
   // C3 (#169, DRY/konsistens): den SYNLIGA lag-etiketten och raden-knappens aria-label
   // läser samma härledda lagnamn (en sanning, inte två teamName-anrop som kan glida
   // isär). De synliga lagnamnen MÅSTE ingå i det tillgängliga namnet (WCAG 2.5.3
-  // label-in-name). Vi bevisar det per rad: den synliga etiketten är "<hemma> - <borta>"
-  // och aria-label börjar "Match: <hemma> mot <borta>", med EXAKT samma två lagnamn.
+  // label-in-name). Vi bevisar det per rad: den synliga texten innehåller "<hemma> -
+  // <borta>" och aria-label börjar "Match: <hemma> mot <borta>", med EXAKT samma två
+  // lagnamn. Vi asserterar mot radens textContent (den SYNLIGA texten) i stället för en
+  // styling-klass (.truncate), så testet inte är känsligt för markup-/Tailwind-refaktorer
+  // (C4). aria-label bidrar inte till textContent, alltså bär textContent bara synlig text,
+  // precis det vi vill verifiera (synlig text och aria-label har samma lagnamn).
   it('synlig lag-etikett och aria-label läser samma lagnamn (C3, label-in-name)', () => {
     adminMatchesState.matches = [FINISHED_GROUP, GROUP_B];
     renderSection(officialStore({ isAdmin: true }));
@@ -439,9 +443,9 @@ describe('AdminResultEntry, synlig match-lista (T80)', () => {
       ['g-B-1', 'esp', 'ger'],
     ] as const) {
       const row = rowFor(matchId);
-      const visible = row.querySelector('.truncate');
-      // Synlig text: "<hemma> - <borta>" (samma härledda namn som aria-label).
-      expect(visible).toHaveTextContent(`${h} - ${a}`);
+      // Synlig text (textContent): innehåller "<hemma> - <borta>" (samma härledda namn
+      // som aria-label). textContent bär bara den synliga texten, inte aria-label.
+      expect(row).toHaveTextContent(`${h} - ${a}`);
       // De synliga lagnamnen ingår i det tillgängliga namnet (label-in-name).
       expect(row).toHaveAttribute('aria-label', expect.stringContaining(`Match: ${h} mot ${a}`));
     }
