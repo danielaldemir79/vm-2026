@@ -38,6 +38,10 @@ export { resolveAppTeamId, WC2026_API_TEAM_BRIDGE } from './team-bridge';
 export { ACTIVE_WINDOW_MINUTES, planPolls } from './poll-budget';
 export type { PollAllocation, PollDayMatch, PollPlan } from './poll-budget';
 
+// Budget-gate per cron-tick (Bit 2: avgör om DETTA tick får slå mot API:t).
+export { decidePollTick } from './poll-gate';
+export type { PollGateDecision, PollGateInput } from './poll-gate';
+
 // Status-styrd matchklocka.
 export { computeClock } from './live-clock';
 export type { MatchClock } from './live-clock';

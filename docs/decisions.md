@@ -5,6 +5,55 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-14 , Livescore Bit 2 (T80): Supabase-backend (persisterad live-data, auto-facit-lås, budget-gate)
+
+Bit 2 ger livescore-featuren sin server-sida: en pollare (edge function) som under turneringen
+hämtar live-data från API-Football och persisterar den, plus AUTO-facit som fyller official_match_results
+när en match avslutas, utan att någonsin röra ett manuellt inmatat resultat.
+
+**Beslut: `match_live_data` persisteras PERMANENT + fryses vid FT** (`frozen=true`). Daniels krav:
+livescore ska vara bläddringsbar dagar tillbaka, så en avslutad matchs snapshot (RÅA API-blobbar i
+jsonb + extraherade fält) bevaras och fryses, raderas aldrig. RLS: SELECT öppen (publik live-data,
+som official_match_results), ingen skriv-policy => bara pollaren via service_role skriver.
+
+**Beslut: `official_match_results.source` ('manual'|'auto'), default 'manual'.** Default 'manual'
+SKYDDAR alla redan inmatade rader (de var per definition admin-inmatade). `upsertOfficialResult`
+sätter alltid `source='manual'` (admin matar in manuellt).
+
+**Beslut: VAR facit-härledningen bor (en sanning) , i pollaren, INTE i en plpgsql-trigger.**
+Facit-REGELN (goals, inte score.extratime) är den mest fel-gissbara raden i featuren och är redan
+implementerad, källhänvisad OCH testad i `parseFinalResult` (parse-live.ts). Att re-implementera den i
+plpgsql vore en andra kopia som kan drifta tyst (lärdomen lattgissad-domanregel-styr-otestad-gren).
+Pollaren återanvänder regeln (mirror i `supabase/functions/_shared/livescore-core.ts`, synk-märkt mot
+parse-live.ts) och har dessutom hela det råa fixtures?id-svaret (inkl. score.penalty). Migrationen
+äger i stället LÅSET (inte härledningen).
+
+**Beslut: auto-facit-LÅSET = `apply_auto_facit(...)` (SECURITY DEFINER, EXECUTE bara service_role).**
+Daniels HARD-krav "skriv aldrig över manuellt" är en DEKLARATIV SQL-invariant: upsertens on-conflict-gren
+har `where official_match_results.source = 'auto'`. En manuell rad matchar inte => uppdateringen hoppas
+=> det manuella facit står orört. INSERT-grenen fyller fortfarande TOMT. **Bevisat** med ett DO-block
+(transaktion + rollback, noll data kvar) i `supabase/proofs/t80_auto_facit_lock_proof.sql`: (1) auto
+fyller tomt, (2) auto uppdaterar auto, (3) auto rör ALDRIG manuellt, (4) manuell upsert vinner alltid.
+Samma anda som T42:s RLS-DO-block. Dirigenten kör beviset mot live vid deploy (RAISE EXCEPTION = rött).
+
+**Beslut: SJÄLV-budgeterande pollare (100/dag), budget i KODEN inte i cron-schemat.** `decidePollTick`
+(poll-gate.ts, ren + testad, återanvänder Bit 1:s planPolls) avgör per tick om vi får polla, med facit-
+fångst (freeze) prioriterad FÖRST och live=all (1 anrop) sedan, allt strikt under dagsbudgeten ur
+`poll_log` (dagens räknare). Även om cron tickar oftare än var 2:e minut kan summan aldrig spräcka taket
+(self-contained, negativ-kontroll körd: mutation av freeze-prioriteten rödnar testerna).
+
+**Beslut: nyckeln i `app_config` (RLS deny-all), aldrig i repot.** MCP kan troligen inte sätta edge-
+function-secrets, så API-Football-nyckeln + auto-facit-admin-id ligger i en privat tabell bara
+service_role når. Migrationen skapar tabellen TOM; dirigenten inserterar värdena vid deploy (HANDOFF).
+
+**Beslut: api_fixture_id -> appens match_id via `fixture_match_map` (inte resolveAppMatch i funktionen).**
+Bit 1:s resolveAppMatch behöver hela matchplanen + lag-bryggan (klient-bundlen), som edge-funktionen
+(Deno, deployar bara functions-trädet) inte kan importera utan att duplicera 104 matcher. En liten
+mappnings-tabell är renaste vägen: känd koppling slås upp deterministiskt, okänd fixture LOGGAS och
+hoppas (gissa aldrig). Kopplingarna seedas när en VM-fixtures id dyker upp i live=all (samma "fylls
+under go-live"-princip som lag-bryggan). DEPLOY GÖRS AV DIRIGENTEN via MCP (migrations, function,
+secret-insert, cron-finalisering), se HANDOFF.
+
 ## 2026-06-14 , Livescore facit: slutresultatet kommer ur `goals`, ALDRIG ur `score.extratime` (korrigering)
 
 `parseFinalResult` (parse-live.ts) härleder en avgjord matchs facit ur API-Footballs `goals`-fält,
