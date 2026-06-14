@@ -120,7 +120,10 @@ function AdminMatchRow({ match, teamName, selected, entered, onSelect }: AdminMa
     >
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-sm font-medium">
-          {teamName(match.homeTeamId)} - {teamName(match.awayTeamId)}
+          {/* SAMMA härledda lagnamn som aria-label läser (home/away ovan), inte ett
+              nytt teamName-anrop: en sanning, så synlig text och tillgängligt namn
+              garanterat aldrig glider isär (WCAG 2.5.3 label-in-name) (C3, #169). */}
+          {home} - {away}
         </span>
         <span className="text-xs text-fg-muted">
           {stageLabel(match)} · {day} {time} ·{' '}

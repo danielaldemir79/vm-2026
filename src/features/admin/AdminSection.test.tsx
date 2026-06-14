@@ -425,6 +425,28 @@ describe('AdminResultEntry, synlig match-lista (T80)', () => {
     expect(plain).toHaveAttribute('aria-label', 'Match: esp mot ger, Ej spelad, ej inmatad');
   });
 
+  // C3 (#169, DRY/konsistens): den SYNLIGA lag-etiketten och raden-knappens aria-label
+  // läser samma härledda lagnamn (en sanning, inte två teamName-anrop som kan glida
+  // isär). De synliga lagnamnen MÅSTE ingå i det tillgängliga namnet (WCAG 2.5.3
+  // label-in-name). Vi bevisar det per rad: den synliga etiketten är "<hemma> - <borta>"
+  // och aria-label börjar "Match: <hemma> mot <borta>", med EXAKT samma två lagnamn.
+  it('synlig lag-etikett och aria-label läser samma lagnamn (C3, label-in-name)', () => {
+    adminMatchesState.matches = [FINISHED_GROUP, GROUP_B];
+    renderSection(officialStore({ isAdmin: true }));
+
+    for (const [matchId, h, a] of [
+      ['g-A-1', 'mex', 'kor'],
+      ['g-B-1', 'esp', 'ger'],
+    ] as const) {
+      const row = rowFor(matchId);
+      const visible = row.querySelector('.truncate');
+      // Synlig text: "<hemma> - <borta>" (samma härledda namn som aria-label).
+      expect(visible).toHaveTextContent(`${h} - ${a}`);
+      // De synliga lagnamnen ingår i det tillgängliga namnet (label-in-name).
+      expect(row).toHaveAttribute('aria-label', expect.stringContaining(`Match: ${h} mot ${a}`));
+    }
+  });
+
   // C2 (#169, PR-spec): varje rad visar matchens status (scheduled/live/finished) som
   // lugn stödinfo med EXAKT samma svenska etiketter som formulärets status-väljare
   // (en sanning, MATCH_STATUS_LABEL). Särskilt viktigt: "Pågår"-matcher ska gå att
