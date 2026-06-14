@@ -1,8 +1,8 @@
 # VM 2026 , app-spec (design)
 
-> Status: design godkänd i brainstorm 2026-06-09. Detta dokument är inputen till
-> Agent Kit-inception (Läge 2: använd befintlig info, forma backlog). Bygget körs via
-> `/agent-kit` i detta repo, task för task, med Agent Kits grindar.
+> Status: design godkänd i brainstorm 2026-06-09. Det här dokumentet är design-underlaget
+> som backloggen formades ur. Bygget kördes task för task, med kvalitetsgrindar (planering,
+> tester, oberoende granskning, CI) på varje ändring.
 
 ## 1. Vision och mål
 
@@ -36,7 +36,7 @@ realtidssynk kan slås på utan omarkitektur.
 gruppchatten. "Lägg till på hemskärm" ger app-ikon och helskärm. Ingen App Store, fungerar
 på iPhone och Android, push-notiser möjliga på installerad PWA.
 
-Teknik-stack (låst i inception 2026-06-09, se [`decisions.md`](decisions.md)):
+Teknik-stack (låst i design-fasen 2026-06-09, se [`decisions.md`](decisions.md)):
 - **Frontend:** React + Vite + TypeScript.
 - **Styling/känsla:** Tailwind CSS + Framer Motion (animationer = det "levande/trendiga").
 - **PWA:** vite-plugin-pwa (installerbar, offline-skal, manifest, ikon).
@@ -94,10 +94,10 @@ Detta är ökänt felkänsligt. Krav:
   spelschemat och FIFA:s tredjeplats-tabell. Får inte gissas.
 - **Egen dedikerad verifierings-task:** extrahera och dubbelkolla hela schemat (grupper,
   matcher, datum, arenor) och slutspelskopplingarna mot källorna i avsnitt 8, samt FIFA:s
-  officiella lottning. Denna task får ta den tid den behöver och passerar Agent Kits
+  officiella lottning. Denna task får ta den tid den behöver och passerar en
   fullständighets-/review-grind innan den anses klar.
 
-## 6. Datamodell (låst i inception 2026-06-09)
+## 6. Datamodell (låst i design-fasen 2026-06-09)
 
 Kärn-entiteter (tracker):
 - **Team:** namn, landskod/flagga, grupp, FIFA-ranking, kuriosa, stjärnspelare, "bästa speldrag".
@@ -147,7 +147,7 @@ Källor Daniel gett (läses av och verifieras i data-tasken):
 - **Sveriges deltagande är osäkert** (avgörs i playoff mars 2026). Appen byggs lagagnostiskt;
   "favoritlag" är generiskt och pinnas per användare, inte hårdkodat till Sverige.
 - Exakta avsparkstider, arenor och TV-kanaler kan ändras , datalagret görs lätt att uppdatera.
-- Hosting **låst i inception 2026-06-09: Cloudflare Pages** (se [`decisions.md`](decisions.md)).
+- Hosting **låst i design-fasen 2026-06-09: Cloudflare Pages** (se [`decisions.md`](decisions.md)).
 
 ## 11. Build-ordning (faser)
 
@@ -167,7 +167,7 @@ Bygget sker i fyra faser. **Den fullständiga, levande task-listan bor på GitHu
 Ordningen följer beroenden: fundament före kärna, kärna före socialt. Den kritiska data-tasken
 (§5) tidigt, allt annat bygger på dess verifierade data.
 
-## 12. Utökad funktionalitet (inception-tillägg, godkänd 2026-06-09)
+## 12. Utökad funktionalitet (design-tillägg, godkänd 2026-06-09)
 
 Utöver grund-designen ovan godkände Daniel en utökning för att lyfta appen flera steg (max
 kvalitet, lugnt tempo). Dessa features är scope och hör till sina respektive faser:

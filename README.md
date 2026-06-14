@@ -9,10 +9,9 @@ badges, reactions and comments). Built and run live for real friends during the 
 > itself ships in Swedish, that is its real audience (friends in Sweden), so the screenshots
 > and in-app copy below are Swedish by design.
 
-> Engineering note: this project was built through an AI-orchestrated quality pipeline
-> (Agent Kit) that I drove, task by task, with planning, tests, independent review and a CI
-> gate on every change. The architecture, design decisions and verification below reflect
-> that process.
+> Engineering note: this project was built task by task with a strict quality pipeline,
+> planning, tests, independent code review and a CI gate on every change. The architecture,
+> design decisions and verification below reflect that process.
 
 ---
 
