@@ -63,6 +63,17 @@ on top of it. Plus a set of information screens around both.
 - **Match cards** compress the information visually instead of a text row: team emblems, the
   TV channel as a badge, the stage, and on each card the **venue (arena, city, country) with
   its capacity** and the **FIFA ranking** of the teams.
+- **Live scores directly on the card.** During live matches, each card gains a live panel: a
+  gently ticking match clock (status-driven and safe across breaks, showing "Half time" during
+  intervals, "45+" or "90+" at the half-time boundary, "Full time" when the match ends, never
+  an invented minute), a live scoreline, goalscorers with assists, yellow and red cards, and
+  substitutions. All visible immediately, no tap required.
+- **"Show more" (expandable stats and line-ups).** A clear expand button unfolds full match
+  statistics (possession, shots, corners, offsides and more shown as comparison bars) and the
+  starting line-ups with formations for each team, behind an honest promise: the button only
+  appears when there is actually data to show.
+- **Browsable history.** Live data is stored permanently and frozen when a match ends. You can
+  scroll back days later and see the stats and goalscorers, not just for ongoing matches.
 - **Group stage, 12 groups (A to L).** Live-computed standings (points, played, GD, goals
   for/against) that update the instant a result is entered. Tables are derived, never stored
   twice.
@@ -81,6 +92,12 @@ on top of it. Plus a set of information screens around both.
   truth that the tables, bracket and scoring read from) can only be written by the admin.
   This is enforced server-side by Postgres Row Level Security, not just hidden in the UI, and
   it is proven with real sessions in integration tests.
+- **Automatic results with manual override.** When a match ends, the final score is written
+  automatically as the official result in the competition. But a manual entry by the admin
+  always has the last word: the automatic process only fills empty slots and updates its own
+  automatic rows. A manually entered result is never touched by the automation (every result
+  carries a source, and manual always wins). This is a declarative SQL rule, not just a
+  promise in the code.
 
 ### Prediction game
 
@@ -223,7 +240,10 @@ npm run preview    # serve the built dist/ locally
 - **Fixtures-first environment gating.** All code is built and tested against typed fixtures;
   a single gate switches to live Supabase via environment variables without changing any
   call-site. That is what let the entire app be built and tested before, and independently of,
-  any backend account.
+  any backend account. The live card renders against bundled sample data in fixtures mode; in
+  live mode, data is read from Supabase (public read, updated in real time) fed by a
+  budget-aware scheduled edge function against a free football data API (100 requests per day,
+  no cost).
 - **Single scroll-page, no router.** Every section renders on the page; vendor code-splitting
   (React, Motion, Supabase) keeps the initial load lean.
 
@@ -239,7 +259,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Format check | `npm run format:check` |
 
-- **1918 passing tests** across 200 test files (Vitest) on a fresh clone, with 56 tests
+- **2106 passing tests** across 217 test files (Vitest) on a fresh clone, with 56 tests
   skipped by design (the live Supabase RLS integration tests, which only run when Supabase
   env is configured, see below). Verified by running `npm test`.
 - **Security proven, not assumed.** The Row Level Security model (only the admin can write

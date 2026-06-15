@@ -1,0 +1,23 @@
+-- T81 (#181): lägg match_live_data i Supabase Realtime-publikationen, så ett
+-- livescore-kort uppdateras LIVE hos alla anslutna klienter när pollaren skriver
+-- en ny snapshot (mål/status/minut), utan reload.
+--
+-- VARFÖR: livescore Bit 2 (pollaren) skriver match_live_data var minut under live.
+-- Utan realtime ser klienten ändringen först vid nästa fokus-/minut-refetch. Med
+-- postgres_changes på tabellen triggas en TYST re-fetch direkt (samma härledd-
+-- state-mönster som T18: payloaden läses aldrig, vi refetchar färdiga rader genom
+-- RLS), så ställning + klocka re-synkar mot DB:ns elapsed_minute + last_synced_at.
+--
+-- SEKRETESS: live-data är PUBLIK fakta (mld_select_all = true, som
+-- official_match_results). Det finns inget hemligt att läcka via kanalen, så att
+-- lägga den i publikationen är säkert. (Tips-tabellerna ligger medvetet UTANFÖR
+-- publikationen, se 20260612072518_t18_realtime_publication.sql , det gäller fortsatt.)
+--
+-- REPLICA IDENTITY: lämnas default. Vi läser ALDRIG `old`-raden i klienten (vi
+-- refetchar färdiga rader genom RLS), så `replica identity full` behövs inte (KISS).
+--
+-- IDEMPOTENT: ADD TABLE på en tabell som redan ingår ger ett fel. Verifierat
+-- 2026-06-15 (read-only mot prod) att match_live_data INTE redan ligger i
+-- supabase_realtime, så ett rent ADD är rätt.
+
+alter publication supabase_realtime add table public.match_live_data;

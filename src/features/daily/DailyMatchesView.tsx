@@ -20,10 +20,13 @@ import { useMemo } from 'react';
 import type { Match, Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { useDailyMatches } from './use-daily-matches';
+import { useLiveData } from './use-live-data';
 import { useDayTheme } from './use-day-theme';
 import { useTodayKey } from './use-today-key';
 import { localDateKey } from './group-matches-by-day';
 import { MatchCard } from './MatchCard';
+import { LiveNowSection } from './LiveNowSection';
+import { selectLiveFeed } from './live-feed';
 import { MatchReactions, MatchComments } from '../rooms';
 import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favorite-team';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
@@ -139,6 +142,35 @@ function Countdown({
   );
 }
 
+/**
+ * "Nästa avspark" som ett SEPARAT, SEKUNDÄRT block (Bit 3c). När en match pågår LEDER
+ * live-blocket (LiveNowSection) sidan; nedräkningen flyttas hit, till en egen lugn pelare
+ * med tydligt mindre tyngd än den stora arena-hero:n , så "vad kommer sen" aldrig
+ * konkurrerar med "vad händer nu". Egen rubrik + eget utrymme, men samma nedräknings-
+ * innehåll (Countdown), så det är EN sanning för nedräkningen (DRY). Nedräkningen pekar
+ * redan på nästa OSPELADE avspark (computeCountdown hoppar över pågående/spelade matcher),
+ * så denna pelare kan aldrig visa en match som live-blocket redan visar.
+ */
+function NextKickoffPillar({
+  countdown,
+  teamsById,
+}: {
+  countdown: CountdownState;
+  teamsById: ReadonlyMap<string, Team>;
+}) {
+  return (
+    <div
+      data-next-kickoff=""
+      className="flex flex-col gap-3 rounded-card border border-border bg-surface p-5 shadow-[var(--vm-shadow-card)] sm:p-6"
+    >
+      <p className="flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.18em] text-fg-muted">
+        Nästa avspark
+      </p>
+      <Countdown countdown={countdown} teamsById={teamsById} />
+    </div>
+  );
+}
+
 export function DailyMatchesView() {
   const {
     status,
@@ -167,6 +199,38 @@ export function DailyMatchesView() {
   // om dagens match rör laget). Tolerant hook (ingen provider -> null), så vyn fungerar
   // oförändrat utan favoritlags-providern. Markeringen är ren visning, ingen data-yta.
   const { favoriteTeamId } = useFavoriteTeam();
+
+  // LIVE-DATA (Bit 3b, #181): persisterad live-data per match-id, färsk via realtid.
+  // Berikar varje matchkort med ett livekort när det FINNS live-data (pågående ELLER
+  // avslutad/frusen match), faller annars tillbaka till kortets vanliga utseende. I
+  // fixtures-läge bär hooken den committade demo-matchen (re-nycklad till app-match-id),
+  // så livekortet syns utan backend. byMatchId är referens-stabil tills datan ändras.
+  const { byMatchId: liveByMatchId } = useLiveData();
+
+  // ALLA turneringens matcher per id (Bit 3c): live-blocket leder med matcher som PÅGÅR
+  // var som helst i schemat, inte bara den valda dagen, så ett uppslag mot HELA
+  // match-listan behövs (live-datan är nycklad på app-match-id). days rymmer varje
+  // kalenderdag i spannet, så en flatten ger alla matcher. Referens-stabil tills days byts.
+  const matchById = useMemo(() => {
+    const map = new Map<string, Match>();
+    for (const day of days) {
+      for (const match of day.matches) {
+        map.set(match.id, match);
+      }
+    }
+    return map;
+  }, [days]);
+
+  // PÅGÅENDE MATCHER (Bit 3c, Daniels live-feedback): de matcher som faktiskt rullar just
+  // nu (live/paus), ordnade mest relevant först. Tom lista = inget pågår -> topp-fältet
+  // behåller sitt vanliga utseende (nedräkning + dagens match). Finns minst en live -> vyn
+  // LEDER med live-blocket och flyttar nedräkningen till en separat sekundär pelare, så en
+  // pågående match aldrig krockar med "nästa avspark" (rent urval i selectLiveFeed).
+  const liveFeed = useMemo(
+    () => selectLiveFeed(liveByMatchId, matchById, teamsById),
+    [liveByMatchId, matchById, teamsById]
+  );
+  const hasLive = liveFeed.length > 0;
 
   // Dynamiskt DAGS-TEMA (T8): härled en subtil, deterministisk accent-hue ur den
   // valda dagens lag och lägg den som en CSS-variabel + stabilt data-attribut på
@@ -240,81 +304,97 @@ export function DailyMatchesView() {
 
       {status === 'ready' && days.length > 0 ? (
         <>
-          {/* Hero: "Match of the day" + live-nedräkning, startskärmens hjärta.
-              Konceptet är "arena i kvällsljus" (SPEC §7): en djup, mörk fond med
-              ett pitch-grönt ljus som tänds ur hörnen, plus ett långsamt rörligt
-              ljus-svep (aria-hidden, stannar vid reducerad rörelse). Nedräkningen
-              pekar mot turneringens NÄSTA avspark (inte nödvändigtvis vald dag),
-              hero-kortet mot den valda dagens framträdande match. */}
-          <Slide direction="up">
-            <div
-              data-daily-hero=""
-              data-day-theme={dayThemeProps['data-day-theme']}
-              data-day-theme-source={dayThemeProps['data-day-theme-source']}
-              className="vm-daily-hero relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
-              // Dags-temats hue (--vm-day-hue) injiceras via seamen som en INLINE-
-              // OVERRIDE i style när dagen har lag. Hero-dekoren (radiella ljus +
-              // sheen) byggs i .vm-daily-hero (tokens.css §6) och tonas mot hue:n
-              // när data-day-theme='active'. --vm-day-hue har alltid en default i
-              // :root (tokens.css), så i default-läget saknas inte variabeln, det
-              // som saknas är den dynamiska inline-override:n: ingen ton-skiftning
-              // sker och dekoren faller på T2:s neutrala ton (default-grenen styrs
-              // av data-day-theme). Den dynamiska tonen lever BARA i background-image
-              // (dekor), aldrig i en text-/yt-token, så läsbarheten (WCAG AA) kan
-              // inte sänkas (kontrast-vakt).
-              style={dayThemeProps.style}
-            >
-              {/* Rörligt ljus-svep: ett brett, mjukt sken som långsamt drar över
-                  fonden (arena-strålkastare). Rent dekorativt, aria-hidden.
-                  vm-hero-sheen driver animationen (index.css, stannar vid reducerad
-                  rörelse); vm-daily-hero-sheen bär själva gradienten (tonas mot
-                  dagens hue i active-läget, tokens.css §6). */}
-              <div
-                aria-hidden="true"
-                className="vm-hero-sheen vm-daily-hero-sheen pointer-events-none absolute inset-0 -z-10 opacity-70"
-              />
-
-              <div className="flex flex-col gap-7 p-5 sm:p-7 lg:flex-row lg:items-stretch lg:gap-10 lg:p-8">
-                {/* Vänster: nedräkningen, hero:ns drama. */}
-                <div className="flex flex-col justify-center gap-3 lg:flex-1">
-                  <p className="flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-                    Nedräkning till avspark
-                  </p>
-                  <Countdown countdown={countdown} teamsById={teamsById} />
-                </div>
-
-                {matchOfTheDay
-                  ? (() => {
-                      // EN etikett, DELAD av hero-rubriken OCH kortets highlight-chip,
-                      // så de aldrig säger olika saker (datum ovanför men "Dagens match"
-                      // i chippet). "Dagens match" bara när matchen spelas IDAG; annars
-                      // matchens dag ("TORSDAG 11 JUNI", versaliserat av uppercase-
-                      // klassen), så etiketten aldrig ljuger när turneringen ligger
-                      // dagar bort (#54, fynd 3 + C3).
-                      const heroLabel = featuredMatchLabel(matchOfTheDay, todayKey);
-                      return (
-                        <div className="flex flex-col gap-2 lg:max-w-sm lg:flex-1">
-                          <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
-                            {heroLabel}
-                          </p>
-                          <MatchCard
-                            match={matchOfTheDay}
-                            teamsById={teamsById}
-                            highlight
-                            highlightLabel={heroLabel}
-                            favorite={matchHasFavorite(
-                              favoriteTeamId,
-                              matchOfTheDay.homeTeamId,
-                              matchOfTheDay.awayTeamId
-                            )}
-                          />
-                        </div>
-                      );
-                    })()
-                  : null}
+          {/* TOPP-FÄLTET, LÄGESMEDVETET (Bit 3c, Daniels live-feedback):
+              - PÅGÅR en match (hasLive): LED med live-blocket (LiveNowSection) , det som
+                händer NU i fokus , och flytta nedräkningen till en SEPARAT, sekundär
+                "Nästa avspark"-pelare med mindre tyngd. Så en pågående match visas aldrig
+                som ett statiskt "dagens match"-kort, och "nu" vs "sen" är tydligt åtskilt.
+              - INGET pågår: behåll den vanliga arena-hero:n (nedräkning + dagens match)
+                helt oförändrad , den är bara ett problem när något faktiskt pågår. */}
+          {hasLive ? (
+            <Slide direction="up">
+              <div className="flex flex-col gap-4">
+                <LiveNowSection entries={liveFeed} />
+                <NextKickoffPillar countdown={countdown} teamsById={teamsById} />
               </div>
-            </div>
-          </Slide>
+            </Slide>
+          ) : (
+            // Hero: "Match of the day" + live-nedräkning, startskärmens hjärta.
+            // Konceptet är "arena i kvällsljus" (SPEC §7): en djup, mörk fond med
+            // ett pitch-grönt ljus som tänds ur hörnen, plus ett långsamt rörligt
+            // ljus-svep (aria-hidden, stannar vid reducerad rörelse). Nedräkningen
+            // pekar mot turneringens NÄSTA avspark (inte nödvändigtvis vald dag),
+            // hero-kortet mot den valda dagens framträdande match.
+            <Slide direction="up">
+              <div
+                data-daily-hero=""
+                data-day-theme={dayThemeProps['data-day-theme']}
+                data-day-theme-source={dayThemeProps['data-day-theme-source']}
+                className="vm-daily-hero relative isolate overflow-hidden rounded-card border border-border shadow-[var(--vm-shadow-raised)]"
+                // Dags-temats hue (--vm-day-hue) injiceras via seamen som en INLINE-
+                // OVERRIDE i style när dagen har lag. Hero-dekoren (radiella ljus +
+                // sheen) byggs i .vm-daily-hero (tokens.css §6) och tonas mot hue:n
+                // när data-day-theme='active'. --vm-day-hue har alltid en default i
+                // :root (tokens.css), så i default-läget saknas inte variabeln, det
+                // som saknas är den dynamiska inline-override:n: ingen ton-skiftning
+                // sker och dekoren faller på T2:s neutrala ton (default-grenen styrs
+                // av data-day-theme). Den dynamiska tonen lever BARA i background-image
+                // (dekor), aldrig i en text-/yt-token, så läsbarheten (WCAG AA) kan
+                // inte sänkas (kontrast-vakt).
+                style={dayThemeProps.style}
+              >
+                {/* Rörligt ljus-svep: ett brett, mjukt sken som långsamt drar över
+                    fonden (arena-strålkastare). Rent dekorativt, aria-hidden.
+                    vm-hero-sheen driver animationen (index.css, stannar vid reducerad
+                    rörelse); vm-daily-hero-sheen bär själva gradienten (tonas mot
+                    dagens hue i active-läget, tokens.css §6). */}
+                <div
+                  aria-hidden="true"
+                  className="vm-hero-sheen vm-daily-hero-sheen pointer-events-none absolute inset-0 -z-10 opacity-70"
+                />
+
+                <div className="flex flex-col gap-7 p-5 sm:p-7 lg:flex-row lg:items-stretch lg:gap-10 lg:p-8">
+                  {/* Vänster: nedräkningen, hero:ns drama. */}
+                  <div className="flex flex-col justify-center gap-3 lg:flex-1">
+                    <p className="flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                      Nedräkning till avspark
+                    </p>
+                    <Countdown countdown={countdown} teamsById={teamsById} />
+                  </div>
+
+                  {matchOfTheDay
+                    ? (() => {
+                        // EN etikett, DELAD av hero-rubriken OCH kortets highlight-chip,
+                        // så de aldrig säger olika saker (datum ovanför men "Dagens match"
+                        // i chippet). "Dagens match" bara när matchen spelas IDAG; annars
+                        // matchens dag ("TORSDAG 11 JUNI", versaliserat av uppercase-
+                        // klassen), så etiketten aldrig ljuger när turneringen ligger
+                        // dagar bort (#54, fynd 3 + C3).
+                        const heroLabel = featuredMatchLabel(matchOfTheDay, todayKey);
+                        return (
+                          <div className="flex flex-col gap-2 lg:max-w-sm lg:flex-1">
+                            <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-fg-muted">
+                              {heroLabel}
+                            </p>
+                            <MatchCard
+                              match={matchOfTheDay}
+                              teamsById={teamsById}
+                              highlight
+                              highlightLabel={heroLabel}
+                              favorite={matchHasFavorite(
+                                favoriteTeamId,
+                                matchOfTheDay.homeTeamId,
+                                matchOfTheDay.awayTeamId
+                              )}
+                            />
+                          </div>
+                        );
+                      })()
+                    : null}
+                </div>
+              </div>
+            </Slide>
+          )}
 
           {/* Datumnavigering: föregående/nästa speldag + dagens rubrik. Riktiga
               <button>:ar med disabled vid kant (a11y/tangentbord). Rubriken är
@@ -407,6 +487,7 @@ export function DailyMatchesView() {
                     <MatchCard
                       match={match}
                       teamsById={teamsById}
+                      liveData={liveByMatchId.get(match.id) ?? null}
                       footer={
                         <>
                           <MatchReactions matchId={match.id} />

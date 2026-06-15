@@ -26,6 +26,9 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import type { Match, Team } from '../../domain/types';
+import type { LiveData } from '../../data/livescore';
+import { resolveApiTeamId } from '../../data/livescore';
+import { LiveMatchCard } from './LiveMatchCard';
 import { formatKickoffTime } from './format-datetime';
 import {
   formatFifaRanking,
@@ -77,6 +80,17 @@ export interface MatchCardProps {
    * design-frontend finputsar den visuella markeringen ovanpå data-favorite-haken.
    */
   favorite?: boolean;
+  /**
+   * Persisterad live-data för matchen (Bit 3b), eller null/undefined när ingen finns.
+   * När den finns BERIKAS kortet med ett livekort (live-minut/status + ställning +
+   * målskyttar/kort/byten + utfällbar statistik/laguppställning). Saknas den ser kortet
+   * ut precis som förr (faller tillbaka, bryter inte befintliga kort). Visas för BÅDE
+   * en pågående OCH en avslutad (frusen, bläddringsbar) match , överallt där det finns
+   * live-data. Default undefined = inget livekort (hero, enhetstester).
+   */
+  liveData?: LiveData | null;
+  /** Nuet (epoch-ms), vidarebefordras till livekortets klocka (test-injicerbart). */
+  now?: number;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -177,6 +191,8 @@ export function MatchCard({
   highlightLabel = 'Dagens match',
   footer = null,
   favorite = false,
+  liveData = null,
+  now,
 }: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
@@ -412,6 +428,22 @@ export function MatchCard({
           </div>
         ) : null}
       </dl>
+
+      {/* LIVEKORTET (Bit 3b): berikar kortet när det finns live-data för matchen. För
+          en pågående match: live-minut/status + ställning + skyttar/kort/byten + (utfällt)
+          statistik/laguppställning. För en avslutad (frusen) match: slutställning + skyttar
+          + utfällt statistik. Saknas live-data renderas inget (kortet ser ut som förr).
+          homeApiId härleds ur appens hemmalag via bryggan (källhänvisad, inte gissad) så
+          live-panelen vet vilken SIDA varje event/kolumn hör till. */}
+      {liveData ? (
+        <LiveMatchCard
+          data={liveData}
+          homeName={home}
+          awayName={away}
+          homeApiId={match.homeTeamId !== null ? resolveApiTeamId(match.homeTeamId) : null}
+          now={now}
+        />
+      ) : null}
 
       {/* Valfri fotrad (T24, #24): reaktions-raden injiceras här av dagens-vyn. En ren
           slot, så kortet är orört utan den (hero, tester). */}

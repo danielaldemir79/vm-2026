@@ -8,7 +8,11 @@ import prettier from 'eslint-config-prettier';
 // ESLint flat config. eslint-config-prettier sist så att den stänger av
 // formaterings-regler som annars krockar med Prettier (Prettier äger formatet).
 export default tseslint.config(
-  { ignores: ['dist', 'dev-dist', 'coverage'] },
+  // supabase/functions är Deno-kod (npm:/jsr:-importer, Deno-globaler), en egen
+  // runtime som deployas separat och INTE typas/lintas av app-grafen. De rena,
+  // testbara bitarna bor i src/data/livescore/. Lintad här skulle Deno-importerna
+  // + Deno.* flaggas falskt av browser/tseslint-konfigen.
+  { ignores: ['dist', 'dev-dist', 'coverage', 'supabase/functions'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

@@ -15,3 +15,10 @@ package-lock.json
 # får aldrig röra den: minsta omformatering skulle bryta troheten mot PDF:en.
 src/domain/bracket/annexe-c-source.txt
 
+# Livescore-feature: de fångade API-Football-svaren är test-guld, committade
+# OFÖRÄNDRADE I FORM (exakt som API:t levererade dem, en rad per svar). Prettier
+# får inte röra dem: parsern (parse-live.ts) bevisas mot den FAKTISKA käll-formen,
+# och en omformatering skulle dölja just det vi vill låsa (samma princip som
+# gold-source-utdraget ovan).
+src/data/livescore/__fixtures__/*.json
+

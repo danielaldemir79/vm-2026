@@ -33,6 +33,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      // T80 (#180): privat server-config (API-Football-nyckel m.m.). RLS deny-all
+      // för anon/authenticated, bara service_role/pollaren når raderna. Nyckel-
+      // VÄRDENA committas aldrig, dirigenten inserterar dem vid deploy.
+      app_config: {
+        Row: {
+          key: string;
+          updated_at: string;
+          value: string;
+        };
+        Insert: {
+          key: string;
+          updated_at?: string;
+          value: string;
+        };
+        Update: {
+          key?: string;
+          updated_at?: string;
+          value?: string;
+        };
+        Relationships: [];
+      };
       // T16 (#16): bracket-/slutspels-tips (vem går vidare per slot + VM-vinnaren).
       bracket_predictions: {
         Row: {
@@ -68,6 +89,27 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      // T80 (#180): api_fixture_id -> appens match_id. Pollaren slår upp den för
+      // att mappa en API-fixture till rätt appmatch (gissar aldrig). Bara
+      // service_role rör den (RLS deny-all för klienten).
+      fixture_match_map: {
+        Row: {
+          api_fixture_id: number;
+          created_at: string;
+          match_id: string;
+        };
+        Insert: {
+          api_fixture_id: number;
+          created_at?: string;
+          match_id: string;
+        };
+        Update: {
+          api_fixture_id?: number;
+          created_at?: string;
+          match_id?: string;
+        };
+        Relationships: [];
       };
       // T16 (#16): gruppvinnar-tips (gissad 1:a + 2:a per grupp/rum/användare).
       group_predictions: {
@@ -124,6 +166,56 @@ export type Database = {
         };
         Relationships: [];
       };
+      // T80 (#180): persisterad live-data per match (livescore Bit 2). RÅA API-
+      // Football-blobbar i jsonb (parsas av klienten med Bit 1) + extraherade
+      // fält pollaren behöver. SELECT öppen (publik live-data), skriv bara
+      // pollaren via service_role (ingen skriv-policy => default-deny för klienten).
+      // frozen=true vid FT (bevarad snapshot, bläddringsbar dagar tillbaka).
+      match_live_data: {
+        Row: {
+          api_fixture_id: number | null;
+          away_goals: number | null;
+          elapsed_minute: number | null;
+          events: Json | null;
+          frozen: boolean;
+          home_goals: number | null;
+          last_synced_at: string | null;
+          lineups: Json | null;
+          match_id: string;
+          statistics: Json | null;
+          status: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          api_fixture_id?: number | null;
+          away_goals?: number | null;
+          elapsed_minute?: number | null;
+          events?: Json | null;
+          frozen?: boolean;
+          home_goals?: number | null;
+          last_synced_at?: string | null;
+          lineups?: Json | null;
+          match_id: string;
+          statistics?: Json | null;
+          status?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          api_fixture_id?: number | null;
+          away_goals?: number | null;
+          elapsed_minute?: number | null;
+          events?: Json | null;
+          frozen?: boolean;
+          home_goals?: number | null;
+          last_synced_at?: string | null;
+          lineups?: Json | null;
+          match_id?: string;
+          statistics?: Json | null;
+          status?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       // T42 (#72): GLOBALA officiella matchresultat (facit). INGEN room_id, gäller
       // alla rum/användare. Skriv bara admin (RLS is_app_admin), SELECT öppen.
       official_match_results: {
@@ -133,6 +225,10 @@ export type Database = {
           match_id: string;
           penalties_away: number | null;
           penalties_home: number | null;
+          // T80 (#180): 'manual' (admin matade in) | 'auto' (auto-facit ur live-
+          // data). Default 'manual' (skyddar redan inmatade rader). Auto skriver
+          // ALDRIG över en manuell rad (apply_auto_facit-låset).
+          source: string;
           status: string;
           updated_at: string;
           updated_by: string;
@@ -143,6 +239,7 @@ export type Database = {
           match_id: string;
           penalties_away?: number | null;
           penalties_home?: number | null;
+          source?: string;
           status: string;
           updated_at?: string;
           updated_by: string;
@@ -153,9 +250,31 @@ export type Database = {
           match_id?: string;
           penalties_away?: number | null;
           penalties_home?: number | null;
+          source?: string;
           status?: string;
           updated_at?: string;
           updated_by?: string;
+        };
+        Relationships: [];
+      };
+      // T80 (#180): pollarens dagliga API-anrops-räknare (budget-gaten läser
+      // calls = "callsUsedToday"). En rad per svensk kalenderdag. Bara
+      // service_role rör den (RLS deny-all för klienten).
+      poll_log: {
+        Row: {
+          calls: number;
+          day: string;
+          updated_at: string;
+        };
+        Insert: {
+          calls?: number;
+          day: string;
+          updated_at?: string;
+        };
+        Update: {
+          calls?: number;
+          day?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -409,6 +528,22 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      // T80 (#180): skriv ett AUTO-härlett facit MEN respektera det manuella
+      // låset (uppdaterar bara om befintlig rad är source='auto', skapar om ingen
+      // finns, rör ALDRIG en manuell rad). SECURITY DEFINER, EXECUTE bara
+      // service_role (pollaren), inte anon/authenticated. Returnerar void.
+      apply_auto_facit: {
+        Args: {
+          p_match_id: string;
+          p_home_goals: number;
+          p_away_goals: number;
+          p_status: string;
+          p_penalties_home: number | null;
+          p_penalties_away: number | null;
+          p_updated_by: string;
+        };
+        Returns: undefined;
+      };
       // T45 (#76): admin-statistik, AVSLÖJADE tips ÖVER ALLA rum (gatad på
       // is_app_admin i RPC:n; icke-admin får tom mängd). Returnerar BARA tips vars
       // deadline passerat (now() >= deadline, samma gräns som RLS own_or_after_kickoff),
