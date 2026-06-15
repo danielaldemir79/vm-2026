@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { useResultsStore } from '../results/results-context';
-import { initialDayIndex, useDailyMatches } from './use-daily-matches';
+import { followDayIndex, initialDayIndex, useDailyMatches } from './use-daily-matches';
 import { groupMatchesByDay, type MatchDay } from './group-matches-by-day';
 import type { Match } from '../../domain/types';
 
@@ -35,6 +35,11 @@ function sched(id: string, kickoff: string): Match {
 /** Som sched men FÄRDIGSPELAD (bär ett resultat), för fokus-flytt-testerna (T57). */
 function finishedMatch(id: string, kickoff: string): Match {
   return { ...sched(id, kickoff), status: 'finished', result: { homeGoals: 1, awayGoals: 0 } };
+}
+
+/** Som sched men PÅGÅENDE (live, inget resultat än), för rollover-testerna (T93). */
+function liveMatch(id: string, kickoff: string): Match {
+  return { ...sched(id, kickoff), status: 'live', result: null };
 }
 
 /**
@@ -94,6 +99,113 @@ describe('initialDayIndex, startdag = idag eller närmast kommande speldag', () 
     const days = spanWithRestDay(); // 2026-06-11, -12 (vilodag), -13
     expect(days[1].matches).toEqual([]); // bekräfta att index 1 verkligen är vilodagen
     expect(initialDayIndex(days, new Date('2026-06-12T08:00:00.000Z'))).toBe(1);
+  });
+});
+
+describe('followDayIndex, rollover när dagens sista match är slut (T93, #186)', () => {
+  // T93 (Daniels live-bugg ~2026-06-15 23:07): "dagens match"/hero stod kvar på en
+  // FÄRDIGSPELAD match medan nedräkningen redan pekade på nästa kommande avspark, som
+  // tillhör NÄSTA svenska kalenderdag (en match med svensk avspark 00:00 ligger på
+  // dagen EFTER i Europe/Stockholm). Den auto-valda dagen var rent kalender-baserad
+  // (initialDayIndex) och rullade bara vid kalender-midnatt. followDayIndex lägger
+  // Daniels regel ovanpå: är HELA dagens speldag färdigspelad, blicka mot dagen för
+  // nästa KOMMANDE match (samma sanning som nedräkningen, computeCountdown).
+
+  // Daniels exakta scenario, datum ur fixtures (matches.ts): civ-ecu spelas svensk
+  // 15 juni 01:00 (kickoff 06-14T23:00Z), ksa-uru svensk 16 juni 00:00 (kickoff
+  // 06-15T22:00Z). Kvällen 15 juni är alla 15-junimatcher klara, men nästa avspark
+  // (ksa-uru) ligger på svenska dagen 16 juni.
+  function midnightSeamSpan(): {
+    days: MatchDay[];
+    matches: Match[];
+  } {
+    const matches: Match[] = [
+      // 15 juni (svensk): färdigspelade när "nu" är kväll.
+      finishedMatch('civ-ecu', '2026-06-14T23:00:00.000Z'), // svensk 15 juni 01:00
+      finishedMatch('esp-cpv', '2026-06-15T16:00:00.000Z'), // svensk 15 juni 18:00
+      finishedMatch('bel-egy', '2026-06-15T19:00:00.000Z'), // svensk 15 juni 21:00
+      // 16 juni (svensk): nästa kommande avspark, avspark exakt svensk midnatt.
+      sched('ksa-uru', '2026-06-15T22:00:00.000Z'), // svensk 16 juni 00:00
+    ];
+    return { days: groupMatchesByDay(matches), matches };
+  }
+
+  it('Daniels scenario: kvällen efter dagens sista match rullar till nästa matchdag (ej kvar på gårdagskänslan)', () => {
+    const { days, matches } = midnightSeamSpan();
+    // Bekräfta att fällan finns i datan: ksa-uru tillhör en SENARE svensk dag.
+    expect(days.map((d) => d.dateKey)).toEqual(['2026-06-15', '2026-06-16']);
+    // "Nu" = 2026-06-15 23:07 svensk (21:07Z), exakt Daniels skärmdumps-läge.
+    const now = new Date('2026-06-15T21:07:00.000Z');
+    // Rent kalender-val (gammalt beteende) hade stannat på index 0 (15 juni) ...
+    expect(initialDayIndex(days, now)).toBe(0);
+    // ... men followDayIndex blickar mot nästa matchdag (16 juni), där nästa avspark är.
+    expect(followDayIndex(days, matches, now)).toBe(1);
+  });
+
+  it('stannar på idag medan dagens match fortfarande är OSPELAD (kommande eller live)', () => {
+    // En av dagens matcher är fortfarande ospelad (live): stå kvar på idag. days och
+    // matches härleds ur SAMMA källa så dagens bucket speglar den live-matchen.
+    const matches: Match[] = [
+      finishedMatch('civ-ecu', '2026-06-14T23:00:00.000Z'),
+      finishedMatch('esp-cpv', '2026-06-15T16:00:00.000Z'),
+      liveMatch('bel-egy', '2026-06-15T19:00:00.000Z'), // pågår nu
+      sched('ksa-uru', '2026-06-15T22:00:00.000Z'),
+    ];
+    const days = groupMatchesByDay(matches);
+    const now = new Date('2026-06-15T19:30:00.000Z'); // bel-egy pågår (svensk 21:30)
+    expect(followDayIndex(days, matches, now)).toBe(0); // 15 juni, en match lever än
+  });
+
+  it('mellan dagar utan kvarvarande match idag rullar till nästa kommande matchs dag', () => {
+    // Tre speldagar, idag (mitten) helt färdigspelad, nästa avspark är dag 3.
+    const matches: Match[] = [
+      finishedMatch('d1', '2026-06-11T17:00:00.000Z'),
+      finishedMatch('d2', '2026-06-12T17:00:00.000Z'), // idag, färdig
+      sched('d3', '2026-06-13T17:00:00.000Z'), // nästa kommande
+    ];
+    const days = groupMatchesByDay(matches);
+    const now = new Date('2026-06-12T20:00:00.000Z'); // efter d2:s avspark, svensk 12 juni 22:00
+    expect(initialDayIndex(days, now)).toBe(1); // kalender-idag = 12 juni
+    expect(followDayIndex(days, matches, now)).toBe(2); // rullar till 13 juni
+  });
+
+  it('SISTA speldagen: efter turneringens sista match finns ingen kommande, stanna på sista dagen', () => {
+    const matches: Match[] = [
+      finishedMatch('d1', '2026-06-11T17:00:00.000Z'),
+      finishedMatch('final', '2026-06-12T17:00:00.000Z'), // sista matchen, spelad
+    ];
+    const days = groupMatchesByDay(matches);
+    const now = new Date('2026-06-12T20:00:00.000Z'); // efter finalen
+    // Ingen kommande match -> faller tillbaka på sista dagen (oförändrat sluttillstånd).
+    expect(followDayIndex(days, matches, now)).toBe(days.length - 1);
+  });
+
+  it('en VILODAG som idag rullar INTE (inga matcher idag = ingen "sista match" att passera, C7 bevarad)', () => {
+    // Spann: 06-11 (spel), 06-12 (vilodag), 06-13 (spel). "Idag" = vilodagen 06-12.
+    // Daniels regel gäller "när dagens sista match är slut"; en vilodag har ingen
+    // match idag, så C7:s dokumenterade vilodags-beteende behålls (stå kvar, visa
+    // vilodags-panelen) i stället för att tyst rulla förbi den.
+    const days = spanWithRestDay();
+    const matches: Match[] = [
+      sched('p1', '2026-06-11T17:00:00.000Z'),
+      sched('p2', '2026-06-13T17:00:00.000Z'),
+    ];
+    const now = new Date('2026-06-12T08:00:00.000Z'); // vilodagen
+    expect(followDayIndex(days, matches, now)).toBe(1); // kvar på vilodagen (= initialDayIndex)
+  });
+
+  it('FÖRE turneringen pekar fortfarande mot premiären (oförändrat)', () => {
+    const matches: Match[] = [
+      sched('d1', '2026-06-11T17:00:00.000Z'),
+      sched('d2', '2026-06-12T17:00:00.000Z'),
+    ];
+    const days = groupMatchesByDay(matches);
+    const now = new Date('2026-06-09T08:00:00.000Z'); // före 11 juni
+    expect(followDayIndex(days, matches, now)).toBe(0); // premiären
+  });
+
+  it('tom dag-lista ger -1 (ingen krasch)', () => {
+    expect(followDayIndex([], [], new Date('2026-06-12T08:00:00.000Z'))).toBe(-1);
   });
 });
 
@@ -403,5 +515,38 @@ describe('useDailyMatches, dag-bläddraren auto-flyttar till AKTUELL dag vid mid
     // Ge eventuell omräkning en chans att slå igenom, bekräfta sedan oförändrat.
     await waitFor(() => expect(result.current.daily.status).toBe('ready'));
     expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-13');
+  });
+});
+
+describe('useDailyMatches, hero rullar till nästa matchdag när dagens sista match är slut (T93, #186)', () => {
+  it('vald dag + matchOfTheDay blickar mot nästa KOMMANDE match, aldrig en spelad gårdagsmatch', async () => {
+    // Daniels scenario END-TO-END genom hooken: kvällen 15 juni (svensk 23:07), alla
+    // 15-junimatcher färdigspelade, nästa avspark (ksa-uru) ligger på svenska 16 juni
+    // (avspark exakt svensk midnatt, kickoff 06-15T22:00Z). Vyn ska rulla till 16 juni
+    // OCH peka på ksa-uru, inte stå kvar på den spelade civ-ecu (Daniels rapport).
+    const now = new Date('2026-06-15T21:07:00.000Z');
+    const { result } = renderHook(() => useDailyWithStore(now), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+
+    act(() =>
+      result.current.setMatches([
+        finishedMatch('civ-ecu', '2026-06-14T23:00:00.000Z'), // svensk 15 juni 01:00, spelad
+        finishedMatch('esp-cpv', '2026-06-15T16:00:00.000Z'), // svensk 15 juni 18:00, spelad
+        finishedMatch('bel-egy', '2026-06-15T19:00:00.000Z'), // svensk 15 juni 21:00, spelad
+        sched('ksa-uru', '2026-06-15T22:00:00.000Z'), // svensk 16 juni 00:00, kommande
+      ])
+    );
+
+    // Den valda dagen rullar till nästa matchdag (16 juni) och hero pekar på ksa-uru,
+    // konsekvent med nedräkningen (samma nästa-kommande-sanning, computeCountdown).
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-16'));
+    expect(result.current.daily.matchOfTheDay?.id).toBe('ksa-uru');
+    expect(result.current.daily.countdown.kind).toBe('upcoming');
+    if (result.current.daily.countdown.kind === 'upcoming') {
+      // EN sanning: hero-dagens match === nedräkningens nästa avspark.
+      expect(result.current.daily.countdown.match.id).toBe('ksa-uru');
+    }
   });
 });

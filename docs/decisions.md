@@ -91,7 +91,36 @@ en tunn IO-wrapper, samma recept som resten av grafen) som verifierar hämtat an
 (`select-all-pages.test.ts`), negativ-kontrollerat (completeness-vakten borttagen -> testet rödnar).
 Mirror-paritetsfixturen stärktes också med en deltagare som scorar OLIKA i två rum (u4: 1p/3p) så
 best-room-**selektionen** diskrimineras (negativ-kontroll: selektions-drift -> u4-assertionen rödnar).
+## 2026-06-16 , T93 (#186): Idag-vyn rullar till nästa matchdag när dagens sista match är slut (rollover)
 
+**Beslut:** Den auto-valda ("följ verklig dag") dagen i Idag-vyn väljs nu av `followDayIndex`
+(use-daily-matches.ts), inte enbart `initialDayIndex`. Regeln ovanpå kalender-valet: är HELA den
+kalendervalda dagens speldag FÄRDIGSPELAD (`status === 'finished'` för varje match den dagen) rullar
+vyn fram till dagen som rymmer NÄSTA KOMMANDE match. "Nästa kommande" hämtas ur EXAKT samma logik som
+hero:ns nedräkning (`computeCountdown`), så dagvalet och nedräkningen är EN sanning och inte kan
+divergera. Vald dag (datum-rad + hero + matchlista) rullar tillsammans.
+
+**Källa till regeln (domän, källhänvisad):** "nästa svenska kalenderdag" är inte en gissning utan en
+följd av tidszonen. En match med svensk avspark 00:00 (t.ex. Saudiarabien-Uruguay, kickoff
+`2026-06-15T22:00:00.000Z`) tillhör den svenska kalenderdagen 16 juni i Europe/Stockholm (sommartid
+UTC+2), inte UTC-dygnet 15 juni , samma off-by-one-skydd som `localDateKey`/`groupMatchesByDay` redan
+bär. Verifierad empiriskt mot fixtures-schemat (`src/data/wc2026/matches.ts`): civ-ecu spelas svensk
+15 juni 01:00, ksa-uru svensk 16 juni 00:00. Daniels skärmdump (~2026-06-15 23:07) bekräftar
+beteendet: nedräkningen pekade rätt (ksa-uru) men hero stod kvar på den spelade civ-ecu.
+
+**Varför:** asymmetri , nedräkningen (`computeCountdown`, tick-driven över ALLA matcher) rullade
+korrekt vid dygnsgränsen, men dagvalet var rent kalender-baserat och rullade bara vid kalender-midnatt.
+Sent på kvällen, när dagens matcher var slut men nästa avspark redan låg på nästa svenska dag, föll
+`selectMatchOfTheDay` tillbaka på dagens tidigaste (spelade) match. Genom att låta dagvalet anka på
+samma nästa-avspark-sanning som nedräkningen försvinner asymmetrin.
+
+**Bevarat (rör inte det som inte är trasigt):** dagens speldag har ännu en OSPELAD match (kommande
+eller live) -> stå kvar på idag; idag är en VILODAG (inga matcher) -> C7:s vilodags-val behålls
+(rollover gäller "när dagens sista match är slut", en vilodag har ingen sådan); före turneringen ->
+premiären; efter sista matchen (ingen kommande) -> sista dagen. Tester (use-daily-matches.test.tsx):
+Daniels exakta scenario (enhet + hook end-to-end), live-match-idag, mellan-dagar, sista speldagen,
+vilodag, före turneringen, tom lista. Negativ-kontroll: rollover avstängd -> exakt de 3
+rollover-asserterande testerna blir röda. Spårbart: #186 + denna rad + `followDayIndex`.
 ## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
 
 Faserna 0-3 är levererade och appen är live. Ägaren godkände ett v2-bygge (SPEC §13). Det
