@@ -280,8 +280,10 @@ describe('LiveMatchCard, SPEGLAT förlopp (hemma vänster | borta höger)', () =
     const assist = awayGoal?.querySelector('[data-live-goal-assist]') as HTMLElement | null;
     expect(assist).not.toBeNull();
     expect(assist?.textContent).toMatch(/assist: Kubo/);
-    // Borta-assisten ligger i höger kolumn (col-start-3) + vänster-ställd, spegel-rätt.
-    expect(assist?.className).toContain('col-start-3');
+    // Finlinjering: assisten ligger i samma text-block som skytten, INNE i borta-cellen
+    // (höger), så den linjerar exakt under namnet på samma sida (ingen egen grid längre).
+    expect(awayGoal?.querySelector('[data-live-event-cell="away"]')?.contains(assist!)).toBe(true);
+    expect(awayGoal?.querySelector('[data-live-event-cell="home"]')).toBeNull();
   });
 
   it('minuten står i en central spine, tydlig per rad', () => {
@@ -508,5 +510,101 @@ describe('LiveMatchCard, hemma/borta-paring i utfällt läge', () => {
     // Hemma-värdet (vänster) ska vara hemmalagets 60%, inte borta-blockets 40%.
     expect(possRow?.querySelector('[data-live-stat-home]')?.textContent).toBe('60%');
     expect(possRow?.querySelector('[data-live-stat-away]')?.textContent).toBe('40%');
+  });
+});
+
+describe('LiveMatchCard, finlinjerat förlopp (namn-block, ellipsis, centrerad knapp)', () => {
+  it('hemma-blocket: namnet är höger-ställt mot mitten, ikonen INNERST (vid spinen)', () => {
+    // Geometri-kontrakt för hemma-sidan: cellen trycker blocket mot mitten (justify-end)
+    // och höger-ställer texten (text-right), så namnet ligger tätt intill den centrala
+    // minut-spinen och text-blockets inre kant bildar en ren vertikal linje.
+    renderCard({ events: [goalEvent({ teamApiId: HOME, playerName: 'Memphis', minute: 23 })] });
+    const homeCell = screen
+      .getByRole('region')
+      .querySelector('[data-live-goal-side="home"] [data-live-event-cell="home"]') as HTMLElement;
+    expect(homeCell).not.toBeNull();
+    expect(homeCell.className).toContain('justify-end');
+    expect(homeCell.className).toContain('text-right');
+  });
+
+  it('borta-blocket: namnet är vänster-ställt mot mitten, ikonen INNERST (vid spinen)', () => {
+    renderCard({ events: [goalEvent({ teamApiId: AWAY, playerName: 'Mitoma', minute: 55 })] });
+    const awayCell = screen
+      .getByRole('region')
+      .querySelector('[data-live-goal-side="away"] [data-live-event-cell="away"]') as HTMLElement;
+    expect(awayCell).not.toBeNull();
+    expect(awayCell.className).toContain('justify-start');
+    expect(awayCell.className).toContain('text-left');
+  });
+
+  it('långt namn ("Memphis Depay") kapas med ellipsis (truncate), radbryter inte', () => {
+    renderCard({
+      events: [goalEvent({ teamApiId: HOME, playerName: 'Memphis Depay', minute: 23 })],
+    });
+    const name = screen.getByText('Memphis Depay');
+    // truncate = whitespace-nowrap + overflow-hidden + text-ellipsis (en ren rad, ingen
+    // rörig radbrytning), så radhöjden hålls konsekvent oavsett namnlängd.
+    expect(name.className).toContain('truncate');
+  });
+
+  it('assist-underraden kapas också med ellipsis (konsekvent radhöjd)', () => {
+    renderCard({
+      events: [
+        goalEvent({ teamApiId: HOME, playerName: 'Memphis', assistName: 'Frenkie de Jong' }),
+      ],
+    });
+    const assist = screen.getByText(/assist: Frenkie de Jong/);
+    expect(assist.className).toContain('truncate');
+  });
+
+  it('kort-spelarnamn kapas med ellipsis (samma radstruktur som mål)', () => {
+    renderCard({
+      events: [
+        goalEvent({
+          kind: 'card',
+          rawType: 'Card',
+          detail: 'Yellow Card',
+          cardColor: 'yellow',
+          minute: 40,
+          playerName: 'Nathan Aké',
+        }),
+      ],
+    });
+    const name = screen.getByText('Nathan Aké');
+    expect(name.className).toContain('truncate');
+  });
+
+  it('"Visa mer"-knappen är centrerad horisontellt (wrappern har justify-center)', () => {
+    renderCard();
+    const toggle = screen.getByRole('button', { name: /Visa mer/i });
+    // Knappens direkta wrapper ska centrera den (flex justify-center), inte vänster-ställa.
+    const wrapper = toggle.parentElement as HTMLElement;
+    expect(wrapper.className).toContain('justify-center');
+  });
+
+  it('byten ärver samma speglade radstruktur (ikon innerst, namn-block, ellipsis-rader)', () => {
+    renderCard({
+      events: [
+        goalEvent({
+          kind: 'subst',
+          rawType: 'subst',
+          detail: 'Substitution 1',
+          minute: 60,
+          teamApiId: AWAY,
+          playerName: 'Takefusa Kubo',
+          assistName: 'Kaoru Mitoma',
+        }),
+      ],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Visa mer/i }));
+    const sub = screen.getByText(/Takefusa Kubo/).closest('[data-live-sub]') as HTMLElement;
+    expect(sub).not.toBeNull();
+    // Borta-bytet ligger i höger cell (samma MirroredEventRow-geometri som mål/kort).
+    const awayCell = sub.querySelector('[data-live-event-cell="away"]') as HTMLElement;
+    expect(awayCell).not.toBeNull();
+    expect(awayCell.className).toContain('justify-start');
+    // Både in- och ut-raden kapas med ellipsis (konsekvent radhöjd).
+    expect(sub.querySelector('[data-live-sub-in]')?.className).toContain('truncate');
+    expect(sub.querySelector('[data-live-sub-out]')?.className).toContain('truncate');
   });
 });
