@@ -1,34 +1,37 @@
-// Provider för den TOTALA (cross-rum) topplistan (T82 del 3, #173).
+// Provider för den GLOBALA (cross-rum) topplistan (T82 del 3, #173; RÄTTVIS + helt global
+// server-side i T90, #183).
 //
-// MILJÖ-GATAD (fixtures-först, lessons + decisions.md T82 del 3):
+// MILJÖ-GATAD (fixtures-först, lessons + decisions.md T82 del 3 / T90):
 //   * DEMO/fixtures-läge (Supabase ej konfigurerat): bygg RoomContribution[] ur den
-//     deterministiska demo-fixturuppsättningen (botar, demo-total-fixtures) så totalen
-//     ser FYLLD ut direkt (~240 deltagare). currentUserId = demo-spelaren.
-//   * LIVE-läge (Supabase konfigurerat + LIVE_READY): hämta per-rums-tips för ALLA
-//     myRooms (loadRoomContributions) och bygg samma RoomContribution[]. currentUserId
-//     = rooms.userId.
-// Samma aggregering (buildTotalLeaderboard) + samma RoomContribution-form i BÅDA lägen,
-// så live tänds utan aggregerings-ändring (en sanning).
+//     deterministiska demo-fixturuppsättningen (botar, demo-total-fixtures) och kör den
+//     RÄTTVISA aggregeringen (buildTotalLeaderboard, bästa rum) lokalt. ~240 deltagare.
+//     currentUserId = demo-spelaren.
+//   * LIVE-läge (Supabase konfigurerat + LIVE_READY): anropa edge-funktionen
+//     (loadGlobalLeaderboard) som server-side poängsätter ALLA rum med SAMMA TS-motor och
+//     returnerar de färdiga, RÄTTVISA, säkra raderna (visningsnamn/poäng/rank/exakt , inga
+//     råa tips). currentUserId = rooms.userId.
+//
+// VARFÖR EDGE-FUNKTION I LIVE (T90, ägarens fusk-/privacy-fix): den gamla vägen laddade
+// bara den inloggades EGNA rum (loadRoomContributions(myRooms)) -> "Global" visade ~54 av
+// 200+, OCH summerade poäng över rum (fler rum = fusk). Den nya vägen rangordnar ALLA i
+// ALLA rum, RÄTTVIST (bästa rum per deltagare), server-side så ingens tips läcker. Demo +
+// live delar EXAKT samma rättvise-regel (buildTotalLeaderboard / buildGlobalLeaderboard kör
+// samma aggregering), bevisat med paritets-/ekvivalens-test.
 //
 // EGEN PROVIDER (inte en utökning av T17:s LeaderboardProvider): per-rums-vyn laddar
 // bara det AKTIVA rummet; totalen behöver ALLA rum. En egen provider håller T17 orörd.
-//
-// FACIT-KÄLLAN: det DELADE, globala facit (useLeaderboardData -> derivePoolFacit), exakt
-// som per-rums-topplistan. En sanning för facit över alla rum/vyer.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
 import { isSupabaseConfigured, LIVE_READY } from '../../data';
+import { loadGlobalLeaderboard } from '../../data/global-leaderboard';
 import { useRoomsStore } from '../rooms';
-import { useLeaderboardData } from '../leaderboard/use-leaderboard-data';
-import { derivePoolFacit, type PoolFacit } from '../leaderboard';
 import {
   buildTotalLeaderboard,
   deriveTotalSelfSummary,
-  type RoomContribution,
+  type TotalLeaderboardEntry,
 } from './aggregate-total';
 import { buildDemoTotalContributions } from './demo-total-fixtures';
-import { loadRoomContributions } from './load-room-contributions';
 import {
   TotalLeaderboardStoreContext,
   type TotalLeaderboardStatus,
@@ -45,8 +48,8 @@ export interface TotalLeaderboardProviderProps {
   client?: VmSupabaseClient;
 }
 
-/** Status för den LIVE-hämtade rums-bidrags-listan (vävs med facit-statusen nedan). */
-type ContributionsStatus = 'idle' | 'loading' | 'ready' | 'error';
+/** Status för den LIVE-hämtade globala listan (edge-funktionssvaret). */
+type LiveStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export function TotalLeaderboardProvider({
   children,
@@ -55,18 +58,18 @@ export function TotalLeaderboardProvider({
   client,
 }: TotalLeaderboardProviderProps) {
   const rooms = useRoomsStore();
-  const data = useLeaderboardData(env);
   const liveConfigured = isSupabaseConfigured(env) && liveReady;
 
-  // DEMO-bidragen byggs EN gång (deterministiskt, tungt nog att inte vilja upprepa varje
-  // render). Bara i demo-läge; i live-läge är de oanvända. useMemo med tom dep = stabil.
+  // DEMO: bygg den RÄTTVISA totalen lokalt ur fixtures (deterministiskt, EN gång). Bara i
+  // demo-läge; i live-läge är den oanvänd. useMemo med tom dep = stabil.
   const demo = useMemo(() => buildDemoTotalContributions(), []);
+  const demoTotal = useMemo(() => buildTotalLeaderboard(demo.rooms, demo.facit), [demo]);
 
-  // LIVE: hämta alla myRooms bidrag. EPOCH-vakt (samma mönster som T17): en ändrad
-  // rumslista får aldrig låta ett föråldrat svar visa fel total.
-  const [liveContributions, setLiveContributions] = useState<RoomContribution[]>([]);
-  const [contributionsStatus, setContributionsStatus] = useState<ContributionsStatus>('idle');
-  const [contributionsError, setContributionsError] = useState<string | null>(null);
+  // LIVE: den server-byggda, rättvisa, säkra listan (edge-funktionen). EPOCH-vakt (samma
+  // mönster som T17): ett föråldrat svar får aldrig visa fel lista.
+  const [liveTotal, setLiveTotal] = useState<TotalLeaderboardEntry[]>([]);
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('idle');
+  const [liveError, setLiveError] = useState<string | null>(null);
   const loadTokenRef = useRef(0);
 
   const supabase = useMemo<VmSupabaseClient | null>(() => {
@@ -79,8 +82,10 @@ export function TotalLeaderboardProvider({
     return getSupabaseClient(env);
   }, [client, liveConfigured, env]);
 
-  // Stabil nyckel för rumslistan (id:n), så effekten bara kör om när rummen FAKTISKT
-  // ändras, inte på varje ny array-referens.
+  // Stabil nyckel för rumslistan (id:n) , re-hämta den globala listan när den inloggades
+  // rum ändras (gick med / lämnade), så hens egen rad + "hoppa till mig" hålls aktuella.
+  // (Listan i sig är global och oberoende av VILKA rum man är med i, men en ny medlems-rad
+  // kan ha tillkommit, och vi vill att hjälten hittar rätt rad efter en join.)
   const roomIdsKey = rooms.myRooms.map((r) => r.id).join(',');
 
   useEffect(() => {
@@ -88,78 +93,50 @@ export function TotalLeaderboardProvider({
       return; // demo-läge: ingen live-hämtning
     }
     const token = ++loadTokenRef.current;
-    if (supabase === null || rooms.myRooms.length === 0) {
-      setLiveContributions([]);
-      setContributionsStatus('ready'); // tom total är ett giltigt läge (inga rum än)
-      setContributionsError(null);
+    if (supabase === null) {
+      setLiveTotal([]);
+      setLiveStatus('ready');
+      setLiveError(null);
       return;
     }
-    setContributionsStatus('loading');
-    setContributionsError(null);
-    loadRoomContributions(supabase, rooms.myRooms)
-      .then((contributions) => {
+    setLiveStatus('loading');
+    setLiveError(null);
+    loadGlobalLeaderboard(supabase)
+      .then((entries) => {
         if (token !== loadTokenRef.current) {
           return; // föråldrat svar, kasta tyst
         }
-        setLiveContributions(contributions);
-        setContributionsStatus('ready');
+        setLiveTotal(entries);
+        setLiveStatus('ready');
       })
       .catch((err: unknown) => {
         if (token !== loadTokenRef.current) {
           return;
         }
-        setContributionsError(
-          err instanceof Error ? err.message : 'Kunde inte ladda den totala topplistan.'
+        setLiveError(
+          err instanceof Error ? err.message : 'Kunde inte ladda den globala topplistan.'
         );
-        setContributionsStatus('error');
+        setLiveStatus('error');
       });
-    // roomIdsKey i deps: re-hämta när rumslistan ändras (gick med / lämnade ett rum).
-  }, [liveConfigured, supabase, roomIdsKey, rooms.myRooms]);
+    // roomIdsKey i deps: re-hämta när rumslistan ändras.
+  }, [liveConfigured, supabase, roomIdsKey]);
 
-  // Det DELADE facit (live väver in det globala officiella facit; demo använder demos
-  // egna facit). Live-vägen poängsätter alla rum mot SAMMA facit (en sanning).
-  const liveFacit: PoolFacit = useMemo(
-    () => derivePoolFacit(data.teams, data.groups, data.matches),
-    [data.teams, data.groups, data.matches]
-  );
-
-  // Välj källa: demo eller live. Bygg den totala topplistan + spelarens sammanfattning.
-  const { total, currentUserId } = useMemo(() => {
-    if (!liveConfigured) {
-      return {
-        total: buildTotalLeaderboard(demo.rooms, demo.facit),
-        currentUserId: demo.currentUserId,
-      };
-    }
-    return {
-      total: buildTotalLeaderboard(liveContributions, liveFacit),
-      currentUserId: rooms.userId,
-    };
-  }, [liveConfigured, demo, liveContributions, liveFacit, rooms.userId]);
+  // Välj källa: demo (lokalt byggd) eller live (server-byggd). I BÅDA fall är raderna samma
+  // form (userId/displayName/points/rank/exactHits) och bär den RÄTTVISA modellen.
+  const total: readonly TotalLeaderboardEntry[] = liveConfigured ? liveTotal : demoTotal;
+  const currentUserId = liveConfigured ? rooms.userId : demo.currentUserId;
 
   const selfSummary = useMemo(
     () => deriveTotalSelfSummary(total, currentUserId),
     [total, currentUserId]
   );
 
-  // VÄVD status. Demo: alltid 'ready' (fixtures finns synkront). Live: 'ready' först när
-  // BÅDE facit-datan OCH rums-bidragen laddat; fel från endera fail-loud:ar.
-  const status: TotalLeaderboardStatus = useMemo(() => {
-    if (!liveConfigured) {
-      return 'ready';
-    }
-    if (data.status === 'error' || contributionsStatus === 'error') {
-      return 'error';
-    }
-    if (data.status === 'ready' && contributionsStatus === 'ready') {
-      return 'ready';
-    }
-    return 'loading';
-  }, [liveConfigured, data.status, contributionsStatus]);
+  // Status. Demo: alltid 'ready' (fixtures finns synkront). Live: speglar edge-hämtningen.
+  const status: TotalLeaderboardStatus = liveConfigured ? liveStatus : 'ready';
 
   // Aktiv när det finns en total att visa: demo har alltid det; live när vi är ready.
   const enabled = !liveConfigured || (liveConfigured && total.length > 0);
-  const error = liveConfigured ? (data.error ?? contributionsError) : null;
+  const error = liveConfigured ? liveError : null;
 
   const store: TotalLeaderboardStore = useMemo(
     () => ({ enabled, status, error, total, selfSummary, currentUserId }),

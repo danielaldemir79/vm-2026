@@ -36,13 +36,12 @@ const entry = (
   userId: string,
   displayName: string,
   points: number,
-  rank: number,
-  roomCount = 1
-): TotalLeaderboardEntry => ({ userId, displayName, points, rank, exactHits: 0, roomCount });
+  rank: number
+): TotalLeaderboardEntry => ({ userId, displayName, points, rank, exactHits: 0 });
 
 /** Bygg N spridda rader (för virtualiserings-/utfälls-testet). */
 function manyEntries(n: number): TotalLeaderboardEntry[] {
-  return Array.from({ length: n }, (_, i) => entry(`u${i}`, `Spelare ${i}`, n - i, i + 1, 1));
+  return Array.from({ length: n }, (_, i) => entry(`u${i}`, `Spelare ${i}`, n - i, i + 1));
 }
 
 // jsdom har ingen layout, så scrollToIndex/scroll-mätningen är inert; det räcker för att
@@ -79,11 +78,10 @@ describe('TotalLeaderboardView, hjälten (din placering)', () => {
       points: 87,
       rank: 2,
       totalParticipants: 240,
-      roomCount: 3,
     };
     const { container } = renderView(
       store({
-        total: [entry('lead', 'Ledaren', 99, 1), entry('me', 'Daniel', 87, 2, 3)],
+        total: [entry('lead', 'Ledaren', 99, 1), entry('me', 'Daniel', 87, 2)],
         selfSummary,
         currentUserId: 'me',
       })
@@ -92,7 +90,7 @@ describe('TotalLeaderboardView, hjälten (din placering)', () => {
     expect(hero).toBeInTheDocument();
     expect(hero).toHaveAttribute('data-rank', '2');
     expect(hero).toHaveAttribute('data-points', '87');
-    // Skärmläsar-meningen bär hela placeringen i ord ("2:a av 240 ... 3 rum").
+    // Skärmläsar-meningen bär hela placeringen i ord ("2:a av 240 ... 87 poäng").
     expect(hero).toHaveTextContent('2:a av 240');
     expect(hero).toHaveTextContent('87 poäng');
   });

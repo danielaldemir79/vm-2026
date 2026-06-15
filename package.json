@@ -20,6 +20,7 @@
     "gen:venue-capacities": "vite-node scripts/generate-venue-capacities.ts",
     "gen:kickoff-seed": "vite-node scripts/generate-kickoff-seed.ts",
     "gen:embedded-match-plan": "vite-node scripts/generate-embedded-match-plan.ts",
+    "gen:global-leaderboard-core": "vite-node scripts/generate-global-leaderboard-core.ts",
     "seed:bots": "vite-node scripts/seed-bots.ts"
   },
   "dependencies": {

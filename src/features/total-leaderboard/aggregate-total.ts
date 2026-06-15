@@ -1,37 +1,50 @@
-// TOTAL (cross-rum) topplista: summera varje deltagares poäng över ALLA rum de är
-// med i, och rangordna globalt (T82 del 3, #173). REN funktion, inget I/O, ingen
+// GLOBAL (cross-rum) topplista: rangordna VARJE deltagare EN gång på deras BÄSTA
+// enskilda rum-poäng (T90, #183, RÄTTVIS modell). REN funktion, inget I/O, ingen
 // React, fristående testbar.
 //
 // ============================================================================
-// AGGREGERINGS-REGELN (dokumenterad i docs/decisions.md, T82 del 3)
+// AGGREGERINGS-REGELN (RÄTTVIS, dokumenterad i docs/decisions.md T90)
 // ============================================================================
-// En deltagares TOTALA poäng = SUMMAN av deras poäng över ALLA rum de är medlem i.
-// Vi RÄKNAR INTE poäng på nytt här (DRY, HARD, en sanning): vi kör den befintliga,
-// redan testade poäng-motorn (buildLeaderboard) PER RUM och summerar sedan varje
-// distinkt deltagares per-rums-totaler. Så match-/grupp-/bracket-/mästar-reglerna,
-// facit-mappningen och tiebreak-måttet ärvs oförändrade ur aggregate-scores.
+// En deltagares GLOBALA poäng = deras BÄSTA ENSKILDA rum-poäng. Antal rum ger
+// INGEN fördel (det var T82-del-3-buggen: summa-över-rum lät fler rum = fler poäng
+// = fusk, ägarens ord). Vi RÄKNAR INTE poäng på nytt här (DRY, HARD, en sanning):
+// vi kör den befintliga, redan testade poäng-motorn (buildLeaderboard) PER RUM och
+// väljer sedan, per distinkt deltagare, det BÄSTA rummets rad. Så match-/grupp-/
+// bracket-/mästar-reglerna, facit-mappningen och tiebreak-måttet ärvs oförändrade
+// ur aggregate-scores.
 //
-// VARFÖR SUMMA PER RUM (inte sammanslagna tips-listor): en deltagare kan vara med i
-// FLERA rum och tippa SAMMA match i båda. Regeln är "summan ÖVER ALLA RUM", så två
-// rum ska ge poäng TVÅ gånger (en gång per rum). Att i stället slå ihop en deltagares
-// tips-arrayer till EN lista och poängsätta en gång skulle tappa det andra rummets
-// bidrag (en match räknas en gång i scoreMember). Vi poängsätter därför per rum och
-// summerar totalerna, vilket också håller poäng-motorn orörd.
+// VARFÖR BÄSTA RUM (inte summa, inte sammanslagna tips): en deltagare kan vara med
+// i flera rum och tippa SAMMA match i flera. Skulle vi summera (gamla regeln) får en
+// deltagare i tre rum tre gångers poäng för exakt samma skicklighet , orättvist mot
+// en lika skicklig deltagare i ett rum. "Bästa rum" mäter SKICKLIGHET (det bästa
+// utfallet deltagaren visat), oberoende av hur många rum hen råkar vara med i. Två
+// identiska tips-uppsättningar i N rum ger då EXAKT samma globala poäng som i 1 rum.
 //
-// N i "X:a av N" = antalet DISTINKTA deltagare i totalen (en deltagare som är med i
-// tre rum räknas EN gång i N, men får sina tre rums poäng summerade).
+// "BÄST" = den rad som vinner enligt SAMMA prioritet som rangordningen (compareEntries
+// i aggregate-scores: poäng, sedan exakta träffar). Så "bästa rum" och "global rank"
+// vilar på en sanning för vad som gör en rad bättre , de kan aldrig säga emot varandra.
+//
+// N i "X:a av N" = antalet DISTINKTA deltagare i den globala listan (varje deltagare
+// EN gång, oavsett rum-antal).
 //
 // RHODOS (+ alla andra rum) läses som vilket rum som helst: aggregeringen är READ-only
-// och rör ingen data. Special-hantering av ett enskilt rum sker ALDRIG tyst här (om en
-// sådan regel behövs ska den vara explicit + dokumenterad, inte gömd i summeringen).
+// och rör ingen data. Special-hantering av ett enskilt rum sker ALDRIG tyst här.
 
-import { buildLeaderboard, type LeaderboardEntry, type MemberPredictions } from '../leaderboard';
+// DEEP imports (inte '../leaderboard'-barrel): barrel:n re-exporterar React-komponenter
+// + CSS, vilket annars bundlas in i edge-funktionens genererade mirror (T90). De rena
+// modulerna importeras direkt, så scoring-grafen förblir ren och bundlingsbar för Deno.
+import {
+  buildLeaderboard,
+  type LeaderboardEntry,
+  type MemberPredictions,
+} from '../leaderboard/aggregate-scores';
 import type { RoomMember } from '../../data/rooms';
-import type { PoolFacit } from '../leaderboard';
+import type { PoolFacit } from '../leaderboard/derive-facit';
 
 /**
- * Ett rums bidrag till totalen: dess medlemmar + deras tips, keyad på userId. Exakt
- * den form per-rums-motorn (buildLeaderboard) redan tar, så vi matar in den orörd.
+ * Ett rums bidrag till den globala listan: dess medlemmar + deras tips, keyad på
+ * userId. Exakt den form per-rums-motorn (buildLeaderboard) redan tar, så vi matar
+ * in den orörd.
  */
 export interface RoomContribution {
   /** Rummets id (för spårbarhet/debug; påverkar inte poängen). */
@@ -42,62 +55,79 @@ export interface RoomContribution {
   predictionsByUser: ReadonlyMap<string, MemberPredictions>;
 }
 
-/** En rad i den TOTALA topplistan: en distinkt deltagare med sin summerade poäng. */
+/** En rad i den GLOBALA topplistan: en distinkt deltagare med sin BÄSTA rum-poäng. */
 export interface TotalLeaderboardEntry {
   userId: string;
   displayName: string;
-  /** Summerad totalpoäng över ALLA deltagarens rum. */
+  /** Deltagarens BÄSTA enskilda rum-poäng (antal rum ger ingen fördel). */
   points: number;
   /** 1-baserad GLOBAL placering. DELAD vid lika poäng (samma "1224"-stil som per rum). */
   rank: number;
-  /** Summerade EXAKTA match-träffar över alla rum (tiebreak-mått, ärvt per rum). */
+  /** EXAKTA match-träffar i det BÄSTA rummet (tiebreak-mått, ärvt per rum). */
   exactHits: number;
-  /** Hur många rum deltagaren bidrog med poäng från (för "med i N rum"-kontext i UI:t). */
-  roomCount: number;
 }
 
-/** En deltagares ackumulerade total medan vi summerar över rummen. */
-interface Accumulator {
+/** En deltagares hittills BÄSTA rum-rad medan vi går igenom rummen. */
+interface BestRoom {
   userId: string;
   displayName: string;
   points: number;
   exactHits: number;
-  roomCount: number;
 }
 
 /**
- * Slå samman en deltagares per-rums-rad in i ackumulatorn. FÖRSTA visningsnamnet vi
- * ser för en deltagare vinner (stabilt, deterministiskt över rums-ordningen); samma
- * deltagare kan i teorin bära olika namn i olika rum, men totalen behöver ETT namn och
- * det första (rums-ordningen är stabil) är ett förutsägbart val.
+ * Är rad `candidate` BÄTTRE än `current` enligt rangordnings-prioriteten? SAMMA
+ * prioritet som per rum (en sanning för "vad gör en rad bättre", compareEntries i
+ * aggregate-scores): primärt högre poäng, sedan fler EXAKTA träffar. (Namn är inte en
+ * KVALITETS-skiljare , det är bara en stabil visnings-ordning vid HELT lika , så det
+ * ingår inte i "bästa rum"-valet; två rum med samma poäng + exactHits är likvärdiga och
+ * först-sedda behålls deterministiskt.)
  */
-function accumulate(acc: Map<string, Accumulator>, room: RoomContribution, facit: PoolFacit): void {
+function isBetterRoom(candidate: LeaderboardEntry, current: BestRoom): boolean {
+  if (candidate.points !== current.points) {
+    return candidate.points > current.points;
+  }
+  return candidate.exactHits > current.exactHits;
+}
+
+/**
+ * Slå in ett rums poängsatta rader i "bästa rum"-kartan: för varje deltagare, behåll
+ * deras BÄSTA rum-rad sett hittills. FÖRSTA visningsnamnet vi ser för en deltagare
+ * vinner (stabilt, deterministiskt över rums-ordningen, samma val som per-rums-vyn).
+ */
+function accumulateBest(
+  best: Map<string, BestRoom>,
+  room: RoomContribution,
+  facit: PoolFacit
+): void {
   const perRoom = buildLeaderboard(room.members, room.predictionsByUser, facit);
   for (const entry of perRoom) {
-    const existing = acc.get(entry.userId);
+    const existing = best.get(entry.userId);
     if (existing === undefined) {
-      acc.set(entry.userId, {
+      best.set(entry.userId, {
         userId: entry.userId,
         displayName: entry.displayName,
         points: entry.points,
         exactHits: entry.exactHits,
-        roomCount: 1,
       });
       continue;
     }
-    existing.points += entry.points;
-    existing.exactHits += entry.exactHits;
-    existing.roomCount += 1;
+    if (isBetterRoom(entry, existing)) {
+      // Behåll det FÖRST sedda visningsnamnet (existing.displayName), byt bara poäng/
+      // exactHits till det bättre rummets , namnet ska inte hoppa mellan renderingar.
+      existing.points = entry.points;
+      existing.exactHits = entry.exactHits;
+    }
   }
 }
 
 /**
- * Jämför två total-rader för sortering. SAMMA prioritetsordning som per rum (en sanning
- * för "vad gör en rad bättre"): primärt total poäng (fallande), sedan fler EXAKTA
+ * Jämför två globala rader för sortering. SAMMA prioritetsordning som per rum (en
+ * sanning för "vad gör en rad bättre"): primärt poäng (fallande), sedan fler EXAKTA
  * match-träffar (kvalitets-tiebreak), sist visningsnamn alfabetiskt (svensk locale) så
  * listan aldrig flaxar mellan renderingar.
  */
-function compareTotals(a: Accumulator, b: Accumulator): number {
+function compareTotals(a: BestRoom, b: BestRoom): number {
   if (a.points !== b.points) {
     return b.points - a.points;
   }
@@ -113,61 +143,58 @@ function compareTotals(a: Accumulator, b: Accumulator): number {
  * är medvetet en KOPIA av per-rums assignRanks-regeln (samma utfall) , vi exporterar inte
  * den interna hjälparen ur aggregate-scores; reglerna hålls i synk via testerna.
  */
-function assignTotalRanks(sorted: readonly Accumulator[]): TotalLeaderboardEntry[] {
+function assignTotalRanks(sorted: readonly BestRoom[]): TotalLeaderboardEntry[] {
   const entries: TotalLeaderboardEntry[] = [];
   let previousPoints: number | null = null;
   let currentRank = 0;
-  sorted.forEach((acc, index) => {
-    if (previousPoints === null || acc.points !== previousPoints) {
+  sorted.forEach((best, index) => {
+    if (previousPoints === null || best.points !== previousPoints) {
       currentRank = index + 1;
-      previousPoints = acc.points;
+      previousPoints = best.points;
     }
     entries.push({
-      userId: acc.userId,
-      displayName: acc.displayName,
-      points: acc.points,
+      userId: best.userId,
+      displayName: best.displayName,
+      points: best.points,
       rank: currentRank,
-      exactHits: acc.exactHits,
-      roomCount: acc.roomCount,
+      exactHits: best.exactHits,
     });
   });
   return entries;
 }
 
 /**
- * Bygg den TOTALA topplistan: poängsätt varje rum med per-rums-motorn, summera varje
- * distinkt deltagares poäng över alla rum, och rangordna globalt med delad placering.
+ * Bygg den GLOBALA topplistan: poängsätt varje rum med per-rums-motorn, behåll varje
+ * distinkt deltagares BÄSTA rum-poäng, och rangordna globalt med delad placering.
  *
  * @param rooms  Varje rums bidrag (medlemmar + tips). Ett tomt rum bidrar med inget.
  * @param facit  Det DELADE, globala facit (en sanning för alla rum, derivePoolFacit).
- * @returns      Den totala topplistan, högsta summa först, delad rank vid lika.
+ * @returns      Den globala topplistan, högsta bästa-rum-poäng först, delad rank vid lika.
  */
 export function buildTotalLeaderboard(
   rooms: readonly RoomContribution[],
   facit: PoolFacit
 ): TotalLeaderboardEntry[] {
-  const acc = new Map<string, Accumulator>();
+  const best = new Map<string, BestRoom>();
   for (const room of rooms) {
-    accumulate(acc, room, facit);
+    accumulateBest(best, room, facit);
   }
-  const sorted = [...acc.values()].sort(compareTotals);
+  const sorted = [...best.values()].sort(compareTotals);
   return assignTotalRanks(sorted);
 }
 
-/** En total-rads sammanfattning för "din placering"-hjälten. */
+/** En global-rads sammanfattning för "din placering"-hjälten. */
 export interface TotalSelfSummary {
   points: number;
   rank: number;
-  /** Antal DISTINKTA deltagare i totalen (N i "X:a av N"). */
+  /** Antal DISTINKTA deltagare i listan (N i "X:a av N"). */
   totalParticipants: number;
-  /** Hur många rum deltagaren bidrog från (kontext i hjälte-kortet). */
-  roomCount: number;
 }
 
 /**
- * Härled aktuell deltagares sammanfattning ur den TOTALA topplistan (samma en-sanning-
+ * Härled aktuell deltagares sammanfattning ur den GLOBALA topplistan (samma en-sanning-
  * princip som per-rums deriveSelfSummary): läs ut raden, räkna aldrig om. null om vi inte
- * kan peka ut en egen rad (ingen identitet, eller identiteten finns inte i totalen) , då
+ * kan peka ut en egen rad (ingen identitet, eller identiteten finns inte i listan) , då
  * visar UI:t ingen hjälte (hellre tyst än en gissad placering).
  */
 export function deriveTotalSelfSummary(
@@ -185,7 +212,6 @@ export function deriveTotalSelfSummary(
     points: self.points,
     rank: self.rank,
     totalParticipants: total.length,
-    roomCount: self.roomCount,
   };
 }
 

@@ -26,7 +26,6 @@ const entry = (userId: string, displayName: string, rank: number): TotalLeaderbo
   points: 100 - rank,
   rank,
   exactHits: 0,
-  roomCount: 1,
 });
 
 function manyEntries(n: number): TotalLeaderboardEntry[] {

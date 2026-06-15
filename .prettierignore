@@ -15,6 +15,12 @@ package-lock.json
 # får aldrig röra den: minsta omformatering skulle bryta troheten mot PDF:en.
 src/domain/bracket/annexe-c-source.txt
 
+# Global-topplistans scoring-mirror är GENERERAD (esbuild-bundle av src-grafen,
+# scripts/generate-global-leaderboard-core.ts, T90). Prettier får inte röra den:
+# den regenereras ur src och vaktas av global-leaderboard-mirror-parity.test.ts;
+# en formaterings-churn vore brus på ett artefakt ingen redigerar för hand.
+supabase/functions/_shared/global-leaderboard-core.ts
+
 # Livescore-feature: de fångade API-Football-svaren är test-guld, committade
 # OFÖRÄNDRADE I FORM (exakt som API:t levererade dem, en rad per svar). Prettier
 # får inte röra dem: parsern (parse-live.ts) bevisas mot den FAKTISKA käll-formen,

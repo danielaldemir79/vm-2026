@@ -5,6 +5,50 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , T90 (#183): Global topplista RÄTTVIS (bästa rum) + helt global (server-side scoring)
+
+**Live fairness-/privacy-fix. SUPERSEDER T82-del-3-beslutet "summa per rum" nedan.**
+
+**Beslut 1 , aggregerings-regeln: bästa rum, INTE summa.** En deltagares globala poäng =
+deras BÄSTA ENSKILDA rum-poäng (inte summan över alla rum). Antal rum ger INGEN fördel.
+**Källa till regeln (gissas inte):** ägarens uttryckliga beslut i GitHub-issue #183 ("Rättvist
++ helt globalt", Daniel 2026-06-15) , den gamla summa-regeln lät en deltagare i N rum få N
+gångers poäng för samma skicklighet (ägaren kallar det fusk). "Bästa rum" väljs med SAMMA
+prioritet som rangordningen (poäng, sedan exakta träffar), så "bästa rum" och "global rank"
+vilar på en sanning (`aggregate-total.ts` `isBetterRoom` == `compareEntries`-prioriteten).
+Bevisat på REAL prod-data: en användare i 4 rum hade per-rum [7,6,7,6] -> global 7 (bästa),
+inte 26 (summa); en i 2 rum [11,7] -> 11, inte 18. Negativ-kontroll: byt best-room mot summa
+-> fairness-testet rödnar (verifierat, aggregate-total.test.ts).
+
+**Beslut 2 , listan omfattar ALLA deltagare i ALLA rum (200+), server-side.** Den gamla
+live-vägen (`loadRoomContributions(myRooms)`) laddade bara den inloggades EGNA rum -> "Global"
+visade ~54 av 263. Den nya vägen rangordnar ALLA. Det MÅSTE ske server-side: en vanlig
+medlems RLS ser bara egna rum + egna/avslöjade tips, så listan kan inte byggas i klienten
+utan att antingen utelämna folk eller läcka andras hemliga tips. **Privacy:** server-vägen
+läser råa tips (förbi RLS, service_role) men returnerar BARA (userId, displayName, points,
+rank, exactHits) , ALDRIG en rå tips-rad (bevisat: privacy-test + real-data-körning gav
+exakt de fem fälten, inga tips-fält i serialiseringen).
+
+**Beslut 3 , arkitektur: edge function kör SAMMA testade TS-motor (genererad bundle), INTE
+en SQL-reimplementation.** Att reimplementera poäng-reglerna (FIFA-tiebreak, bracket-
+härledning, score) i SQL vore en andra, drift-bar motor (ägarens #1-risk). I stället:
+en READ-ONLY edge function (`supabase/functions/global-leaderboard/`) kör `buildGlobalLeaderboard`
+ur en **genererad, bundlad kopia** av den rena src-grafen (`derivePoolFacit` + `buildTotalLeaderboard`
++ `applyRoomResults` + den källåkrade statiska planen), emitterad av
+`scripts/generate-global-leaderboard-core.ts` via esbuild. Genererad ur src = ingen hand-drift-
+yta (till skillnad från den hand-skrivna livescore-mirror:n). Paritet vaktas behavioralt i
+`global-leaderboard-mirror-parity.test.ts` (bundlar om src, jämför diskriminerande in->ut mot
+den committade mirror:n , en glömd regenerering rödnar i CI). Demo/fixtures-vägen kör SAMMA
+`buildTotalLeaderboard` lokalt -> demo + live delar exakt en rättvise-regel (ekvivalens-test).
+
+**Beslut 4 , UI: "med i N rum"-etiketten borttagen.** Under bästa-rum-modellen ger rum-antalet
+ingen fördel, så att visa det bredvid placering/poäng vore vilseledande. Raden + hjälten visar
+bara placering + namn + poäng (deltagarens bästa rum-resultat); `roomCount`-fältet är borttaget
+ur `TotalLeaderboardEntry`/`TotalSelfSummary`.
+
+**Data-integritet:** ingen migration, ingen schema-ändring; edge-funktionen gör BARA `.select()`.
+Bot-/seed-datan är bevisat oförändrad (md5 på bot_accounts + predictions identisk före/efter).
+
 ## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
 
 Faserna 0-3 är levererade och appen är live. Ägaren godkände ett v2-bygge (SPEC §13). Det
