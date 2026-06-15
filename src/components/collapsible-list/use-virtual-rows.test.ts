@@ -1,7 +1,8 @@
-// Tester för virtualiserings-spannet (T82 del 3, #173). Den RENA spann-matematiken
+// Tester för virtualiserings-spannet (delad husprimitiv, #173). Den RENA spann-matematiken
 // (computeRange) testas utan DOM: givet antal rader + radhöjd + viewport + scroll, vilka
 // index renderas? Vi bevisar att bara en DELMÄNGD (synligt + overscan) väljs, inte hela
-// listan , det är hela poängen med virtualiseringen (ingen 240-DOM-vägg).
+// listan , det är hela poängen med virtualiseringen (ingen 240-DOM-vägg). Flyttad med hooken
+// från total-leaderboard till den delade collapsible-list-byggstenen (T82 del 4).
 
 import { describe, expect, it } from 'vitest';
 import { computeRange, OVERSCAN } from './use-virtual-rows';

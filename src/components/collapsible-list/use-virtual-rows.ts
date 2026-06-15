@@ -1,8 +1,13 @@
-// Lättviktig FAST-HÖJD virtualisering för den totala topplistans utfällda läge
-// (T82 del 3, #173). Ingen extern dependency (PRINCIPLES §11): fast-höjd-windowing är
-// en liten, väl förstådd beräkning (scroll-position + viewport-höjd -> synligt
-// index-spann), så vi skriver den själva i stället för att dra in ett virtualiserings-
-// paket. 240+ rader renderas då aldrig som en DOM-vägg , bara de synliga (+ overscan).
+// Lättviktig FAST-HÖJD virtualisering (delad husprimitiv, #173 T82 del 4). Flyttad ur
+// total-leaderboard/use-virtual-rows.ts till den delade collapsible-list-byggstenen så
+// alla långa listor som behöver windowing delar EN sanning (PRINCIPLES §3-4, rule-of-
+// three: total-topplista + andra långa listor). Logiken är OFÖRÄNDRAD mot ursprунget
+// (samma spann-matematik, samma overscan, samma scrollToIndex), bara husplatsen är ny.
+//
+// Ingen extern dependency (PRINCIPLES §11): fast-höjd-windowing är en liten, väl förstådd
+// beräkning (scroll-position + viewport-höjd -> synligt index-spann), så vi skriver den
+// själva i stället för att dra in ett virtualiserings-paket. 240+ rader renderas då aldrig
+// som en DOM-vägg , bara de synliga (+ overscan).
 //
 // MODELL: alla rader har samma höjd (rowHeight). Den totala höjden = count * rowHeight
 // (en spacer-div håller scrollbaren rätt). Vid en scroll-position beräknar vi första

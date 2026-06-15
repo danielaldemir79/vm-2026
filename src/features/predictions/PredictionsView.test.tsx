@@ -257,6 +257,37 @@ describe('PredictionsView, dagens-fönster + expandera (T68/#129)', () => {
     expect(topToggle()).toHaveAttribute('aria-expanded', 'false');
   });
 
+  // #173 T82 del 4 (ägarens feedback "den där raden som följer med i listorna"): i UTFÄLLT
+  // läge ska den övre tips-kontrollen bli STICKY (följer med ner i den långa listan), i
+  // komprimerat läge en vanlig inline-kontroll. Samma StickyFollowToggle som resultat-listan.
+  it('den övre kontrollen blir STICKY (följer med) i UTFÄLLT läge, inline i komprimerat', async () => {
+    dataState.matches = [
+      match('p0', '2026-06-11T18:00:00.000Z'), // idag
+      match('p1', '2026-06-12T18:00:00.000Z'),
+      match('p9', '2026-06-20T18:00:00.000Z'),
+    ];
+    renderView(store({}), PREMIERE);
+    const bar = (): HTMLElement | null => document.querySelector('[data-predictions-toggle-bar]');
+
+    // KOMPRIMERAT: inte sticky.
+    expect(bar()).not.toBeNull();
+    expect(bar()!.className).not.toContain('sticky');
+    expect(bar()!.hasAttribute('data-sticky')).toBe(false);
+
+    // Fäll ut -> baren blir sticky och pinnas under sajt-headern (top-16).
+    fireEvent.click(topToggle() as HTMLButtonElement);
+    await waitFor(() => expect(bar()!.getAttribute('data-sticky')).toBe('true'));
+    expect(bar()!.className).toContain('sticky');
+    expect(bar()!.className).toContain('top-16');
+    // Komprimera-kontrollen bor i den sticky baren (följer med).
+    expect(bar()!.querySelector('button[data-predictions-toggle-position="top"]')).not.toBeNull();
+
+    // Fäll ihop -> inline igen.
+    fireEvent.click(topToggle() as HTMLButtonElement);
+    await waitFor(() => expect(bar()!.hasAttribute('data-sticky')).toBe(false));
+    expect(bar()!.className).not.toContain('sticky');
+  });
+
   it('kontrollen är DUBBLERAD (uppe + nere) med identisk aria-semantik', async () => {
     dataState.matches = [
       match('p0', '2026-06-11T18:00:00.000Z'), // idag

@@ -25,11 +25,21 @@
 //
 // UTAN aktivt rum: "gå med i ett rum" (topplistan är per rum, samma som T15/T16).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
 import { useRegisterSection, SECTIONS } from '../section-nav';
+import { StickyFollowToggle } from '../../components/collapsible-list';
+import { ExpandToggle } from '../../components/ExpandToggle';
+
+// Hur många rader topplistan visar i KOMPRIMERAT default-läge (toppen). En per-rums-topplista
+// kan bli lång (seedade rum har upp till ~200 deltagare, bot-seed-planen), så vi börjar
+// komprimerad med pallen + lite till och fäller ut resten på begäran , samma "börja
+// komprimerad + sticky följ-med-kontroll"-mönster som den globala topplistan (#173 T82 del 4,
+// ägarens feedback). Under tröskeln (korta vänskaps-rum) renderas hela listan som förr (inget
+// att komprimera), så det vanliga lilla rummet är OFÖRÄNDRAT.
+const COLLAPSED_VISIBLE = 8;
 
 /** Spring för layout-glidet: en tävlings-tight men mjuk fjäder (premium, ingen wobble). */
 const LAYOUT_SPRING = { type: 'spring', stiffness: 520, damping: 38, mass: 0.9 } as const;
@@ -138,6 +148,27 @@ export function LeaderboardView() {
   // Animera placerings-ändringar bara om användaren inte valt minska rörelse.
   const animateLayout = !reduceMotion;
 
+  // KOMPRIMERA/UTFÄLL (#173 T82 del 4): en lång per-rums-topplista börjar komprimerad (topp-N)
+  // och fälls ut på begäran, med en STICKY följ-med-komprimera-kontroll i utfällt läge. Vi
+  // VIRTUALISERAR INTE här (till skillnad från den globala topplistan): rad-glidet (motion.li
+  // layout) kräver mountade rader, så vi slice:ar bara den renderade mängden och låter
+  // AnimatePresence sköta in/ut. Korta rum (<= tröskeln) rör vi inte (ingen toggle).
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
+  // Fokus-flytt vid ihopfällning (samma a11y-grepp som resultat-/tips-listan): den NEDRE
+  // toggeln kan ligga långt ner i en utfälld lista. Fäller man ihop därifrån ska fokus föras
+  // upp till den ÖVRE (sticky) kontrollen vid listans topp.
+  const topToggleRef = useRef<HTMLButtonElement>(null);
+  function toggleExpanded() {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (!next) {
+        requestAnimationFrame(() => topToggleRef.current?.focus());
+      }
+      return next;
+    });
+  }
+
   const ready = store.enabled && store.status === 'ready';
 
   // PLACERINGS-PULS-spårning: jämför varje medlems rank mot förra renderingens rank,
@@ -234,22 +265,84 @@ export function LeaderboardView() {
         </p>
       ) : null}
 
-      {/* Topplistan: en placerings-ordnad lista som glider vid ändring. */}
-      {ready && store.leaderboard.length > 0 ? (
-        <ol data-leaderboard-list="" className="mt-5 flex list-none flex-col gap-2 p-0">
-          <AnimatePresence initial={false}>
-            {store.leaderboard.map((entry) => (
-              <LeaderboardRow
-                key={entry.userId}
-                entry={entry}
-                animateLayout={animateLayout}
-                isSelf={store.currentUserId !== null && entry.userId === store.currentUserId}
-                rankChanged={animateLayout && changedIds.has(entry.userId)}
-              />
-            ))}
-          </AnimatePresence>
-        </ol>
-      ) : null}
+      {/* Topplistan: en placerings-ordnad lista som glider vid ändring. Lång lista (seedat
+          rum) börjar KOMPRIMERAD (topp-N) med en sticky följ-med-komprimera-kontroll i utfällt
+          läge; korta rum visar hela listan (ingen toggle, oförändrat). */}
+      {ready && store.leaderboard.length > 0
+        ? (() => {
+            const hasMore = store.leaderboard.length > COLLAPSED_VISIBLE;
+            // Rendera bara topp-N i komprimerat läge; allt i utfällt. AnimatePresence sköter
+            // in/ut, layout-glidet behålls på den renderade mängden (ingen virtualisering).
+            const visible =
+              hasMore && !expanded
+                ? store.leaderboard.slice(0, COLLAPSED_VISIBLE)
+                : store.leaderboard;
+            const hiddenCount = store.leaderboard.length - COLLAPSED_VISIBLE;
+            return (
+              <>
+                {/* ÖVRE kontroll: i UTFÄLLT läge en STICKY följ-med-bar (komprimera alltid ett
+                  tryck bort oavsett scroll), i komprimerat en vanlig "Visa alla N"-inline-
+                  kontroll. Bara när listan är längre än tröskeln. */}
+                {hasMore ? (
+                  <div className="mt-5">
+                    <StickyFollowToggle
+                      expanded={expanded}
+                      labels={{
+                        expand: `Visa alla ${store.leaderboard.length}`,
+                        collapse: 'Komprimera',
+                      }}
+                      controls={listId}
+                      onToggle={toggleExpanded}
+                      buttonRef={topToggleRef}
+                      name="leaderboard"
+                    />
+                  </div>
+                ) : null}
+
+                <ol
+                  id={listId}
+                  data-leaderboard-list=""
+                  data-expanded={hasMore ? (expanded ? 'true' : 'false') : undefined}
+                  className="mt-5 flex list-none flex-col gap-2 p-0"
+                >
+                  <AnimatePresence initial={false}>
+                    {visible.map((entry) => (
+                      <LeaderboardRow
+                        key={entry.userId}
+                        entry={entry}
+                        animateLayout={animateLayout}
+                        isSelf={
+                          store.currentUserId !== null && entry.userId === store.currentUserId
+                        }
+                        rankChanged={animateLayout && changedIds.has(entry.userId)}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </ol>
+
+                {/* NEDRE kontroll (dubblerad, bara i UTFÄLLT läge): så man kan fälla ihop utan att
+                  skrolla tillbaka upp. Identisk semantik som den övre (samma ExpandToggle), och
+                  vid ihopfällning förs fokus upp till den övre (sticky) kontrollen. */}
+                {hasMore && expanded ? (
+                  <div className="mt-4 flex">
+                    <ExpandToggle
+                      expanded={expanded}
+                      hiddenCount={hiddenCount}
+                      labels={{
+                        expand: `Visa alla ${store.leaderboard.length}`,
+                        collapse: 'Komprimera',
+                      }}
+                      controls={listId}
+                      onToggle={toggleExpanded}
+                      position="bottom"
+                      name="leaderboard"
+                    />
+                  </div>
+                ) : null}
+              </>
+            );
+          })()
+        : null}
     </section>
   );
 }

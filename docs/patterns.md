@@ -16,7 +16,8 @@ rendera alla på en gång ger en DOM-vägg (långsam, hög minnesåtgång). Ett 
 (`@tanstack/react-virtual` m.fl.) löser det men är ett nytt beroende för något som är en liten,
 väl förstådd beräkning (PRINCIPLES §11: lägg inte till ett paket för det triviala).
 
-**Recept (`src/features/total-leaderboard/use-virtual-rows.ts`):**
+**Recept (`src/components/collapsible-list/use-virtual-rows.ts`):** (flyttad hit från total-
+leaderboard i #173 T82 del 4 när den blev en DELAD husprimitiv, se collapsible-list-mönstret nedan.)
 1. Anta FAST radhöjd (`rowHeight`, matchad mot CSS). Totalhöjd = `count * rowHeight`.
 2. Mät den scrollande containerns höjd (ResizeObserver, fallback window-resize för jsdom/test).
 3. Vid en scroll-position: `startIndex = floor(scrollTop / rowHeight) - OVERSCAN`,
@@ -1174,6 +1175,57 @@ brytpunkten, och genom att återanvända `ExpandToggle` ärver hela sidan en red
 kontroll med rätt a11y. Design-frontend stylar via de stabila `data-${name}-toggle` / `data-collapsible-*`-
 hakarna. Källa: T68 (#129), `src/components/CollapsibleSection.tsx` + wiring i groups/scenarios/bracket/
 group-predictions/bracket-predictions/admin/leaderboard.
+
+### sticky-kontroll-rad-som-foljer-med-i-en-lang-lista-plus-borja-komprimerad (React, VM 2026)
+
+**Problem (ägarens feedback, #173):** en lång RAD-lista (topplista, resultat, tips) ska (a) börja
+KOMPRIMERAD med några rader synliga, och (b) ha en komprimera-kontroll som FÖLJER MED i listan, så man
+kan fälla in/söka/hoppa från VILKEN scroll-position som helst utan att skrolla tillbaka till toppen.
+(Skiljer sig från höjd-klipp-mönstret ovan: det är för RESPONSIVA grid/träd, detta för platta rad-listor
+med en sann "N rader synliga"-preview.)
+
+**Två varianter, EN husplats (`src/components/collapsible-list/`), valda per lista:**
+
+1. **Virtualiserat scroll-fönster med en INRE sticky kontroll-rad** (`CollapsibleList` + `CollapsibleScrollList`),
+   för listor som kan bli MYCKET långa och vars rader är fristående (ingen osparad inmatning, ingen
+   layout-glide). `CollapsibleList` orkestrerar: komprimerat default = en preview (render-prop, de N
+   översta raderna, t.ex. en pall) + en "Visa alla M"-`ExpandToggle`; utfällt = `CollapsibleScrollList`,
+   ett `max-height`-begränsat `overflow-y-auto`-fönster med en `position: sticky; top:0`-kontroll-rad
+   INUTI fönstret. Den raden bär en KOMPRIMERA-knapp (alltid nåbar) + ett valfritt `controls`-slot
+   (sök/hoppa-till-mig). Vid satt `rowHeight` VIRTUALISERAS raderna (delad `use-virtual-rows`, bara
+   synliga + overscan i DOM:en); utan `rowHeight` renderas alla rader (kort lista). Den sticky raden har
+   en OPAK fond + skugga (`.vm-collapsible-controls`) så raderna under aldrig lyser igenom (ingen jitter).
+   Fokus-återföring vid komprimering: när den sticky kontrollen avmonteras förs fokus till "Visa alla M".
+   *Konsument:* den globala topplistan (`TotalLeaderboardList`/`TotalLeaderboardView`), 241 deltagare.
+
+2. **Sticky FÖLJ-MED-toggle över en lista som INTE kan virtualiseras** (`StickyFollowToggle`), för listor
+   där rader MÅSTE förbli mountade: dag-grupperade resultat/tips (osparad inmatning bevaras via `hidden`
+   på `<li>`, inte unmount) och den motion-animerade per-rums-topplistan (layout-glidet kräver mountade
+   rader). I stället för ett scroll-fönster wrappar den den befintliga `ExpandToggle` i en bar som blir
+   `position: sticky; top-16` (under sajt-headern, opak `.vm-sticky-follow-bar`-fond) ENBART i UTFÄLLT
+   läge, så komprimera följer med ner i listan; i komprimerat läge är den en vanlig inline-kontroll. Det
+   befintliga fönstret/inmatningen/sorteringen rörs INTE, bara kontrollens klister-position per läge.
+   *Konsumenter:* resultat-listan + tips-listan (3-dygns/dagens-fönster, oförändrat) + per-rums-topplistan
+   (börjar komprimerad topp-N över en tröskel, glidet bevarat).
+
+**A11y:** list-ARIA (`role="list"` + `aria-setsize`/`aria-posinset` per rad, INTE grid-attribut) bär hela
+storleken även när bara en delmängd renderas; komprimera/expandera bär `aria-expanded`/`aria-controls`;
+den sticky raden är bara en container (kontrollerna i den är vanliga fokuserbara knappar/fält, inget
+fokus-fångande). Kontrast MÄTT i webbläsaren på renderad yta (inte hex), båda teman: komprimera-knapp
+15.2/17.9, sök-fält 12.7/17.9, resultat-bar-knapp 9.8/13.4 (alla >> 4.5); de sticky radernas/barernas
+fond är OPAK och bär ingen egen text.
+
+**Test (per byggsten + per konsument):** byggstenen , komprimerat visar N, utfäll visar alla, sticky
+komprimera bor INUTI scroll-fönstret/baren och nås oavsett scroll, list-ARIA korrekt, fokus-återgång.
+Varje konsument , att den börjar komprimerad + fäller ut + behåller sina särdrag (egen rad markerad,
+inmatning bevarad, glidet kvar). jsdom saknar layout, så STRUKTUREN (sticky-klass + top-offset per läge)
+bevisas i test, den faktiska visuella stickyn i webbläsaren (`.vmshots/`). Negativ-kontroll på de nya
+beteende-testerna (mutera bort slicen/stickyn -> rött).
+
+**Varför:** ägaren gillade total-topplistans sticky kontroll-rad och ville ha den på alla långa listor.
+Rule-of-three uppfyllt (total + resultat + tips + per-rums), så mönstret bröts ut till EN husplats med två
+varianter, valda per lista efter dess tvång (virtualiserbar vs inmatnings-/glide-bunden), i stället för en
+parallell variant per vy. Källa: #173 T82 del 4, `src/components/collapsible-list/`.
 
 ### delad-modal-primitiv-agar-a11y-dialog-kontraktet-en-gang (React + motion, VM 2026)
 

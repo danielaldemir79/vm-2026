@@ -5,6 +5,49 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , T82 del 4 (#173): "sticky kontroll-rad + börja-komprimerad" bruten till delad byggsten + applicerad på de långa listorna
+
+Ägaren gillade total-topplistans sticky kontroll-rad ("följer med i listan") + att listan börjar
+komprimerad, och ville ha SAMMA mönster på alla långa listor, samt att resultat-listan längst ned
+"börjar bli lång bör startas komprimerad med några resultat synliga".
+
+**Beslut 1: bryt ut mönstret till EN husplats med TVÅ varianter** (`src/components/collapsible-list/`),
+valda per lista efter dess tvång (rule-of-three uppfyllt: total + resultat + tips + per-rums):
+- **Virtualiserat scroll-fönster + inre sticky kontroll-rad** (`CollapsibleList`/`CollapsibleScrollList`,
+  + den FLYTTADE delade `use-virtual-rows`) för fristående rader. **Total-topplistan refaktorerades att
+  KONSUMERA den** , dess beteende + alla dess tester är OFÖRÄNDRADE (den var redan granskad).
+- **Sticky FÖLJ-MED-toggle** (`StickyFollowToggle`) för listor som INTE kan virtualiseras: dag-grupperade
+  resultat/tips (osparad inmatning bevaras via `hidden`, virtualisering skulle unmounta + tappa den) och
+  per-rums-topplistan (motion-layout-glidet kräver mountade rader). Den klistrar BARA komprimera-kontrollen
+  (top-16, under headern) i utfällt läge; fönster/inmatning/sortering oförändrade.
+
+**Beslut 2: resultat-listan + tips-listan får sticky FÖLJ-MED, inte ett scroll-fönster.** De "börjar redan
+komprimerade" (3-dygns- resp dagens-fönster, oförändrat); det nya är att den övre komprimera-kontrollen blir
+sticky i utfällt läge så den följer med ner i den långa listan. VIRTUALISERAS MEDVETET INTE: resultat-/tips-
+formulären håller osparad inmatning i lokal `useState` och bevaras via `hidden`-på-`<li>` , en virtualisering
+(som unmountar rader) skulle tappa den. Inmatning + validering rörda = noll (taskens hårda krav).
+
+**Beslut 3: per-rums-topplistan börjar komprimerad (topp-N) över en längd-tröskel, INTE virtualiserad.**
+Seedade rum kan ha ~200 deltagare (bot-seed-planen), så lång nog att tjäna på det. Men dess signatur är
+motion-layout-glidet (rader glider till ny plats vid poäng-ändring), som kräver mountade rader , därför
+slice:ar vi bara den renderade mängden (topp-N komprimerat, allt utfällt) och låter `AnimatePresence` sköta
+in/ut, ingen virtualisering. Korta rum (<= tröskeln) är OFÖRÄNDRADE (ingen toggle).
+
+**Medvetet ORÖRDA:** gruppspels-tips, slutspelsträd, scenarier, gruppspelstabellen och bracket-tips
+använder REDAN den delade höjd-klipp-primitiven (`CollapsibleSection`, T68) , de är RESPONSIVA grid/träd,
+inte platta rad-listor, så "sticky kontroll-rad som följer en lista" passar inte (höjd-klippet är rätt
+mönster för dem, och de börjar redan komprimerade). Kommentar-tråden har sin egen chat-/load-more-semantik.
+
+**Beslut 4 (F1, reviewer-fynd): nav-ordningen rättad + mekaniskt vaktad.** `totalLeaderboard.order` var 75
+men sektionen MONTERAS efter per-rums-topplistan (order 80), så chip-raden inverterades mot sidan i live-
+läge (Global listades före Topplista men scrollade efter den). Satt till **85** (speglar monterings-
+ordningen). Ett nytt test (`section-order-mirrors-mount.test.ts`) läser App.tsx, sorterar sektionerna på
+deras FAKTISKA mount-position och kräver strikt stigande `order`, så driften fångas mekaniskt framöver.
+
+Kontrast MÄTT i webbläsaren på renderad yta (båda teman): komprimera 15.2/17.9, sök-fält 12.7/17.9,
+resultat-bar-knapp 9.8/13.4 (alla >> 4.5). Visuellt verifierat i `.vmshots/` (total + resultat, komprimerad
++ sticky mitt i listan). Recept: `docs/patterns.md` (sticky-kontroll-rad-...-borja-komprimerad).
+
 ## 2026-06-15 , Global topplista: sticky kontroll-rad (komprimera nåbar från alla scroll-lägen) (#173)
 
 UX-tillägg ovanpå T82 del 3. Ägaren testade UI:t och hittade en riktig miss: "Komprimera"-kontrollen

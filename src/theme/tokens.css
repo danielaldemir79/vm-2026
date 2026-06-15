@@ -2499,39 +2499,13 @@ body {
     0 2px 10px -4px color-mix(in srgb, var(--color-accent) 50%, transparent);
 }
 
-/* KONTROLL-PILLARNA (sök-knapp, visa alla, hoppa till mig): en diskret surface-raised-pill
-   med fg-text + border, hover tänder en accent-kant + lyfter ytan (samma affordans som
-   install-pillen §22). Färg-only hover (ingen transform), bryter ingen reduced-motion. */
-.vm-total-control,
-.vm-total-jump {
-  background-color: var(--color-surface);
-  color: var(--color-fg);
-  border: 1px solid var(--color-border);
-  font-family: var(--font-display);
-  cursor: pointer;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .vm-total-control,
-  .vm-total-jump {
-    transition:
-      background-color 0.18s ease,
-      border-color 0.18s ease;
-  }
-}
-
-.vm-total-control:hover,
-.vm-total-jump:hover {
-  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
-  background-color: var(--color-surface-raised);
-}
-
-.vm-total-control:focus-visible,
-.vm-total-jump:focus-visible,
-.vm-total-search:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
-  outline-offset: 2px;
-}
+/* KONTROLL-PILLARNA + DEN STICKY KONTROLL-RADEN + DET SCROLLANDE FÖNSTRET är GENERALISERADE
+   (#173 T82 del 4) till den delade collapsible-list-byggstenen: bas-recepten för
+   .vm-total-control / .vm-total-controls / .vm-total-scroll (yta, hover, focus, sticky-fond,
+   scroll-ram) bor nu i src/components/collapsible-list/collapsible-list.css, GRUPPERADE med
+   de nya .vm-collapsible-*-klasserna (EN sanning, total-klasserna kvar som alias så de redan
+   testade klassnamnen gäller). Här stannar bara det TOTAL-SPECIFIKA: hjälten, medaljen, sök-
+   fältets input-yta, "hoppa till mig"-variantens accent-tint, och sök-feedbacken. */
 
 /* "HOPPA TILL MIG": en lite varmare variant (accent-tint) så den sticker ut som DEN
    genväg man oftast vill ha. Fortfarande fg-text på en accent-9%-tint mot surface (samma
@@ -2558,32 +2532,7 @@ body {
   opacity: 1;
 }
 
-/* DET VIRTUALISERADE SCROLL-FÖNSTRET: en hårfin border + surface-fond, så den långa listan
-   läser som en avgränsad, scrollbar yta (inte ett oändligt fält). Bär ingen egen text. */
-.vm-total-scroll {
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  /* Mjukare scrollstopp på den sticky raden (faller tillbaka rent där osupportat). */
-  scroll-padding-top: 56px;
-}
-
-/* STICKY KONTROLL-RAD (sök + hoppa-till-mig + komprimera): fäst överst i scroll-fönstret så
-   kontrollerna ALDRIG skrollas ur synhåll , man kan komprimera/söka/hoppa från VILKEN
-   scroll-position som helst (ägarens feedback, #173). [VÄRDE, ej @theme-kontrakt]
-
-   ANTI-JITTER + INGEN GENOMLYSNING: raden har en OPAK fond (samma surface som fönstret) så
-   raderna som skrollar UNDER den aldrig lyser igenom eller skapar flimmer. En hårfin
-   nederkant + en mjuk skugga skiljer raden från innehållet under den utan att hoppa.
-   Den OPAKA fonden bär ingen egen text utöver kontrollernas (sök-fältet/knapparna har sina
-   egna README-mätta fg-på-surface-par, §26-kontrast-vakten), så sticky-raden kan inte sänka
-   någon text-kontrast. z-index håller raden över de absolut-positionerade raderna. */
-.vm-total-controls {
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  /* Mjuk skugga UNDER raden så den läser som ett "tak" över den scrollande listan, utan en
-     hård kant. Negativ spridning håller skuggan smal (ingen layout-påverkan, ingen CLS). */
-  box-shadow: 0 6px 12px -8px color-mix(in srgb, var(--color-fg) 22%, transparent);
-}
+/* (.vm-total-scroll + .vm-total-controls bor nu i collapsible-list.css, se notisen ovan.) */
 
 /* Sök-feedbacken ("ingen träff") ligger direkt under den sticky raden men SCROLLAR med
    listan (den hör till sök-resultatet, inte kontrollerna). Opak surface så den inte heller

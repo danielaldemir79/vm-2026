@@ -202,3 +202,73 @@ describe('LeaderboardView, placerings-puls (data-rank-changed nollas så den kan
     }
   });
 });
+
+// #173 T82 del 4 (ägarens feedback "den där raden som följer med i listorna"): en LÅNG per-
+// rums-topplista (seedat rum, upp till ~200 deltagare) ska börja KOMPRIMERAD (topp-N) och
+// fällas ut på begäran, med en STICKY följ-med-komprimera-kontroll i utfällt läge. KORTA rum
+// (<= tröskeln) rör vi inte. Motion-glidet bevaras (ingen virtualisering: vi slice:ar bara
+// den renderade mängden). jsdom saknar layout, så vi bevisar STRUKTUREN (renderad delmängd,
+// sticky-klassen, toggle-semantik), inte den faktiska visuella stickyn (se .vmshots).
+describe('LeaderboardView, lång lista: börja komprimerad + sticky följ-med', () => {
+  function manyEntries(n: number): LeaderboardEntry[] {
+    return Array.from({ length: n }, (_, i) => entry(`u${i}`, `Spelare ${i}`, n - i, i + 1));
+  }
+  const topToggle = (c: HTMLElement): HTMLButtonElement =>
+    c.querySelector('button[data-leaderboard-toggle-position="top"]') as HTMLButtonElement;
+
+  it('en KORT lista (<= tröskeln) visar alla rader och ingen komprimera-kontroll', () => {
+    const { container } = renderView(store({ leaderboard: manyEntries(8) }));
+    expect(container.querySelectorAll('[data-leaderboard-row]').length).toBe(8);
+    expect(container.querySelector('[data-leaderboard-toggle-bar]')).not.toBeInTheDocument();
+  });
+
+  it('en LÅNG lista börjar KOMPRIMERAD (bara topp-N i DOM:en) med en "Visa alla N"-kontroll', () => {
+    const { container } = renderView(store({ leaderboard: manyEntries(120) }));
+    // Komprimerat: bara topp-8 renderas (inte 120 = ingen DOM-vägg).
+    expect(container.querySelectorAll('[data-leaderboard-row]').length).toBe(8);
+    const toggle = topToggle(container);
+    expect(toggle).toHaveTextContent('Visa alla 120');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls');
+    // Listan är markerad komprimerad.
+    expect(container.querySelector('[data-leaderboard-list]')).toHaveAttribute(
+      'data-expanded',
+      'false'
+    );
+    // I komprimerat läge är toggle-baren INTE sticky (inget att följa med i).
+    expect(container.querySelector('[data-leaderboard-toggle-bar]')!.className).not.toContain(
+      'sticky'
+    );
+  });
+
+  it('utfäll visar ALLA rader och gör den övre kontrollen STICKY (följer med)', () => {
+    const { container } = renderView(store({ leaderboard: manyEntries(120) }));
+    act(() => {
+      topToggle(container).click();
+    });
+    // Alla 120 raderna renderas i utfällt läge (ingen match går förlorad).
+    expect(container.querySelectorAll('[data-leaderboard-row]').length).toBe(120);
+    // Baren är nu sticky (följer med ner i listan) och pinnas under sajt-headern.
+    const bar = container.querySelector('[data-leaderboard-toggle-bar]')!;
+    expect(bar.getAttribute('data-sticky')).toBe('true');
+    expect(bar.className).toContain('sticky');
+    expect(bar.className).toContain('top-16');
+    expect(topToggle(container)).toHaveTextContent('Komprimera');
+    expect(topToggle(container)).toHaveAttribute('aria-expanded', 'true');
+    // En NEDRE komprimera-kontroll dubbleras i utfällt läge (samma semantik).
+    const bottom = container.querySelector('button[data-leaderboard-toggle-position="bottom"]');
+    expect(bottom).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('[data-leaderboard-list]')).toHaveAttribute(
+      'data-expanded',
+      'true'
+    );
+  });
+
+  it('den egna raden behåller sin markering (data-self) i komprimerat läge (topp-N)', () => {
+    // u0 ligger först (rank 1), så den är inom topp-N även komprimerat.
+    const { container } = renderView(store({ leaderboard: manyEntries(120), currentUserId: 'u0' }));
+    const myRow = container.querySelector('[data-user-id="u0"]')!;
+    expect(myRow).toHaveAttribute('data-self', 'true');
+    expect(within(myRow as HTMLElement).getByText('Du')).toBeInTheDocument();
+  });
+});
