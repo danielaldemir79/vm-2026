@@ -5,6 +5,27 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T90 re-review-fix: App-testets install-knapp-query bytt från getByRole({name}) till stabil markör
+
+**Beslut:** I `src/App.test.tsx` hittas den kompakta install-knappen (onboarding-klar-grenen) via
+`document.querySelector('[data-install-button="native"]')` + en scoped assertion (knapp-element,
+tillgängligt namn, native-markör), INTE via `screen.getByRole('button', { name: /Installera som app/i })`.
+
+**Varför (mätt empiriskt, inte gissat):** När onboarding är KLAR finns ingen modal som gör resten
+av skalet inert, så hela app-trädet (~4400 DOM-element, ~145 knappar i fixtures-läget med den fyllda
+demo-datan) är tillgängligt. `getByRole({ name })` tvingar `dom-accessibility-api` att beräkna det
+tillgängliga NAMNET för VARJE knapp; varje sådan beräkning anropar jsdom:s `getComputedStyle`, vars
+kostnad växer med DOM-storleken (~450 ms/knapp under last). 145 knappar -> ~38 s, vilket spränger
+vitest test-timeout (15 s) och fällde testet. **Detta är en TEST-frågans kostnad, inte en mount-/
+prod-regression:** appen settlar på ~1,5 s, demo-bygget är en engångs-~30 ms (mätt). Bekräftat
+PRE-EXISTERANDE på develop (dc5d3ad): exakt samma test timeout:ar där också, så det är inte ett
+T90-fynd , T90 lägger bara till ~46 av 4400 element (~1 %). Syskon-testet (touren ÖPPEN) drabbas
+inte: den öppna modalen gör skalets knappar inert, så bara dialogens få knappar namn-beräknas.
+**Markör-fixen** är O(1)-uppslag och bevarar HELA beteende-assertionen (negativ-kontroll: muterad
+markör OCH muterat namn rödnar båda testet, verifierat). Den bredare DOM-storleks-/getComputedStyle-
+kostnaden i jsdom (syns även i `ResultEntryView.test.tsx`, ~31 s men under sin timeout) är en
+separat test-prestanda-fråga, ägd av flik-IA-tasken (T83) per north-star-specens bygg-ordning.
+
 ## 2026-06-15 , T90 (#183): Global topplista RÄTTVIS (bästa rum) + helt global (server-side scoring)
 
 **Live fairness-/privacy-fix. SUPERSEDER T82-del-3-beslutet "summa per rum" nedan.**

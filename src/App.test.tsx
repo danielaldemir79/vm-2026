@@ -232,8 +232,23 @@ describe('App-skalet, install-knappen gatad bakom onboarding (T39/#68, T63/#113)
     // Vänta in att skalet SETTLAT (laddnings-texten borta) FÖRST, så knappen
     // bedöms i ett stabilt träd och inget state-update sker efter testet (act).
     await waitForAppSettled();
-    const button = screen.getByRole('button', { name: /Installera som app/i });
-    expect(button).toBeInTheDocument();
-    expect(button).toHaveAttribute('data-install-button', 'native');
+
+    // Hitta install-knappen via dess STABILA markör (data-install-button="native") i
+    // stället för screen.getByRole('button', { name }). Varför: när onboarding är KLAR
+    // (ingen modal som gör resten inert) är hela app-skalet tillgängligt , ~145 knappar.
+    // getByRole({ name }) tvingar dom-accessibility-api att beräkna det tillgängliga
+    // NAMNET för VARJE knapp, och varje sådan beräkning anropar jsdom:s getComputedStyle
+    // vars kostnad växer med DOM-storleken (~4400 element här), så queryn blir ~38 s och
+    // testet timeout:ar (15 s). Detta är en TEST-frågans kostnad (en användare kör aldrig
+    // getByRole), inte en mount-/prod-kostnad , appen settlar på ~1,5 s. Markör-uppslaget
+    // är O(1) och vi behåller HELA beteende-assertionen nedan (knapp-element + tillgängligt
+    // namn + native-markör). Syskon-testet ovan (touren ÖPPEN) drabbas inte: den öppna
+    // modalen gör skalets knappar inert, så bara dialogens få knappar namn-beräknas.
+    const button = document.querySelector<HTMLButtonElement>('[data-install-button="native"]');
+    expect(button).not.toBeNull();
+    // Bekräfta att markören sitter på ett RIKTIGT knapp-element med rätt tillgängligt namn
+    // (a11y-intentionen i testet), nu billigt eftersom vi pekar ut EN nod.
+    expect(button?.tagName).toBe('BUTTON');
+    expect(button).toHaveAccessibleName(/Installera som app/i);
   });
 });
