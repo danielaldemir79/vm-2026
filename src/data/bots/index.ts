@@ -35,4 +35,20 @@ export {
   type PlannedRoom,
   type PlannedMembership,
   type PlannedPredictions,
+  type PlannedRoomReaction,
+  type PlannedRoomComment,
 } from './seed-plan';
+
+export { generateBotReactions, isAllowedReactionEmoji, type PlannedReaction } from './react';
+
+export {
+  generateBotComments,
+  planReplies,
+  COMMENT_SCALE,
+  REPLY_CHANCE,
+  type PlannedComment,
+  type PrimaryComment,
+  type PlannedReply,
+} from './comment';
+
+export { moodFromScoreline, type MatchMood } from './match-mood';

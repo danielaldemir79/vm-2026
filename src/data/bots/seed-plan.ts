@@ -21,6 +21,8 @@
 
 import type { BotPersona, BotCohort } from './personas';
 import { generateBotPredictions, type PredictConfig, DEFAULT_PREDICT_CONFIG } from './predict';
+import { generateBotReactions, type PlannedReaction } from './react';
+import { generateBotComments, planReplies, type PrimaryComment } from './comment';
 import type { Match, Group } from '../../domain/types';
 import type { PoolFacit } from '../../features/leaderboard/derive-facit';
 
@@ -90,12 +92,34 @@ export interface PlannedPredictions {
   bracketPredictions: ReturnType<typeof generateBotPredictions>['bracketPredictions'];
 }
 
+/** En planerad emoji-reaktion (room_reactions): en bot reagerar på en match i sitt rum. */
+export interface PlannedRoomReaction {
+  personaKey: string;
+  target: PlannedMembership['target'];
+  matchId: string;
+  emoji: PlannedReaction['emoji'];
+}
+
+/** En planerad kommentar (room_comments, match-tråd): en bot skriver i sitt rum. */
+export interface PlannedRoomComment {
+  personaKey: string;
+  target: PlannedMembership['target'];
+  matchId: string;
+  body: string;
+  /** True = en följd-fras (svar-approximation) på en annan bots kommentar i samma tråd. */
+  isReply: boolean;
+}
+
 /** Hela seed-planen: allt exekveringen ska skapa, + en sammanfattning för dry-run. */
 export interface SeedPlan {
   accounts: PlannedAccount[];
   newRooms: PlannedRoom[];
   memberships: PlannedMembership[];
   predictions: PlannedPredictions[];
+  /** Liv-lagret (T82 del 2): emoji-reaktioner, scopade till bot-medlemskap. */
+  reactions: PlannedRoomReaction[];
+  /** Liv-lagret (T82 del 2): SPARSAMMA kommentarer (+ ev. svar), scopade till bot-medlemskap. */
+  comments: PlannedRoomComment[];
   /** Persona-nycklar som hoppades över för att kontot redan fanns (idempotens). */
   skippedExisting: string[];
   summary: SeedPlanSummary;
@@ -107,6 +131,10 @@ export interface SeedPlanSummary {
   newRoomsToCreate: number;
   membershipsToCreate: number;
   predictionRowsToCreate: number;
+  reactionsToCreate: number;
+  commentsToCreate: number;
+  /** Hur många av kommentarerna som är svar (följd-fraser). Synliggör sparsamheten. */
+  replyComments: number;
   skippedExisting: number;
   byCohort: Record<BotCohort, number>;
 }
@@ -158,8 +186,15 @@ export function buildSeedPlan(
   const accounts: PlannedAccount[] = [];
   const memberships: PlannedMembership[] = [];
   const predictions: PlannedPredictions[] = [];
+  const reactions: PlannedRoomReaction[] = [];
   const skippedExisting: string[] = [];
   const usedNewRoomIndices = new Set<number>();
+
+  // Primära kommentarer samlas FÖRST (med författar-persona + target), så svaren kan
+  // planeras efteråt över hela mängden (en bot svarar på en ANNAN bots kommentar i samma
+  // tråd, vilket bara går att avgöra när alla primära kommentarer finns).
+  const primaryComments: PlannedRoomComment[] = [];
+  const replyInputs: (PrimaryComment & { target: PlannedMembership['target'] })[] = [];
 
   for (const persona of personas) {
     const key = personaKey(persona);
@@ -198,7 +233,28 @@ export function buildSeedPlan(
       groupPredictions: preds.groupPredictions,
       bracketPredictions: preds.bracketPredictions,
     });
+
+    // LIV-LAGRET (T82 del 2): reaktioner (primärt, billigt) + SPARSAMMA primära kommentarer.
+    for (const r of generateBotReactions(persona, domain.matches, domain.facit)) {
+      reactions.push({ personaKey: key, target, matchId: r.matchId, emoji: r.emoji });
+    }
+    for (const c of generateBotComments(persona, domain.matches, domain.facit)) {
+      primaryComments.push({
+        personaKey: key,
+        target,
+        matchId: c.matchId,
+        body: c.body,
+        isReply: false,
+      });
+      replyInputs.push({ personaKey: key, persona, matchId: c.matchId, target });
+    }
   }
+
+  // SVAR-APPROXIMATION (sparsamt): följd-fraser i match-trådar. Grupperas per (rum, match)
+  // så ett svar bara läggs där en ANNAN bot redan kommenterat i SAMMA rum (en giltig
+  // befintlig konversation), aldrig korsa rum. Se planRepliesPerRoom.
+  const replyComments = planRepliesPerRoom(replyInputs);
+  const comments = [...primaryComments, ...replyComments];
 
   // Nya rum: BARA de index som faktiskt fick minst en (icke-överhoppad) bot. Namnges
   // deterministiskt och igenkännligt (men inte uppenbart "bot-rum").
@@ -208,17 +264,87 @@ export function buildSeedPlan(
 
   // RHODOS-VAKT (HARD, F7): bevisa på den FÄRDIGA planen att inget mål rör Rhodos id.
   // Körs sist (när alla targets finns) så den faktiskt kan utlösa om en framtida
-  // ändring började mappa mot Rhodos. Se assertRhodosUntouched.
-  assertRhodosUntouched(snapshot, memberships, predictions);
+  // ändring började mappa mot Rhodos. Täcker NU även reaktioner + kommentarer (liv-lagret
+  // skriver också mot rum), så en framtida bugg som riktade liv-data mot Rhodos fångas.
+  assertRhodosUntouched(snapshot, memberships, predictions, reactions, comments);
 
   return {
     accounts,
     newRooms,
     memberships,
     predictions,
+    reactions,
+    comments,
     skippedExisting,
-    summary: summarize(accounts, newRooms, memberships, predictions, skippedExisting),
+    summary: summarize(
+      accounts,
+      newRooms,
+      memberships,
+      predictions,
+      reactions,
+      comments,
+      skippedExisting
+    ),
   };
+}
+
+/**
+ * Planera svar PER RUM: gruppera de primära kommentarerna på det RIKTIGA mål-rummet (så ett
+ * svar aldrig korsar rum) och delegera till den rena planReplies för varje rum. Mål-nyckeln
+ * är stabil ('existing#<id>' eller 'new#<index>'), och seeden härleds ur den så svaren är
+ * deterministiska per rum.
+ */
+function planRepliesPerRoom(
+  inputs: readonly (PrimaryComment & { target: PlannedMembership['target'] })[]
+): PlannedRoomComment[] {
+  const byRoom = new Map<
+    string,
+    { target: PlannedMembership['target']; items: PrimaryComment[] }
+  >();
+  for (const input of inputs) {
+    const roomKey = targetKey(input.target);
+    const bucket = byRoom.get(roomKey);
+    const item: PrimaryComment = {
+      personaKey: input.personaKey,
+      persona: input.persona,
+      matchId: input.matchId,
+    };
+    if (bucket) {
+      bucket.items.push(item);
+    } else {
+      byRoom.set(roomKey, { target: input.target, items: [item] });
+    }
+  }
+
+  const out: PlannedRoomComment[] = [];
+  for (const [roomKey, { target, items }] of byRoom) {
+    const replies = planReplies(items, hashString(roomKey));
+    for (const reply of replies) {
+      out.push({
+        personaKey: reply.personaKey,
+        target,
+        matchId: reply.matchId,
+        body: reply.body,
+        isReply: true,
+      });
+    }
+  }
+  return out;
+}
+
+/** Stabil sträng-nyckel för ett mål-rum (för gruppering + seed-härledning, deterministisk). */
+function targetKey(target: PlannedMembership['target']): string {
+  return target.kind === 'existing' ? `existing#${target.roomId}` : `new#${target.roomIndex}`;
+}
+
+/** Liten deterministisk sträng-hash (FNV-1a 32-bit) -> en seed för svar-rng:n per rum. */
+function hashString(value: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
 }
 
 /* ------------------------------------------------------------------ *
@@ -247,7 +373,8 @@ function findRoomByName(snapshot: RoomsSnapshot, name: string): ExistingRoom | n
  * kasta (PRINCIPLES §8: en fail-loud som inte kan faila är teater).
  *
  * Den ÄKTA kontrollen: ta Rhodos rum-id ur snapshot:en (om Rhodos finns) och kasta
- * om något planerat 'existing'-mål (medlemskap eller tips) refererar det id:t.
+ * om något planerat 'existing'-mål (medlemskap, tips, reaktion ELLER kommentar) refererar
+ * det id:t. Liv-lagret (T82 del 2) skriver också mot rum, så vakten täcker det också.
  *
  * Finns Rhodos inte i snapshot:en är det en säker no-op , det finns då inget id att
  * råka peka på, och planeraren skapar bara nya rum + de två namngivna befintliga.
@@ -255,7 +382,9 @@ function findRoomByName(snapshot: RoomsSnapshot, name: string): ExistingRoom | n
 function assertRhodosUntouched(
   snapshot: RoomsSnapshot,
   memberships: readonly PlannedMembership[],
-  predictions: readonly PlannedPredictions[]
+  predictions: readonly PlannedPredictions[],
+  reactions: readonly PlannedRoomReaction[],
+  comments: readonly PlannedRoomComment[]
 ): void {
   const rhodos = findRoomByName(snapshot, PROTECTED_ROOM_NAME);
   if (rhodos === null) {
@@ -266,7 +395,9 @@ function assertRhodosUntouched(
 
   if (
     memberships.some((m) => touchesRhodos(m.target)) ||
-    predictions.some((p) => touchesRhodos(p.target))
+    predictions.some((p) => touchesRhodos(p.target)) ||
+    reactions.some((r) => touchesRhodos(r.target)) ||
+    comments.some((c) => touchesRhodos(c.target))
   ) {
     throw new Error(
       `[VM2026] AVBRYTER: en seed-plan refererar det SKYDDADE Rhodos-rummet (${rhodos.id}). ` +
@@ -316,6 +447,8 @@ function summarize(
   newRooms: readonly PlannedRoom[],
   memberships: readonly PlannedMembership[],
   predictions: readonly PlannedPredictions[],
+  reactions: readonly PlannedRoomReaction[],
+  comments: readonly PlannedRoomComment[],
   skippedExisting: readonly string[]
 ): SeedPlanSummary {
   const byCohort: Record<BotCohort, number> = { 'new-room': 0, vm2026: 0, fsu: 0 };
@@ -332,6 +465,9 @@ function summarize(
     newRoomsToCreate: newRooms.length,
     membershipsToCreate: memberships.length,
     predictionRowsToCreate: predictionRows,
+    reactionsToCreate: reactions.length,
+    commentsToCreate: comments.length,
+    replyComments: comments.filter((c) => c.isReply).length,
     skippedExisting: skippedExisting.length,
     byCohort,
   };

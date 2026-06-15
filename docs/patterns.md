@@ -9,6 +9,40 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### sparsam-deterministisk-social-generering-med-tysthets-default (VM 2026)
+
+**Recept (generera "levande" social-data , reaktioner/kommentarer , från botar/agenter utan att spamma
+och utan att gissa data källan inte bär):**
+
+1. **Härled en KATEGORI ur källans EGNA form, gissa inte fält som saknas.** Klassa utfallet (här en
+   matchs "mood") ENBART ur det källan faktiskt bär (här `PoolFacit.matches[i].actual = Scoreline`), och
+   härled MEDVETET INTE kategorier som kräver data du inte har (här "skräll"/odds, "sen vinst"/minut).
+   Kategorin är EN sanning som alla generatorer läser (DRY). Testa prioritets-ordningen med DISKRIMINERANDE
+   fixturer (ett värde där fel ordning ger ett ANNAT svar) + operator-mutation som rödnar.
+2. **Reaktioner är primärt + billigt, kommentarer en sällsynt krydda.** Gata reaktioner på en MÅTTLIG
+   benägenhet, men SKALA NER kommentar-chansen hårt (här `commentChance * COMMENT_SCALE`), så kommentarer
+   blir få. Allt val (emoji, fras) ur KURERADE pooler som speglar en DB-CHECK / en enda sanning (här
+   `REACTION_EMOJIS`), aldrig en egen sträng som kan nekas live.
+3. **TYSTHETS-DEFAULT som beteende, inte som efterhandstanke.** Faller inte sannolikheten -> generera
+   INGET (var tyst). BEVISA sparsamheten kvantitativt (andel kommenterade enheter låg) OCH tysthets-
+   defaulten (lågbenägen aktör i ett "tråkigt" fall = 0), med en NEGATIV-KONTROLL (samma fall med hög
+   benägenhet ger > 0, annars vaktade testet inget).
+4. **Variation, inte mekaniska mallar.** Flera fras-varianter per (kategori, ton), valda deterministiskt,
+   så samma aktör inte upprepar identisk text och olika aktörer säger olika saker om samma händelse.
+5. **Determinism via separata seed-rymder per beteende.** Ge varje generator (tips/reaktion/kommentar/svar)
+   en EGEN seed-konstant XOR:ad med ett stabilt index, så beteendena inte korrelerar inom samma aktör men
+   ändå är reproducerbara (samma input -> samma output, dry-run == live).
+6. **Saknar schemat en koppling , approximera ärligt och dokumentera det.** Saknas en svars-/tråd-FK
+   (här room_comments utan parent_id) , approximera "svar" som en följd-rad i samma grupp (match-tråd) som
+   REDAN har en annan aktörs inlägg (giltig befintlig konversation), korsa aldrig grupper, och skriv ut
+   i decisions.md att det inte är en hård länk.
+
+**Varför:** social "atmosfär" från botar blir lätt antingen spam (för många, för mekaniska) eller falsk
+(hittar på utfall källan inte bär). Genom att härleda en kategori bara ur källans form, hålla kommentarer
+sällsynta med en bevisad tysthets-default, variera ur kurerade pooler, och approximera saknade kopplingar
+ärligt, blir resultatet diskret och naturligt , och varje "är det här sparsamt/sant?" är testbart, inte
+en gissning. Källa: T82 del 2 (`src/data/bots/match-mood.ts` + `react.ts` + `comment.ts` + `comment-pools.ts`).
+
 ### rå-api-kuvert-i-jsonb-projiceras-genom-kall-parsern-med-per-blob-isolering (VM 2026)
 
 **Recept (en DB-rad med RÅA externa svar i jsonb -> klient-modell, utan att gissa formen och utan att

@@ -20,6 +20,7 @@
 // Detta skript körs ALDRIG mot den skarpa databasen av byggaren; live-läget körs av
 // ägaren efter uttryckligt go (se HANDOFF). Här bevisas det bara kunna köras säkert.
 
+import { createHash } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../src/data/supabase-types';
 import { generatePersonas } from '../src/data/bots/personas';
@@ -188,6 +189,8 @@ function reportPlan(plan: SeedPlan, live: boolean): void {
   console.log(`  Nya rum att skapa:     ${s.newRoomsToCreate}`);
   console.log(`  Medlemskap att skapa:  ${s.membershipsToCreate}`);
   console.log(`  Tips-rader att skapa:  ${s.predictionRowsToCreate}`);
+  console.log(`  Reaktioner att skapa:  ${s.reactionsToCreate}`);
+  console.log(`  Kommentarer att skapa: ${s.commentsToCreate} (varav svar: ${s.replyComments})`);
   console.log(`  Hoppas över (finns):   ${s.skippedExisting}`);
 
   // Stickprov: visa 5 planerade botar (namn + kohort + mål) så man ser att de ser rimliga ut.
@@ -397,6 +400,71 @@ async function executePlan(client: AdminClient, plan: SeedPlan): Promise<void> {
     const roomId = resolveRoomId(pred.target, roomIdByIndex);
     await upsertPredictions(client, roomId, userId, pred);
   }
+
+  // 5) LIV-LAGRET (T82 del 2): emoji-reaktioner + SPARSAMMA kommentarer, i rätt rum.
+  await upsertReactions(client, plan, userIdByKey, roomIdByIndex);
+  await upsertComments(client, plan, userIdByKey, roomIdByIndex);
+}
+
+/**
+ * Emoji-reaktioner: en rad per planerad reaktion. Idempotent via PK:n
+ * (room_id, user_id, match_id) , en omkörning byter bara emojin på samma rad, dubblar inte
+ * (samma upsert-modell som klientens upsertMyReaction). user_id sätts här.
+ */
+async function upsertReactions(
+  client: AdminClient,
+  plan: SeedPlan,
+  userIdByKey: ReadonlyMap<string, string>,
+  roomIdByIndex: ReadonlyMap<number, string>
+): Promise<void> {
+  if (plan.reactions.length === 0) {
+    return;
+  }
+  const rows = plan.reactions.map((r) => ({
+    room_id: resolveRoomId(r.target, roomIdByIndex),
+    user_id: mustUserId(userIdByKey, r.personaKey),
+    match_id: r.matchId,
+    emoji: r.emoji,
+  }));
+  const { error } = await client
+    .from('room_reactions')
+    .upsert(rows, { onConflict: 'room_id,user_id,match_id' });
+  if (error) {
+    throw new Error(`[VM2026] Kunde inte skriva bot-reaktioner: ${error.message}`);
+  }
+}
+
+/**
+ * Kommentarer (match-trådar): en rad per planerad kommentar. room_comments har INGET
+ * naturligt unik-index (en användare kan ha flera kommentarer per match), så vi gör
+ * omkörningen idempotent via en DETERMINISTISK id (uuid härledd ur det stabila innehållet
+ * room_id+user_id+match_id+isReply+body) och upsert på `id`. Samma plan -> samma id -> ingen
+ * dubblett, och en bot kan inte råka få samma fras två gånger i samma tråd (önskad dedup).
+ */
+async function upsertComments(
+  client: AdminClient,
+  plan: SeedPlan,
+  userIdByKey: ReadonlyMap<string, string>,
+  roomIdByIndex: ReadonlyMap<number, string>
+): Promise<void> {
+  if (plan.comments.length === 0) {
+    return;
+  }
+  const rows = plan.comments.map((c) => {
+    const roomId = resolveRoomId(c.target, roomIdByIndex);
+    const userId = mustUserId(userIdByKey, c.personaKey);
+    return {
+      id: deterministicCommentId(roomId, userId, c.matchId, c.isReply, c.body),
+      room_id: roomId,
+      user_id: userId,
+      match_id: c.matchId,
+      body: c.body,
+    };
+  });
+  const { error } = await client.from('room_comments').upsert(rows, { onConflict: 'id' });
+  if (error) {
+    throw new Error(`[VM2026] Kunde inte skriva bot-kommentarer: ${error.message}`);
+  }
 }
 
 /** Match-/grupp-/bracket-tips för EN bot i ETT rum (rad-idempotent via onConflict). */
@@ -465,6 +533,32 @@ async function upsertPredictions(
 /** Persona-nyckel -> e-post-säker slug (a-z0-9 + bindestreck). */
 function slugifyKey(key: string): string {
   return key.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+}
+
+/**
+ * DETERMINISTISK kommentar-id (uuid v5-stil, SHA-1 över ett namespace + stabilt innehåll).
+ * room_comments saknar ett naturligt unik-index, så detta gör en omkörning idempotent:
+ * samma plan -> samma id -> upsert byter raden i stället för att skapa en dubblett. Format-
+ * korrekt uuid (version-nibble 5, variant-bitar satta) så DB:ns uuid-kolumn accepterar den.
+ */
+function deterministicCommentId(
+  roomId: string,
+  userId: string,
+  matchId: string,
+  isReply: boolean,
+  body: string
+): string {
+  // Fast namespace (en slumpad uuid, konstant) + det stabila innehållet. SHA-1 -> 16 byte.
+  const namespace = 'a3f1c2d4-5b6e-7f80-91a2-b3c4d5e6f708';
+  const hash = createHash('sha1')
+    .update(namespace)
+    .update(`${roomId}|${userId}|${matchId}|${isReply ? 'r' : 'c'}|${body}`)
+    .digest();
+  const bytes = Buffer.from(hash.subarray(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50; // version 5
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122-variant
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** Den första medlemmens persona-nyckel i ett nytt rum (skaparen). */

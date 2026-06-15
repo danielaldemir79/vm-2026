@@ -65,6 +65,56 @@ finns i snapshot:en, kasta om något planerat 'existing'-mål refererar Rhodos i
 snapshot:en är det en säker no-op (inget id att råka peka på). Negativ-kontroll körd (en plan som
 pekar på Rhodos id -> vakten kastar).
 
+## 2026-06-15 , Bot-liv-lagret T82 del 2 (#173): reaktioner + sparsamma kommentarer
+
+Liv-lagret som får sidan att kännas naturligt LEVANDE utan att spamma. Ägarens regel (HARD):
+kommenterar ibland, inte för mycket; blir en kommentar inte naturlig är det BÄTTRE att boten är tyst
+och bara reagerar. Reaktioner är primärt + billigt, kommentarer en sällsynt krydda.
+
+**Beslut: match-stämning (mood) härleds ENBART ur det facit faktiskt bär (ordinarie Scoreline).**
+`moodFromScoreline` (src/data/bots/match-mood.ts) klassar en spelad match som målfest / mållöst /
+oavgjort / rafflande / klar seger / knapp seger. Vi härleder MEDVETET INTE "skräll" (kräver
+odds/förväntan) eller "sen vinst" (kräver matchminut) , den datan finns inte i facit-formen
+(`PoolFacit.matches[i].actual = Scoreline`, derive-facit.ts), och att hitta på dem ur en ren siffra
+vore en gissning maskerad som fakta (lessons "lattgissad-domanregel-styr-otestad-gren"). Prioritets-
+ordningen (målfest före thriller osv.) är en VAL-invariant, testad med diskriminerande fixturer
+(en 4-3 = målfest, inte thriller) + negativ-kontroll (operator-mutation rödnar). Mood är EN sanning
+som både reaktions- och kommentar-genereringen läser (DRY).
+
+**Beslut: emoji-reaktioner styrs av mood + ton, ALLTID ur den kurerade 8-listan.** `generateBotReactions`
+(react.ts) väljer emoji ur en mood-palett (målfest -> ⚽/🎉, mållöst -> 🧊 osv.) med en liten ton-nyans,
+alltid ur klientens `REACTION_EMOJIS` (reactions-api.ts) som speglar DB:ns `room_reactions_emoji_allowed`
+-CHECK 1:1 (en sanning). Kadens via personans `reactionChance` (0..0.5), spritt (seed per index), en
+reaktion per (bot, match) = PK-invarianten. Kohort: new-room reagerar på SPELADE matcher (de var med),
+vm2026/fsu på KOMMANDE (de har inte sett facit) med en neutral "het match"-emoji 🔥.
+
+**Beslut: kommentarer är KURERADE svenska fraspooler per (mood, ton), med en TYSTHETS-DEFAULT.**
+Poolerna (comment-pools.ts) har FLERA varianter per (mood, ton) så texten varierar (inte mekaniska
+mallar som upprepas , det skulle se botigt ut). En bot kommenterar en spelad match bara om (a) den
+är new-room OCH (b) en dragning < `commentChance * COMMENT_SCALE` (0.35) faller , annars INGEN
+kommentar (boten är tyst). Sparsamheten är BEVISAD kvantitativt (en högt pratig bot kommenterar
+~5 % av matcherna, summan över alla botar < 15 % av taket) + tysthets-defaulten testad (lågbenägen
+bot i en mållös turnering = 0 kommentarer, med negativ-kontroll som rödnar). Det finns ingen extern
+"rätt" formulering att källåkra , poolerna är ett medvetet designval, inte en gissad regel.
+
+**Beslut: "svar mellan botar" approximeras som följd-fraser i samma match-tråd (schemat saknar svars-
+koppling).** room_comments har INGEN parent_id/reply-kolumn (bekräftat i migrationerna
+20260612103836_t66 + 20260613144345_t77: bara en nullable `match_id` som delar in i match-trådar,
+ingen rad-till-rad-referens). En bot kan alltså inte peka ett svar på en SPECIFIK kommentar. `planReplies`
+(comment.ts) lägger därför sparsamt en kort medhålls-fras i en tråd som REDAN har minst en ANNAN bots
+kommentar (en giltig befintlig konversation, aldrig ett svar i en tom/egen tråd), per rum (svar korsar
+aldrig rum). Ärlig avvägning: det läses som ett svar utan att vara en hård FK-länk. Vill vi senare ha
+äkta trådar krävs en parent_id-migration (ej i scope här).
+
+**Beslut: kommentar-idempotens via deterministisk id (room_comments saknar naturligt unik-index).**
+En bot kan ha flera kommentarer per match, så det finns ingen `(rum,bot,match)`-unikhet att upserta på.
+Exekvereraren (seed-bots.ts) härleder ett DETERMINISTISKT uuid (v5-stil SHA-1 över rum+bot+match+isReply
++body) och upsertar på `id`, så en omkörning byter raden i stället för att dubbla. Reaktioner upsertas på
+sin PK `(room_id,user_id,match_id)` (samma modell som klientens upsertMyReaction). Teardown städar båda
+via cascade (FK on delete cascade mot auth.users, verifierat i migrationerna). Rhodos-vakten utökad att
+täcka liv-lagret (reaktioner + kommentarer riktas också mot rum), negativ-kontroll körd: reaktions-/
+kommentar-grenen kan utlösa på egen hand (membership/prediction-grenen bortmuterad -> vakten kastar ändå).
+
 ## 2026-06-15 , Livescore pollare-v3: per-match-polling med fönster-gating (full rik data LIVE)
 
 Byter pollarens modell: en LIVE match får full rik data UNDER matchen (målskytt/assist/kort/

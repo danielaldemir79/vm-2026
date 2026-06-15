@@ -252,3 +252,107 @@ describe('fail loud när ett namngivet mål-rum saknas', () => {
     expect(() => buildSeedPlan(onlyNewRoom, snap, DOMAIN)).not.toThrow();
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * LIV-LAGRET (T82 del 2): reaktioner + kommentarer i planen.
+ * ------------------------------------------------------------------ */
+
+describe('liv-lagret i planen (reaktioner + kommentarer)', () => {
+  const plan = buildSeedPlan(PERSONAS, freshSnapshot(), DOMAIN);
+  const botKeys = new Set(PERSONAS.map((p) => personaKey(p)));
+
+  it('planen innehåller reaktioner (botarna reagerar) + summan stämmer', () => {
+    expect(plan.reactions.length).toBeGreaterThan(0);
+    expect(plan.summary.reactionsToCreate).toBe(plan.reactions.length);
+  });
+
+  it('planen innehåller kommentarer (sparsamt) + summan + svar-räkningen stämmer', () => {
+    expect(plan.comments.length).toBeGreaterThan(0);
+    expect(plan.summary.commentsToCreate).toBe(plan.comments.length);
+    expect(plan.summary.replyComments).toBe(plan.comments.filter((c) => c.isReply).length);
+  });
+
+  it('kommentarer är FÄRRE än reaktioner (kommentar = krydda, reaktion = primärt)', () => {
+    expect(plan.comments.length).toBeLessThan(plan.reactions.length);
+  });
+
+  it('varje reaktion + kommentar hör till ett PLANERAT bot-konto (scopat, ingen riktig data)', () => {
+    for (const r of plan.reactions) {
+      expect(botKeys.has(r.personaKey)).toBe(true);
+    }
+    for (const c of plan.comments) {
+      expect(botKeys.has(c.personaKey)).toBe(true);
+    }
+  });
+
+  it('inget liv-lager-mål pekar på ett befintligt Rhodos-id', () => {
+    for (const r of plan.reactions) {
+      if (r.target.kind === 'existing') {
+        expect(r.target.roomId).not.toBe(RHODOS.id);
+      }
+    }
+    for (const c of plan.comments) {
+      if (c.target.kind === 'existing') {
+        expect(c.target.roomId).not.toBe(RHODOS.id);
+      }
+    }
+  });
+
+  it('reaktioner: ingen bot reagerar två gånger på samma match i samma rum (PK-invariant)', () => {
+    const seen = new Set<string>();
+    for (const r of plan.reactions) {
+      const targetId = r.target.kind === 'existing' ? r.target.roomId : `new#${r.target.roomIndex}`;
+      const key = `${r.personaKey}|${targetId}|${r.matchId}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+
+  it('svar-kommentarer ligger i en tråd som har minst en ANNAN bots primär-kommentar', () => {
+    // En svar-kommentar är bara giltig om det finns en primär kommentar från en ANNAN bot
+    // i samma (rum, match). Annars vore svaret påklistrat (svar i en tom/egen tråd).
+    const primariesByThread = new Map<string, Set<string>>();
+    for (const c of plan.comments) {
+      if (c.isReply) {
+        continue;
+      }
+      const targetId = c.target.kind === 'existing' ? c.target.roomId : `new#${c.target.roomIndex}`;
+      const threadKey = `${targetId}|${c.matchId}`;
+      const authors = primariesByThread.get(threadKey) ?? new Set<string>();
+      authors.add(c.personaKey);
+      primariesByThread.set(threadKey, authors);
+    }
+    const replies = plan.comments.filter((c) => c.isReply);
+    for (const reply of replies) {
+      const targetId =
+        reply.target.kind === 'existing' ? reply.target.roomId : `new#${reply.target.roomIndex}`;
+      const threadKey = `${targetId}|${reply.matchId}`;
+      const authors = primariesByThread.get(threadKey);
+      expect(authors).toBeDefined();
+      // Det finns minst en primär-författare som INTE är svararen (någon att svara på).
+      const others = [...authors!].filter((a) => a !== reply.personaKey);
+      expect(others.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('idempotens: redan-seedade botar ger inga reaktioner/kommentarer (tom plan)', () => {
+    const snap: RoomsSnapshot = {
+      existingRooms: [RHODOS, VM_ROOM, FSU_ROOM],
+      existingBotKeys: new Set(PERSONAS.map((p) => personaKey(p))),
+    };
+    const empty = buildSeedPlan(PERSONAS, snap, DOMAIN);
+    expect(empty.reactions).toHaveLength(0);
+    expect(empty.comments).toHaveLength(0);
+  });
+
+  it('RHODOS-VAKTEN KASTAR om en reaktion riktas mot Rhodos id (negativ-kontroll, liv-lagret)', () => {
+    // VM-rummet bär Rhodos id => vm2026-botarnas reaktioner (existing-mål) pekar på det
+    // SKYDDADE id:t. Vakten ska fail-loud:a på den färdiga planen (täcker nu liv-lagret).
+    const vmSharingRhodosId: ExistingRoom = { id: RHODOS.id, name: VM2026_ROOM_NAME };
+    const snap: RoomsSnapshot = {
+      existingRooms: [RHODOS, vmSharingRhodosId, FSU_ROOM],
+      existingBotKeys: new Set(),
+    };
+    expect(() => buildSeedPlan(PERSONAS, snap, DOMAIN)).toThrow(/SKYDDADE Rhodos-rummet/);
+  });
+});
