@@ -20,7 +20,6 @@ import { Fade, Slide, transitions } from '../../motion';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupData } from './use-group-data';
 import { GroupTable } from './GroupTable';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 
 /**
  * Teckenförklaring för kolumn-förkortningarna, så de inte är kryptiska (a11y).
@@ -130,8 +129,6 @@ export function GroupStageView() {
   // vyn är en ren konsument. Måste därför renderas inuti en ResultsProvider.
   const { status, tables, teams, mode, error } = useGroupData();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
-  // Anmäl sektionen till chip-navet (T78, #165) medan vyn är monterad.
-  useRegisterSection(SECTIONS.groups);
 
   return (
     <section aria-labelledby="gruppspel-rubrik" className="flex flex-col gap-6">

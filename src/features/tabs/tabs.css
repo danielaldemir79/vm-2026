@@ -1,0 +1,120 @@
+/* Flik-radens layout + baseline-utseende (T83, #175).
+ *
+ * FUNKTIONELL + tillgänglig baseline; design-frontend lägger premium-finishen
+ * (ikoner, aktiv-indikator, mikro-animation) ovanpå via de stabila .vm-tab*-hakarna
+ * + data-attributen (samma arbetsdelning som tidigare tasks). Här bor bara det som
+ * gör raden ANVÄNDBAR och RESPONSIV: var den sitter, hur den klarar tangentbord
+ * (fokus-ring), och att den inte skymmer innehåll.
+ *
+ * RESPONSIV PLACERING (ren CSS, ingen JS-resize-gissning, samma princip som T79):
+ *   - MOBIL (< 640px): en flik-rad FAST längst ner (sport-app-mönster, tummen når
+ *     den). safe-area-inset så den inte hamnar under iPhone-hemknappsindikatorn.
+ *   - DESKTOP (>= 640px): en horisontell rad i flödet, sticky direkt under app-
+ *     headern (top-0-headern är z-10), så den alltid är nåbar vid scroll.
+ * Vilken layout som gäller styrs HELT av media-queries, så ingen dubbel-rendering
+ * och inget JS behövs (en enda DOM-nod, två lägen). */
+
+/* Bredd-brytpunkten matchar Tailwinds `sm` (640px), appens etablerade mobil/desktop-
+   gräns (App.tsx + section-nav använde sm:). En sanning för var "mobil" slutar. */
+
+/* --- MOBIL (default): fast flik-rad längst ner --- */
+.vm-tab-bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 20; /* Över sid-innehåll, under modaler (z-50) + UpdatePrompt. */
+  border-top: 1px solid var(--color-border);
+  /* Opak, lätt frostad fond så innehåll som scrollar under raden inte lyser igenom
+     (samma anti-genomlysnings-recept som app-headern). */
+  background-color: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  /* Respektera mobilens safe-area (iPhone home-indikator), annars klipps raden. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.vm-tab-list {
+  display: flex;
+  margin-inline: auto;
+  max-width: 72rem; /* max-w-6xl, samma som appens main-container. */
+}
+
+.vm-tab {
+  flex: 1 1 0; /* Fem lika breda flikar på mobil. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.625rem 0.5rem;
+  min-height: 3rem; /* >= 44px touch-mål (WCAG 2.5.5 / mobil-ergonomi). */
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Aktiv flik: full fg + en accent-markör (ovanför texten på mobil-raden). Färg-
+   markering ENSAM räcker inte (färgblind), så design-frontend lägger en ikon/vikt-
+   skillnad ovanpå; baseline ger fg-kontrast + en synlig topp-markör. */
+.vm-tab[data-active='true'] {
+  color: var(--color-fg);
+  box-shadow: inset 0 2px 0 0 var(--color-accent);
+}
+
+/* Synlig tangentbords-fokus (WCAG 2.4.7), samma accent-ring-recept som appens övriga
+   kontroller. focus-visible => musklick ger ingen ring, tangentbord gör det. */
+.vm-tab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-tab {
+    transition:
+      color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+}
+
+/* Innehålls-luft så den fasta mobil-raden aldrig skymmer sidans sista innehåll.
+   Sätts på en wrapper appen ger (data-tab-content); höjd-raden (~3.25rem) + safe-area. */
+.vm-tab-content {
+  padding-bottom: calc(3.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* --- DESKTOP (>= 640px): horisontell rad i flödet, sticky under headern --- */
+@media (min-width: 640px) {
+  .vm-tab-bar {
+    position: sticky;
+    top: 0; /* Headern är inte sticky-staplad ovanför här (se nedan); raden tar toppen. */
+    bottom: auto;
+    border-top: none;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 0;
+  }
+
+  .vm-tab-list {
+    justify-content: flex-start;
+    gap: 0.25rem;
+    padding-inline: 1.5rem;
+  }
+
+  .vm-tab {
+    flex: 0 0 auto; /* Innehållsbred på desktop (inte tvingat lika breda). */
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    border-radius: 0;
+  }
+
+  /* Desktop: aktiv-markören blir en UNDERLINJE (under raden) i stället för topp-streck. */
+  .vm-tab[data-active='true'] {
+    box-shadow: inset 0 -2px 0 0 var(--color-accent);
+  }
+
+  /* Ingen fast botten-rad => ingen extra botten-luft behövs på desktop. */
+  .vm-tab-content {
+    padding-bottom: 0;
+  }
+}

@@ -9,6 +9,56 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### flik-app-shell-med-hash-routning-utan-router-dependency (VM 2026)
+
+**Problem:** en SPA som vuxit till en lång sida ska bli en flik-app (vy-växling) med delbar URL,
+bakåt-knapp och djuplänk , men ett router-paket är överkill för EN navigerings-axel (PRINCIPLES §11).
+
+**Recept (`src/features/tabs/`, T83):**
+1. **EN katalog** (`tab-config.ts`) = en sanning per flik: id (typad union), etikett, URL-slug, ordning.
+   Flik-raden, routningen OCH App.tsx läser samma lista, så en ny/ändrad flik ändras på ETT ställe.
+2. **Ren hash<->flik-mappning** (`tab-routing.ts`, ingen window/React): `tabFromHash` (fail-safe till
+   default för tom/okänd hash) + `hashForTab`. Testbar fristående med round-trip + okänd-slug-fall.
+3. **Hook med window/history-IO** (`use-tab-routing.ts`): lat initial-läsning ur `location.hash`
+   (djuplänk vid kall-laddning), `history.pushState` per flik-byte (bakåt-knapp = en post per byte),
+   lyssna på BÅDE `popstate` (bakåt) och `hashchange` (manuell länk), normalisera tom hash till
+   kanonisk form med `replaceState` (ingen extra post). **Hash, inte path**, för statiskt hostade
+   SPA:er (Cloudflare/GitHub Pages): en path-rutt ger 404 vid direkt-laddning, hash serveras alltid.
+4. **Tillgänglig tablist** (`TabBar.tsx`): role tablist/tab, aria-selected + aria-current + aria-controls,
+   ROVING TABINDEX (bara aktiv flik tabbar, övriga -1), piltangenter/Home/End som flyttar+aktiverar+
+   flyttar fokus. focus-visible-ring + reduced-motion i CSS. Responsiv placering (mobil-botten/desktop-
+   top) via REN CSS-media-query (ingen JS-resize-gissning).
+5. **Alla paneler MONTERADE, inaktiv = `hidden`** (`TabPanel.tsx`, role tabpanel + aria-labelledby):
+   bevarar vy-state (formulär/sök/utfällt) över flik-byte (unmount skulle tappa det), delar providers +
+   live-data, och `hidden` (display:none) tar bort den dolda panelen ur layout OCH a11y-trädet (ren
+   scroll per flik, skärmläsaren ser bara aktiv flik). Pris: `getByRole` ser inte roller i en `hidden`
+   panel , navigera till fliken i test före roll-assertioner (bevisar också vy-växlingen end-to-end).
+
+**Varför:** state + hash/history räcker exakt för delbar länk + bakåt + djuplänk, utan en router-
+dependency, och en katalog + ren mappning + tillgänglig tablist ger en testbar, drift-säker grund som
+senare flik-features placeras i. Källa: T83 (`src/features/tabs/*`, decisions.md 2026-06-15).
+
+### sticky-foljer-sidscroll-kraver-gemensam-containing-block (VM 2026)
+
+**Problem:** en `position: sticky`-kontroll (t.ex. en "komprimera"-bar som ska följa med ner i en lång
+lista) "glider ur vy" i stället för att klistra , den verkar inte följa sidans scroll.
+
+**Root cause:** en sticky-yta klistrar/följer bara med inom sin egen CONTAINING BLOCK = föräldra-
+elementets innehållsbox (CSS Positioned Layout L3 §6.2). Ligger den sticky baren och den långa listan
+som SKILDA SYSKON, är barens containing block bara dess egen lilla wrapper (noll extra höjd) , den har
+ingen sträcka att följa längs och skrollar ur vy direkt. (Förväxla inte med en faktisk nästlad overflow-
+scroll; här är det containing-block-relationen, inte en inre scroll-container.)
+
+**Fix:** lägg den sticky baren OCH innehållet den ska följa längs i SAMMA förälder (skicka listan som
+`children`, rendera den efter baren i samma wrapper). Då sträcker sig containing block:en över hela
+listans höjd och `sticky top-N` klistrar baren under headern hela vägen ner.
+
+**Bevisa (jsdom har ingen layout):** (1) enhetstest på den STRUKTURELLA invarianten , bar och lista har
+samma `parentElement` , med en negativ-kontroll som rödnar om listan åter blir ett syskon; (2) en
+browser-probe (Playwright) som mäter barens `getBoundingClientRect().top` före/efter `window.scrollBy`
+och bekräftar att den stannar nära toppen (under headern), inte glider bort. Källa: T83, F1
+(`src/components/collapsible-list/StickyFollowToggle.tsx` + `.test.tsx`, decisions.md 2026-06-15).
+
 ### hand-rullad-fast-höjd-virtualisering-utan-dependency (VM 2026)
 
 **Problem:** en lista kan bli LÅNG (240+ rader, t.ex. den totala topplistan över alla rum), och att

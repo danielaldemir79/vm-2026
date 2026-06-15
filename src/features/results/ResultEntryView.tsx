@@ -200,40 +200,39 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
 
           STICKY "FÖLJ-MED"-KONTROLL i UTFÄLLT läge (#173 T82 del 4, ägarens feedback
           "den där raden som följer med i listorna bör finnas på alla"): när listan är
-          utfälld (104 matcher = lång) klistrar den övre kontrollen direkt under sektions-
-          navet (--vm-section-nav-offset, samma offset rubrikerna rensar), så KOMPRIMERA
-          alltid är ett tryck bort oavsett hur djupt man skrollat , man behöver inte längre
-          skrolla tillbaka till listans topp. I KOMPRIMERAT läge (3-dygnsfönstret, kort) är
-          den en vanlig inline-kontroll (inget att följa med i). Den inre 3-dygns-
-          komprimeringen + hidden-bevarad inmatning är OFÖRÄNDRAD; bara kontrollens
-          klister-position ändras per läge (ren list-presentation, ingen inmatnings-/
-          validerings-logik rörd). data-results-sticky bär bara styling-/test-haken. */}
-      {status === 'ready' && editable.length > 0 && hasHidden ? (
-        <StickyFollowToggle
-          expanded={expanded}
-          hiddenCount={windowed.hiddenCount}
-          controls={listId}
-          onToggle={toggleExpanded}
-          buttonRef={topToggleRef}
-          name="results"
-        />
-      ) : null}
-
-      {status === 'ready' && editable.length > 0 ? (
-        // DAG-GRUPPERAD lista (T28/#42): varje speldag är ett <li> med en rubrik
-        // (h3) + en nästlad <ul> av matchkort. Listans yttre id är aria-controls-
-        // målet för båda toggle-kontrollerna.
-        //
-        // BEVARAR #39-invarianten (C2): varje MATCHKORTS <li> behåller sitt egna
-        // `hidden`-attribut (out-of-window-kort döljs, men UNMOUNTAS inte, så
-        // osparad inmatning överlever expandera/ihopfäll). Dag-<li>:t döljs bara
-        // när HELA dagen är utanför fönstret (annars vore rubriken en tom rad),
-        // men kortens egna hidden står kvar oberoende, så closest('li')-haken i
-        // C2-testet (det innersta korts-<li>:t) fortsätter stämma.
-        <ul id={listId} className="m-0 flex list-none flex-col gap-6 p-0">
-          {dayGroups.map((day) => (
-            <li key={day.dateKey} data-result-day={day.dateKey} hidden={!dayHasVisible(day)}>
-              {/* Dag-rubrik: läsbar svensk dag ("torsdag 11 juni 2026") via daily/
+          utfälld (104 matcher = lång) klistrar den övre kontrollen direkt under sajt-
+          headern (top-16), så KOMPRIMERA alltid är ett tryck bort oavsett hur djupt man
+          skrollat , man behöver inte längre skrolla tillbaka till listans topp. I
+          KOMPRIMERAT läge (3-dygnsfönstret, kort) är den en vanlig inline-kontroll (inget
+          att följa med i). Den inre 3-dygns-komprimeringen + hidden-bevarad inmatning är
+          OFÖRÄNDRAD; bara kontrollens klister-position ändras per läge (ren list-
+          presentation, ingen inmatnings-/validerings-logik rörd). */}
+      {status === 'ready' && editable.length > 0
+        ? (() => {
+            // DAG-GRUPPERAD lista (T28/#42): varje speldag är ett <li> med en rubrik
+            // (h3) + en nästlad <ul> av matchkort. Listans yttre id är aria-controls-
+            // målet för båda toggle-kontrollerna.
+            //
+            // STICKY "FÖLJ-MED" (F1-fix T83): när fönstret döljer något wrappar
+            // StickyFollowToggle den övre kontrollen OCH hela dag-listan i EN container,
+            // så den sticky baren (utfällt läge) klistrar under sajt-headern och följer
+            // med ner i listan. Listan ligger som `children` (inte ett syskon) just för
+            // att en sticky-yta bara följer med inom sin egen containing block , det var
+            // F1-buggen. I komprimerat läge (3-dygnsfönstret, kort) ingen toggle => naken
+            // lista (oförändrat). Den inre 3-dygns-komprimeringen + hidden-bevarad
+            // inmatning + dag-rubrikernas egen sticky är OFÖRÄNDRADE.
+            const list = (
+              //
+              // BEVARAR #39-invarianten (C2): varje MATCHKORTS <li> behåller sitt egna
+              // `hidden`-attribut (out-of-window-kort döljs, men UNMOUNTAS inte, så
+              // osparad inmatning överlever expandera/ihopfäll). Dag-<li>:t döljs bara
+              // när HELA dagen är utanför fönstret (annars vore rubriken en tom rad),
+              // men kortens egna hidden står kvar oberoende, så closest('li')-haken i
+              // C2-testet (det innersta korts-<li>:t) fortsätter stämma.
+              <ul id={listId} className="m-0 flex list-none flex-col gap-6 p-0">
+                {dayGroups.map((day) => (
+                  <li key={day.dateKey} data-result-day={day.dateKey} hidden={!dayHasVisible(day)}>
+                    {/* Dag-rubrik: läsbar svensk dag ("torsdag 11 juni 2026") via daily/
                   formatDayHeading (DRY, EN sanning för dag-rubriken). h3 under vyns
                   h2, så rubrik-hierarkin är korrekt för skärmläsare.
 
@@ -256,37 +255,37 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
                   z-10 lägger den över korten (men under/jämsides headern, ingen
                   överlapp eftersom de inte delar y-rum). capitalize lyfter
                   veckodags-initialen. */}
-              {/* I UTFÄLLT läge ligger en STICKY komprimera-bar ovanför listan (#173 T82 del 4),
+                    {/* I UTFÄLLT läge ligger en STICKY komprimera-bar ovanför listan (#173 T82 del 4),
                   så dag-rubriken pinnas en bit LÄGRE (top-28) för att hamna UNDER baren i
                   stället för bakom den. I komprimerat läge (ingen sticky bar) pinnar den som
                   förr (top-16, precis under sajt-headern). */}
-              <div
-                className={`sticky z-10 -mx-1 mb-3 bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] px-1 py-2 backdrop-blur-sm ${
-                  expanded ? 'top-28' : 'top-16'
-                }`}
-              >
-                <h3
-                  data-result-day-heading=""
-                  className="flex items-center gap-2.5 font-display text-sm font-semibold capitalize tracking-tight text-fg"
-                >
-                  {/* Accent-"tändsticka": en kort lodrät glöd-list (gräsplan-grön),
+                    <div
+                      className={`sticky z-10 -mx-1 mb-3 bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] px-1 py-2 backdrop-blur-sm ${
+                        expanded ? 'top-28' : 'top-16'
+                      }`}
+                    >
+                      <h3
+                        data-result-day-heading=""
+                        className="flex items-center gap-2.5 font-display text-sm font-semibold capitalize tracking-tight text-fg"
+                      >
+                        {/* Accent-"tändsticka": en kort lodrät glöd-list (gräsplan-grön),
                       den lilla kvällsljus-gnistan som markerar dagens start. */}
-                  <span
-                    aria-hidden="true"
-                    className="h-4 w-[3px] shrink-0 rounded-pill bg-[var(--color-accent)] shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
-                  />
-                  <span className="whitespace-nowrap">{formatDayHeading(day.dateKey)}</span>
-                  {/* Horisont-linje: en hårfin gradient som tonar ut åt höger (grön ->
+                        <span
+                          aria-hidden="true"
+                          className="h-4 w-[3px] shrink-0 rounded-pill bg-[var(--color-accent)] shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent)_60%,transparent)]"
+                        />
+                        <span className="whitespace-nowrap">{formatDayHeading(day.dateKey)}</span>
+                        {/* Horisont-linje: en hårfin gradient som tonar ut åt höger (grön ->
                       guld -> inget), arena-tier-linjen. Tar resten av bredden så
                       rubriken fyller raden snyggt. aria-hidden (ren dekoration). */}
-                  <span
-                    aria-hidden="true"
-                    className="h-px min-w-6 flex-1 rounded-pill bg-[linear-gradient(90deg,color-mix(in_srgb,var(--color-accent)_45%,transparent),color-mix(in_srgb,var(--vm-gold)_30%,transparent)_45%,transparent)]"
-                  />
-                </h3>
-              </div>
-              <ul className="m-0 flex list-none flex-col gap-3 p-0">
-                {/* RENDERA ALLA dagens matcher alltid, dölj de utanför fönstret med
+                        <span
+                          aria-hidden="true"
+                          className="h-px min-w-6 flex-1 rounded-pill bg-[linear-gradient(90deg,color-mix(in_srgb,var(--color-accent)_45%,transparent),color-mix(in_srgb,var(--vm-gold)_30%,transparent)_45%,transparent)]"
+                        />
+                      </h3>
+                    </div>
+                    <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                      {/* RENDERA ALLA dagens matcher alltid, dölj de utanför fönstret med
                     `hidden` (Copilot R1, C2 från #39). VARFÖR `hidden` i stället för
                     att FILTRERA bort dem: ett out-of-window-formulär kan ha OSPARAD
                     inmatning i sin lokala useState; filtrerar vi bort det vid
@@ -295,26 +294,42 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
                     så ett pågående edit överlever expandera/ihopfäll. Dolda kort nås
                     inte av tab eller skärmläsare, och getAllByRole('group') räknar
                     bara de synliga, så hiddenCount i knappen stämmer. */}
-                {day.matches.map((match) => (
-                  <li key={match.id} hidden={!isInWindow(match.id)}>
-                    {/* STABIL key (match.id), INTE en data-beroende key (C7/C8):
+                      {day.matches.map((match) => (
+                        <li key={match.id} hidden={!isInWindow(match.id)}>
+                          {/* STABIL key (match.id), INTE en data-beroende key (C7/C8):
                         ResultEntryForm synkar sig själv mot matchens nuvarande värden
                         via en DIRTY-medveten effekt (mål/status/straffar konsekvent),
                         men bara när formuläret är "rent", så pågående inmatning bevaras.
                         Därför behövs ingen re-mount-key, instansen lever kvar. */}
-                    <ResultEntryForm
-                      match={match}
-                      teamsById={teamsById}
-                      onSubmit={submitResult}
-                      onSaved={handleSaved}
-                    />
+                          <ResultEntryForm
+                            match={match}
+                            teamsById={teamsById}
+                            onSubmit={submitResult}
+                            onSaved={handleSaved}
+                          />
+                        </li>
+                      ))}
+                    </ul>
                   </li>
                 ))}
               </ul>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+            );
+            return hasHidden ? (
+              <StickyFollowToggle
+                expanded={expanded}
+                hiddenCount={windowed.hiddenCount}
+                controls={listId}
+                onToggle={toggleExpanded}
+                buttonRef={topToggleRef}
+                name="results"
+              >
+                {list}
+              </StickyFollowToggle>
+            ) : (
+              list
+            );
+          })()
+        : null}
 
       {/* NEDRE ihopfäll-/expandera-kontroll (T28/#42, dubblerad): i UTFÄLLT läge
           ligger den efter hela listan, så användaren kan fälla ihop utan att skrolla

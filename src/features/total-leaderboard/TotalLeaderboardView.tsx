@@ -6,16 +6,12 @@
 //      "Visa alla N"-knapp för att fälla ut.
 //   3. UTFÄLLT LÄGE: hela listan som EN virtualiserad scroll + sök + "hoppa till mig"
 //      (TotalLeaderboardList). Egen rad fortsatt markerad.
-//
-// Anmäler sig till sektions-navet (useRegisterSection) så chip:et "Global" bara finns när
-// vyn FAKTISKT renderar (självregistrering, lessons "inga döda gränssnitts-val").
 
 import { useEffect, useRef, useState } from 'react';
 import { useTotalLeaderboardStore } from './total-leaderboard-context';
 import { TotalSelfHero } from './TotalSelfHero';
 import { TotalLeaderboardRow } from './TotalLeaderboardRow';
 import { TotalLeaderboardList } from './TotalLeaderboardList';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 
 /** Hur många toppdeltagare som visas i det KOMPRIMERADE läget (pallen + lite till). */
 const PODIUM_COUNT = 5;
@@ -25,7 +21,6 @@ const FULL_LIST_ID = 'total-leaderboard-full';
 
 export function TotalLeaderboardView() {
   const store = useTotalLeaderboardStore();
-  useRegisterSection(SECTIONS.totalLeaderboard);
   const [expanded, setExpanded] = useState(false);
   // Ref till "Visa alla N"-toggeln, så fokus kan återföras dit när listan komprimeras via
   // den sticky kontrollen INUTI listan (annars tappas fokus när den kontrollen avmonteras).

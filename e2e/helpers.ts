@@ -4,7 +4,7 @@
 // härledda ur appens faktiska konstanter/markup så ett namnbyte i appen failar HÄR
 // i stället för att tyst göra ett test irrelevant.
 
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 // Tema-systemets localStorage-nyckel + attribut. Speglar src/theme/theme-constants.ts
 // (THEME_STORAGE_KEY = 'vm2026-theme', THEME_ATTRIBUTE = 'data-theme'). De är ett
@@ -75,12 +75,22 @@ export async function openApp(page: Page, options: OpenAppOptions = {}): Promise
   await page.getByRole('heading', { level: 1, name: 'VM 2026' }).waitFor();
 }
 
-// De fyra kärn-sektionernas tillgängliga rubrik-namn (h2), i renderings-ordning.
-// Härledda ur de faktiska <h2 id="...-rubrik">-elementen i respektive vy. Används
-// av "appen laddar + sektioner renderas"-scenariot.
-export const SECTION_HEADINGS = [
-  'Dagens matcher',
-  'Gruppspelet',
-  'Vad krävs',
-  'Slutspelsträdet',
-] as const;
+// Kärn-sektionernas tillgängliga rubrik-namn (h2), grupperade per FLIK (T83): efter
+// flik-IA:n (issue #175) ligger "Dagens matcher" i Idag-fliken och gruppspel/"vad krävs"/
+// slutspelsträd i Turnering-fliken. Härledda ur de faktiska <h2 id="...-rubrik">-elementen
+// i respektive vy. Används av "appen laddar + sektioner renderas"-scenariot.
+export const IDAG_HEADINGS = ['Dagens matcher'] as const;
+export const TURNERING_HEADINGS = ['Gruppspelet', 'Vad krävs', 'Slutspelsträdet'] as const;
+
+/**
+ * Byt till en flik via flik-raden (tablist) och vänta tills dess panel är aktiv.
+ * Klickar den tillgängliga tab-knappen (samma väg en användare tar). Flik-etiketterna
+ * speglar TABS i src/features/tabs/tab-config.ts.
+ */
+export async function gotoTab(
+  page: Page,
+  label: 'Idag' | 'Tips' | 'Topplista' | 'Turnering' | 'Mer'
+): Promise<void> {
+  await page.getByRole('tab', { name: label }).click();
+  await expect(page.getByRole('tab', { name: label })).toHaveAttribute('aria-selected', 'true');
+}
