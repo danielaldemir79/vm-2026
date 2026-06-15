@@ -467,13 +467,23 @@ export function DailyMatchesView() {
               I listan visas den som ett vanligt kort (kortet bär dock alltid sin
               egen a11y-sammanfattning, så inget tappas för skärmläsare). */}
           {selectedDay && selectedDay.matches.length > 0 ? (
-            <ul className="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+            // EN CENTRERAD ENKEL-KOLUMN (omdesign, Daniels rot-fix): korten staplas
+            // vertikalt i en kolumn med max-bredd, så VARJE kort får sin EGEN höjd.
+            // Tidigare var detta ett 2-/3-kolumns-rutnät där kort med olika mycket
+            // innehåll (mål, kort, utfälld statistik, kommentarer) tvingades dela
+            // radhöjd , ett kort sträcktes ut och grann-kortet blev tomt, och en
+            // expandering/kommentar drog ut grannen. I en enkel-kolumn kan inget kort
+            // dela höjd med ett annat, så expandering och kommentarer påverkar bara
+            // sitt EGET kort. Mobil-först: på telefon var det redan en kolumn
+            // (oförändrat); på bredare skärm centreras kolumnen i stället för att bli
+            // två/tre. Max-bredden håller radlängden behaglig (ingen utdragen rad på
+            // ultrawide), mx-auto centrerar.
+            <ul className="m-0 mx-auto flex w-full max-w-[40rem] list-none flex-col gap-4 p-0">
               {selectedDay.matches.map((match, i) => (
                 <li key={match.id}>
                   <Slide
                     direction="up"
                     transition={{ ...transitions.smooth, delay: Math.min(i * 0.04, 0.32) }}
-                    className="h-full"
                   >
                     {/* Fotraden i LIST-korten (matchkorten där snacket händer): reaktions-
                         raden (T24, #24) + den HOPFÄLLDA kommentar-affordansen (T77, #161),

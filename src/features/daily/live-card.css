@@ -68,24 +68,58 @@
   filter: saturate(1.1);
 }
 
-/* KORT-PIPS (gult/rött): en liten rektangel i kort-form. Färgerna är de AA-mätta
- * status-tokens (warning = guld/amber, danger = korall), så de läses som "gult/rött
- * kort" även för den som scannar färg. Texten ("gult/rött kort") bär ändå betydelsen
- * (färg-oberoende), pip:en är cue. */
+/* KORT-IKONEN (gult/rött kort): en liten rektangel i spelkorts-form. FÄRGEN bär
+ * betydelsen (gul = gult kort, röd = rött kort), så ingen "gult/rött kort"-text behövs
+ * på raden , a11y säkras i stället av en sr-only-etikett INNE i ikonen (LiveMatchCard).
+ *
+ * KONTRAST/SYNLIGHET (WCAG, icke-text-kontrast 1.4.11): ett gult kort på en ljus yta
+ * kan tappa kant. En tunn kontrast-kant (mörkare amber/röd) ringar in ikonen så den
+ * alltid syns mot kort-ytan i båda teman, exakt samma grepp som tidigare warning-/
+ * danger-brickor i appen. width/height ger den igenkännbara stående spelkorts-formen. */
 [data-live-card] .vm-live-card-pip {
-  display: inline-block;
+  display: inline-flex;
   width: 0.6rem;
   height: 0.85rem;
   border-radius: 0.15rem;
-  transform: translateY(0.1rem);
 }
 
 [data-live-card] .vm-live-card-pip-yellow {
   background-color: var(--color-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 70%, #000);
 }
 
 [data-live-card] .vm-live-card-pip-red {
   background-color: var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 70%, #000);
+}
+
+/* LAG-TILLHÖRIGHETS-BRICKAN på en mål-/kort-/byte-rad: lagets kod (eller initialer) som
+ * TEXT i full fg (AA-säkert, INGEN text på en genererad färg, lessons), på en lugn yt-ton.
+ * En liten färg-punkt (.vm-live-event-team-dot) skiljer hemma (accent) från borta (neutral
+ * fg-ton) som CUE , men koden bär lag-tillhörigheten, färgen är bara förstärkning. */
+[data-live-card] .vm-live-event-team {
+  color: var(--color-fg);
+  background-color: color-mix(in srgb, var(--color-fg) 7%, var(--color-surface));
+}
+
+/* Punktens färg per sida: hemma = accent (matchar ställnings-/live-språket), borta = en
+ * dämpad fg-ton. aria-hidden, ren cue, så den behöver inte nå text-AA. */
+[data-live-card] [data-live-event-team-side='home'] .vm-live-event-team-dot {
+  background-color: var(--color-accent);
+}
+
+[data-live-card] [data-live-event-team-side='away'] .vm-live-event-team-dot {
+  background-color: color-mix(in srgb, var(--color-fg-muted) 70%, var(--color-surface));
+}
+
+/* BYTES-PILARNA: in = accent (spelaren som kom in), ut = dämpad fg-ton. aria-hidden:
+ * orden (in-/ut-spelaren) bär betydelsen, pilen är en riktnings-cue. */
+[data-live-card] .vm-live-sub-arrow {
+  color: var(--color-accent);
+}
+
+[data-live-card] .vm-live-sub-arrow-out {
+  color: var(--color-fg-muted);
 }
 
 /* STATISTIK-STAPELN: hemma-segmentet bär accent, borta en neutral fg-ton, så

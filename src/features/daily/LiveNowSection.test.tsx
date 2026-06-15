@@ -71,6 +71,8 @@ function entry(
     live: live(id, over),
     homeName: teamsById.get(home)?.name ?? '',
     awayName: teamsById.get(away)?.name ?? '',
+    homeCode: teamsById.get(home)?.code ?? null,
+    awayCode: teamsById.get(away)?.code ?? null,
   };
 }
 

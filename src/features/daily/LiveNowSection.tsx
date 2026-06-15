@@ -114,6 +114,8 @@ export function LiveNowSection({ entries, now }: LiveNowSectionProps) {
           homeName={focused.homeName}
           awayName={focused.awayName}
           homeApiId={homeApiId(focused)}
+          homeCode={focused.homeCode}
+          awayCode={focused.awayCode}
           now={now}
         />
       </div>

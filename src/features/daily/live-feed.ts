@@ -19,6 +19,14 @@ import type { Match, Team } from '../../domain/types';
 import type { LiveData } from '../../data/livescore';
 import { teamDisplayName } from './match-display';
 
+/** FIFA-landskoden för ett lag (lag-tillhörighet i livekortet), null när laget är okänt. */
+function teamCode(teamId: string | null, teamsById: ReadonlyMap<string, Team>): string | null {
+  if (teamId === null) {
+    return null;
+  }
+  return teamsById.get(teamId)?.code ?? null;
+}
+
 /**
  * En post i live-blocket: matchen, dess live-data och de visningsnamn + det API-lag-id
  * livekortet behöver. Färdigformad så vyn bara renderar, ingen uppslagning i JSX:en.
@@ -32,6 +40,10 @@ export interface LiveFeedEntry {
   homeName: string;
   /** Bortalagets visningsnamn. */
   awayName: string;
+  /** Hemmalagets FIFA-landskod (lag-tillhörighet på mål/kort i livekortet), null om okänt. */
+  homeCode: string | null;
+  /** Bortalagets FIFA-landskod, null om okänt. */
+  awayCode: string | null;
 }
 
 /** Pågår matchen just nu (live eller halvtidsvila)? En frusen/avslutad match gör det inte. */
@@ -81,6 +93,8 @@ export function selectLiveFeed(
       live,
       homeName: teamDisplayName(match.homeTeamId, teamsById),
       awayName: teamDisplayName(match.awayTeamId, teamsById),
+      homeCode: teamCode(match.homeTeamId, teamsById),
+      awayCode: teamCode(match.awayTeamId, teamsById),
     });
   }
   entries.sort((a, b) => {
