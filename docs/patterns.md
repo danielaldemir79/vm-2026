@@ -9,6 +9,39 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### hand-rullad-fast-höjd-virtualisering-utan-dependency (VM 2026)
+
+**Problem:** en lista kan bli LÅNG (240+ rader, t.ex. den totala topplistan över alla rum), och att
+rendera alla på en gång ger en DOM-vägg (långsam, hög minnesåtgång). Ett virtualiserings-PAKET
+(`@tanstack/react-virtual` m.fl.) löser det men är ett nytt beroende för något som är en liten,
+väl förstådd beräkning (PRINCIPLES §11: lägg inte till ett paket för det triviala).
+
+**Recept (`src/features/total-leaderboard/use-virtual-rows.ts`):**
+1. Anta FAST radhöjd (`rowHeight`, matchad mot CSS). Totalhöjd = `count * rowHeight`.
+2. Mät den scrollande containerns höjd (ResizeObserver, fallback window-resize för jsdom/test).
+3. Vid en scroll-position: `startIndex = floor(scrollTop / rowHeight) - OVERSCAN`,
+   `endIndex = startIndex + ceil(viewportH / rowHeight) + OVERSCAN*2`, klampat i `[0, count]`.
+4. Rendera BARA spannet `[startIndex, endIndex)` absolut-positionerat på `startIndex * rowHeight`,
+   inuti en spacer-div med full höjd (scrollbaren stämmer mot hela listan).
+5. Bryt ut den RENA spann-matematiken (`computeRange`) så den testas utan DOM (tom lista, kortare än
+   viewporten, skrollad till botten, overscan-klamp, rowHeight 0). Hooken (DOM-delen) testas i
+   komponenten (mät att DOM:en bär en DELMÄNGD, inte hela listan).
+
+**A11y (viktigt):** virtualiseringen får INTE ljuga om listans storlek för en skärmläsare. Sätt
+`role="list"` på containern och `aria-setsize={total}` + `aria-posinset={absolutIndex+1}` på VARJE
+synlig rad (giltig list-ARIA), så AT vet att listan har N rader även när bara en delmängd är monterad.
+ANVÄND INTE `aria-rowcount`/`aria-rowindex`, de är grid/table-attribut, inte giltiga på en `role="list"`.
+
+**"Hoppa till"-genväg:** en knapp/sök som skrollar containern till `index * rowHeight` (en bit ner i
+viewporten, inte exakt i kanten, så raden känns "hittad"). `scrollTo({behavior:'smooth'})` respekterar
+OS:ets reduced-motion automatiskt (ingen Framer-anim att gata). Element utanför fönstret som ALLTID
+ska synas (egen rad i topp-3, en hjälte) renderas UTANFÖR det virtualiserade spannet, så de aldrig kan
+saknas ur DOM:en även om de skrollats förbi.
+
+**Varför:** fast-höjd-windowing är ~50 rader ren kod med en testbar kärna, inget paket behövs. Resultatet:
+240+ rader scrollar mjukt med ~20 rader i DOM:en (verifierat i browsern: 241 deltagare -> 21 monterade),
+och AT får hela listans storlek via aria-setsize.
+
 ### sparsam-deterministisk-social-generering-med-tysthets-default (VM 2026)
 
 **Recept (generera "levande" social-data , reaktioner/kommentarer , från botar/agenter utan att spamma

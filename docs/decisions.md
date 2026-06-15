@@ -5,6 +5,66 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , Total (cross-rum) topplista T82 del 3 (#173)
+
+Den GLOBALA topplistan: en enda rankning av ALLA deltagare (botar + riktiga) över ALLA rum, vid
+sidan av den befintliga per-rums-topplistan (T17). Bygger UI:t + demo-fixtures + wiringen ovanpå den
+redan testade aggregeringen (`aggregate-total.ts`, byggd i del 1 av tasken).
+
+**Beslut: aggregerings-regeln = SUMMA per rum, rangordna globalt.** En deltagares totala poäng =
+summan av deras poäng ÖVER ALLA rum de är medlem i. Vi räknar INTE poäng på nytt (DRY, en sanning):
+vi kör den befintliga, testade poäng-motorn (`buildLeaderboard`) PER RUM och summerar varje distinkt
+deltagares per-rums-totaler. Match-/grupp-/bracket-/mästar-reglerna, facit-mappningen och
+tiebreak-måttet (exakta träffar, sedan namn alfabetiskt; delad "1224"-rank vid lika poäng) ärvs
+oförändrade. **Varför summa per rum (inte sammanslagna tips-listor):** en deltagare kan vara med i
+flera rum och tippa SAMMA match i båda. Regeln är "summan över alla rum", så två rum ger poäng två
+gånger (en per rum). Att i stället slå ihop tips-arrayerna och poängsätta en gång skulle tappa det
+andra rummets bidrag (en match räknas en gång i `scoreMember`). N i "X:a av N" = antalet DISTINKTA
+deltagare i totalen (en deltagare i tre rum räknas EN gång i N, men får sina tre rums poäng
+summerade). Regeln + härledningen bor också som modul-doc överst i `aggregate-total.ts`.
+
+**Beslut: Rhodos (och alla andra rum) läses som vilket rum som helst, READ-only.** Aggregeringen rör
+ALDRIG data, den läser och summerar. Ingen tyst special-hantering av ett enskilt rum. Skulle en
+sådan regel behövas vore den explicit + dokumenterad här, inte gömd i summeringen. INGEN anledning
+funnen att special-hantera Rhodos i denna task (flaggas i handoff om det ändras).
+
+**Beslut: en EGEN `TotalLeaderboardProvider`, miljö-gatad, INTE en utökning av den per-rums
+`LeaderboardProvider`.** Per-rums-providern laddar bara DET AKTIVA rummets medlemmar + RLS-synliga
+tips; totalen behöver bidrag från ALLA `myRooms`. En egen provider håller den per-rums-vyn orörd
+(bryt inte T17) och bär totalens egna data-väg. I DEMO/fixtures-läge bygger den `RoomContribution[]`
+ur en deterministisk demo-fixturuppsättning (botar). I LIVE-läge skulle den hämta per-rums-tips för
+alla `myRooms` och bygga samma `RoomContribution[]`. **Ärlighet om live-vägen:** demo-vägen är den
+som visuellt + test-verifieras i denna task (off-season, inget live-backend). Live-hämtningen följer
+exakt samma per-rum-API:er som T17 redan använder (`listRoom*Predictions` + `listMembers`), så den
+tänds utan ny aggregerings-kod, men den live-grenen körs inte skarpt förrän VM och flera rum finns.
+
+**Beslut: DEMO-fixtures genereras ur bot-motorn (T82 del 1) mot ett DELVIS spelat facit.** För att
+totalen ska se FYLLD ut direkt (~240 deltagare med spridda poäng) i dev/demo genererar vi personas
+(`generatePersonas`) + tips (`generateBotPredictions`) mot ett facit där en del av gruppspelet
+markerats spelat. Botarna sprids över hela listan (capAccuracy 0.62 håller dem under en topp-spelare,
+T82 del 1). Fixtures uppfyller KÄLLANS schema-typer (`RoomMember`, `MemberPredictions` =
+`Prediction`/`GroupPrediction`/`BracketPrediction`), inte konsument-formen (lessons: fixtures mot
+källans schema, annars döljs mappnings-drift). Den DELADE, riktiga `derivePoolFacit` används för
+facit (samma form live väver in), så aggregeringen bevisas mot den riktiga skarven.
+
+**Beslut: virtualisering hand-rullad (ingen ny dependency).** Utfällt läge renderar 240+ rader som
+EN scroll men virtualiserad: bara synliga rader (+ overscan) ligger i DOM:en, mätt mot scroll-position
+och fast radhöjd. PRINCIPLES §11 (minimera beroenden, lägg inte till ett paket för något trivialt):
+fast-höjd-windowing är en liten, väl förstådd beräkning (scrollTop + viewport -> synligt index-spann),
+så vi skriver en fokuserad `useVirtualRows`-hook i stället för att dra in `@tanstack/react-virtual`.
+Egen rad + topp-3 ligger UTANFÖR det virtualiserade fönstret (alltid renderade), så "din placering"
+och pallen aldrig kan saknas ur DOM:en även om de skrollats förbi.
+
+**Beslut: placering = EGEN prominent sektion ("Global topplista") överst i tävlings-ytan.** Totalen
+får ett eget chip i sektions-navet (`SECTIONS.totalLeaderboard`) och renderas FÖRE den per-rums
+topplistan, men inom samma live-gate (syns bara i live-läge, som de andra sociala sektionerna).
+"Din placering"-hjälten överst i sektionen gör att den inloggade spelarens egen position aldrig är
+svår att hitta (ägarens uttryckliga krav). Egen rad är dessutom färg-OBEROENDE framhävd (accent-ring
++ "DU"-bricka + tint, återbrukar T17:s `.vm-board-row[data-self]`-recept) både i komprimerat och
+utfällt läge.
+
+---
+
 ## 2026-06-15 , Bot-seedning T82 (#173): atmosfär-botar, datalager + säkert seed-skript
 
 Bygger datalagret + det säkra seed-skriptet för ~240 diskreta "atmosfär"-botar (del 1 av flera).

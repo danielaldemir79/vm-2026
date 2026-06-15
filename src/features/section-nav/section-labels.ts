@@ -44,5 +44,8 @@ export const SECTIONS = {
   predictions: { id: 'predictions-heading', label: 'Match-tips', order: 50 },
   groupPredictions: { id: 'group-predictions-heading', label: 'Grupp-tips', order: 60 },
   bracketPredictions: { id: 'bracket-predictions-heading', label: 'Mästare', order: 70 },
+  // Den GLOBALA (cross-rum) topplistan (T82 del 3, #173): visas i demo OCH live, FÖRE den
+  // per-rums-topplistan. Kort chip-etikett ("Global") för att hålla raden smal (lean-krav).
+  totalLeaderboard: { id: 'total-leaderboard-heading', label: 'Global', order: 75 },
   leaderboard: { id: 'leaderboard-heading', label: 'Topplista', order: 80 },
 } as const satisfies Record<string, SectionDescriptor>;

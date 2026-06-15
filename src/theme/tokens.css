@@ -2429,3 +2429,138 @@ body {
   );
   box-shadow: inset 0 1.5px 0 0 color-mix(in srgb, var(--vm-gold) 24%, transparent);
 }
+
+/* =============================================================================
+   26. GLOBAL (CROSS-RUM) TOPPLISTA, premium-finish (T82 del 3, issue #173).
+   [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   IDENTITET: den GLOBALA topplistan , EN rankning av ALLA deltagare över ALLA rum.
+   Tre lager:
+
+   A) "DIN PLACERING"-HJÄLTEN (.vm-total-hero): ägarens krav , den egna positionen
+      ska ALDRIG vara svår att hitta. En framträdande, varm accent-tintad surface-
+      raised-yta med en accent-hörn-glow + accent-kant, och placerings-siffran som en
+      SOLID accent-bricka med accent-fg-ink (.vm-total-hero-medal). Pitch-grön accent =
+      turneringens energi-identitet, så hjälten KÄNNS som "din plats i racet".
+
+   B) RADERNA: ÅTERBRUKAR T17:s board-recept (.vm-board-row + .vm-pool-medal +
+      [data-self]/[data-leader]), ingen ny rad-stil. Egen rad färg-OBEROENDE framhävd
+      (accent-ring + DU-bricka + tint), ledaren guld-glow. Se §13.
+
+   C) KONTROLLERNA (sök, hoppa-till-mig, visa alla): diskreta surface-raised-pillar
+      med fg-text, hover tänder en accent-kant (samma affordans-familj som install-
+      pillen §22). Sök-fältet är en surface-raised-input med fg-text.
+
+   KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall, BÅDA teman, mätt i webbläsaren på
+   faktiskt renderad yta, decisions.md T82 del 3-visuellt):
+   - Hjälte-brickans siffra + "plats" = accent-fg-ink på SOLID accent (den färg-oberoende
+     solid-bricka-formen, samma par som DU-brickan/sigillet): 10.85:1 mörkt / 5.40:1 ljust.
+   - "Din placering"-eyebrow (text-accent) sitter UPPE TILL VÄNSTER, hjälte-glow:en i NEDRE
+     HÖGRA hörnet (motsatta-hörn-disciplinen §17), så accent-texten möter ALDRIG glow-toppen:
+     uppmätt accent-text på den rena vänster-ytan 8.10:1 mörkt / 4.77:1 ljust (>= 4.5 normal).
+   - Resten (ordningstal, "av N", poäng, rum-kontext) = fg/fg-muted på opak surface-raised
+     (README-mätt brödtext-par, 12.6:1 - 17.9:1 fg / 5.69:1 - 6.10:1 fg-muted, båda teman).
+   - Kontroll-pillarnas + sök-fältets text = fg på opak surface-raised (samma README-par).
+   Glow-/kant-/ring-lagren bär ALDRIG text. MIN över alla nya text-ytor: 4.77:1 ljust /
+   8.10:1 mörkt (accent-eyebrow är den lägsta; alla >= 4.5, normal text).
+
+   RÖRELSE (lessons reduced-motion): inga egna layout/transform-animationer i CSS:en.
+   "Hoppa till mig"/sök skrollar med behavior:'smooth', men det är en BROWSER-scroll
+   som respekterar OS:ets prefers-reduced-motion automatiskt (ingen Framer layout-anim
+   att gata). Hover är bara FÄRG (skyddas inte av reduced-motion, bryter ingen grind).
+   -------------------------------------------------------------------------- */
+
+/* "DIN PLACERING"-HJÄLTEN: en varm accent-tintad surface-raised-yta med en accent-glow i
+   NEDRE HÖGRA hörnet + en accent-kant, så den läser som "din plats, framträdande". Glow:en
+   bär ingen text (eyebrow:n sitter uppe till vänster, motsatta hörnet). */
+.vm-total-hero {
+  background-color: var(--color-surface-raised);
+  background-image: radial-gradient(
+    130% 130% at 100% 100%,
+    color-mix(in srgb, var(--color-accent) 12%, transparent),
+    transparent 60%
+  );
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  box-shadow:
+    var(--vm-shadow-card),
+    inset 0 1.5px 0 0 color-mix(in srgb, var(--color-accent) 26%, transparent);
+}
+
+/* HJÄLTE-BRICKAN (stor placerings-siffra): en SOLID accent-bricka med accent-fg-ink, den
+   färg-oberoende solid-bricka-formen (samma AA-par som DU-brickan/sigillet, 10.85:1 mörkt
+   / 5.40:1 ljust). En mjuk inre högdager ger brickan relief utan en bild (noll asset). */
+.vm-total-hero-medal {
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-family: var(--font-display);
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.28),
+    0 2px 10px -4px color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+
+/* KONTROLL-PILLARNA (sök-knapp, visa alla, hoppa till mig): en diskret surface-raised-pill
+   med fg-text + border, hover tänder en accent-kant + lyfter ytan (samma affordans som
+   install-pillen §22). Färg-only hover (ingen transform), bryter ingen reduced-motion. */
+.vm-total-control,
+.vm-total-jump {
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-total-control,
+  .vm-total-jump {
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease;
+  }
+}
+
+.vm-total-control:hover,
+.vm-total-jump:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background-color: var(--color-surface-raised);
+}
+
+.vm-total-control:focus-visible,
+.vm-total-jump:focus-visible,
+.vm-total-search:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* "HOPPA TILL MIG": en lite varmare variant (accent-tint) så den sticker ut som DEN
+   genväg man oftast vill ha. Fortfarande fg-text på en accent-9%-tint mot surface (samma
+   lätta-tint-AA-recept som pågår-pillen §13, fg-text läser långt över 4.5 på en 9%-tint). */
+.vm-total-jump {
+  background-color: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
+}
+
+.vm-total-jump:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+}
+
+/* SÖK-FÄLTET: en surface-raised-input med fg-text + border (README-mätt fg-par på opak
+   surface-raised). Placeholdern är fg-muted (full opacitet, AA-säker, ingen opacity-fälla). */
+.vm-total-search {
+  background-color: var(--color-surface-raised);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+}
+
+.vm-total-search::placeholder {
+  color: var(--color-fg-muted);
+  opacity: 1;
+}
+
+/* DET VIRTUALISERADE SCROLL-FÖNSTRET: en hårfin border + surface-fond, så den långa listan
+   läser som en avgränsad, scrollbar yta (inte ett oändligt fält). Bär ingen egen text. */
+.vm-total-scroll {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
