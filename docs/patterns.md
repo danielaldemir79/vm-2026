@@ -1169,3 +1169,34 @@ Styling-slottarna + `children` bevarar varje dialogs distinkta visuella identite
 inline a11y-dialog ÄR nu `<Modal>`. Källa: T33 (#56), `src/components/Modal.tsx` (+ `Modal.test.tsx`),
 migrerade dialoger: `TeamProfilePanel` (T10), `OnboardingDialog` (T13), `SettingsControl` (T32),
 `ScoreGuide` (T34), `GetStartedDialog`/`GetStartedControl` (T54).
+
+### ren-planerare-plus-tunn-exekverare-med-dry-run-och-fore-efter-skydd (VM 2026)
+
+**Recept (ett skript som SKRIVER mot den delade DB:n , seeding, bulk-migrering, städning , utan att kunna
+röra riktig data av misstag):**
+
+1. **Dela i en REN PLANERARE och en TUNN EXEKVERARE.** Planeraren (`buildSeedPlan`, ingen I/O) tar
+   en ÖGONBLICKSBILD av DB-läget (read-only: vilka rum/rader finns) + indata och returnerar en PLAN
+   (vad som SKULLE skapas/ändras). Exekveraren gör bara I/O:t mot planen. ALL logik värd att testa
+   (antal, scopning, uteslutning av skyddad data, idempotens) bor i planeraren och enhetstestas mot
+   fixtures; exekveraren hålls dum. Källa: T82 (`src/data/bots/seed-plan.ts` + `scripts/seed-bots.ts`).
+2. **Dry-run är DEFAULT, skrivning kräver en explicit flagga.** Skriptet skriver INGET om man bara kör
+   det , det rapporterar planen (antal + stickprov). `--live`/`--teardown` krävs för att verkställa. Så
+   man kan aldrig RÅKA skriva. Dry-run kan dessutom planera mot en SYNTETISK snapshot om env saknas, så
+   planens FORM syns utan att röra DB:n alls.
+3. **Secrets ur ENV, fail loud om de saknas i skriv-läge.** service_role-nyckel + URL läses ur
+   `process.env` (aldrig committat), och `requireEnv` kastar med begriplig text om de saknas i
+   `--live`/`--teardown`. Inga secrets i koden (PRINCIPLES §7).
+4. **Uteslut skyddad data i PLANERAREN, inte bara i exekveraren.** Rader/rum som ALDRIG får röras (här
+   Rhodos-rummet) utesluts strukturellt i den rena planen (matchas på NAMN, aldrig på en gissad position),
+   och bevisas i testet (inget medlemskap/tips/nytt rum pekar någonsin dit). Så skyddet är testbart och
+   inte beroende av att exekveraren "kommer ihåg" det.
+5. **FÖRE/EFTER-skydd i skriv-läget.** Räkna RIKTIG (icke-bot/icke-mål) data FÖRE och EFTER körningen och
+   AVBRYT (kasta) om den ändrats. En bugg som mot förmodan rör riktig data fail-loud:ar i stället för att
+   tyst skada den. Idempotens dessutom på rad-nivå (upsert/onConflict + ett UNIQUE idempotens-ankare, här
+   `bot_accounts.persona_key`), så en omkörning aldrig dubblar.
+
+**Varför:** ett skript som skriver mot en DB med RIKTIGA användare är den farligaste kod-klassen i projektet.
+Genom att lägga all beslutslogik i en ren, testad planerare och hålla exekveraren tunn blir "vad händer?"
+bevisbart före en enda rad skrivs, och dry-run-default + env-gating + skyddad-data-uteslutning +
+före/efter-räkning gör att en oavsiktlig eller buggig körning inte kan skada riktig data tyst.

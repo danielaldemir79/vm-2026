@@ -5,6 +5,66 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , Bot-seedning T82 (#173): atmosfär-botar, datalager + säkert seed-skript
+
+Bygger datalagret + det säkra seed-skriptet för ~240 diskreta "atmosfär"-botar (del 1 av flera).
+Liv-lagret (kommentarer/reaktioner) är nästa task; persona-fälten för det definieras redan nu.
+
+**Beslut: fördelning ~240 botar = 200 (20 nya rum, ojämnt) + 35 ('VM 2026') + 5 ('Full Stack
+United', coola smeknamn).** Källa: Daniels bot-seeding-plan (memory `vm2026-bot-seeding-plan`,
+2026-06-15). New-room-botarna tippar ALLT inkl. spelade matcher (får poäng, sprids över hela
+topplistan); vm2026/fsu tippar bara kommande matcher (börjar på 0). Rhodos-rummet rörs ALDRIG.
+
+**Beslut: poäng-skiktningens TAK = capAccuracy 0.62 (konfigurerbart), floor 0.15.** Varför just ett
+tak under 1: en bot får ALDRIG kunna toppa topplistan (skulle döda tävlings-känslan mot riktiga
+vänner). 0.62 är satt under vad en stark riktig spelare rimligen når (~0.9 i referens-testet), och
+bevisas i predict.test.ts (60+ botar håller sig under en stark referens-spelare, topplistans 1:a är
+spelaren inte en bot). Skiktningen modelleras genom att, per poängsatt enhet, med sannolikhet
+`accuracy` (= skill_tier skalat in i [floor, cap]) kopiera FACIT, annars generera ett rimligt fel.
+Detta är MIN design (T82), inte en extern regel; poäng-VÄRDENA (3/1, grupp 3/2, bracket 1..5,
+mästare 20) återanvänds oförändrade ur den befintliga motorn (score.ts/bonus-score.ts), de gissas
+inte om.
+
+**Beslut: determinism via egen seedad PRNG (mulberry32).** Källa för algoritmen: mulberry32 (Tommy
+Ettinger, publik domän), inline-citerad i prng.ts. Vald för att seedningen ska vara reproducerbar
+(samma seed -> samma personas + tips), så en dry-run alltid matchar en senare live-körning och
+fördelningen kan testas. Medvetet INTE kryptografisk (ingen säkerhet hänger på oförutsägbarhet).
+
+**Beslut: idempotens-ankaret = `bot_accounts.persona_key` (UNIQUE).** Registret bot_accounts är
+hela seedningens ångerknapp (user_id FK -> auth.users ON DELETE CASCADE: radera kontot => cascade
+städar medlemskap + tips). persona_key (kohort#index, deterministisk) gör en omkörning idempotent
+(redan seedade personas hoppas över). RLS deny-all (ingen klient når registret), samma mönster som
+app_config (T80). Seed-skriptet: dry-run default, --live/--teardown bakom env (service_role aldrig
+committad), Rhodos uteslutet i den rena planeraren, och ett FÖRE/EFTER-skydd som räknar riktig
+(icke-bot) data och avbryter om den ändras. Byggaren kör aldrig live; koden är ändå körbar för ägaren.
+
+**Beslut (fix-pass): rumskoden för ett seedat rum härleds INJEKTIVT (bas-32-växling), inte via en
+siffer-bump.** rooms.code är UNIQUE (rooms_code_format `^[a-z2-9]{4,12}$`, T14-migrationen). Den
+första `roomCodeForIndex` byggde koden som `'liga' + String(index+22)` med en `<2 -> +2`-bump , den
+är INTE injektiv (index 8 och 10 gav båda `liga32`), så det 11:e rum-insertet hade kastat på UNIQUE
+mitt i en skarp körning. Fixen bas-växlar index till `ROOM_CODE_ALPHABET` (32 tecken, bijektion),
+noll-paddat till 3 tecken = 32^3 = 32 768 unika koder (`liga` + 3, längd 7, inom 4-12). Bor i
+`src/data/rooms/room-code.ts` (samma sanning som alfabetet, kan aldrig drifta), enhetstestat över
+hela domänen (alla N unika + format-regex, negativ-kontroll körd mot den gamla varianten -> rött).
+
+**Beslut (fix-pass): före/efter-skyddet räknar icke-bot-data SERVER-SIDE (RPC), inte via en
+NOT-IN-lista i URL:en.** Den första versionen fogade ~240 bot-UUID:er (~8,9 kB) i ett PostgREST
+`not in`-filter i GET-URL:en, nära/över URL-längd-taket , efter-räkningen (som körs EFTER
+skrivningarna) kunde då faila och lämna en halv-seedad DB. Fixen: en SECURITY DEFINER-RPC
+`count_non_bot_rows(p_table)` (migration `20260615140000_t82_count_non_bot_rows.sql`) som gör NOT-IN
+i SQL (`not exists`-subquery mot bot_accounts), så URL:en bär bara tabellnamnet. p_table allowlist:as
+till `room_members | predictions`, EXECUTE bara service_role (samma mönster som apply_auto_facit, T80).
+Skydds-BESLUTET (kasta vid ändrad räkning) bröts ut till en ren, enhetstestad funktion
+(`src/data/bots/seed-protection.ts`), så nätet bevisligen kan kasta (negativ-kontroll körd).
+
+**Beslut (fix-pass): Rhodos-vakten gjordes ÄKTA (kollar planen mot Rhodos id, kan faktiskt utlösa).**
+Den gamla `assertRhodosUntouched` jämförde `rhodos.name === VM2026_ROOM_NAME` , men `findRoomByName`
+hade redan matchat på namnet 'Rhodos', så jämförelsen var alltid falsk och vakten kunde ALDRIG kasta
+(PRINCIPLES §8: en fail-loud som inte kan faila är teater). Fixen kollar den FÄRDIGA planen: om Rhodos
+finns i snapshot:en, kasta om något planerat 'existing'-mål refererar Rhodos id. Finns Rhodos inte i
+snapshot:en är det en säker no-op (inget id att råka peka på). Negativ-kontroll körd (en plan som
+pekar på Rhodos id -> vakten kastar).
+
 ## 2026-06-15 , Livescore pollare-v3: per-match-polling med fönster-gating (full rik data LIVE)
 
 Byter pollarens modell: en LIVE match får full rik data UNDER matchen (målskytt/assist/kort/
