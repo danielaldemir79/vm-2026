@@ -87,7 +87,7 @@ getComputedStyle, inte mot hex). Ingen horisontell scroll vid 280px (scrollWidth
 
 Den GLOBALA topplistan: en enda rankning av ALLA deltagare (botar + riktiga) över ALLA rum, vid
 sidan av den befintliga per-rums-topplistan (T17). Bygger UI:t + demo-fixtures + wiringen ovanpå den
-redan testade aggregeringen (`aggregate-total.ts`, byggd i del 1 av tasken).
+redan testade aggregeringen (`aggregate-total.ts`, byggd i del 3 av tasken).
 
 **Beslut: aggregerings-regeln = SUMMA per rum, rangordna globalt.** En deltagares totala poäng =
 summan av deras poäng ÖVER ALLA rum de är medlem i. Vi räknar INTE poäng på nytt (DRY, en sanning):

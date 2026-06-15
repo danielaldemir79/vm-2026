@@ -1,7 +1,7 @@
 // UI-tester för den utfällda, virtualiserade listan (T82 del 3, #173): sök, hoppa-till-mig
 // och virtualiserings-fönstret. jsdom saknar layout (scrollTop/clientHeight = 0), så vi
 // bevisar (a) att rätt scroll-ÅTGÄRD anropas (scrollTo) och (b) att fönstret är en
-// delmängd + aria-rowcount bär hela storleken.
+// delmängd + aria-setsize bär hela storleken.
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, within } from '@testing-library/react';
