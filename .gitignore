@@ -34,3 +34,6 @@ pnpm-debug.log*
 .idea/
 .vscode/
 *.local
+
+# Lokala verktygskataloger (lokal agent-/arbetsyta, ska aldrig checkas in)
+.claude/
