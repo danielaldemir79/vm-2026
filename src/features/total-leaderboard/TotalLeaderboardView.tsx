@@ -10,7 +10,7 @@
 // Anmäler sig till sektions-navet (useRegisterSection) så chip:et "Global" bara finns när
 // vyn FAKTISKT renderar (självregistrering, lessons "inga döda gränssnitts-val").
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTotalLeaderboardStore } from './total-leaderboard-context';
 import { TotalSelfHero } from './TotalSelfHero';
 import { TotalLeaderboardRow } from './TotalLeaderboardRow';
@@ -20,10 +20,35 @@ import { useRegisterSection, SECTIONS } from '../section-nav';
 /** Hur många toppdeltagare som visas i det KOMPRIMERADE läget (pallen + lite till). */
 const PODIUM_COUNT = 5;
 
+/** Id på den fulla listans region (delas av expand-toggeln + listans komprimera-kontroll). */
+const FULL_LIST_ID = 'total-leaderboard-full';
+
 export function TotalLeaderboardView() {
   const store = useTotalLeaderboardStore();
   useRegisterSection(SECTIONS.totalLeaderboard);
   const [expanded, setExpanded] = useState(false);
+  // Ref till "Visa alla N"-toggeln, så fokus kan återföras dit när listan komprimeras via
+  // den sticky kontrollen INUTI listan (annars tappas fokus när den kontrollen avmonteras).
+  const expandToggleRef = useRef<HTMLButtonElement | null>(null);
+  // Sätts när komprimeringen skedde via en KONTROLL (inte vid initial render), så fokus
+  // bara flyttas som svar på användarens komprimera-klick, inte vid första monteringen.
+  const restoreFocusRef = useRef(false);
+
+  // Komprimera den fulla listan. Markera att fokus ska återföras till expand-toggeln när
+  // den åter-monteras (effekten nedan kör efter att toggeln finns i DOM:en igen).
+  const collapse = () => {
+    restoreFocusRef.current = true;
+    setExpanded(false);
+  };
+
+  // Fokus-återföring EFTER att DOM:en åter-renderat i komprimerat läge (expand-toggeln finns
+  // igen). Körs bara när komprimeringen var en användar-åtgärd, så ingen fokus-stöld vid mount.
+  useEffect(() => {
+    if (!expanded && restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      expandToggleRef.current?.focus();
+    }
+  }, [expanded]);
 
   const ready = store.enabled && store.status === 'ready';
 
@@ -93,24 +118,34 @@ export function TotalLeaderboardView() {
             </div>
           ) : null}
 
-          {/* "Visa alla N" / "Visa färre"-knapp. */}
-          {store.total.length > PODIUM_COUNT ? (
+          {/* "Visa alla N"-knapp (KOMPRIMERAT läge). I utfällt läge tar listans STICKY
+              "Komprimera"-kontroll över (alltid nåbar oavsett scroll), så vi duplicerar inte
+              en toggle ovanför fönstret , det var hela problemet ägaren flaggade. */}
+          {!expanded && store.total.length > PODIUM_COUNT ? (
             <button
+              ref={expandToggleRef}
               type="button"
               data-total-expand-toggle=""
-              aria-expanded={expanded}
-              aria-controls="total-leaderboard-full"
-              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={false}
+              aria-controls={FULL_LIST_ID}
+              onClick={() => setExpanded(true)}
               className="vm-total-control self-start rounded-pill px-5 py-2.5 text-sm font-semibold"
             >
-              {expanded ? 'Visa färre' : `Visa alla ${store.total.length}`}
+              {`Visa alla ${store.total.length}`}
             </button>
           ) : null}
 
-          {/* 3) UTFÄLLT: hela listan, virtualiserad + sök + hoppa till mig. */}
+          {/* 3) UTFÄLLT: hela listan, virtualiserad + sök + hoppa till mig + en STICKY
+              "Komprimera"-kontroll inuti listan (onCollapse), så listan kan fällas in från
+              vilken scroll-position som helst utan att skrolla tillbaka till toppen. */}
           {expanded ? (
-            <div id="total-leaderboard-full" data-total-full="">
-              <TotalLeaderboardList entries={store.total} currentUserId={store.currentUserId} />
+            <div id={FULL_LIST_ID} data-total-full="">
+              <TotalLeaderboardList
+                entries={store.total}
+                currentUserId={store.currentUserId}
+                onCollapse={collapse}
+                listId={FULL_LIST_ID}
+              />
             </div>
           ) : null}
         </div>

@@ -150,8 +150,12 @@ describe('TotalLeaderboardView, komprimerat -> utfällt', () => {
       fireEvent.click(toggle);
     });
 
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // I utfällt läge tar listans sticky KOMPRIMERA-kontroll över; View:ns egen expand-toggle
+    // duplicerar inte en kontroll ovanför fönstret (den skulle skrolla ur synhåll).
+    expect(container.querySelector('[data-total-expand-toggle]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-total-full]')).toBeInTheDocument();
+    const collapse = container.querySelector('[data-total-collapse]')!;
+    expect(collapse).toHaveAttribute('aria-expanded', 'true');
     // Pallen göms i utfällt läge (full listan tar över).
     expect(container.querySelector('[data-total-podium]')).not.toBeInTheDocument();
   });
@@ -169,5 +173,52 @@ describe('TotalLeaderboardView, komprimerat -> utfällt', () => {
     // Men aria-setsize talar om att HELA listan har 240 rader (AT får sanningen).
     const firstItem = full.querySelector('[role="listitem"]')!;
     expect(firstItem).toHaveAttribute('aria-setsize', '240');
+  });
+
+  it('utfällt: en KOMPRIMERA-kontroll bor i den sticky kontroll-raden INUTI listan (alltid nåbar)', () => {
+    // Ägarens fynd: man måste kunna komprimera från ALLA scroll-lägen utan att skrolla
+    // tillbaka. Den sticky komprimera-kontrollen ligger i listans kontroll-rad, inte
+    // ovanför fönstret, så den följer med när man bläddrar djupt i listan.
+    const { container } = renderView(store({ total: manyEntries(240) }));
+    act(() => {
+      fireEvent.click(container.querySelector('[data-total-expand-toggle]')!);
+    });
+    const full = container.querySelector('[data-total-full]')!;
+    const collapse = full.querySelector('[data-total-collapse]')!;
+    expect(collapse).toBeInTheDocument();
+    expect(collapse).toHaveAttribute('aria-controls', 'total-leaderboard-full');
+  });
+
+  it('utfällt: View duplicerar INTE sin egen expand-toggle (sticky komprimera tar över)', () => {
+    // I utfällt läge skulle View:ns egen toggle skrolla ur synhåll (det var hela problemet).
+    // Den kanoniska komprimera-kontrollen är den sticky inuti listan, så View:ns toggle
+    // ska bara finnas i KOMPRIMERAT läge (för "Visa alla N"-affordansen), inte dupliceras.
+    const { container } = renderView(store({ total: manyEntries(240) }));
+    act(() => {
+      fireEvent.click(container.querySelector('[data-total-expand-toggle]')!);
+    });
+    expect(container.querySelector('[data-total-expand-toggle]')).not.toBeInTheDocument();
+  });
+
+  it('klick på listans sticky KOMPRIMERA fäller in den fulla listan igen (tillbaka till pallen)', () => {
+    const { container } = renderView(store({ total: manyEntries(240) }));
+    act(() => {
+      fireEvent.click(container.querySelector('[data-total-expand-toggle]')!);
+    });
+    expect(container.querySelector('[data-total-full]')).toBeInTheDocument();
+
+    // Komprimera via den sticky kontrollen INUTI listan (inte via en toggle ovanför fönstret).
+    act(() => {
+      fireEvent.click(container.querySelector('[data-total-collapse]')!);
+    });
+
+    expect(container.querySelector('[data-total-full]')).not.toBeInTheDocument();
+    // Tillbaka till komprimerat: pallen + "Visa alla N"-toggeln syns igen.
+    expect(container.querySelector('[data-total-podium]')).toBeInTheDocument();
+    const toggle = container.querySelector('[data-total-expand-toggle]')!;
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Fokus-återgång: efter komprimering ska expand-toggeln ta fokus (ingen tappad fokus
+    // när den sticky kontrollen försvinner ur DOM:en).
+    expect(toggle).toHaveFocus();
   });
 });

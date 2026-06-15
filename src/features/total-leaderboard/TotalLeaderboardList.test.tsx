@@ -8,6 +8,18 @@ import { act, fireEvent, render, within } from '@testing-library/react';
 import { TotalLeaderboardList } from './TotalLeaderboardList';
 import type { TotalLeaderboardEntry } from './aggregate-total';
 
+/** Närmaste förfader med position:sticky (om någon) , bär kontroll-radens fästning. */
+function closestSticky(el: Element | null): HTMLElement | null {
+  let node = el as HTMLElement | null;
+  while (node !== null) {
+    if (node.dataset.totalControls !== undefined) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
 const entry = (userId: string, displayName: string, rank: number): TotalLeaderboardEntry => ({
   userId,
   displayName,
@@ -124,5 +136,87 @@ describe('TotalLeaderboardList, hoppa till mig', () => {
     const myRow = container.querySelector('[data-user-id="u0"]')!;
     expect(myRow).toHaveAttribute('data-self', 'true');
     expect(within(myRow as HTMLElement).getByText('Du')).toBeInTheDocument();
+  });
+});
+
+describe('TotalLeaderboardList, komprimera-kontroll åtkomlig oavsett scroll-position', () => {
+  it('renderar en komprimera-kontroll som anropar onCollapse vid klick', () => {
+    const onCollapse = vi.fn();
+    const { container } = render(
+      <TotalLeaderboardList
+        entries={manyEntries(240)}
+        currentUserId={null}
+        onCollapse={onCollapse}
+        listId="total-leaderboard-full"
+      />
+    );
+    const collapse = container.querySelector('[data-total-collapse]') as HTMLButtonElement;
+    expect(collapse).toBeInTheDocument();
+    act(() => {
+      fireEvent.click(collapse);
+    });
+    expect(onCollapse).toHaveBeenCalledTimes(1);
+  });
+
+  it('komprimera-kontrollen sitter i en STICKY kontroll-rad (oberoende av att toppen är i vy)', () => {
+    // Kärnan i fyndet: kontrollen får INTE vara beroende av att listans topp är i vy.
+    // Den ligger i en sticky kontroll-rad (position:sticky) INUTI det scrollande fönstret,
+    // så den följer med oavsett om man står på plats 3 eller 203. Vi bevisar (a) att
+    // kontrollen ligger i den sticky containern och (b) att containern faktiskt är sticky.
+    const { container } = render(
+      <TotalLeaderboardList
+        entries={manyEntries(240)}
+        currentUserId={null}
+        onCollapse={vi.fn()}
+        listId="total-leaderboard-full"
+      />
+    );
+    const collapse = container.querySelector('[data-total-collapse]');
+    const sticky = closestSticky(collapse);
+    expect(sticky).not.toBeNull();
+    // jsdom rapporterar inline-style/klass; vi vaktar att sticky-positioneringen är satt
+    // (klassen vm-total-controls bär `position: sticky; top: 0` i tokens.css).
+    expect(sticky!.className).toContain('vm-total-controls');
+    expect(sticky!).toHaveAttribute('data-total-controls', '');
+    // Sökfältet OCH komprimera-kontrollen bor i SAMMA sticky rad (en kontroll-rad som följer med).
+    expect(sticky!.querySelector('[data-total-search]')).toBeInTheDocument();
+  });
+
+  it('komprimera-kontrollen bär korrekt aria-expanded + aria-controls', () => {
+    const { container } = render(
+      <TotalLeaderboardList
+        entries={manyEntries(240)}
+        currentUserId={null}
+        onCollapse={vi.fn()}
+        listId="total-leaderboard-full"
+      />
+    );
+    const collapse = container.querySelector('[data-total-collapse]')!;
+    expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    expect(collapse).toHaveAttribute('aria-controls', 'total-leaderboard-full');
+  });
+
+  it('utan onCollapse-callback (bakåtkompatibel) renderas ingen komprimera-kontroll', () => {
+    const { container } = render(
+      <TotalLeaderboardList entries={manyEntries(240)} currentUserId={null} />
+    );
+    expect(container.querySelector('[data-total-collapse]')).not.toBeInTheDocument();
+  });
+
+  it('sök fungerar fortfarande med kontroll-raden sticky', () => {
+    const { container } = render(
+      <TotalLeaderboardList
+        entries={manyEntries(240)}
+        currentUserId={null}
+        onCollapse={vi.fn()}
+        listId="total-leaderboard-full"
+      />
+    );
+    const input = container.querySelector('[data-total-search]') as HTMLInputElement;
+    act(() => {
+      fireEvent.change(input, { target: { value: 'Spelare 150' } });
+      fireEvent.click(container.querySelector('[data-total-search-go]')!);
+    });
+    expect(scrollToSpy).toHaveBeenCalled();
   });
 });

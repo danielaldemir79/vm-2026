@@ -2563,4 +2563,33 @@ body {
 .vm-total-scroll {
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
+  /* Mjukare scrollstopp på den sticky raden (faller tillbaka rent där osupportat). */
+  scroll-padding-top: 56px;
+}
+
+/* STICKY KONTROLL-RAD (sök + hoppa-till-mig + komprimera): fäst överst i scroll-fönstret så
+   kontrollerna ALDRIG skrollas ur synhåll , man kan komprimera/söka/hoppa från VILKEN
+   scroll-position som helst (ägarens feedback, #173). [VÄRDE, ej @theme-kontrakt]
+
+   ANTI-JITTER + INGEN GENOMLYSNING: raden har en OPAK fond (samma surface som fönstret) så
+   raderna som skrollar UNDER den aldrig lyser igenom eller skapar flimmer. En hårfin
+   nederkant + en mjuk skugga skiljer raden från innehållet under den utan att hoppa.
+   Den OPAKA fonden bär ingen egen text utöver kontrollernas (sök-fältet/knapparna har sina
+   egna README-mätta fg-på-surface-par, §26-kontrast-vakten), så sticky-raden kan inte sänka
+   någon text-kontrast. z-index håller raden över de absolut-positionerade raderna. */
+.vm-total-controls {
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  /* Mjuk skugga UNDER raden så den läser som ett "tak" över den scrollande listan, utan en
+     hård kant. Negativ spridning håller skuggan smal (ingen layout-påverkan, ingen CLS). */
+  box-shadow: 0 6px 12px -8px color-mix(in srgb, var(--color-fg) 22%, transparent);
+}
+
+/* Sök-feedbacken ("ingen träff") ligger direkt under den sticky raden men SCROLLAR med
+   listan (den hör till sök-resultatet, inte kontrollerna). Opak surface så den inte heller
+   lyser igenom rader, och en liten andrum så den inte klistrar i kontroll-raden. */
+.vm-total-search-feedback {
+  background-color: var(--color-surface);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
 }

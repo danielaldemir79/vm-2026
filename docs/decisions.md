@@ -5,6 +5,41 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , Global topplista: sticky kontroll-rad (komprimera nåbar från alla scroll-lägen) (#173)
+
+UX-tillägg ovanpå T82 del 3. Ägaren testade UI:t och hittade en riktig miss: "Komprimera"-kontrollen
+satt bara OVANFÖR det utfällda scroll-fönstret, så stod man på plats ~100 i den utfällda listan tvingades
+man skrolla tillbaka till toppen för att fälla in den. Helt korrekt fynd.
+
+**Beslut: en STICKY kontroll-rad INUTI scroll-fönstret, inte en toggle ovanför det.** Sök-fältet,
+"Hoppa till mig" OCH en "Komprimera"-kontroll bor nu i en `position: sticky; top: 0`-rad högst upp i det
+scrollande fönstret (`.vm-total-controls`, tokens.css §26), så de FÖLJER MED när man bläddrar djupt i
+listan. Komprimera är därmed alltid ETT tryck bort, oavsett om man står på plats 3 eller 203. Den sticky
+raden har en OPAK surface-fond + hårfin nederkant + mjuk skugga, så raderna som skrollar under den aldrig
+lyser igenom eller flimrar (anti-jitter). Verifierat pinnat till fönstrets topp i ALLA bredder (280px
+vikbar cover -> 1920 ultrawide) + båda teman.
+
+**Varför sticky rad och INTE en flytande "Komprimera"-knapp:** appen har redan en flytande/diskret
+"Hoppa till mig", och en andra flytande knapp i samma hörn riskerar att krocka visuellt + skymma rader. En
+sticky kontroll-RAD samlar alla tre kontrollerna (sök/hoppa/komprimera) på ETT ställe som följer med,
+vilket är mindre visuellt brus och en tydligare mental modell ("kontrollerna sitter alltid överst i
+listan") än flytande knappar. På vikbar cover (~280px) WRAPPAR hoppa+komprimera till två full-bredds-pillar
+(flex-wrap + flex-1) så ingen knapp klipps; på sm+ sitter de inline.
+
+**Beslut: View duplicerar inte sin egen expand-toggle i utfällt läge.** I KOMPRIMERAT läge äger View:n
+"Visa alla N"-toggeln (med `aria-expanded`/`aria-controls`); i UTFÄLLT läge tar listans sticky
+"Komprimera" över som den kanoniska komprimera-kontrollen (samma `aria-controls`). Annars skulle View:ns
+toggle skrolla ur synhåll, vilket var hela problemet. Fokus återförs till "Visa alla N"-toggeln när listan
+komprimeras via den sticky kontrollen (en `useEffect` kör efter att toggeln åter-monterats), så ingen
+tangentbords-fokus tappas när den sticky kontrollen avmonteras.
+
+**A11y:** komprimera-kontrollen är en riktig `<button>` (tangentbords-nåbar, fokus-ring via befintlig
+`.vm-total-control:focus-visible`), bär `aria-expanded="true"` + `aria-controls="total-leaderboard-full"`,
+och kontrast på den faktiskt renderade sticky-raden uppmätt (knapp-etikett 15.24:1 mörkt / 17.91:1 ljust,
+getComputedStyle, inte mot hex). Ingen horisontell scroll vid 280px (scrollWidth 360 <= 375).
+
+---
+
 ## 2026-06-15 , Total (cross-rum) topplista T82 del 3 (#173)
 
 Den GLOBALA topplistan: en enda rankning av ALLA deltagare (botar + riktiga) över ALLA rum, vid
