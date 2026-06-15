@@ -11,9 +11,10 @@
 //      reimplementation av poängregler här (en sanning, ingen divergens).
 //   4. Returnera BARA SafeGlobalEntry-rader. Råa tips lämnar ALDRIG funktionen.
 //
-// READ-ONLY (HARD, dataintegritet): funktionen gör BARA .select() , inget .insert/.update/
-// .delete/.upsert/.rpc-med-bieffekt. Den rör ALDRIG bot-/seed-datan eller någon annan rad.
-// Bot-datan är bevisat oförändrad efter deploy (inga skrivningar finns i koden).
+// READ-ONLY (HARD, dataintegritet): funktionen gör BARA .select() (med .order()/.range() ,
+// rena läs-modifierare, ingen skriv-semantik), inget .insert/.update/.delete/.upsert/.rpc-
+// med-bieffekt. Den rör ALDRIG bot-/seed-datan eller någon annan rad. Bot-datan är bevisat
+// oförändrad efter deploy (inga skrivningar finns i koden).
 //
 // PRIVACY (HARD): de råa tipsen läses (måste, för att poängsätta alla), men returvärdet bär
 // BARA (userId, displayName, points, rank, exactHits). buildGlobalLeaderboard projicerar
@@ -31,31 +32,46 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
   buildGlobalLeaderboard,
+  selectAllPages,
+  DEFAULT_PAGE_SIZE,
   EMBEDDED_STATIC_PLAN,
 } from '../_shared/global-leaderboard-core.ts';
 
 /**
- * Hämta ALLA rader ur en tabell, sidindelat (Supabase cap:ar .select() till 1000 rader/
- * anrop). Vi läser tills en sida är kortare än sidstorleken , så vi får hela tävlingen
- * (predictions har ~18k rader). Fail-loud på fel (en partiell läsning får inte tyst ge en
- * felaktig topplista).
+ * Hämta ALLA rader ur en tabell, sidindelat (Supabase cap:ar .select() till ~1000 rader/
+ * anrop; predictions har ~18k rader = 19 sidor). DEN gissningskänsliga loop-/completeness-
+ * logiken bor i den DELADE, TESTADE `selectAllPages` (src/data/global-leaderboard/
+ * select-all-pages.ts, bundlad in via mirror:n) , den här funktionen är bara IO-wrappern
+ * som bygger en page-fetcher per tabell.
+ *
+ * STABIL ORDER BY (HARD, dataintegritet): PostgREST/Postgres garanterar INTE samma
+ * radordning mellan två sidanrop UTAN en total ORDER BY. Utan den kan en rad hoppas över
+ * (understruken poäng) eller dubbleras (uppblåst poäng) vid sid-gränsen under samtidiga
+ * skrivningar/en annan query-plan , exakt fairness-buggen T90 fixar. Vi ordnar därför på
+ * tabellens PK (en TOTAL ordning), och ber om ett `count: 'exact'` så `selectAllPages` kan
+ * verifiera completeness (hämtat antal == rapporterat antal) och fail-loud:a annars.
+ * Källa: senior-developer-lärdom "paginerad-las-utan-stabil-order-..." (reviewer T90).
+ *
+ * @param db        Supabase-klienten (service_role, read-only).
+ * @param table     Tabellnamn.
+ * @param columns   Kolumn-projektionen.
+ * @param orderCols Tabellens PK-kolumner (i ordning) , den STABILA totalordningen.
  */
-async function selectAll(db, table, columns) {
-  const PAGE = 1000;
-  const rows = [];
-  let from = 0;
-  for (;;) {
-    const { data, error } = await db
-      .from(table)
-      .select(columns)
-      .range(from, from + PAGE - 1);
-    if (error) throw new Error(`Läs ${table} misslyckades: ${error.message}`);
-    const page = data ?? [];
-    rows.push(...page);
-    if (page.length < PAGE) break;
-    from += PAGE;
-  }
-  return rows;
+function selectAll(db, table, columns, orderCols) {
+  return selectAllPages(
+    async ({ from, to }) => {
+      // .order() per PK-kolumn = total ordning; .range() = sidan; count:'exact' = total.
+      let query = db.from(table).select(columns, { count: 'exact' });
+      for (const col of orderCols) {
+        query = query.order(col, { ascending: true });
+      }
+      const { data, error, count } = await query.range(from, to);
+      if (error) throw new Error(`Läs ${table} misslyckades: ${error.message}`);
+      return { rows: data ?? [], total: count ?? 0 };
+    },
+    table,
+    DEFAULT_PAGE_SIZE
+  );
 }
 
 Deno.serve(async () => {
@@ -70,19 +86,31 @@ Deno.serve(async () => {
     const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
     // --- 1. Läs allt som behövs (READ-ONLY, sidindelat) ---
+    // orderCols = tabellens PK (verifierat mot live-schemat): en TOTAL ordning, så sid-
+    // gränserna är väldefinierade (ingen tappad/dubblerad rad). Se selectAll-headern.
     const [members, matchPreds, groupPreds, bracketPreds, official] = await Promise.all([
-      selectAll(db, 'room_members', 'room_id, user_id, display_name'),
-      selectAll(db, 'predictions', 'room_id, match_id, user_id, home_goals, away_goals'),
+      selectAll(db, 'room_members', 'room_id, user_id, display_name', ['room_id', 'user_id']),
+      selectAll(db, 'predictions', 'room_id, match_id, user_id, home_goals, away_goals', [
+        'room_id',
+        'match_id',
+        'user_id',
+      ]),
       selectAll(
         db,
         'group_predictions',
-        'room_id, group_id, user_id, winner_team_id, runner_up_team_id'
+        'room_id, group_id, user_id, winner_team_id, runner_up_team_id',
+        ['room_id', 'group_id', 'user_id']
       ),
-      selectAll(db, 'bracket_predictions', 'room_id, slot_id, user_id, advancing_team_id'),
+      selectAll(db, 'bracket_predictions', 'room_id, slot_id, user_id, advancing_team_id', [
+        'room_id',
+        'slot_id',
+        'user_id',
+      ]),
       selectAll(
         db,
         'official_match_results',
-        'match_id, home_goals, away_goals, penalties_home, penalties_away, status'
+        'match_id, home_goals, away_goals, penalties_home, penalties_away, status',
+        ['match_id']
       ),
     ]);
 

@@ -113,20 +113,27 @@ function rawRoom(
 }
 
 const OFFICIAL = [official('g-A-1', 2, 1)];
-const EXACT = { matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 };
-const OUTCOME = { matchId: 'g-A-1', homeGoals: 3, awayGoals: 1 };
-const MISS = { matchId: 'g-A-1', homeGoals: 0, awayGoals: 2 };
+const EXACT = { matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 }; // 3p
+const OUTCOME = { matchId: 'g-A-1', homeGoals: 3, awayGoals: 1 }; // rätt 1X2, 1p
+const MISS = { matchId: 'g-A-1', homeGoals: 0, awayGoals: 2 }; // 0p
 
-// Diskriminerande fall: en deltagare i FLERA rum (fairness, skiljer best-room från summa),
-// flera deltagare över flera rum (rangordning + delad rank), tomma rum.
+// Diskriminerande fall (FEL logik ger ETT ANNAT svar):
+//  - u1: SAMMA poäng (3) i två rum -> skiljer best-room från SUMMA (3, ej 6).
+//  - u4: OLIKA poäng i två rum (1p i r1, 3p i r2) -> skiljer en korrekt best-room-SELEKTION
+//    (3, det bättre rummet) från en drift som tar fel rum (1) eller summa (4). Bara
+//    identiska-poäng-fallet (u1) räcker INTE för att fånga en selektions-drift (då ger
+//    rätt och fel rum samma tal). Reviewer-fynd F1, punkt 5.
+//  - flera deltagare över flera rum (rangordning + delad rank), tomt rum.
 const ROOMS: RawRoomData[] = [
   rawRoom('r1', [
     { userId: 'u1', displayName: 'Alice', preds: matchPreds('u1', [EXACT]) }, // 3p i r1
     { userId: 'u2', displayName: 'Bob', preds: matchPreds('u2', [OUTCOME]) }, // 1p
+    { userId: 'u4', displayName: 'Dan', preds: matchPreds('u4', [OUTCOME]) }, // 1p i r1 (sämre)
   ]),
   rawRoom('r2', [
     { userId: 'u1', displayName: 'Alice', preds: matchPreds('u1', [EXACT]) }, // 3p i r2 (best = 3, ej 6)
     { userId: 'u3', displayName: 'Cara', preds: matchPreds('u3', [MISS]) }, // 0p
+    { userId: 'u4', displayName: 'Dan', preds: matchPreds('u4', [EXACT]) }, // 3p i r2 (BÄTTRE rum)
   ]),
   rawRoom('r3', []), // tomt rum
 ];
@@ -141,13 +148,19 @@ describe('global-leaderboard mirror-paritet: committad mirror == src (Deno-bundl
     expect(srcPlan.matches.length).toBeGreaterThan(100);
   });
 
-  it('committad mirror ger IDENTISK global lista som src (fairness + rangordning)', () => {
+  it('committad mirror ger IDENTISK global lista som src (fairness + best-room-selektion + rangordning)', () => {
     const src = srcBuild(ROOMS, OFFICIAL, srcPlan);
     const mir = mirror.buildGlobalLeaderboard(ROOMS, OFFICIAL, mirror.EMBEDDED_STATIC_PLAN);
     expect(mir).toEqual(src);
-    // Sanity: best-room (u1 = 3, INTE 6 från två rum) , diskriminerar fairness-regeln.
-    const u1 = src.find((e) => e.userId === 'u1');
-    expect(u1).toMatchObject({ points: 3, rank: 1 });
+    // Diskriminerande sanity-koll på BÅDA sidorna (mirror OCH src), inte bara mir==src:
+    for (const board of [src, mir]) {
+      // u1: SAMMA poäng i två rum -> best-room = 3, INTE 6 (summa). Skiljer best-room/summa.
+      expect(board.find((e) => e.userId === 'u1')).toMatchObject({ points: 3, rank: 1 });
+      // u4: OLIKA poäng (1p i r1, 3p i r2) -> best-room ska VÄLJA det bättre rummet = 3.
+      // Detta fall skiljer en korrekt selektion (3) från en drift som tar fel rum (1) eller
+      // summerar (4) , identiska-poäng-fallet (u1) ensamt kan inte fånga det (reviewer F1 p5).
+      expect(board.find((e) => e.userId === 'u4')).toMatchObject({ points: 3, rank: 1 });
+    }
   });
 
   it('FÄRSK src-bundle == committad mirror (fångar en glömd regenerering)', () => {

@@ -14,6 +14,7 @@
 import { WC2026_TEAMS, WC2026_GROUPS } from '../wc2026/teams';
 import { WC2026_MATCHES } from '../wc2026/matches';
 import { buildGlobalLeaderboard, type StaticPlan } from './build-global-leaderboard';
+import { selectAllPages, DEFAULT_PAGE_SIZE } from './select-all-pages';
 
 /**
  * Den statiska, källåkrade turneringsplanen (lag + grupper + matcher) , INBÄDDAD i
@@ -27,5 +28,8 @@ export const EMBEDDED_STATIC_PLAN: StaticPlan = {
   matches: WC2026_MATCHES,
 };
 
-export { buildGlobalLeaderboard };
+// Sidindelad full-läsning (stabil ordning + completeness-vakt) bundlas också in, så
+// edge-funktionen kör SAMMA testade loop-logik som src , den förblir en tunn IO-wrapper.
+export { buildGlobalLeaderboard, selectAllPages, DEFAULT_PAGE_SIZE };
 export type { RawRoomData, SafeGlobalEntry, StaticPlan } from './build-global-leaderboard';
+export type { PageFetcher, PageRequest, PageResult } from './select-all-pages';

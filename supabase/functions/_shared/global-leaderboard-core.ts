@@ -3830,6 +3830,39 @@ function buildGlobalLeaderboard(rooms, officialResults, plan) {
   return total.map(toSafeEntry);
 }
 
+// src/data/global-leaderboard/select-all-pages.ts
+var DEFAULT_PAGE_SIZE = 1e3;
+async function selectAllPages(fetchPage, label, pageSize = DEFAULT_PAGE_SIZE) {
+  if (pageSize <= 0) {
+    throw new Error(`selectAllPages(${label}): sidstorlek m\xE5ste vara > 0 (fick ${pageSize}).`);
+  }
+  const rows = [];
+  let from = 0;
+  let expectedTotal = null;
+  for (; ; ) {
+    const { rows: page, total } = await fetchPage({ from, to: from + pageSize - 1 });
+    if (expectedTotal === null) {
+      expectedTotal = total;
+    }
+    rows.push(...page);
+    if (page.length < pageSize) {
+      break;
+    }
+    from += pageSize;
+    if (rows.length > expectedTotal) {
+      throw new Error(
+        `selectAllPages(${label}): l\xE4ste ${rows.length} rader men k\xE4llan rapporterade ${expectedTotal} (over-read , trolig instabil ordning utan stabil ORDER BY). Avbryter hellre \xE4n att bygga en topplista p\xE5 dubblerad data.`
+      );
+    }
+  }
+  if (expectedTotal !== null && rows.length !== expectedTotal) {
+    throw new Error(
+      `selectAllPages(${label}): h\xE4mtade ${rows.length} rader men k\xE4llan rapporterade ${expectedTotal} (ofullst\xE4ndig/dubblerad l\xE4sning). Avbryter hellre \xE4n att returnera en felaktig topplista.`
+    );
+  }
+  return rows;
+}
+
 // src/data/global-leaderboard/edge-entry.ts
 var EMBEDDED_STATIC_PLAN = {
   teams: WC2026_TEAMS,
@@ -3837,6 +3870,8 @@ var EMBEDDED_STATIC_PLAN = {
   matches: WC2026_MATCHES
 };
 export {
+  DEFAULT_PAGE_SIZE,
   EMBEDDED_STATIC_PLAN,
-  buildGlobalLeaderboard
+  buildGlobalLeaderboard,
+  selectAllPages
 };

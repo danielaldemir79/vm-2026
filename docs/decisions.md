@@ -46,8 +46,30 @@ ingen fördel, så att visa det bredvid placering/poäng vore vilseledande. Rade
 bara placering + namn + poäng (deltagarens bästa rum-resultat); `roomCount`-fältet är borttaget
 ur `TotalLeaderboardEntry`/`TotalSelfSummary`.
 
-**Data-integritet:** ingen migration, ingen schema-ändring; edge-funktionen gör BARA `.select()`.
-Bot-/seed-datan är bevisat oförändrad (md5 på bot_accounts + predictions identisk före/efter).
+**Data-integritet:** ingen migration, ingen schema-ändring; edge-funktionen gör BARA `.select()`
+(med `.order()`/`.range()`, rena läs-modifierare). Bot-/seed-datan är bevisat oförändrad (md5 på
+bot_accounts + predictions identisk före/efter).
+
+**Beslut 5 (F1, reviewer-fynd, must-fix): paginerad läsning MÅSTE vara totalordnad + completeness-
+vaktad.** `selectAll` läste predictions (~18k = 19 sidor), bracket_predictions (~8k) och
+group_predictions (~3k) sidvis med `.range()` i en loop UTAN `.order()`. **Regeln (gissas inte,
+källhänvisad):** PostgREST/Postgres garanterar INTE samma radordning mellan två sidanrop utan en
+total `ORDER BY` , under samtidiga skrivningar eller en annan query-plan kan en rad hoppas över
+(understruken poäng) eller dubbleras (samma match räknad två gånger -> uppblåst poäng) vid sid-
+gränsen, exakt den fairness-/integritets-bugg T90 skulle fixa. **Källa:** senior-developer-lärdom
+`paginerad-las-utan-stabil-order-...` (reviewer, eskalerad panel T90), verifierad mot live prod-
+radantal (predictions 18061 = 19 sidor, bracket_predictions 7931, group_predictions 3049, hämtade
+2026-06-15). **Fix:** (a) varje paginerad läsning ordnas på tabellens **PK** (en TOTAL ordning ,
+verifierat mot live-schemat: predictions `(room_id, match_id, user_id)`, bracket `(room_id, slot_id,
+user_id)`, group `(room_id, group_id, user_id)`, room_members `(room_id, user_id)`, official
+`(match_id)`); (b) loop-/completeness-logiken flyttad till en REN, testad funktion
+(`src/data/global-leaderboard/select-all-pages.ts`, bundlad in i mirror:n , edge-funktionen blir
+en tunn IO-wrapper, samma recept som resten av grafen) som verifierar hämtat antal mot ett
+`count: 'exact'` och **fail-loud:ar** vid under-/over-read; (c) ett test som KORSAR sid-gränsen
+(sidstorlek 3, > 1 sida) bevisar completeness + ingen tapp/dubblering + fail-loud
+(`select-all-pages.test.ts`), negativ-kontrollerat (completeness-vakten borttagen -> testet rödnar).
+Mirror-paritetsfixturen stärktes också med en deltagare som scorar OLIKA i två rum (u4: 1p/3p) så
+best-room-**selektionen** diskrimineras (negativ-kontroll: selektions-drift -> u4-assertionen rödnar).
 
 ## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
 
