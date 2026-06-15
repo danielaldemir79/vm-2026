@@ -5,6 +5,33 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
+
+Faserna 0-3 är levererade och appen är live. Ägaren godkände ett v2-bygge (SPEC §13). Det
+bärande beslutet: gå från EN lång sida + sticky chip-rad (sektions-navet T78/T79) till en
+**flik-app med fem flikar** (Idag, Tips, Topplista, Turnering, Mer), flik-rad längst ner på
+mobil (sport-app-mönster), responsiv till top-/sido-nav på större skärm.
+
+**Varför:** den långa sidan skalade inte , för mycket på en gång skrämmer användaren, och chip-
+raden räckte inte (den hoppar bara, den fokuserar inte). Fokuserade flikar visar bara det
+relevanta. Befintliga vyer återanvänds oförändrat i sak; bara placering + navigering ändras
+(återanvänd, bygg inte om).
+
+**Kopplat beslut , scroll/sticky:** scroll-modellen görs om i flik-strukturen, och sticky-buggen
+(komprimera-kontrollen följer inte sidans scroll, den fäster i ett inre fönster , se T82-del-4-
+beslutet nedan + `StickyFollowToggle` `top-16`) löses holistiskt där, på ALLA långa listor.
+
+**Öppna design-beslut som T83 äger (logga utfallet här under bygget):**
+- Routing-modell (state + history/hash vs router-dependency).
+- Scroll-container-ägande (vem äger scrollen per flik).
+- **SimulationFrame/what-if spänner nu över flera flikar:** sim-läget omsluter i dag daily +
+  gruppspel + "vad krävs" + slutspelsträd + resultatinmatning som EN zon med en sticky badge.
+  Flik-IA:n delar zonen mellan Idag (daily) och Turnering (tabeller/träd/scenario). T83 måste
+  besluta: sim-läget blir globalt state, varje flik som visar en simulerad vy bär sim-ramen/badgen,
+  och what-if-kontrollen (Start/Återställ/Avsluta) + `ResultEntryGate` får EN tydlig hemvist.
+
+**Orört i v2:** live-pollaren + bot-/seednings-lagret (live och fungerar).
+
 ## 2026-06-15 , T82 del 4 (#173): "sticky kontroll-rad + börja-komprimerad" bruten till delad byggsten + applicerad på de långa listorna
 
 Ägaren gillade total-topplistans sticky kontroll-rad ("följer med i listan") + att listan börjar
