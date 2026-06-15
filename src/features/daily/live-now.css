@@ -1,0 +1,90 @@
+/* "LIVE NU"-FÄLTET (Bit 3c): premium-finish för topp-fältets primära live-block. Stylar
+ * ENBART via data-/klass-hakarna i LiveNowSection.tsx, så semantiken (region, aria,
+ * knappar) bärs av TSX:en. Allt token-drivet (color-mix mot semantiska tokens, ingen rå
+ * hex utom de redan AA-mätta accent-paren), tema-medvetet och reduced-motion-gatat.
+ *
+ * VISUELL TON (SPEC §7, "arena i kvällsljus"): live-fältet är topp-fältets HJÄLTE när en
+ * match pågår. Det lånar samma arena-glow som dagshero:n (pitch-grön ur övre hörnet, varm
+ * guld ur det nedre) men en aning STARKARE accent-kant, så det läses direkt som "här lever
+ * matchen just nu" och tydligt skiljer sig från den lugnare nedräknings-pelaren under. */
+
+/* SJÄLVA FÄLTET: surface-raised med arena-glow + en accent-kant som signalerar "live".
+ *
+ * GLOW-ALFA 0.16 (inte starkare) är medvetet: det är EXAKT samma nivå som den redan
+ * AA-verifierade dagshero:n (.vm-daily-hero, tokens.css §6), som bär ett text-accent-label
+ * ("Nedräkning till avspark") rakt i samma övre hörn. Genom att matcha den nivån håller
+ * topp-fältets text-bärande etiketter (count-raden fg-muted, steg-etiketten text-accent)
+ * AA även i VÄRSTA fallet, där glow:en är som starkast i hörnet (uppmätt i srgb över hela
+ * patchen, inte ett typfall: fg-muted/accent-text >= 4.5:1 i båda teman). En starkare glow
+ * (0.2) drog fg-muted-raden under AA i mörkt tema (3.98), så vi stannar på den beprövade
+ * nivån , samma "verifiera värsta fallet, inte typfallet"-regel som T7/T13. */
+.vm-live-now {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background-color: var(--color-surface-raised);
+  background-image:
+    radial-gradient(120% 130% at 0% 0%, rgb(var(--vm-glow-accent) / 0.16), transparent 58%),
+    radial-gradient(
+      90% 120% at 100% 100%,
+      color-mix(in srgb, var(--vm-gold) 12%, transparent),
+      transparent 55%
+    );
+}
+
+/* RUBRIK-BRICKAN "Live nu": solid accent med accent-fg-ink (det AA-mätta token-paret,
+ * samma som appens primär-knapp + livekortets live-badge), så ordet alltid är läsbart. */
+.vm-live-now-badge {
+  color: var(--color-accent-fg);
+  background-color: var(--color-accent);
+}
+
+/* PULSANDE LIVE-PUNKT: i rubrik-brickan bär den accent-fg (mot den fyllda accent-ytan),
+ * i de kompakta raderna accent (mot en svag yta). Andas via samma vm-pulse-keyframe som
+ * resten av appen (DRY, keyframen bor i index.css), stannar vid reducerad rörelse nedan. */
+.vm-live-now-badge .vm-live-now-dot {
+  background-color: var(--color-accent-fg);
+  animation: vm-pulse 2s ease-in-out infinite;
+}
+
+/* KOMPAKTA "FLER LIVE"-RADER: en lugn yta med en svag accent-kant, en synlig hover/fokus-
+ * lyft (det är riktiga knappar, WCAG 2.4.7 fokus-synlighet bevaras av appens globala
+ * fokus-ring). En liten accent-tint så raderna hör ihop med live-fältet utan att tävla
+ * med fokus-kortet ovanför. */
+.vm-live-now-row {
+  border-color: color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface));
+  color: var(--color-fg);
+}
+
+.vm-live-now-row:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+}
+
+/* RAD-BADGE (Live/Paus): live = solid accent-bricka (accent-fg-ink, AA), paus = en lugn
+ * neutral bricka. Färg-oberoende: texten ("Live"/"Paus") bär betydelsen, brickan är cue. */
+.vm-live-now-row-badge[data-live-row-badge='live'] {
+  color: var(--color-accent-fg);
+  background-color: var(--color-accent);
+}
+
+.vm-live-now-row-badge[data-live-row-badge='paused'] {
+  color: var(--color-fg-muted);
+  background-color: color-mix(in srgb, var(--color-fg) 8%, var(--color-surface));
+  border: 1px solid var(--color-border);
+}
+
+/* Live-punkten i en rad-badge pulsar mot den fyllda accent-ytan (accent-fg). */
+.vm-live-now-row-badge .vm-live-now-dot {
+  background-color: var(--color-accent-fg);
+  animation: vm-pulse 2s ease-in-out infinite;
+}
+
+/* REDUCED MOTION (WCAG 2.3.3): punkterna slutar pulsa men behåller FÄRGEN, så live-läget
+ * fortfarande syns , bara rörelsen tas bort, aldrig informationen. (Spegling av den
+ * globala regeln i index.css, explicit här så avsikten är läsbar på elementet.) */
+@media (prefers-reduced-motion: reduce) {
+  .vm-live-now-badge .vm-live-now-dot,
+  .vm-live-now-row-badge .vm-live-now-dot {
+    animation: none;
+  }
+}

@@ -16,6 +16,7 @@ import {
   projectLiveData,
   type LiveData,
 } from './live-read';
+import { liveClockFor } from './live-realtime';
 import type { Database } from '../supabase-types';
 import type { VmSupabaseClient } from '../supabase-browser';
 
@@ -252,5 +253,37 @@ describe('getLiveData (gate-medveten) + fixtures-läge', () => {
     expect(first).toHaveProperty('status');
     expect(first).toHaveProperty('frozen');
     expect(first).toHaveProperty('lastSyncedAt');
+  });
+
+  // DEMO-KLOCKAN TICKAR (lessons: tidsberoende headline-UI bara bevisat med injicerat now).
+  // En PÅGÅENDE demo-match ska synka lastSyncedAt till NU så klockan tickar mjukt i demon,
+  // i stället för att den FRUSNA kickoff-tiden åldras och drar klockan till halvleks-taket
+  // ("45+", stilla). Vi bevisar det genom att köra den RIKTIGA klock-bryggan mot demo-raden
+  // med ett verklighetstroget `now` (dagar efter den committade kickoff-tiden).
+  it('en PÅGÅENDE demo-match synkar lastSyncedAt till `now` (klockan tickar, capar inte)', () => {
+    const now = Date.parse('2026-06-20T12:00:00.000Z'); // långt EFTER fixturens kickoff
+    const rows = fixtureLiveData(now);
+    const liveRow = rows.find((r) => r.status === 'live');
+    expect(liveRow).toBeDefined();
+    // Synkad till nu (inte den frusna kickoff-tiden 2026-06-14T20:00Z).
+    expect(liveRow?.lastSyncedAt).toBe(new Date(now).toISOString());
+
+    // Klockan: 0 min sedan sync -> visar snapshotens elapsed och TICKAR (inte "45+").
+    const clock = liveClockFor(liveRow as LiveData, now);
+    expect(clock.ticking).toBe(true);
+    expect(clock.label).not.toMatch(/\+/); // inte halvleks-taket
+  });
+
+  // NEGATIV-KONTROLL: den GAMLA buggen (lastSyncedAt = den frusna kickoff-tiden) skulle,
+  // med samma `now`, kapa klockan till "45+" och sluta ticka. Vi bevisar att DEN formen
+  // verkligen är trasig, så testet ovan vaktar något äkta (lessons: bevisa att testet vaktar).
+  it('negativ-kontroll: en FRUSEN kickoff-sync med samma now hade capat klockan ("45+")', () => {
+    const now = Date.parse('2026-06-20T12:00:00.000Z');
+    const live = fixtureLiveData(now).find((r) => r.status === 'live') as LiveData;
+    // Återinför den gamla, trasiga formen (frusen kickoff som sync-bas).
+    const frozenSync: LiveData = { ...live, lastSyncedAt: '2026-06-14T20:00:00.000Z' };
+    const clock = liveClockFor(frozenSync, now);
+    expect(clock.ticking).toBe(false);
+    expect(clock.label).toMatch(/\+/); // halvleks-taket, raka motsatsen till live-känslan
   });
 });

@@ -220,20 +220,37 @@ export async function getLiveData(env: ImportMetaEnv = import.meta.env): Promise
  * men i fixtures-läge vill vi visa ett RIKT kort, så vi väver in dem på den enda
  * fixtures-matchen (det är demo-data, inte påhittad live-data: varje del är en verklig
  * parsad fixtur). Exporteras så tester och UI kan använda den utan en klient.
+ *
+ * DEMO-KLOCKAN TICKAR (lessons: tidsberoende headline-UI bara bevisat med injicerat now):
+ * en PÅGÅENDE fixtures-match sätter lastSyncedAt = `now` (inte den FRUSNA kickoffUtc).
+ * Då är "minuter sedan sync" alltid 0 vid läsning, så klockan visar snapshotens elapsed
+ * och TICKAR mjukt framåt i stället för att slå i halvleks-taket ("45+") , den committade
+ * kickoff-tidsstämpeln åldras annars och drar demo-klockan till sitt tak (raka motsatsen
+ * till live-känslan kortet är byggt för). En FRUSEN (finished) demo-match rör vi inte:
+ * den tickar ändå inte och ska visa sin historiska sync-tid. `now` injiceras för
+ * deterministiska tester (default Date.now()).
+ *
+ * @param now  nuet (epoch-ms), injiceras för test (default = aktuell tid).
  */
-export function fixtureLiveData(): LiveData[] {
-  return fixtureLiveSnapshots.map((snapshot) => ({
-    matchId: `api-${snapshot.apiFixtureId}`,
-    apiFixtureId: snapshot.apiFixtureId,
-    status: snapshot.status,
-    elapsedMinute: snapshot.elapsedMinute,
-    homeGoals: snapshot.homeGoals,
-    awayGoals: snapshot.awayGoals,
-    events: fixtureLiveEvents,
-    statistics: fixtureLiveStatistics,
-    lineups: fixtureLiveLineups,
-    // Fixtures-matchen är en PÅGÅENDE match (live=all), alltså inte fryst.
-    frozen: snapshot.status === 'finished',
-    lastSyncedAt: snapshot.kickoffUtc,
-  }));
+export function fixtureLiveData(now: number = Date.now()): LiveData[] {
+  const nowIso = new Date(now).toISOString();
+  return fixtureLiveSnapshots.map((snapshot) => {
+    const finished = snapshot.status === 'finished';
+    return {
+      matchId: `api-${snapshot.apiFixtureId}`,
+      apiFixtureId: snapshot.apiFixtureId,
+      status: snapshot.status,
+      elapsedMinute: snapshot.elapsedMinute,
+      homeGoals: snapshot.homeGoals,
+      awayGoals: snapshot.awayGoals,
+      events: fixtureLiveEvents,
+      statistics: fixtureLiveStatistics,
+      lineups: fixtureLiveLineups,
+      // Fixtures-matchen är en PÅGÅENDE match (live=all), alltså inte fryst.
+      frozen: finished,
+      // Pågående demo: synka till NU så klockan tickar (se doc ovan). Frusen: behåll den
+      // historiska kickoff-tiden (en avslutad match tickar inte oavsett).
+      lastSyncedAt: finished ? snapshot.kickoffUtc : nowIso,
+    };
+  });
 }
