@@ -1,46 +1,62 @@
-// LIVESCORE-POLLER (edge function, Deno) , T80 (#180), livescore Bit 2.
+// LIVESCORE-POLLER (edge function, Deno) , pollare-v3 (per-match-polling).
 //
-// ANSVAR (tunt, en sak): EN cron-tick = (1) läs nyckel + budget, (2) avgör med
-// budget-gaten om vi får polla, (3) ett `fixtures?league=1&live=all`-anrop
-// (täcker ALLA live-matcher), (4) skriv match_live_data per resolvbar match,
-// (5) för matcher som nyss AVSLUTATS: hämta `fixtures?id=` (rikt svar med
-// events/lineups/statistics), härled facit (Bit 1:s regel via _shared) och skriv
-// det med apply_auto_facit (det manuella låset), frys raden.
+// ANSVAR (tunt, en sak): EN cron-tick =
+//   1. Läs nyckel + admin-id + dagens budget (poll_log).
+//   2. FÖNSTER-GATING (selectInWindowMatches): vilka matcher är i sitt live-fönster
+//      NU (kickoff i [now-3,5h, now+5min])? Ingen i fönster OCH inga ofrysta att
+//      facit-kolla -> HOPPA hela ticket (0 API-anrop). INGA anrop mellan matcher.
+//   3. PLAN (buildPerMatchPollPlan): discovery (1 live=all BARA om en in-fönster-match
+//      saknar mappning) + per-match (ett fixtures?id per MAPPAD in-fönster-match),
+//      facit-prio, strikt under dagsbudgeten (100/dag).
+//   4. DISCOVERY: ett live=all -> auto-mappa okända (resolveFixtureToMatch, självseed).
+//   5. PER-MATCH: ett fixtures?id per match = FULL RIK DATA (status/ställning/elapsed
+//      + events/statistics/lineups INLINE). Skriv match_live_data VARJE poll, kuvert-
+//      lindat (shapeFrozenBlobs), frozen=false medan matchen pågår -> live-kortet får
+//      målskytt/assist/kort/byten/statistik LIVE. Är matchen AVGJORD i svaret:
+//      apply_auto_facit (det manuella låset) + frozen=true.
+//   6. ROBUST FACIT-FÅNGST (skyddsnät): matcher som föll UR fönstret innan FT sågs
+//      (selectFreezeChecks, 4h bak-fönster) facit-kollas ändå, budget-gatat med facit-prio.
 //
 // SJÄLV-BUDGETERANDE (Daniels HARD-krav, 100/dag): poll_log räknar dagens anrop;
-// gaten släpper aldrig igenom mer än vad som ryms. Live=all (1 anrop) prioriteras
-// lågt mot facit-fångst (freeze) , facit får aldrig missas pga budget. Även om
-// cron tickar oftare än tänkt kan summan aldrig spräcka taket.
+// buildPerMatchPollPlan + de hårda kollarna nedan släpper ALDRIG igenom mer än vad
+// som ryms. Daniels matte: ~625 match-min/dag / 100 = ~7 min, så cron körs */7.
+// FACIT-PRIO: en avgjord-men-ofryst match får sitt anrop före en pågående om budgeten
+// tryter , facit får aldrig missas. Även om cron tickar oftare än tänkt kan summan
+// aldrig spräcka taket.
 //
-// IDEMPOTENT + FAIL-LOUD: upsertar på match_id (kör om utan dubbletter); varje
-// fel loggas + kastar (svarar 500), aldrig en tyst no-op. Okänd fixture (ingen
-// rad i fixture_match_map) HOPPAS och loggas (gissa aldrig en koppling).
+// IDEMPOTENT + FAIL-LOUD: upsertar på match_id (kör om utan dubbletter); varje fel
+// loggas + kastar (svarar 500), aldrig en tyst no-op. Okänd fixture (ingen mappning,
+// ej auto-mappbar) HOPPAS och loggas (gissa aldrig en koppling).
 //
 // INGA SECRETS I KODEN (PRINCIPLES §7): API-nyckeln läses ur app_config via
 // service_role (funktioner får SUPABASE_SERVICE_ROLE_KEY i env automatiskt).
 
-// @ts-nocheck , Deno-runtime (npm:/Deno-globaler). Den här filen typas/lintas
-// INTE av app-grafen (tsc -b/eslint kör mot src/, supabase/functions är
-// undantaget). De rena, testbara bitarna bor i src/data/livescore/ + _shared/.
+// @ts-nocheck , Deno-runtime (npm:/Deno-globaler). Den här filen typas/lintas INTE av
+// app-grafen (tsc -b/eslint kör mot src/, supabase/functions är undantaget). All
+// gissningskänslig, testbar logik bor i src/data/livescore/ + _shared/ (rena
+// funktioner, enhetstestade + paritets-testade mot mirror:n).
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
+  buildPerMatchPollPlan,
   deriveFacit,
   EMBEDDED_MATCH_PLAN,
   normalizeStatus,
   resolveFixtureToMatch,
   selectFreezeChecks,
+  selectInWindowMatches,
   shapeFrozenBlobs,
   type MappedMatchState,
   type RawFixtureResponse,
+  type WindowMatchState,
 } from '../_shared/livescore-core.ts';
 
 const API_BASE = 'https://v3.football.api-sports.io';
 const WC_LEAGUE_ID = 1; // API-Football: World Cup
 const DAILY_BUDGET = 100; // gratisnyckelns kvot
 const STOCKHOLM_TZ = 'Europe/Stockholm';
-// Tak för robust-facit-kollar per tick (utöver dagsbudgeten): så ett enstaka tick
-// aldrig bränner hela budgeten på gamla matcher. Normalt 0-2 matcher behöver det.
+// Tak för robust-facit-kollar per tick (skyddsnätet, utöver per-match-planen): så ett
+// enstaka tick aldrig bränner budgeten på gamla matcher. Normalt 0-1 matcher behöver det.
 const MAX_ROBUST_FREEZE_CHECKS_PER_TICK = 4;
 
 /** Svensk kalenderdag (YYYY-MM-DD), samma zon som appens dag-gruppering. */
@@ -71,7 +87,7 @@ Deno.serve(async (_req) => {
     if (!apiKey) throw new Error('app_config saknar api_football_key (inserta vid deploy).');
     if (!adminId) throw new Error('app_config saknar auto_facit_admin_id (inserta vid deploy).');
 
-    // --- 2. Budget: dagens räknare + gate ---
+    // --- 2. Budget: dagens räknare ---
     const now = new Date();
     const day = swedishDay(now);
     const { data: logRow, error: logErr } = await db
@@ -81,129 +97,117 @@ Deno.serve(async (_req) => {
       .maybeSingle();
     if (logErr) throw new Error(`Läs poll_log misslyckades: ${logErr.message}`);
     const callsUsedToday = logRow?.calls ?? 0;
-    const remaining = DAILY_BUDGET - callsUsedToday;
-    if (remaining <= 0) {
-      // Hård budget-vägg: polla aldrig mer idag.
-      return json({
-        skipped: true,
-        reason: `dagsbudget spräckt (${callsUsedToday}/${DAILY_BUDGET})`,
-      });
-    }
 
     let callsThisTick = 0;
     const log: string[] = [];
 
-    // --- 3. live=all: ETT anrop täcker alla samtidiga live-matcher ---
-    const liveResp = await apiGet(apiKey, `/fixtures?league=${WC_LEAGUE_ID}&live=all`);
-    callsThisTick += 1;
-    const liveFixtures: RawFixtureResponse[] = (liveResp.response ?? []) as RawFixtureResponse[];
+    // --- 3. FÖNSTER-GATING: vilka matcher är i sitt live-fönster NU? ---
+    const inWindow = selectInWindowMatches(EMBEDDED_MATCH_PLAN, now);
 
-    // Översätt API-fixture-id -> appens match_id via mappnings-tabellen (gissar aldrig).
-    let matchIdByFixture = await loadFixtureMap(
-      db,
-      liveFixtures.map((f) => f.fixture.id)
-    );
+    // DB-state för de in-fönster-matcherna: är de mappade (fixture_match_map) och
+    // vad har deras live-rad för status/frozen (match_live_data)?
+    const inWindowMatchIds = inWindow.map((m) => m.matchId);
+    const fixtureByMatch = await loadFixtureIdsByMatch(db, inWindowMatchIds);
+    const liveStateByMatch = await loadLiveStateByMatch(db, inWindowMatchIds);
 
-    // --- 3b. AUTO-MAPPNING: självseeda fixture_match_map för okända live-fixtures ---
-    // En live-fixture som SAKNAR mappnings-rad auto-resolveras mot den inbäddade
-    // matchplanen (lag-par via bryggan + kickoff, eller unik kickoff för slutspel).
-    // Entydig träff -> insert; tvetydig/saknad -> hoppas + loggas (gissa ALDRIG).
-    for (const f of liveFixtures) {
-      if (matchIdByFixture.has(f.fixture.id)) {
-        continue; // redan mappad
-      }
-      const res = resolveFixtureToMatch({
-        apiFixtureId: f.fixture.id,
-        homeTeamApiId: f.teams.home.id,
-        awayTeamApiId: f.teams.away.id,
-        kickoffUtc: new Date(f.fixture.date).toISOString(),
-      });
-      if (res.kind !== 'resolved') {
-        log.push(`auto-map ${f.fixture.id}: ${res.reason}, hoppas`);
-        continue;
-      }
-      const inserted = await insertFixtureMap(db, res.appMatchId, f.fixture.id);
-      if (inserted) {
-        matchIdByFixture.set(f.fixture.id, res.appMatchId);
-        log.push(`auto-map: fixture ${f.fixture.id} -> ${res.appMatchId} (självseedad)`);
-      } else {
-        // En konkurrent (annat tick/manuell seed) hann skapa raden , läs om så vi
-        // ändå får match_id (idempotent, ingen dubbel-insert, gissar inte).
+    const windowMatches: WindowMatchState[] = inWindow.map((m) => {
+      const live = liveStateByMatch.get(m.matchId);
+      return {
+        match: m,
+        apiFixtureId: fixtureByMatch.get(m.matchId) ?? null,
+        frozen: live?.frozen === true,
+        // Känd avgjord men ofryst -> facit-prio (får sitt anrop före pågående).
+        finishedAwaitingFreeze: live?.status === 'finished' && live?.frozen !== true,
+      };
+    });
+
+    // --- 4. PLAN: discovery + per-match, strikt under dagsbudgeten (facit-prio) ---
+    const plan = buildPerMatchPollPlan({
+      windowMatches,
+      callsUsedToday,
+      dailyBudget: DAILY_BUDGET,
+    });
+    log.push(`plan: ${plan.reason}`);
+
+    let matchIdByFixture = new Map<number, string>();
+
+    if (!plan.skipTick) {
+      // --- 4a. DISCOVERY: ETT live=all -> auto-mappa okända in-fönster-matcher ---
+      if (plan.needsDiscovery) {
+        const liveResp = await apiGet(apiKey, `/fixtures?league=${WC_LEAGUE_ID}&live=all`);
+        callsThisTick += 1;
+        const liveFixtures: RawFixtureResponse[] = (liveResp.response ??
+          []) as RawFixtureResponse[];
         matchIdByFixture = await loadFixtureMap(
           db,
-          liveFixtures.map((fx) => fx.fixture.id)
+          liveFixtures.map((f) => f.fixture.id)
         );
+        for (const f of liveFixtures) {
+          if (matchIdByFixture.has(f.fixture.id)) continue; // redan mappad
+          const res = resolveFixtureToMatch({
+            apiFixtureId: f.fixture.id,
+            homeTeamApiId: f.teams.home.id,
+            awayTeamApiId: f.teams.away.id,
+            kickoffUtc: new Date(f.fixture.date).toISOString(),
+          });
+          if (res.kind !== 'resolved') {
+            log.push(`auto-map ${f.fixture.id}: ${res.reason}, hoppas`);
+            continue;
+          }
+          const inserted = await insertFixtureMap(db, res.appMatchId, f.fixture.id);
+          if (inserted) {
+            matchIdByFixture.set(f.fixture.id, res.appMatchId);
+            log.push(`auto-map: fixture ${f.fixture.id} -> ${res.appMatchId} (självseedad)`);
+          } else {
+            // En konkurrent hann skapa raden , läs om så vi ändå får match_id.
+            matchIdByFixture = await loadFixtureMap(
+              db,
+              liveFixtures.map((fx) => fx.fixture.id)
+            );
+          }
+        }
+      }
+
+      // --- 4b. PER-MATCH: ett fixtures?id per mappad in-fönster-match = FULL DATA ---
+      // Planen gav redan de MAPPADE matcher som ryms (facit-prio + budget-kapat). En
+      // match som auto-mappades i discovery ovan pollas först NÄSTA tick (planen kände
+      // inte dess fixture-id än) , vi gissar aldrig ett id.
+      for (const t of plan.perMatchTargets) {
+        if (callsUsedToday + callsThisTick >= DAILY_BUDGET) {
+          log.push(`budget slut , skjuter upp per-match-poll av ${t.matchId} till nästa tick`);
+          break; // self-contained: spräck aldrig taket
+        }
+        const ok = await pollMatchFull(db, apiKey, adminId, t, now, log);
+        callsThisTick += 1; // pollMatchFull gör alltid ett fixtures?id-anrop
+        if (ok) log.push(`per-match: ${t.matchId}${t.facitPriority ? ' (facit-prio)' : ''}`);
       }
     }
 
-    // --- 4. Skriv match_live_data per RESOLVBAR live-match (upsert, idempotent) ---
-    const newlyFinished: { matchId: string; apiFixtureId: number }[] = [];
-    for (const f of liveFixtures) {
-      const matchId = matchIdByFixture.get(f.fixture.id);
-      if (!matchId) {
-        log.push(`okänd fixture ${f.fixture.id} (kunde inte auto-mappas), hoppas`);
-        continue;
-      }
-      const status = normalizeStatus(f.fixture.status.short);
-      const finished = status === 'finished';
-      const { error: upErr } = await db.from('match_live_data').upsert(
-        {
-          match_id: matchId,
-          api_fixture_id: f.fixture.id,
-          status,
-          elapsed_minute: f.fixture.status.elapsed,
-          home_goals: f.goals.home,
-          away_goals: f.goals.away,
-          // live=all bär inte alltid events/stats/lineups , de fylls vid freeze
-          // (fixtures?id) nedan. Rör inte de jsonb-fälten här (behåll ev. tidigare).
-          last_synced_at: now.toISOString(),
-          frozen: false,
-          updated_at: now.toISOString(),
-        },
-        { onConflict: 'match_id' }
-      );
-      if (upErr)
-        throw new Error(`Upsert match_live_data ${matchId} misslyckades: ${upErr.message}`);
-      if (finished) newlyFinished.push({ matchId, apiFixtureId: f.fixture.id });
-    }
-
-    // --- 5. FREEZE + AUTO-FACIT för nyss avslutade (facit FÖRST, inom budget) ---
-    // En match räknas som "behöver freeze" om den är avgjord men ännu inte fryst.
-    const toFreeze = await filterUnfrozen(db, newlyFinished);
-    for (const m of toFreeze) {
-      if (callsUsedToday + callsThisTick >= DAILY_BUDGET) {
-        log.push(`budget slut , skjuter upp freeze av ${m.matchId} till nästa tick`);
-        break; // self-contained: spräck aldrig taket
-      }
-      const ok = await freezeFacit(db, apiKey, adminId, m, now, log);
-      callsThisTick += 1; // freezeFacit gör alltid ett fixtures?id-anrop
-      if (ok) log.push(`facit + freeze (live=all): ${m.matchId}`);
-    }
-
-    // --- 6. ROBUST FACIT-FÅNGST: matcher som FÖLL UR live=all innan FT sågs ---
-    // Varje tick kollar vi även MAPPADE matcher vars kickoff passerat (inom bak-
-    // fönstret) och som ÄNNU INTE är frysta. Så ett slutresultat missas aldrig ens
-    // om matchen försvann ur live=all mellan två tick (g-F-1-buggen). Facit har
-    // högst prio men allt är budget-gatat (spräck aldrig 100/dag) + kapat per tick.
+    // --- 5. ROBUST FACIT-FÅNGST (skyddsnät): matcher som föll UR fönstret ofrysta ---
+    // Per-match-pollningen ovan täcker matcher i fönster. Men en match kan ha fallit ur
+    // fönstret (>3,5h sedan kickoff) innan dess FT hann frysas. Robust-vägen (4h bak-
+    // fönster) fångar dem så ett slutresultat aldrig missas. Budget-gatat (facit högst
+    // prio, spräck aldrig 100/dag) + kapat per tick. KÖRS ÄVEN OM ticket annars hoppades
+    // (det är just då en match utanför fönstret kan behöva sitt facit).
     const robustBudget = DAILY_BUDGET - (callsUsedToday + callsThisTick);
     if (robustBudget > 0) {
       const mapped = await loadMappedMatchStates(db);
       const maxChecks = Math.min(robustBudget, MAX_ROBUST_FREEZE_CHECKS_PER_TICK);
-      // Hoppa matcher vi redan frös denna tick (steg 5), undvik dubbel-anrop.
-      const frozenThisTick = new Set(toFreeze.map((m) => m.matchId));
+      // Hoppa matcher vi redan per-match-pollade denna tick (steg 4b), undvik dubbel-anrop.
+      const polledThisTick = new Set(plan.perMatchTargets.map((t) => t.matchId));
       const candidates = selectFreezeChecks(EMBEDDED_MATCH_PLAN, mapped, now, maxChecks).filter(
-        (t) => !frozenThisTick.has(t.matchId)
+        (t) => !polledThisTick.has(t.matchId)
       );
       for (const t of candidates) {
         if (callsUsedToday + callsThisTick >= DAILY_BUDGET) {
           log.push(`budget slut , skjuter upp robust freeze av ${t.matchId} till nästa tick`);
           break;
         }
-        const ok = await freezeFacit(
+        const ok = await pollMatchFull(
           db,
           apiKey,
           adminId,
-          { matchId: t.matchId, apiFixtureId: t.apiFixtureId },
+          { matchId: t.matchId, apiFixtureId: t.apiFixtureId, facitPriority: true },
           now,
           log
         );
@@ -212,12 +216,15 @@ Deno.serve(async (_req) => {
       }
     }
 
-    // --- Bokför dagens anrop (atomisk öka via RPC-fri upsert med läst värde) ---
-    await bumpCallCount(db, day, callsUsedToday + callsThisTick);
+    // --- 6. Bokför dagens anrop (idempotent upsert med läst värde) ---
+    if (callsThisTick > 0) {
+      await bumpCallCount(db, day, callsUsedToday + callsThisTick);
+    }
 
     return json({
       ok: true,
       day,
+      skipped: plan.skipTick && callsThisTick === 0,
       callsThisTick,
       callsUsedToday: callsUsedToday + callsThisTick,
       log,
@@ -250,6 +257,36 @@ async function apiGet(apiKey: string, path: string): Promise<{ response?: unknow
     throw new Error(`API-Football ${path} fel: ${JSON.stringify(errors)}`);
   }
   return body;
+}
+
+/** Läs api_fixture_id för en mängd match_id (in-fönster-matchernas mappning). */
+async function loadFixtureIdsByMatch(
+  db: ReturnType<typeof createClient>,
+  matchIds: string[]
+): Promise<Map<string, number>> {
+  if (matchIds.length === 0) return new Map();
+  const { data, error } = await db
+    .from('fixture_match_map')
+    .select('match_id, api_fixture_id')
+    .in('match_id', matchIds);
+  if (error) throw new Error(`Läs fixture_match_map (per match) misslyckades: ${error.message}`);
+  return new Map((data ?? []).map((r) => [r.match_id, r.api_fixture_id]));
+}
+
+/** Läs status + frozen för en mängd match_id (in-fönster-matchernas live-state). */
+async function loadLiveStateByMatch(
+  db: ReturnType<typeof createClient>,
+  matchIds: string[]
+): Promise<Map<string, { status: string; frozen: boolean }>> {
+  if (matchIds.length === 0) return new Map();
+  const { data, error } = await db
+    .from('match_live_data')
+    .select('match_id, status, frozen')
+    .in('match_id', matchIds);
+  if (error) throw new Error(`Läs match_live_data (per match) misslyckades: ${error.message}`);
+  return new Map(
+    (data ?? []).map((r) => [r.match_id, { status: r.status, frozen: r.frozen === true }])
+  );
 }
 
 async function loadFixtureMap(
@@ -293,7 +330,7 @@ async function insertFixtureMap(
  * Läs ALLA mappade matchers frozen-status (för robust facit-fångst). Joinar
  * fixture_match_map (kopplingen) med match_live_data (frozen-flaggan): en match utan
  * live-rad ännu räknas som EJ fryst (frozen=false), så den freeze-kollas om dess
- * kickoff passerat (just det fall där matchen föll ur live=all innan vi såg den).
+ * kickoff passerat (just det fall där matchen föll ur fönstret innan vi såg FT).
  */
 async function loadMappedMatchStates(
   db: ReturnType<typeof createClient>
@@ -321,56 +358,65 @@ async function loadMappedMatchStates(
 }
 
 /**
- * Hämta fixtures?id, härled facit (Bit 1:s regel) + apply_auto_facit (det manuella
- * låset) + frys snapshot med KUVERT-LINDADE rika blobbar (skarv-fixen: shapeFrozenBlobs
- * ger exakt den form läs-lagrets parsers tar). EN sanning för freeze, delad av live=all-
- * och robust-vägen. Returnerar true om matchen faktiskt frystes (false om inget svar).
- * GÖR ALLTID ett fixtures?id-anrop (anroparen räknar upp callsThisTick efteråt).
+ * PER-MATCH-POLL (v3 kärnan): hämta fixtures?id = FULL RIK DATA i ETT anrop och skriv
+ * match_live_data med ställning/status/elapsed OCH kuvert-lindade blobbar
+ * (events/statistics/lineups via shapeFrozenBlobs , skarv-fixen: producent-form ==
+ * konsument-form). Så live-kortet får målskytt/assist/kort/byten/statistik LIVE.
+ *
+ *   - Matchen PÅGÅR -> frozen=false (fortsätt polla nästa tick).
+ *   - Matchen är AVGJORD -> apply_auto_facit (det manuella låset) + frozen=true.
+ *
+ * EN sanning för per-match-skrivning, delad av per-match- och robust-vägen. Returnerar
+ * true om en rad skrevs (false om svaret saknade posten). GÖR ALLTID ett fixtures?id-
+ * anrop (anroparen räknar upp callsThisTick efteråt).
  */
-async function freezeFacit(
+async function pollMatchFull(
   db: ReturnType<typeof createClient>,
   apiKey: string,
   adminId: string,
-  m: { matchId: string; apiFixtureId: number },
+  m: { matchId: string; apiFixtureId: number; facitPriority?: boolean },
   now: Date,
   log: string[]
 ): Promise<boolean> {
-  // Rikt id-uppslag (events/lineups/statistics + score.penalty INLINE i ETT anrop).
+  // Rikt id-uppslag (status/goals/score + events/statistics/lineups INLINE, ett anrop).
   const fxResp = await apiGet(apiKey, `/fixtures?id=${m.apiFixtureId}`);
   const rich = (fxResp.response ?? [])[0] as RawFixtureResponse | undefined;
   if (!rich) {
     log.push(`fixtures?id=${m.apiFixtureId} gav ingen post, hoppas`);
     return false;
   }
-  // Bara en AVGJORD match får facit (robust-vägen kan träffa en match som ännu
-  // pågår om kickoff nyss passerat). deriveFacit fail-loud:ar på icke-finished,
-  // så vi kollar status FÖRST och hoppar (ingen freeze) tyst-säkert, inte krasch.
-  if (normalizeStatus(rich.fixture.status.short) !== 'finished') {
-    log.push(`${m.matchId}: ännu inte avgjord (${rich.fixture.status.short}), freeze skjuts upp`);
-    return false;
-  }
-  const facit = deriveFacit(rich); // Bit 1:s facit-regel (goals, inte extratime)
-  // Skriv facit MED det manuella låset (apply_auto_facit): rör aldrig en manuell
-  // rad, fyller tomt eller uppdaterar auto.
-  const { error: facitErr } = await db.rpc('apply_auto_facit', {
-    p_match_id: m.matchId,
-    p_home_goals: facit.homeGoals,
-    p_away_goals: facit.awayGoals,
-    p_status: 'finished',
-    p_penalties_home: facit.penalties?.home ?? null,
-    p_penalties_away: facit.penalties?.away ?? null,
-    p_updated_by: adminId,
-  });
-  if (facitErr) throw new Error(`apply_auto_facit ${m.matchId} misslyckades: ${facitErr.message}`);
-  // KUVERT-LINDA de rika blobbarna så läs-lagret kan parsa dem (skarv-fixen).
+  const status = normalizeStatus(rich.fixture.status.short);
+  const finished = status === 'finished';
+
+  // KUVERT-LINDA de rika blobbarna så läs-lagret kan parsa dem (skarv-fixen). Görs för
+  // BÅDE pågående och avgjorda matcher , det är hela v3-poängen: rik data LIVE.
   const blobs = shapeFrozenBlobs(
     rich as { events?: unknown[]; statistics?: unknown[]; lineups?: unknown[] }
   );
-  const { error: freezeErr } = await db.from('match_live_data').upsert(
+
+  // Avgjord match: skriv facit MED det manuella låset (apply_auto_facit) FÖRST , rör
+  // aldrig en manuell rad, fyller tomt eller uppdaterar auto. deriveFacit fail-loud:ar
+  // bara på faktiskt avgjorda, så vi gör det bara i finished-grenen.
+  if (finished) {
+    const facit = deriveFacit(rich); // Bit 1:s facit-regel (goals, inte extratime)
+    const { error: facitErr } = await db.rpc('apply_auto_facit', {
+      p_match_id: m.matchId,
+      p_home_goals: facit.homeGoals,
+      p_away_goals: facit.awayGoals,
+      p_status: 'finished',
+      p_penalties_home: facit.penalties?.home ?? null,
+      p_penalties_away: facit.penalties?.away ?? null,
+      p_updated_by: adminId,
+    });
+    if (facitErr)
+      throw new Error(`apply_auto_facit ${m.matchId} misslyckades: ${facitErr.message}`);
+  }
+
+  const { error: upErr } = await db.from('match_live_data').upsert(
     {
       match_id: m.matchId,
       api_fixture_id: m.apiFixtureId,
-      status: 'finished',
+      status,
       elapsed_minute: rich.fixture.status.elapsed,
       home_goals: rich.goals.home,
       away_goals: rich.goals.away,
@@ -378,29 +424,13 @@ async function freezeFacit(
       statistics: blobs.statistics,
       lineups: blobs.lineups,
       last_synced_at: now.toISOString(),
-      frozen: true,
+      frozen: finished, // fryst BARA när matchen är avgjord; pågående pollas vidare
       updated_at: now.toISOString(),
     },
     { onConflict: 'match_id' }
   );
-  if (freezeErr) throw new Error(`Frys ${m.matchId} misslyckades: ${freezeErr.message}`);
+  if (upErr) throw new Error(`Upsert match_live_data ${m.matchId} misslyckades: ${upErr.message}`);
   return true;
-}
-
-/** Behåll bara matcher som ännu inte är frysta (de behöver freeze/facit). */
-async function filterUnfrozen(
-  db: ReturnType<typeof createClient>,
-  matches: { matchId: string; apiFixtureId: number }[]
-): Promise<{ matchId: string; apiFixtureId: number }[]> {
-  if (matches.length === 0) return [];
-  const ids = matches.map((m) => m.matchId);
-  const { data, error } = await db
-    .from('match_live_data')
-    .select('match_id, frozen')
-    .in('match_id', ids);
-  if (error) throw new Error(`Läs frozen-status misslyckades: ${error.message}`);
-  const frozen = new Set((data ?? []).filter((r) => r.frozen).map((r) => r.match_id));
-  return matches.filter((m) => !frozen.has(m.matchId));
 }
 
 async function bumpCallCount(

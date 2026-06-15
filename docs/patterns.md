@@ -79,6 +79,25 @@ bara syns live. Återanvänds av alla framtida edge-funktioner som delar logik/d
 livescore pollare-v2 (`src/data/livescore/{freeze-shape,fixture-map-resolver,freeze-selection,match-plan}.ts`
 + tester, `supabase/functions/_shared/{livescore-core,embedded-match-plan}.ts`, decisions.md 2026-06-15).
 
+**Steg 3 KONKRETISERAT (pollare-v3, det paritetstest steget föreskrev men v2 aldrig byggde):**
+`src/data/livescore/v3-mirror-parity.test.ts` är det fungerande receptet , en mall att kopiera för
+nästa mirror-funktion:
+- `import { build } from 'esbuild'` (finns transitivt via vite), bundla mirror-filen i `beforeAll`:
+  `build({ entryPoints: ['supabase/functions/_shared/livescore-core.ts'], bundle: true, format: 'esm',
+  platform: 'neutral', write: false })`. Bundlingen löser mirror:ns `./embedded-match-plan.ts`-import.
+- Ladda bundlen som modul via en `data:`-URL UTAN Buffer/btoa (de typas inte av app-libs / bryts i
+  miljöer): `data:text/javascript,${encodeURIComponent(code)}` + dynamisk `import(/* @vite-ignore */ url)`.
+- **Kör i NODE-miljön:** lägg `// @vitest-environment node` som FÖRSTA rad. esbuild kräver en
+  TextEncoder/Uint8Array-invariant som jsdom BRYTER ("Invariant violation ... incorrectly false").
+  Den globala `src/test/setup.ts` gatar därför sin DOM-stubbning på `HAS_DOM`
+  (`typeof window !== 'undefined' && typeof document !== 'undefined'`) så node-tester kan dela setup:en.
+- Kör SAMMA diskriminerande in->ut-assertion mot BÅDE src och mirror med `expect(mir).toEqual(src)`
+  på fall där FEL logik skulle ge ETT ANNAT svar (facit-prio under budget-tryck, fönster-paus mellan
+  matcher, budget-vägg), + ett fail-loud-paritets-fall. Negativ-kontrollera: mutera mirror:n EN-sidigt
+  och bekräfta RÖTT (gjort: mirror MAX->SUM / window-bound borttagen -> testet rödnar).
+Källa: pollare-v3 (`v3-mirror-parity.test.ts`, `live-window.ts` + `per-match-poll-plan.ts` + mirror i
+`_shared/livescore-core.ts`, decisions.md 2026-06-15).
+
 ### server-harledd-dag-via-before-trigger-for-en-per-omgang-PK (Supabase, VM 2026)
 
 **Recept (upprätthåll "EN rad per användare och kalenderdag" STRUKTURELLT, oförfalskbart):**

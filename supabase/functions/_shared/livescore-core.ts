@@ -383,3 +383,189 @@ export function selectFreezeChecks(
   targets.sort((a, b) => b.msSinceKickoff - a.msSinceKickoff);
   return targets.slice(0, maxChecks);
 }
+
+// ---------------------------------------------------------------------------
+// FÖNSTER-GATING (mirror av src/data/livescore/live-window.ts). Vilka matcher är i
+// sitt LIVE-FÖNSTER NU? Pollare-v3 per-match-pollar bara matcher i fönster, så
+// budgeten (100/dag) räcker , ingen tomgångs-polling mellan matcher. Synk-märkt mot
+// live-window.ts , medvetna kopior, inte två sanningar.
+// ---------------------------------------------------------------------------
+
+export const LIVE_WINDOW_BEFORE_MS = 5 * 60 * 1000; // ~5 min före avspark
+export const LIVE_WINDOW_AFTER_MS = 3.5 * 60 * 60 * 1000; // ~3,5 h efter avspark
+
+export interface InWindowMatch {
+  matchId: string;
+  kickoffUtc: string;
+  homeAppId: string | null;
+  awayAppId: string | null;
+  msSinceKickoff: number;
+}
+
+export interface LiveWindowBounds {
+  beforeMs?: number;
+  afterMs?: number;
+}
+
+/** Välj de matcher ur planen vars kickoff ligger i live-fönstret NU. Äldst-kickoff först. */
+export function selectInWindowMatches(
+  plan: readonly MatchPlanEntry[],
+  now: Date,
+  bounds: LiveWindowBounds = {}
+): InWindowMatch[] {
+  const beforeMs = bounds.beforeMs ?? LIVE_WINDOW_BEFORE_MS;
+  const afterMs = bounds.afterMs ?? LIVE_WINDOW_AFTER_MS;
+  if (beforeMs < 0 || afterMs < 0) {
+    throw new Error(
+      `selectInWindowMatches: fönster-gränserna får inte vara negativa (before ${beforeMs}, after ${afterMs}).`
+    );
+  }
+  const nowMs = now.getTime();
+  if (Number.isNaN(nowMs)) {
+    throw new Error('selectInWindowMatches: now är ett ogiltigt datum.');
+  }
+
+  const inWindow: InWindowMatch[] = [];
+  for (const entry of plan) {
+    const kickoffMs = Date.parse(entry.kickoffUtc);
+    if (Number.isNaN(kickoffMs)) {
+      continue;
+    }
+    const msSinceKickoff = nowMs - kickoffMs;
+    if (msSinceKickoff >= -beforeMs && msSinceKickoff <= afterMs) {
+      inWindow.push({
+        matchId: entry.matchId,
+        kickoffUtc: entry.kickoffUtc,
+        homeAppId: entry.homeAppId,
+        awayAppId: entry.awayAppId,
+        msSinceKickoff,
+      });
+    }
+  }
+  inWindow.sort((a, b) => b.msSinceKickoff - a.msSinceKickoff);
+  return inWindow;
+}
+
+// ---------------------------------------------------------------------------
+// PER-MATCH-POLL-PLAN + BUDGET-ALLOKERING (mirror av src/data/livescore/
+// per-match-poll-plan.ts). Discovery (live=all bara när en in-fönster-match saknar
+// mappning) + per-match (fixtures?id, full data) med FACIT-PRIO, strikt under
+// dagsbudgeten. Synk-märkt mot per-match-poll-plan.ts.
+// ---------------------------------------------------------------------------
+
+export const DEFAULT_DAILY_BUDGET = 100;
+export const DEFAULT_MAX_PER_MATCH_CALLS_PER_TICK = 6;
+
+export interface WindowMatchState {
+  match: InWindowMatch;
+  apiFixtureId: number | null;
+  frozen: boolean;
+  finishedAwaitingFreeze?: boolean;
+}
+
+export interface PerMatchPlanInput {
+  windowMatches: readonly WindowMatchState[];
+  callsUsedToday: number;
+  dailyBudget?: number;
+  maxPerMatchCallsPerTick?: number;
+}
+
+export interface PerMatchPollTarget {
+  matchId: string;
+  apiFixtureId: number;
+  facitPriority: boolean;
+}
+
+export interface PerMatchPollPlan {
+  skipTick: boolean;
+  needsDiscovery: boolean;
+  perMatchTargets: PerMatchPollTarget[];
+  callBudgetThisTick: number;
+  reason: string;
+}
+
+/** Planera ett cron-tick: discovery + per-match med facit-prio, strikt under dagsbudgeten. */
+export function buildPerMatchPollPlan(input: PerMatchPlanInput): PerMatchPollPlan {
+  const dailyBudget = input.dailyBudget ?? DEFAULT_DAILY_BUDGET;
+  const maxPerMatch = input.maxPerMatchCallsPerTick ?? DEFAULT_MAX_PER_MATCH_CALLS_PER_TICK;
+  if (dailyBudget < 0) {
+    throw new Error(
+      `buildPerMatchPollPlan: dailyBudget får inte vara negativ (fick ${dailyBudget}).`
+    );
+  }
+  if (input.callsUsedToday < 0) {
+    throw new Error(
+      `buildPerMatchPollPlan: callsUsedToday får inte vara negativ (fick ${input.callsUsedToday}).`
+    );
+  }
+  if (maxPerMatch < 0) {
+    throw new Error(
+      `buildPerMatchPollPlan: maxPerMatchCallsPerTick får inte vara negativ (fick ${maxPerMatch}).`
+    );
+  }
+
+  const remaining = dailyBudget - input.callsUsedToday;
+  const skip = (reason: string): PerMatchPollPlan => ({
+    skipTick: true,
+    needsDiscovery: false,
+    perMatchTargets: [],
+    callBudgetThisTick: 0,
+    reason,
+  });
+
+  if (remaining <= 0) {
+    return skip(`dagsbudget spräckt (${input.callsUsedToday}/${dailyBudget})`);
+  }
+  if (input.windowMatches.length === 0) {
+    return skip('ingen match i live-fönster (0 anrop, ingen tomgångs-polling)');
+  }
+
+  const hasUnmapped = input.windowMatches.some((w) => w.apiFixtureId === null);
+
+  const candidates = input.windowMatches
+    .filter((w): w is WindowMatchState & { apiFixtureId: number } => w.apiFixtureId !== null)
+    .filter((w) => !w.frozen)
+    .sort((a, b) => {
+      const aPrio = a.finishedAwaitingFreeze === true ? 1 : 0;
+      const bPrio = b.finishedAwaitingFreeze === true ? 1 : 0;
+      if (aPrio !== bPrio) return bPrio - aPrio;
+      return b.match.msSinceKickoff - a.match.msSinceKickoff;
+    });
+
+  if (!hasUnmapped && candidates.length === 0) {
+    return skip('inget att polla (alla in-fönster-matcher frysta, inga okända)');
+  }
+
+  const discoveryCalls = hasUnmapped ? 1 : 0;
+  if (discoveryCalls > remaining) {
+    return skip(`budget räcker inte ens till discovery (kvar ${remaining})`);
+  }
+
+  const perMatchBudget = Math.min(remaining - discoveryCalls, maxPerMatch);
+  const perMatchTargets: PerMatchPollTarget[] = candidates.slice(0, perMatchBudget).map((w) => ({
+    matchId: w.match.matchId,
+    apiFixtureId: w.apiFixtureId,
+    facitPriority: w.finishedAwaitingFreeze === true,
+  }));
+
+  const callBudgetThisTick = discoveryCalls + perMatchTargets.length;
+  if (callBudgetThisTick === 0) {
+    return skip(`budget slut för per-match-anrop detta tick (kvar ${remaining})`);
+  }
+
+  const parts: string[] = [];
+  if (discoveryCalls > 0) parts.push('1 live=all (discovery)');
+  if (perMatchTargets.length > 0) {
+    const prio = perMatchTargets.filter((t) => t.facitPriority).length;
+    parts.push(
+      `${perMatchTargets.length} fixtures?id${prio > 0 ? ` (varav ${prio} facit-prio)` : ''}`
+    );
+  }
+  return {
+    skipTick: false,
+    needsDiscovery: hasUnmapped,
+    perMatchTargets,
+    callBudgetThisTick,
+    reason: `pollar: ${parts.join(' + ')} (kvar ${remaining}/${dailyBudget})`,
+  };
+}

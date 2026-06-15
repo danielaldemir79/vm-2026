@@ -67,3 +67,20 @@ export type { LiveData } from './live-read';
 
 // Bit 3a: realtids-prenumeration på match_live_data + klock-brygga (re-sync mot push).
 export { liveClockFor, liveDataSubscription, MATCH_LIVE_DATA_TABLE } from './live-realtime';
+
+// Pollare-v3: fönster-gating (vilka matcher per-match-pollas NU) + per-match-poll-plan
+// (discovery + budget-allokering med facit-prio). Rena, testbara byggstenar, speglade
+// i _shared för edge-pollaren.
+export { LIVE_WINDOW_AFTER_MS, LIVE_WINDOW_BEFORE_MS, selectInWindowMatches } from './live-window';
+export type { InWindowMatch, LiveWindowBounds } from './live-window';
+export {
+  buildPerMatchPollPlan,
+  DEFAULT_DAILY_BUDGET,
+  DEFAULT_MAX_PER_MATCH_CALLS_PER_TICK,
+} from './per-match-poll-plan';
+export type {
+  PerMatchPlanInput,
+  PerMatchPollPlan,
+  PerMatchPollTarget,
+  WindowMatchState,
+} from './per-match-poll-plan';

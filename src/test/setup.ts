@@ -7,6 +7,14 @@ import { createRoot } from 'react-dom/client';
 import { MotionGlobalConfig, useReducedMotion } from 'motion/react';
 import { vi } from 'vitest';
 
+// De flesta tester kör i jsdom (default), men enstaka rena-logik-tester väljer
+// node-miljön via `// @vitest-environment node` (t.ex. v3-mirror-parity, som kör
+// esbuild , esbuild kräver en TextEncoder/Uint8Array-invariant jsdom bryter). I
+// node-miljön finns ingen DOM, så all matchMedia-/observer-/motion-warmup nedan
+// (som rör window/document) hoppas. Produktionen påverkas inte; detta gör bara den
+// delade setup:en säker att dela mellan jsdom- och node-tester.
+const HAS_DOM = typeof window !== 'undefined' && typeof document !== 'undefined';
+
 // virtual:pwa-register finns BARA i ett riktigt Vite-bygge, inte i Vitest. Tester
 // som monterar hela appen (App.test) går via den riktiga useAppUpdate ->
 // registerAppSw som dynamiskt importerar modulen. Vi mockar den globalt till en
@@ -31,79 +39,83 @@ vi.mock('virtual:pwa-register', () => ({
 // plåster, utan tar bort tidsberoendet. Vi rör inte produktionsbeteendet.
 MotionGlobalConfig.skipAnimations = true;
 
-// jsdom saknar matchMedia. Både tema-systemet (prefers-color-scheme) och
-// motion (prefers-reduced-motion) anropar window.matchMedia, så vi ger en
-// neutral standard-stub: inga preferenser matchar (matches: false). Enskilda
-// tester som behöver en specifik preferens kan spionera över denna.
-if (!window.matchMedia) {
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  }));
-}
+// All DOM-beroende stubbning nedan körs bara i jsdom (HAS_DOM). I node-miljön finns
+// ingen window/document och inget av detta behövs (de testerna rör ingen DOM).
+if (HAS_DOM) {
+  // jsdom saknar matchMedia. Både tema-systemet (prefers-color-scheme) och
+  // motion (prefers-reduced-motion) anropar window.matchMedia, så vi ger en
+  // neutral standard-stub: inga preferenser matchar (matches: false). Enskilda
+  // tester som behöver en specifik preferens kan spionera över denna.
+  if (!window.matchMedia) {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+  }
 
-// jsdom saknar IntersectionObserver (scroll-spy:n, T78) OCH ResizeObserver (sektions-
-// navets band-höjd-mätning, T78). Vi ger en inert, återanvändbar stub för båda så
-// komponenter som monterar dem inte kraschar i testmiljön. Stubbarna OBSERVERAR utan att
-// emittera (ingen scroll i jsdom), vilket är rätt default: spy-/mät-LOGIKEN testas separat
-// med en INJICERAD/kontrollerad observer-callback (use-section-spy.test.ts), så stubben
-// döljer inget beteende, den gör bara monterings-seam:et inert (samma anda som
-// matchMedia-/virtual:pwa-register-stubbarna). Enskilda tester kan ersätta global
-// IntersectionObserver med en spion när de vill driva callbacken.
-if (!('IntersectionObserver' in globalThis)) {
-  // Konstruktor-argumenten (callback/options) ignoreras medvetet, stubben emitterar
-  // aldrig. JS tar emot extra argument oavsett, så vi tar inga formella parametrar
-  // (slipper "oanvänd parameter" utan att tappa beteende). Cast:en bär typkontraktet.
-  class IntersectionObserverStub {
-    readonly root = null;
-    readonly rootMargin = '';
-    readonly thresholds: ReadonlyArray<number> = [];
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-    takeRecords(): IntersectionObserverEntry[] {
-      return [];
+  // jsdom saknar IntersectionObserver (scroll-spy:n, T78) OCH ResizeObserver (sektions-
+  // navets band-höjd-mätning, T78). Vi ger en inert, återanvändbar stub för båda så
+  // komponenter som monterar dem inte kraschar i testmiljön. Stubbarna OBSERVERAR utan att
+  // emittera (ingen scroll i jsdom), vilket är rätt default: spy-/mät-LOGIKEN testas separat
+  // med en INJICERAD/kontrollerad observer-callback (use-section-spy.test.ts), så stubben
+  // döljer inget beteende, den gör bara monterings-seam:et inert (samma anda som
+  // matchMedia-/virtual:pwa-register-stubbarna). Enskilda tester kan ersätta global
+  // IntersectionObserver med en spion när de vill driva callbacken.
+  if (!('IntersectionObserver' in globalThis)) {
+    // Konstruktor-argumenten (callback/options) ignoreras medvetet, stubben emitterar
+    // aldrig. JS tar emot extra argument oavsett, så vi tar inga formella parametrar
+    // (slipper "oanvänd parameter" utan att tappa beteende). Cast:en bär typkontraktet.
+    class IntersectionObserverStub {
+      readonly root = null;
+      readonly rootMargin = '';
+      readonly thresholds: ReadonlyArray<number> = [];
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+      takeRecords(): IntersectionObserverEntry[] {
+        return [];
+      }
     }
+    globalThis.IntersectionObserver =
+      IntersectionObserverStub as unknown as typeof IntersectionObserver;
   }
-  globalThis.IntersectionObserver =
-    IntersectionObserverStub as unknown as typeof IntersectionObserver;
-}
 
-if (!('ResizeObserver' in globalThis)) {
-  class ResizeObserverStub {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
+  if (!('ResizeObserver' in globalThis)) {
+    class ResizeObserverStub {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
   }
-  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
-}
 
-// EAGER motion-reduced-motion-init (T33): motion lazy-initierar sin globala
-// prefers-reduced-motion-lyssnare FÖRSTA gången useReducedMotion() anropas i en worker,
-// via window.matchMedia('(prefers-reduced-motion)').addEventListener(...). Förr körde
-// varje dialog-ägande komponent useReducedMotion EAGERT vid mount (mot den rena stubben
-// ovan), så init skedde tidigt och säkert. Med den delade <Modal>-primitiven (T33) körs
-// useReducedMotion först när en dialog ÖPPNAS, vilket kan inträffa i ett test där en
-// matchMedia-spion (vi.spyOn ... mockImplementation/restoreAllMocks) tillfälligt gör att
-// reduced-motion-frågan saknar addEventListener -> motion-init kraschar (recovered
-// concurrent-render-fel, brusar i svit-loggen). Vi WARM:ar motion-init EN gång här genom
-// att rendera en minimal komponent som anropar useReducedMotion, mot den KOMPLETTA stubben
-// ovan (innan någon spion hinner störa), så motions globala flagga sätts säkert och lazy-
-// init aldrig sker mot ett transient matchMedia-läge senare. Produktionen påverkas inte
-// (riktig matchMedia finns alltid); detta härdar bara testmiljön, samma anda som
-// matchMedia-/MotionGlobalConfig-stubbarna ovan.
-function MotionInitWarmup() {
-  useReducedMotion();
-  return null;
-}
-const warmupRoot = createRoot(document.createElement('div'));
-act(() => {
-  warmupRoot.render(createElement(MotionInitWarmup));
-});
-warmupRoot.unmount();
+  // EAGER motion-reduced-motion-init (T33): motion lazy-initierar sin globala
+  // prefers-reduced-motion-lyssnare FÖRSTA gången useReducedMotion() anropas i en worker,
+  // via window.matchMedia('(prefers-reduced-motion)').addEventListener(...). Förr körde
+  // varje dialog-ägande komponent useReducedMotion EAGERT vid mount (mot den rena stubben
+  // ovan), så init skedde tidigt och säkert. Med den delade <Modal>-primitiven (T33) körs
+  // useReducedMotion först när en dialog ÖPPNAS, vilket kan inträffa i ett test där en
+  // matchMedia-spion (vi.spyOn ... mockImplementation/restoreAllMocks) tillfälligt gör att
+  // reduced-motion-frågan saknar addEventListener -> motion-init kraschar (recovered
+  // concurrent-render-fel, brusar i svit-loggen). Vi WARM:ar motion-init EN gång här genom
+  // att rendera en minimal komponent som anropar useReducedMotion, mot den KOMPLETTA stubben
+  // ovan (innan någon spion hinner störa), så motions globala flagga sätts säkert och lazy-
+  // init aldrig sker mot ett transient matchMedia-läge senare. Produktionen påverkas inte
+  // (riktig matchMedia finns alltid); detta härdar bara testmiljön, samma anda som
+  // matchMedia-/MotionGlobalConfig-stubbarna ovan.
+  function MotionInitWarmup() {
+    useReducedMotion();
+    return null;
+  }
+  const warmupRoot = createRoot(document.createElement('div'));
+  act(() => {
+    warmupRoot.render(createElement(MotionInitWarmup));
+  });
+  warmupRoot.unmount();
+} // slut HAS_DOM
