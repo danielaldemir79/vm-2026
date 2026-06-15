@@ -68,29 +68,35 @@
   filter: saturate(1.1);
 }
 
-/* KORT-IKONEN (gult/rött kort): en liten rektangel i spelkorts-form. FÄRGEN bär
+/* KORT-IKONEN (gult/rött kort): en stående rektangel i domarkorts-form. FÄRGEN bär
  * betydelsen (gul = gult kort, röd = rött kort), så ingen "gult/rött kort"-text behövs
  * på raden , a11y säkras i stället av en sr-only-etikett INNE i ikonen (LiveMatchCard).
  *
- * KONTRAST/SYNLIGHET (WCAG, icke-text-kontrast 1.4.11): ett gult kort på en ljus yta
- * kan tappa kant. En tunn kontrast-kant (mörkare amber/röd) ringar in ikonen så den
- * alltid syns mot kort-ytan i båda teman, exakt samma grepp som tidigare warning-/
- * danger-brickor i appen. width/height ger den igenkännbara stående spelkorts-formen. */
+ * FÄRGVAL (Daniels feedback): fyllningen är de RENA domarkorts-tokens (--vm-card-yellow
+ * /--vm-card-red), INTE --color-warning/--color-danger. De senare är AA-tunade för TEXT
+ * och mörknar i ljust tema (warning -> brun ockra), vilket gjorde det gula kortet brunt.
+ * Ett kort ska läsas som en FÄRG, så vi använder mättad gul resp. röd som ser likadan
+ * ut i båda teman.
+ *
+ * KONTRAST/SYNLIGHET (WCAG 1.4.11, icke-text-kontrast >= 3:1): ett mättat gult kort kan
+ * tappa kant mot en ljus yta. En tunn, mörkare kant (--vm-card-*-edge) ringar in formen
+ * så kortet alltid syns mot kort-ytan i båda teman, utan att grumla den gula/röda
+ * fyllningen. width/height ger den igenkännbara STÅENDE spelkorts-formen (domarkort). */
 [data-live-card] .vm-live-card-pip {
   display: inline-flex;
-  width: 0.6rem;
-  height: 0.85rem;
+  width: 0.7rem;
+  height: 1rem;
   border-radius: 0.15rem;
 }
 
 [data-live-card] .vm-live-card-pip-yellow {
-  background-color: var(--color-warning);
-  border: 1px solid color-mix(in srgb, var(--color-warning) 70%, #000);
+  background-color: var(--vm-card-yellow);
+  border: 1px solid var(--vm-card-yellow-edge);
 }
 
 [data-live-card] .vm-live-card-pip-red {
-  background-color: var(--color-danger);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 70%, #000);
+  background-color: var(--vm-card-red);
+  border: 1px solid var(--vm-card-red-edge);
 }
 
 /* LAG-TILLHÖRIGHETS-BRICKAN på en mål-/kort-/byte-rad: lagets kod (eller initialer) som

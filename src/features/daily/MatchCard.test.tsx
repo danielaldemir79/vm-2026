@@ -216,6 +216,27 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     expect(screen.getByText('Arena')).toBeInTheDocument();
   });
 
+  it('lägger kapaciteten INLINE i parentes efter arena-namnet på samma rad (Daniels feedback)', () => {
+    const { container } = renderCard(
+      <MatchCard
+        match={groupMatch({ venue: 'Estadio Azteca, Mexico City, Mexiko' })}
+        teamsById={teamsById}
+      />
+    );
+    const cap = container.querySelector('[data-venue-capacity]') as HTMLElement;
+    expect(cap).not.toBeNull();
+    // Kapaciteten står i PARENTES ("(80 824 platser)"), inte som lös text.
+    expect(cap.textContent).toMatch(/^\(80.824 platser\)$/);
+    // INLINE, inte på en egen rad: den är ett <span> (inline-flöde), inte ett block.
+    expect(cap.classList.contains('block')).toBe(false);
+    // Den ligger i SAMMA dd som arena-namnet (samma rad/textflöde), direkt efter det.
+    const dd = cap.closest('dd');
+    expect(dd).not.toBeNull();
+    expect(dd?.querySelector('span')?.textContent).toContain('Estadio Azteca');
+    // Hela dd-textinnehållet läser arena + kapacitet som en sammanhängande rad.
+    expect(dd?.textContent).toMatch(/Estadio Azteca, Mexico City, Mexiko\s+\(80.824 platser\)/);
+  });
+
   it('visar INGEN kapacitet TYST för en arena utan verifierad kapacitet (T4e)', () => {
     // En arena som inte finns i kapacitets-tabellen (t.ex. den äldre "Arena, Stad"-formen
     // utan land): arenan visas, men ingen kapacitets-siffra (gissa aldrig).

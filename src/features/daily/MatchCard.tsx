@@ -402,27 +402,27 @@ export function MatchCard({
         {/* Arena visas BARA om den är verifierad. Platshållaren ("Arena ej
             verifierad", #35) visas inte som om den vore data; den döljs här tills
             riktig arena-data finns.
-            BALANS (design-frontend, T4e #149): arena-namnet ("Arena, Stad, Land") är
-            redan långt; att glua kapaciteten inline efter det ("... Mexiko (80 824 platser)")
-            sprängde raden till två rader på 360/344 och läste rörigt (en löpande sträng).
-            Vi lägger därför kapaciteten på en EGEN, lugn rad UNDER arena-namnet, så
-            arenan skannas rent och kapaciteten är ett tydligt SEKUNDÄRT komplement, inte
-            en del av samma textsjok. Den hålls extra diskret (en grad mindre, fg-muted),
-            så den aldrig konkurrerar med arena-namnet. items-baseline gör att "Arena"-
-            etiketten linjerar med arena-namnets FÖRSTA rad även när dd:n blir tvårads.
-            data-venue-capacity + fg-muted (redan AA-mätt, ingen ny färg) är oförändrade. */}
+            KAPACITET INLINE (Daniels feedback): kapaciteten står i parentes DIREKT efter
+            arena-namnet på samma rad ("Estadio Azteca, Mexico City, Mexiko (80 824
+            platser)"), inte på en egen rad under. Vi använder INTE white-space: nowrap,
+            så hela frasen radbryter NATURLIGT när kort-bredden är trång (parentesen
+            hamnar då på en följande rad i samma textflöde, aldrig avkapad). Kapaciteten
+            hålls en grad mindre + fg-muted så den läses som ett SEKUNDÄRT komplement och
+            aldrig konkurrerar med arena-namnet. items-baseline gör att "Arena"-etiketten
+            linjerar med arena-namnets första rad även när dd:n radbryter. data-venue-
+            capacity + fg-muted (redan AA-mätt, ingen ny färg) är oförändrade. */}
         {showVenue ? (
           <div className="flex items-baseline gap-1">
             <dt className="font-semibold">Arena</dt>
             <dd className="min-w-0">
               <span>{match.venue}</span>
               {venueCapacity !== null ? (
-                <span
-                  data-venue-capacity=""
-                  className="block text-[0.6875rem] leading-tight text-fg-muted"
-                >
-                  {venueCapacity}
-                </span>
+                <>
+                  {' '}
+                  <span data-venue-capacity="" className="text-[0.6875rem] text-fg-muted">
+                    ({venueCapacity})
+                  </span>
+                </>
               ) : null}
             </dd>
           </div>

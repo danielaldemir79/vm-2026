@@ -104,14 +104,17 @@ describe('LiveMatchCard, kärnan syns direkt', () => {
     expect(assist?.textContent).toMatch(/assist: Gakpo/);
   });
 
-  it('bär lag-tillhörighet på mål-raden (lag-kod-bricka, inte H/B)', () => {
+  it('bär lag-tillhörighet via SIDAN på mål-raden (vänster = hemma), inte en kod-bricka', () => {
     renderCard();
     const goal = screen.getByRole('region').querySelector('[data-live-goal]');
-    const tag = goal?.querySelector('[data-live-event-team]');
-    expect(tag).not.toBeNull();
-    // Hemmalagets kod (NED) eftersom mål-eventet är hemmalagets.
-    expect(tag?.textContent).toContain('NED');
-    expect(tag?.getAttribute('data-live-event-team-side')).toBe('home');
+    expect(goal).not.toBeNull();
+    // Lag-tillhörigheten bärs nu av POSITIONEN (sidan), inte en NED/JPN-bricka på raden.
+    // Hemma-målet ligger i HEMMA-cellen (vänster) och har data-live-goal-side="home".
+    expect(goal?.getAttribute('data-live-goal-side')).toBe('home');
+    expect(goal?.querySelector('[data-live-event-cell="home"]')).not.toBeNull();
+    expect(goal?.querySelector('[data-live-event-cell="away"]')).toBeNull();
+    // Ingen kod-bricka på själva mål-/kort-raden längre (den lever kvar i byten-blocket).
+    expect(goal?.querySelector('[data-live-event-team]')).toBeNull();
   });
 
   it('visar gult OCH rött kort i kärnan: FÄRG bär betydelsen, ingen kort-TEXT', () => {
@@ -199,6 +202,97 @@ describe('LiveMatchCard, kärnan syns direkt', () => {
     expect(sub).not.toBeNull();
     expect(sub?.querySelector('[data-live-sub-in]')?.textContent).toMatch(/Weghorst/);
     expect(sub?.querySelector('[data-live-sub-out]')?.textContent).toMatch(/Memphis/);
+  });
+});
+
+describe('LiveMatchCard, SPEGLAT förlopp (hemma vänster | borta höger)', () => {
+  it('mål: hemmalagets mål hamnar i VÄNSTER cell, bortalagets i HÖGER (Daniels feedback)', () => {
+    renderCard({
+      events: [
+        goalEvent({ teamApiId: HOME, playerName: 'Memphis', minute: 23 }),
+        goalEvent({ teamApiId: AWAY, playerName: 'Mitoma', minute: 55 }),
+      ],
+    });
+    const card = screen.getByRole('region');
+    const homeGoal = card.querySelector('[data-live-goal][data-live-goal-side="home"]');
+    const awayGoal = card.querySelector('[data-live-goal][data-live-goal-side="away"]');
+    expect(homeGoal).not.toBeNull();
+    expect(awayGoal).not.toBeNull();
+    // Hemma-målet ligger i HEMMA-cellen (vänster kolumn), inte borta-cellen.
+    const homeCell = homeGoal?.querySelector('[data-live-event-cell="home"]');
+    expect(homeCell).not.toBeNull();
+    expect(homeGoal?.querySelector('[data-live-event-cell="away"]')).toBeNull();
+    expect(homeCell?.textContent).toContain('Memphis');
+    // Borta-målet ligger i BORTA-cellen (höger kolumn), inte hemma-cellen.
+    const awayCell = awayGoal?.querySelector('[data-live-event-cell="away"]');
+    expect(awayCell).not.toBeNull();
+    expect(awayGoal?.querySelector('[data-live-event-cell="home"]')).toBeNull();
+    expect(awayCell?.textContent).toContain('Mitoma');
+  });
+
+  it('kort: hemmalagets kort i VÄNSTER cell, bortalagets i HÖGER (spegel, som statistiken)', () => {
+    renderCard({
+      events: [
+        goalEvent({
+          kind: 'card',
+          rawType: 'Card',
+          detail: 'Yellow Card',
+          cardColor: 'yellow',
+          minute: 40,
+          teamApiId: HOME,
+          playerName: 'De Jong',
+        }),
+        goalEvent({
+          kind: 'card',
+          rawType: 'Card',
+          detail: 'Red Card',
+          cardColor: 'red',
+          minute: 70,
+          teamApiId: AWAY,
+          playerName: 'Endo',
+        }),
+      ],
+    });
+    const card = screen.getByRole('region');
+    const yellow = card.querySelector('[data-live-card-color="yellow"]');
+    const red = card.querySelector('[data-live-card-color="red"]');
+    // Hemmalagets gula kort -> vänster (hemma-cellen).
+    expect(yellow?.getAttribute('data-live-event-side')).toBe('home');
+    expect(yellow?.querySelector('[data-live-event-cell="home"]')?.textContent).toContain(
+      'De Jong'
+    );
+    expect(yellow?.querySelector('[data-live-event-cell="away"]')).toBeNull();
+    // Bortalagets röda kort -> höger (borta-cellen).
+    expect(red?.getAttribute('data-live-event-side')).toBe('away');
+    expect(red?.querySelector('[data-live-event-cell="away"]')?.textContent).toContain('Endo');
+    expect(red?.querySelector('[data-live-event-cell="home"]')).toBeNull();
+  });
+
+  it('assist hamnar på SAMMA sida som skytten (hemma -> vänster, borta -> höger)', () => {
+    renderCard({
+      events: [
+        goalEvent({ teamApiId: AWAY, playerName: 'Mitoma', assistName: 'Kubo', minute: 55 }),
+      ],
+    });
+    const awayGoal = screen
+      .getByRole('region')
+      .querySelector('[data-live-goal][data-live-goal-side="away"]');
+    const assist = awayGoal?.querySelector('[data-live-goal-assist]') as HTMLElement | null;
+    expect(assist).not.toBeNull();
+    expect(assist?.textContent).toMatch(/assist: Kubo/);
+    // Borta-assisten ligger i höger kolumn (col-start-3) + vänster-ställd, spegel-rätt.
+    expect(assist?.className).toContain('col-start-3');
+  });
+
+  it('minuten står i en central spine, tydlig per rad', () => {
+    renderCard({
+      events: [goalEvent({ teamApiId: HOME, playerName: 'Memphis', minute: 23, extra: null })],
+    });
+    const homeGoal = screen
+      .getByRole('region')
+      .querySelector('[data-live-goal][data-live-goal-side="home"]');
+    // Minuten finns på raden (spine), tydligt formaterad ("23'").
+    expect(homeGoal?.textContent).toContain("23'");
   });
 });
 
