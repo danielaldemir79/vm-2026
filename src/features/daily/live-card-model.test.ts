@@ -165,11 +165,27 @@ describe('buildStatRows', () => {
   });
 
   it('saknat tal -> "-" och 0.5/0.5-andel (ingen NaN, ljuger inte om skillnad)', () => {
-    const list = [stats(HOME, { 'Yellow Cards': null }), stats(AWAY, { 'Yellow Cards': null })];
+    // En visad stat-typ (Total Shots) men utan tal på någon sida: raden finns ändå
+    // (minst en sida hade typen) men visar "-" och delar 50/50, så stapeln inte ljuger.
+    const list = [stats(HOME, { 'Total Shots': null }), stats(AWAY, { 'Total Shots': null })];
     const rows = buildStatRows(list, HOME);
-    const yc = rows.find((r) => r.label === 'Gula kort');
-    expect(yc).toMatchObject({ homeText: '-', awayText: '-' });
-    expect(yc?.homeShare).toBe(0.5);
+    const shots = rows.find((r) => r.label === 'Skott totalt');
+    expect(shots).toMatchObject({ homeText: '-', awayText: '-' });
+    expect(shots?.homeShare).toBe(0.5);
+  });
+
+  it('visar ALDRIG en kort-räkning i statistiken (korten syns i förloppet i stället)', () => {
+    // Daniels spec: gula/röda kort ska visas i matchförloppet (på kortets framsida),
+    // inte som en stat-RAD , annars dubbel-visas samma sak. Även om API:t skickar en
+    // kort-räkning ska ingen "Gula kort"/"Röda kort"-rad byggas.
+    const list = [
+      stats(HOME, { 'Yellow Cards': 3, 'Red Cards': 1, 'Total Shots': 13 }),
+      stats(AWAY, { 'Yellow Cards': 2, 'Red Cards': 0, 'Total Shots': 8 }),
+    ];
+    const rows = buildStatRows(list, HOME);
+    expect(rows.some((r) => /kort/i.test(r.label))).toBe(false);
+    // Den vanliga spel-statistiken finns kvar (vakten tog inte bort allt).
+    expect(rows.some((r) => r.label === 'Skott totalt')).toBe(true);
   });
 
   it('tom statistik -> inga rader', () => {

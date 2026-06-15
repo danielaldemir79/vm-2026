@@ -441,6 +441,8 @@ export function MatchCard({
           homeName={home}
           awayName={away}
           homeApiId={match.homeTeamId !== null ? resolveApiTeamId(match.homeTeamId) : null}
+          homeCode={homeCode}
+          awayCode={awayCode}
           now={now}
         />
       ) : null}

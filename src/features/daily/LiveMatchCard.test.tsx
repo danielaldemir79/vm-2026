@@ -76,6 +76,8 @@ function renderCard(over: Partial<LiveData> = {}, now = SYNC_MS) {
       homeName="Nederländerna"
       awayName="Japan"
       homeApiId={HOME}
+      homeCode="NED"
+      awayCode="JPN"
       now={now}
     />
   );
@@ -91,12 +93,28 @@ describe('LiveMatchCard, kärnan syns direkt', () => {
     expect(card.querySelector('[data-live-score]')?.textContent).toContain('1');
   });
 
-  it('region bär ett tillgängligt namn som sammanfattar live-läget', () => {
+  it('lägger ASSISTEN på en EGEN rad under skytten (Daniels spec, hierarki)', () => {
     renderCard();
-    expect(screen.getByRole('region', { name: /Nederländerna 1-0 Japan/i })).toBeInTheDocument();
+    const goal = screen.getByRole('region').querySelector('[data-live-goal]');
+    expect(goal).not.toBeNull();
+    // Skytten finns; assisten ligger i ett SEPARAT element (data-live-goal-assist),
+    // inte inline på skytte-raden, så de aldrig trängs ihop.
+    const assist = goal?.querySelector('[data-live-goal-assist]');
+    expect(assist).not.toBeNull();
+    expect(assist?.textContent).toMatch(/assist: Gakpo/);
   });
 
-  it('visar gult OCH rött kort + byte i kärnan (färg-oberoende: ord + sida)', () => {
+  it('bär lag-tillhörighet på mål-raden (lag-kod-bricka, inte H/B)', () => {
+    renderCard();
+    const goal = screen.getByRole('region').querySelector('[data-live-goal]');
+    const tag = goal?.querySelector('[data-live-event-team]');
+    expect(tag).not.toBeNull();
+    // Hemmalagets kod (NED) eftersom mål-eventet är hemmalagets.
+    expect(tag?.textContent).toContain('NED');
+    expect(tag?.getAttribute('data-live-event-team-side')).toBe('home');
+  });
+
+  it('visar gult OCH rött kort i kärnan: FÄRG bär betydelsen, ingen kort-TEXT', () => {
     renderCard({
       events: [
         goalEvent(),
@@ -117,6 +135,50 @@ describe('LiveMatchCard, kärnan syns direkt', () => {
           teamApiId: AWAY,
           playerName: 'Endo',
         }),
+      ],
+    });
+    const card = screen.getByRole('region');
+    // Spelarna + korten syns i kärnan (utan att fälla ut).
+    expect(within(card).getByText('De Jong')).toBeInTheDocument();
+    expect(within(card).getByText('Endo')).toBeInTheDocument();
+    const yellow = card.querySelector('[data-live-card-color="yellow"]');
+    const red = card.querySelector('[data-live-card-color="red"]');
+    expect(yellow).not.toBeNull();
+    expect(red).not.toBeNull();
+    // Färgad kort-ikon finns per kort (gul/röd), den BÄR betydelsen.
+    expect(yellow?.querySelector('.vm-live-card-pip-yellow')).not.toBeNull();
+    expect(red?.querySelector('.vm-live-card-pip-red')).not.toBeNull();
+  });
+
+  it('kort: ingen synlig "gult/rött kort"-text, men a11y-etikett finns (sr-only)', () => {
+    renderCard({
+      events: [
+        goalEvent({
+          kind: 'card',
+          rawType: 'Card',
+          detail: 'Yellow Card',
+          cardColor: 'yellow',
+          minute: 40,
+          playerName: 'De Jong',
+        }),
+      ],
+    });
+    const card = screen.getByRole('region');
+    const pip = card.querySelector('[data-live-card-color="yellow"] .vm-live-card-pip');
+    // A11y: en dold etikett inne i ikonen säger "gult kort" för skärmläsare.
+    const srLabel = pip?.querySelector('.sr-only');
+    expect(srLabel?.textContent).toBe('gult kort');
+    // Men kort-RADEN bär ingen synlig "gult kort"-löptext bredvid spelaren.
+    const row = card.querySelector('[data-live-card-color="yellow"]') as HTMLElement;
+    // textContent rymmer sr-only (den finns i DOM), så vi kollar att den SYNLIGA
+    // spelar-cellen inte upprepar "gult kort".
+    const playerCell = within(row).getByText('De Jong');
+    expect(playerCell.textContent).toBe('De Jong');
+  });
+
+  it('byten ligger INTE i kärnan utan längst ned i "Visa mer" (Daniels ordning)', () => {
+    renderCard({
+      events: [
         goalEvent({
           kind: 'subst',
           rawType: 'subst',
@@ -127,12 +189,16 @@ describe('LiveMatchCard, kärnan syns direkt', () => {
         }),
       ],
     });
-    expect(screen.getByText('De Jong')).toBeInTheDocument();
-    expect(screen.getByText(/gult kort/)).toBeInTheDocument();
-    expect(screen.getByText('Endo')).toBeInTheDocument();
-    expect(screen.getByText(/rött kort/)).toBeInTheDocument();
-    expect(screen.getByText('Weghorst')).toBeInTheDocument();
-    expect(screen.getByText(/in för Memphis/)).toBeInTheDocument();
+    // Innan utfällning: bytet syns inte (det är detalj, inte kärna).
+    expect(screen.queryByText('Weghorst')).not.toBeInTheDocument();
+    expect(screen.queryByText('Byten')).not.toBeInTheDocument();
+    // Fäll ut -> bytet visas, med in-spelaren (Weghorst) och ut-spelaren (Memphis) STAPLADE.
+    fireEvent.click(screen.getByRole('button', { name: /Visa mer/i }));
+    expect(screen.getByText('Byten')).toBeInTheDocument();
+    const sub = screen.getByText('Weghorst').closest('[data-live-sub]');
+    expect(sub).not.toBeNull();
+    expect(sub?.querySelector('[data-live-sub-in]')?.textContent).toMatch(/Weghorst/);
+    expect(sub?.querySelector('[data-live-sub-out]')?.textContent).toMatch(/Memphis/);
   });
 });
 
@@ -208,9 +274,78 @@ describe('LiveMatchCard, "Visa mer" fäller ut statistik + laguppställning', ()
     expect(screen.queryByText('Statistik')).not.toBeInTheDocument();
   });
 
-  it('ingen "Visa mer" när det inte finns detaljer (tom statistik + lineup)', () => {
-    renderCard({ statistics: [], lineups: [] });
+  it('ordningen i panelen är statistik -> laguppställning -> byten (Daniels spec)', () => {
+    renderCard({
+      events: [
+        goalEvent({
+          kind: 'subst',
+          rawType: 'subst',
+          detail: 'Substitution 1',
+          minute: 60,
+          playerName: 'Weghorst',
+          assistName: 'Memphis',
+        }),
+      ],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Visa mer/i }));
+    const panel = screen.getByRole('region').querySelector('[data-live-detail]') as HTMLElement;
+    const stats = panel.querySelector('[data-live-stats]');
+    const lineups = panel.querySelector('[data-live-lineups]');
+    const subs = panel.querySelector('[data-live-subs]');
+    expect(stats).not.toBeNull();
+    expect(lineups).not.toBeNull();
+    expect(subs).not.toBeNull();
+    // DOM-ordning = visuell ordning: statistik före laguppställning före byten.
+    expect(
+      stats!.compareDocumentPosition(lineups!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(lineups!.compareDocumentPosition(subs!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('statistiken visar ALDRIG en kort-räkning (korten syns i förloppet)', () => {
+    renderCard({
+      statistics: [
+        {
+          teamApiId: HOME,
+          teamName: 'Netherlands',
+          statistics: [
+            { type: 'Ball Possession', value: '60%' },
+            { type: 'Yellow Cards', value: 3 },
+            { type: 'Red Cards', value: 1 },
+          ],
+        },
+        {
+          teamApiId: AWAY,
+          teamName: 'Japan',
+          statistics: [
+            { type: 'Ball Possession', value: '40%' },
+            { type: 'Yellow Cards', value: 2 },
+            { type: 'Red Cards', value: 0 },
+          ],
+        },
+      ],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Visa mer/i }));
+    const stats = screen.getByRole('region').querySelector('[data-live-stats]') as HTMLElement;
+    expect(within(stats).getByText('Bollinnehav')).toBeInTheDocument();
+    // Ingen kort-rad i statistiken (varken gula eller röda).
+    expect(within(stats).queryByText(/kort/i)).not.toBeInTheDocument();
+  });
+
+  it('ingen "Visa mer" när det inte finns detaljer (tom statistik + lineup + inga byten)', () => {
+    renderCard({ statistics: [], lineups: [], events: [] });
     expect(screen.queryByRole('button', { name: /Visa mer/i })).not.toBeInTheDocument();
+  });
+
+  it('STRUKTUR enhetlig: 0 händelser ger samma sektions-ramverk (bara tomt), inte trasigt', () => {
+    // En match med 0 events + ingen statistik/lineup: kärnan visar ställning + klocka,
+    // inga tomma mål-/kort-listor, ingen "Visa mer" (ärligt löfte). Inget "trasigt".
+    const { container } = renderCard({ statistics: [], lineups: [], events: [] });
+    expect(container.querySelector('[data-live-score]')).not.toBeNull();
+    expect(container.querySelector('[data-live-clock]')).not.toBeNull();
+    expect(container.querySelector('[data-live-goals]')).toBeNull();
+    expect(container.querySelector('[data-live-cards]')).toBeNull();
+    expect(container.querySelector('[data-live-detail-wrap]')).toBeNull();
   });
 });
 

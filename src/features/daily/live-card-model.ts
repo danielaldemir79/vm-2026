@@ -161,6 +161,11 @@ export interface StatRow {
  * De statistik-typer livekortet visar, i ordning, med svensk etikett. URVAL med flit
  * (KISS): de mest spännande nyckeltalen, inte API:ts hela lista (som har dubbletter
  * som "Shots insidebox"). API:ts engelska `type` är nyckeln (källhänvisad, parse-live).
+ *
+ * INGEN kort-räkning här (varken "Gula kort" eller "Röda kort"): korten visas redan i
+ * matchförloppet på kortets framsida (en kort-ikon per kort, med spelare + lag), så en
+ * kort-RAD i statistiken vore en dubbel-visning av samma sak (Daniels feedback). Vi visar
+ * därför bara spel-statistik (innehav/skott/hörnor osv.), aldrig disciplin-räkningen.
  */
 const STAT_DISPLAY: ReadonlyArray<{ apiType: string; label: string }> = [
   { apiType: 'Ball Possession', label: 'Bollinnehav' },
@@ -169,7 +174,6 @@ const STAT_DISPLAY: ReadonlyArray<{ apiType: string; label: string }> = [
   { apiType: 'Corner Kicks', label: 'Hörnor' },
   { apiType: 'Fouls', label: 'Frisparkar' },
   { apiType: 'Offsides', label: 'Offside' },
-  { apiType: 'Yellow Cards', label: 'Gula kort' },
   { apiType: 'Goalkeeper Saves', label: 'Räddningar' },
   { apiType: 'Passes %', label: 'Passningar %' },
 ];
