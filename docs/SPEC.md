@@ -203,3 +203,49 @@ kvalitet, lugnt tempo). Dessa features är scope och hör till sina respektive f
 
 Reaktioner (lätt socialt, emoji på matcher/topplista) och personlig statistik (din träffsäkerhet
 över tid) hör till Fas 3.
+
+## 13. v2 , Flik-IA och live-statistik (godkänd 2026-06-15)
+
+Faserna 0-3 är levererade och appen är live (vm-2026.pages.dev). Daniel godkände ett v2-bygge
+som lyfter appen från "en lång sida" till en fokuserad flik-app, och som utnyttjar det uppgraderade
+live-data-kontot (API-Football Pro, ~7500 anrop/dag, tills 15 juli) för rik VM-statistik. Mål:
+mer proffsigt, mer användarvänligt, roligare att följa VM tillsammans.
+
+**13.1 Informationsarkitektur , flik-app (kärnan, byggs först).**
+Den enda långa sidan + den sticky chip-raden (sektions-navet, T78/T79) ersätts av en flik-rad
+längst ner (mobil-först, som en modern sport-app). Användaren ska inte skrämmas av allt på en
+gång , varje flik visar bara det relevanta. Fem flikar:
+- **Idag** (hem): dagens matcher, den pågående LIVE-matchen (rik vy), hero + nedräkning.
+- **Tips:** tips-spelet (match-, grupp-, bracket-tips) + rummen.
+- **Topplista:** total (cross-rum) + per-rum, med LIVE-scoring som rör sig under matcher.
+- **Turnering:** grupptabeller, slutspelsträd, "vad krävs", skytteliga, turneringsstatistik.
+- **Mer:** lag-profiler, favoritlag, inställningar (push), arrangörs-/admin-ytan.
+Skalet är responsivt (flik-rad på mobil, top-/sido-nav på större skärm). Befintliga vyer
+återanvänds oförändrat i sak , bara deras placering och navigering ändras.
+
+**13.2 Scroll-modell och sticky-fix (löses inuti 13.1).**
+Den sticky "visa färre"/komprimera-kontrollen följer i dag inte sidans scroll (den fäster i ett
+inre scroll-fönster och glider ur vy). Scroll-modellen görs om i flik-strukturen så kontrollen
+följer scrollen överallt, och den ska finnas på ALLA långa listor, inte bara några.
+
+**13.3 Live-statistik-features (utnyttjar Pro-kontot, härledd state ur live-datan).**
+Live-data-infrastrukturen finns redan (per-match-pollare som edge function + `match_live_data`
+med events/statistics/lineups + Realtime). v2 bygger UI och härledd statistik ovanpå den:
+- **Live-uppdaterad topplista under matcher:** placeringar rör sig i realtid när mål trillar
+  (kärnan i tips-spänningen).
+- **Mål-push-notiser:** PWA-push "MÅL! Spanien 2-1" (bygger på push-infran från Fas 3).
+- **Rik live-matchvy:** statistik-panel (bollinnehav/skott/hörnor) + laguppställning/formation +
+  händelse-tidslinje (datan finns i `match_live_data`; bygger vidare på befintliga livekort).
+- **Skytteliga:** aggregera målskyttar ur event-datan.
+- **Turneringsstatistik:** flest mål/lag, skrällar och andra roliga VM-stat-vyer.
+
+**13.4 Datakälla (tillägg till §8).**
+Live-resultat och matchstatistik: API-Football (v3, World Cup league-id 1), Pro-plan från
+2026-06-15. Nyckel i Supabase `app_config`, aldrig i koden (§7-säkerhet). Self-budgeterande
+pollare så taket aldrig spräcks. Den befintliga pollaren och bot-/seednings-lagret RÖRS EJ i v2
+(de är live och fungerar).
+
+**13.5 Out of scope (YAGNI för v2).** Ingen ombyggnad av pollaren/bot-lagret, ingen ny backend,
+ingen native app. v2 är IA + UI + härledd statistik ovanpå redan existerande data.
+
+Den fullständiga, levande task-listan för v2 bor på GitHub-boarden (en sanning per fakta).
