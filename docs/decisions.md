@@ -5,6 +5,58 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , Livescore pollare-v3: per-match-polling med fönster-gating (full rik data LIVE)
+
+Byter pollarens modell: en LIVE match får full rik data UNDER matchen (målskytt/assist/kort/
+byten/statistik/laguppställning), inte bara vid slutet, OCH pollaren slår bara mot API:t under
+match-tid (inga anrop mellan matcher). Daniels poll-modell. Ersätter v2:s "live=all varje tick +
+rik data bara vid freeze".
+
+**Beslut: FÖNSTER-GATING (`selectInWindowMatches`, ren + mirror).** Ur den inbäddade matchplanen
+väljs de matcher vars kickoff ligger i live-fönstret NU: `kickoff ∈ [now - 3,5h, now + 5min]`
+(`LIVE_WINDOW_AFTER_MS` / `LIVE_WINDOW_BEFORE_MS`). Ingen match i fönster OCH inga ofrysta att
+facit-kolla -> pollaren HOPPAR hela ticket (0 API-anrop). **Inga anrop mellan matcher** (Daniels
+HARD-krav , det är detta som gör att budgeten räcker). 3,5h efter kickoff: 90 min + paus + ev.
+förlängning 30 + straffar < 3h, 3,5h ger marginal för stoppat spel/VAR. Snävare än
+`FREEZE_LOOKBACK_MS` (4h) , den aktiva pollningen slutar när matchen rimligen är slut, men
+facit-skyddsnätet (robust-vägen) får ett extra bak-fönster.
+
+**Beslut: PER-MATCH FULL DATA (`buildPerMatchPollPlan` + `pollMatchFull`).** Varje MAPPAD
+in-fönster-match pollas med ETT `fixtures?id=<id>`-anrop, som bär status/ställning/elapsed OCH
+events/statistics/lineups INLINE (verifierat pollare-v2, `__fixtures__/fixture-aet-pen.json`: 35
+events/2 statistics/2 lineups på response[0]). Blobbarna kuvert-lindas (`shapeFrozenBlobs`, samma
+skarv-fix som v2) och skrivs VARJE poll med `frozen=false` medan matchen pågår, så live-kortet får
+rik data LIVE. Matchen avgjord i svaret -> `apply_auto_facit` (det manuella låset, oförändrat) +
+`frozen=true`. EN delad skriv-helper för per-match- och robust-vägen (en sanning för facit-regel +
+kuvert-form).
+
+**Beslut: DISCOVERY bara när det behövs.** En in-fönster-match som saknar rad i fixture_match_map
+-> ETT `live=all`-anrop + auto-mappning (`resolveFixtureToMatch`, oförändrad). När alla
+in-fönster-matcher är mappade behövs INGET live=all (sparar ett anrop per tick). En match som
+auto-mappas i discovery pollas först NÄSTA tick (planen kände inte dess fixture-id än) , gissar
+aldrig ett id.
+
+**Beslut (KÄLLA = Daniels budget-matte, HARD): cron */7 + hård 100/dag-vakt med FACIT-PRIO.**
+~625 match-minuter/dag (mest-aktiva VM-dygn) ÷ 100 anrop = ~6,25 min/anrop -> cron-intervall */7
+(sätts vid deploy). Dagsbudgeten (100, gratisnyckelns kvot) vaktas i `buildPerMatchPollPlan` (ren,
+testad) OCH av hårda kollar i pollaren: `callBudgetThisTick` kan ALDRIG ta summan över 100.
+FACIT-PRIO: en avgjord-men-ofryst match (status finished, frozen=false) får sitt fixtures?id FÖRE
+en pågående om budgeten tryter , facit får aldrig missas. Self-contained: även om cron tickar
+oftare än */7 kan summan aldrig spräcka taket. **Källa till siffrorna:** Daniels poll-modell denna
+session (match-min/dag ÷ kvot), API-Footballs gratiskvot 100 anrop/dag.
+
+**Beslut: mirror-paritet BEVISAS mekaniskt (inte bara synk-märkt).** De två nya rena funktionerna
+speglas i `supabase/functions/_shared/livescore-core.ts` (Deno kan inte importera src/), och
+`v3-mirror-parity.test.ts` esbuild-BUNDLAR mirror-filen och kör SAMMA diskriminerande assertioner
+mot src OCH mirror (fönster-urval, facit-prio, budget-vägg, fail-loud). En en-sidig redigering av
+mirror:n rödnar nu i CI (negativ-kontrollerat: muterad mirror -> rött). Det bygger det paritetstest
+`docs/patterns.md` redan föreskrev men som aldrig byggdes i v2 (lärdom). Testet kör i node-miljön
+(`// @vitest-environment node`) , esbuild kräver en TextEncoder/Uint8Array-invariant jsdom bryter;
+`src/test/setup.ts` gatar därför sin DOM-stubbning på `HAS_DOM`.
+
+**Avgränsning:** v3 rör BARA pollaren/data-logiken (backend). Live-kortets RENDERING (visa
+målskytt/kort direkt under matchen) är frontend och hör till en design-frontend-task, inte hit.
+
 ## 2026-06-15 , Livescore pollare-v2: full lag-brygga + skarv-fix + auto-mappning + robust facit-fångst
 
 Gör livescore-pollaren fullt autonom för HELA turneringen och fixar skarv-buggen Bit 3a fann.
