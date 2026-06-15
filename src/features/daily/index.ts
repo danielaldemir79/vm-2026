@@ -26,7 +26,7 @@ export {
   type StatRow,
   type MatchSide,
 } from './live-card-model';
-export { useDailyMatches, initialDayIndex } from './use-daily-matches';
+export { useDailyMatches, initialDayIndex, followDayIndex } from './use-daily-matches';
 export type { DailyMatchesData } from './use-daily-matches';
 export { useTodayKey, type TodayKey } from './use-today-key';
 export {

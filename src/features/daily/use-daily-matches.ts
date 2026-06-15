@@ -86,6 +86,88 @@ export function initialDayIndex(
   return idx === -1 ? days.length - 1 : idx;
 }
 
+/**
+ * Den auto-valda ("följ verklig dag") dagen MED rollover efter dagens sista match
+ * (T93, #186). Lägger Daniels regel ovanpå kalender-valet (initialDayIndex):
+ *
+ *   När HELA den kalendervalda dagens speldag är FÄRDIGSPELAD ska vyn blicka mot
+ *   NÄSTA matchdag och peka på nästa KOMMANDE match , aldrig stå kvar och visa en
+ *   redan spelad match som "dagens match".
+ *
+ * VARFÖR detta behövs utöver kalender-midnatt: en match med svensk avspark 00:00
+ * (t.ex. ksa-uru, kickoff 2026-06-15T22:00Z) tillhör den svenska kalenderdagen
+ * EFTER (Europe/Stockholm, se group-matches-by-day). Sent på kvällen 15 juni är
+ * alla 15-junimatcher slut, men nästa avspark ligger redan på svenska dagen 16
+ * juni. Det rena kalender-valet (initialDayIndex) rullar bara vid kalender-midnatt,
+ * så hero:n stod kvar på 15 juni och `selectMatchOfTheDay` föll tillbaka på dagens
+ * tidigaste (spelade) match , exakt Daniels live-bugg (skärmdump 2026-06-15 ~23:07:
+ * hero på spelade Elfenbenskusten-Ecuador medan nedräkningen pekade på ksa-uru).
+ *
+ * EN SANNING (PRINCIPLES §4): "nästa kommande match" hämtas ur EXAKT samma logik
+ * som hero:ns nedräkning (`computeCountdown`), så dagvalet och nedräkningen aldrig
+ * kan divergera (det var själva asymmetrin i buggen , nedräkningen rullade, dagen
+ * inte). Vi rullar bara till en dag SENARE än kalender-idag (nästa avspark kan på
+ * en lång match-kväll fortfarande ligga på innevarande dag; då rör vi inget).
+ *
+ * BEVARAT beteende (rör inte det som inte är trasigt):
+ *  - Dagens speldag har ännu en OSPELAD match (kommande ELLER live, status !==
+ *    'finished'): stå kvar på idag (du vill se det som händer/strax händer idag).
+ *  - Idag är en VILODAG (inga matcher idag): C7:s dokumenterade val behålls (stå
+ *    kvar, visa vilodags-panelen). Regeln gäller "när dagens sista match är slut";
+ *    en vilodag har ingen match att passera.
+ *  - Idag ligger FÖRE turneringen: premiären (oförändrat).
+ *  - Efter turneringens sista match (ingen kommande): sista dagen (oförändrat).
+ *
+ * TVÅ KLOCKOR, MEDVETET SKILDA (T93 F1): kalender-basen (initialDayIndex) tar
+ * `calendarNow`, ett DAG-GRANULÄRT "nu" som bara rör sig vid dygnsväxling och är
+ * FRUSET inom ett dygn (useTodayKey, PWA-fällan: flik öppen hela dagen). Men
+ * nästa-kommande-match-härledningen (computeCountdown) filtrerar `kickoff > now`
+ * och kräver därför ett FÄRSKT realtids-"nu". Matas computeCountdown samma frusna
+ * dag-klocka plockar den en match som redan kickat igång tidigare samma dag (dess
+ * kickoff > dygnets-start-now), nextKey blir dagens datum och rollovern firar
+ * ALDRIG , exakt Daniels live-bugg (hero kvar på spelad match). Därför tar
+ * funktionen BÅDA: dag-klockan för basen, realtids-klockan för nästa-avspark-valet.
+ *
+ * @param days        Dagarna i kronologisk ordning (speldagar OCH vilodagar).
+ * @param matches     Alla matcher (för nästa-kommande-valet, samma källa som hero:n).
+ * @param calendarNow DAG-granulärt "nu" för kalender-basen (default = nu).
+ * @param realtimeNow FÄRSKT realtids-"nu" för nästa-avspark-valet (default =
+ *                    calendarNow, så befintliga anrop med en klocka beter sig
+ *                    oförändrat när klockan ÄR färsk, t.ex. i enhetstest).
+ */
+export function followDayIndex(
+  days: readonly MatchDay[],
+  matches: readonly Match[],
+  calendarNow: Date | number = Date.now(),
+  realtimeNow: Date | number = calendarNow
+): number {
+  const base = initialDayIndex(days, calendarNow);
+  if (base === -1) {
+    return -1;
+  }
+  const today = days[base];
+  // Rulla BARA när idag faktiskt var en speldag OCH varje match är färdigspelad
+  // ("dagens sista match är slut"). En ospelad match idag (kommande/live) eller en
+  // vilodag (tom) -> stå kvar (bevarat beteende ovan).
+  const todayAllFinished =
+    today.matches.length > 0 && today.matches.every((m) => m.status === 'finished');
+  if (!todayAllFinished) {
+    return base;
+  }
+  // Nästa KOMMANDE match ur samma sanning som nedräkningen, mot REALTIDS-klockan
+  // (inte den frusna dag-klockan, F1). Ingen kommande (efter finalen) -> stå kvar
+  // (sluttillståndet, oförändrat).
+  const countdown = computeCountdown(matches, realtimeNow);
+  if (countdown.kind !== 'upcoming') {
+    return base;
+  }
+  // Dagen som rymmer nästa avspark (svensk kalenderdag). Bara framåt: en sen kväll
+  // kan ha nästa avspark kvar på innevarande dag, då rullar vi inte bakåt/sidledes.
+  const nextKey = localDateKey(countdown.match.kickoff);
+  const nextIdx = days.findIndex((d) => d.dateKey === nextKey);
+  return nextIdx > base ? nextIdx : base;
+}
+
 export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesData {
   const { status, matches, teams, mode, error } = useResultsStore();
 
@@ -108,15 +190,33 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
   const { nowMs: liveNowMs } = useTodayKey(now);
 
   // Användarens MEDVETET valda dag (nyckel) eller null = "följ den verkliga dagen".
-  // Null låter startdags-härledningen (initialDayIndex mot liveNowMs) styra, så
-  // bläddraren auto-flyttar till AKTUELL dag vid midnatt. Navigering sätter en
+  // Null låter startdags-härledningen (followDayIndex mot liveNowMs, med rollover
+  // T93) styra, så bläddraren auto-flyttar till AKTUELL/nästa matchdag. Navigering sätter en
   // nyckel och PINNAR dagen (då vinner användarens val, dagen hoppar inte under
   // hen). Nyckel (inte index) är stabil om dag-listan ändrar längd (realtidskälla).
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
 
+  // LIVE-tick: håll ett "nu" i state och bumpa det varje sekund, så den rena
+  // nedräknings-funktionen räknas om. Initieras ur det injicerade `now` (så
+  // tester är deterministiska); i appen är det aktuell tid och intervallet tar
+  // över. Intervallet städas vid unmount (ingen läckande timer).
+  //
+  // DEKLARERAS HÄR (före selectedIndex) MEDVETET (T93 F1): följDay-härledningen
+  // behöver detta FÄRSKA realtids-nu till sitt computeCountdown-anrop, skilt från
+  // det dag-frusna liveNowMs. liveNowMs styr kalender-basen (rätt dag), nowMs styr
+  // nästa-avspark-valet (rätt nästa match). Annars plockar countdown med ett fruset
+  // dag-nu en redan spelad match och rollovern firar aldrig (Daniels live-bugg).
+  const initialNowMs = typeof now === 'number' ? now : now.getTime();
+  const [nowMs, setNowMs] = useState(initialNowMs);
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // EFFEKTIVT index, härlett SYNKRONT i render (inte via en effekt): finns en
   // pinnad nyckel kvar i dagarna används den, annars den HÄRLEDDA aktuella dagen
-  // (initialDayIndex mot det dag-medvetna liveNowMs). VARFÖR synkront: en useEffect
+  // (followDayIndex mot dag-klockan liveNowMs + realtids-klockan nowMs, se nedan).
+  // VARFÖR synkront: en useEffect
   // körs FÖRST efter första commit, så en effekt-initierad nyckel ger en render där
   // status==='ready' och days.length>0 men selectedDay===null -> vyn skulle
   // flicker-visa tom-dag-panelen fast matcher finns (Copilot R1, C1). Genom att
@@ -128,8 +228,13 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
       return -1;
     }
     const pinnedIdx = pinnedKey === null ? -1 : days.findIndex((d) => d.dateKey === pinnedKey);
-    return pinnedIdx !== -1 ? pinnedIdx : initialDayIndex(days, liveNowMs);
-  }, [days, pinnedKey, liveNowMs]);
+    // Follow-läget (ingen pinnad nyckel) använder followDayIndex: kalender-idag MED
+    // rollover efter dagens sista match (T93), så hero:n aldrig fastnar på en spelad
+    // match medan nästa avspark ligger på nästa svenska dag. matches är källan för
+    // "nästa kommande" (samma sanning som nedräkningen). TVÅ klockor (F1): liveNowMs
+    // (dag-fruset) för kalender-basen, nowMs (per-sekund) för nästa-avspark-valet.
+    return pinnedIdx !== -1 ? pinnedIdx : followDayIndex(days, matches, liveNowMs, nowMs);
+  }, [days, matches, pinnedKey, liveNowMs, nowMs]);
   const selectedDay = selectedIndex === -1 ? null : days[selectedIndex];
 
   // Dagens framträdande match (ren, deterministisk regel: tidigaste OSPELADE, T57).
@@ -140,17 +245,6 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
     () => (selectedDay ? selectMatchOfTheDay(selectedDay.matches) : null),
     [selectedDay]
   );
-
-  // LIVE-tick: håll ett "nu" i state och bumpa det varje sekund, så den rena
-  // nedräknings-funktionen räknas om. Initieras ur det injicerade `now` (så
-  // tester är deterministiska); i appen är det aktuell tid och intervallet tar
-  // över. Intervallet städas vid unmount (ingen läckande timer).
-  const initialNowMs = typeof now === 'number' ? now : now.getTime();
-  const [nowMs, setNowMs] = useState(initialNowMs);
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   // Nedräkningen räknas över ALLA matcher (nästa avspark är inte nödvändigtvis på
   // den valda dagen), så hero:n alltid pekar mot turneringens nästa avspark.
@@ -174,12 +268,14 @@ export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesDa
       // permanent-pinnades idag av en bläddring och bläddraren skulle stå kvar på
       // gårdagen vid midnatt (Daniels rapporterade symptom, efter en bläddring i
       // samma öppna flik). Pinnad på en ANNAN dag = orörd: en medveten dag stannar
-      // (hoppar aldrig under hen). Samma härledning (initialDayIndex mot det
-      // dag-medvetna liveNowMs) som selectedIndex använder, så "är idag?" är EN regel.
-      const todayIdx = initialDayIndex(days, liveNowMs);
+      // (hoppar aldrig under hen). Samma härledning (followDayIndex mot det
+      // dag-medvetna liveNowMs + realtids-nowMs, MED rollover T93) som selectedIndex
+      // använder, så "är idag?" är EN regel , bläddrar man till den rollover-flyttade
+      // dagen återupptas follow-läget korrekt (de kan inte divergera).
+      const todayIdx = followDayIndex(days, matches, liveNowMs, nowMs);
       setPinnedKey(index === todayIdx ? null : days[index].dateKey);
     },
-    [days, liveNowMs]
+    [days, matches, liveNowMs, nowMs]
   );
   const goPrev = useCallback(() => goToIndex(selectedIndex - 1), [goToIndex, selectedIndex]);
   const goNext = useCallback(() => goToIndex(selectedIndex + 1), [goToIndex, selectedIndex]);

@@ -91,6 +91,48 @@ en tunn IO-wrapper, samma recept som resten av grafen) som verifierar hämtat an
 (`select-all-pages.test.ts`), negativ-kontrollerat (completeness-vakten borttagen -> testet rödnar).
 Mirror-paritetsfixturen stärktes också med en deltagare som scorar OLIKA i två rum (u4: 1p/3p) så
 best-room-**selektionen** diskrimineras (negativ-kontroll: selektions-drift -> u4-assertionen rödnar).
+## 2026-06-16 , T93 (#186): Idag-vyn rullar till nästa matchdag när dagens sista match är slut (rollover)
+
+**Beslut:** Den auto-valda ("följ verklig dag") dagen i Idag-vyn väljs nu av `followDayIndex`
+(use-daily-matches.ts), inte enbart `initialDayIndex`. Regeln ovanpå kalender-valet: är HELA den
+kalendervalda dagens speldag FÄRDIGSPELAD (`status === 'finished'` för varje match den dagen) rullar
+vyn fram till dagen som rymmer NÄSTA KOMMANDE match. "Nästa kommande" hämtas ur EXAKT samma logik som
+hero:ns nedräkning (`computeCountdown`), så dagvalet och nedräkningen är EN sanning och inte kan
+divergera. Vald dag (datum-rad + hero + matchlista) rullar tillsammans.
+
+**Källa till regeln (domän, källhänvisad):** "nästa svenska kalenderdag" är inte en gissning utan en
+följd av tidszonen. En match med svensk avspark 00:00 (t.ex. Saudiarabien-Uruguay, kickoff
+`2026-06-15T22:00:00.000Z`) tillhör den svenska kalenderdagen 16 juni i Europe/Stockholm (sommartid
+UTC+2), inte UTC-dygnet 15 juni , samma off-by-one-skydd som `localDateKey`/`groupMatchesByDay` redan
+bär. Verifierad empiriskt mot fixtures-schemat (`src/data/wc2026/matches.ts`): civ-ecu spelas svensk
+15 juni 01:00, ksa-uru svensk 16 juni 00:00. Daniels skärmdump (~2026-06-15 23:07) bekräftar
+beteendet: nedräkningen pekade rätt (ksa-uru) men hero stod kvar på den spelade civ-ecu.
+
+**Varför:** asymmetri , nedräkningen (`computeCountdown`, tick-driven över ALLA matcher) rullade
+korrekt vid dygnsgränsen, men dagvalet var rent kalender-baserat och rullade bara vid kalender-midnatt.
+Sent på kvällen, när dagens matcher var slut men nästa avspark redan låg på nästa svenska dag, föll
+`selectMatchOfTheDay` tillbaka på dagens tidigaste (spelade) match. Genom att låta dagvalet anka på
+samma nästa-avspark-sanning som nedräkningen försvinner asymmetrin.
+
+**Bevarat (rör inte det som inte är trasigt):** dagens speldag har ännu en OSPELAD match (kommande
+eller live) -> stå kvar på idag; idag är en VILODAG (inga matcher) -> C7:s vilodags-val behålls
+(rollover gäller "när dagens sista match är slut", en vilodag har ingen sådan); före turneringen ->
+premiären; efter sista matchen (ingen kommande) -> sista dagen. Tester (use-daily-matches.test.tsx):
+Daniels exakta scenario (enhet + hook end-to-end), live-match-idag, mellan-dagar, sista speldagen,
+vilodag, före turneringen, tom lista. Negativ-kontroll: rollover avstängd -> exakt de 3
+rollover-asserterande testerna blir röda. Spårbart: #186 + denna rad + `followDayIndex`.
+
+**Rättning (2026-06-16, T93 F1, reviewer-fälld):** `followDayIndex` tar nu TVÅ klockor, inte en.
+Kalender-basen (`initialDayIndex`) matas med `calendarNow` (det dag-granulära, inom-dygnet FRUSNA
+`liveNowMs` från `useTodayKey`), men nästa-avspark-härledningen (`computeCountdown`, som filtrerar
+`kickoff > now`) matas med `realtimeNow` (det per-sekund tickande `nowMs`, samma klocka som hero:ns
+nedräkning). VARFÖR: en PWA-flik öppen hela dagen fryser `liveNowMs` vid dygnets början; matades
+`computeCountdown` den frusna klockan plockade den en match som redan kickat igång tidigare samma dag
+-> `nextKey` = dagens datum -> rollovern firade ALDRIG (exakt Daniels bugg återinförd). De injicerade-
+`now`-testerna missade detta för att de gav `liveNowMs === nowMs` (alltid färskt), så den dag-frusna
+grenen aldrig kördes. Nytt test (use-daily-matches.test.tsx): den dag-frusna grenen körs MEDVETET
+(kalender-klocka fryst vid dygnets början, realtids-klocka på kvällen) på både enhets- och hook-nivå;
+negativ-kontroll: delad klocka -> hook-testet rödnar (`'2026-06-15'` i st f `'2026-06-16'`).
 
 ## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
 
