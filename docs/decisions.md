@@ -121,6 +121,19 @@ premiären; efter sista matchen (ingen kommande) -> sista dagen. Tester (use-dai
 Daniels exakta scenario (enhet + hook end-to-end), live-match-idag, mellan-dagar, sista speldagen,
 vilodag, före turneringen, tom lista. Negativ-kontroll: rollover avstängd -> exakt de 3
 rollover-asserterande testerna blir röda. Spårbart: #186 + denna rad + `followDayIndex`.
+
+**Rättning (2026-06-16, T93 F1, reviewer-fälld):** `followDayIndex` tar nu TVÅ klockor, inte en.
+Kalender-basen (`initialDayIndex`) matas med `calendarNow` (det dag-granulära, inom-dygnet FRUSNA
+`liveNowMs` från `useTodayKey`), men nästa-avspark-härledningen (`computeCountdown`, som filtrerar
+`kickoff > now`) matas med `realtimeNow` (det per-sekund tickande `nowMs`, samma klocka som hero:ns
+nedräkning). VARFÖR: en PWA-flik öppen hela dagen fryser `liveNowMs` vid dygnets början; matades
+`computeCountdown` den frusna klockan plockade den en match som redan kickat igång tidigare samma dag
+-> `nextKey` = dagens datum -> rollovern firade ALDRIG (exakt Daniels bugg återinförd). De injicerade-
+`now`-testerna missade detta för att de gav `liveNowMs === nowMs` (alltid färskt), så den dag-frusna
+grenen aldrig kördes. Nytt test (use-daily-matches.test.tsx): den dag-frusna grenen körs MEDVETET
+(kalender-klocka fryst vid dygnets början, realtids-klocka på kvällen) på både enhets- och hook-nivå;
+negativ-kontroll: delad klocka -> hook-testet rödnar (`'2026-06-15'` i st f `'2026-06-16'`).
+
 ## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
 
 Faserna 0-3 är levererade och appen är live. Ägaren godkände ett v2-bygge (SPEC §13). Det

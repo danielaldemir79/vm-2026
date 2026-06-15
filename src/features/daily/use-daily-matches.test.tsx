@@ -142,6 +142,33 @@ describe('followDayIndex, rollover när dagens sista match är slut (T93, #186)'
     expect(followDayIndex(days, matches, now)).toBe(1);
   });
 
+  it('DAG-FRUSEN kalender-klocka + FÄRSK realtids-klocka: rollovern firar ändå (F1, PWA-fällan)', () => {
+    // F1 (reviewerns korrekthets-bugg): i appen matas kalender-basen med ett DAG-
+    // GRANULÄRT liveNowMs (useTodayKey) som är FRUSET inom dygnet (en PWA-flik öppen
+    // hela dagen). Skulle nästa-avspark-härledningen (computeCountdown) dela samma
+    // frusna klocka plockar den en match som redan kickat igång tidigare samma dag
+    // -> nextKey = dagens datum -> rollovern firar ALDRIG (Daniels bugg återinförd).
+    // followDayIndex tar därför TVÅ klockor: kalender (fruset, för dag-basen) och
+    // realtid (färskt, för nästa-avspark-valet). Detta test kör EXAKT den frusna
+    // grenen: kalender-klockan fryst vid dygnets BÖRJAN, realtids-klockan på kvällen.
+    const { days, matches } = midnightSeamSpan();
+    // Kalender-klockan fryst vid svensk midnatt 15 juni (= 14 juni 22:00Z, dygnets
+    // start). MEDVETET skild från match-tiderna (en match, civ-ecu, kickar 14T23:00Z
+    // = EFTER denna frusna klocka, så ett delat now skulle felaktigt se den som
+    // kommande).
+    const frozenCalendarNow = new Date('2026-06-14T22:00:00.000Z'); // svensk midnatt 15 juni
+    const freshRealtimeNow = new Date('2026-06-15T21:07:00.000Z'); // svensk 15 juni 23:07
+    // Kalender-basen är fortfarande 15 juni (det frusna dygnet) ...
+    expect(initialDayIndex(days, frozenCalendarNow)).toBe(0);
+    // ... men med den FÄRSKA realtids-klockan ser nästa-avspark-valet att alla
+    // 15-junimatcher kickat -> nästa kommande är ksa-uru (16 juni) -> rollover till 1.
+    expect(followDayIndex(days, matches, frozenCalendarNow, freshRealtimeNow)).toBe(1);
+    // NEGATIV KONTROLL (bevisar att klock-skillnaden är det som räddar oss): matas
+    // BÅDA klockorna det frusna now:et (= det gamla enkel-klock-beteendet) missas
+    // rollovern, exakt F1-mekaniken.
+    expect(followDayIndex(days, matches, frozenCalendarNow, frozenCalendarNow)).toBe(0);
+  });
+
   it('stannar på idag medan dagens match fortfarande är OSPELAD (kommande eller live)', () => {
     // En av dagens matcher är fortfarande ospelad (live): stå kvar på idag. days och
     // matches härleds ur SAMMA källa så dagens bucket speglar den live-matchen.
@@ -515,6 +542,62 @@ describe('useDailyMatches, dag-bläddraren auto-flyttar till AKTUELL dag vid mid
     // Ge eventuell omräkning en chans att slå igenom, bekräfta sedan oförändrat.
     await waitFor(() => expect(result.current.daily.status).toBe('ready'));
     expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-13');
+  });
+});
+
+describe('useDailyMatches, rollovern firar i PWA-fällan med ett DAG-FRUSET liveNowMs (T93 F1)', () => {
+  // F1 END-TO-END genom hooken: en PWA-flik öppen hela dagen fryser liveNowMs
+  // (useTodayKey, dag-granulärt) vid dygnets början, medan den per-sekund tickande
+  // nowMs hinner fram till kvällen. Tidigare matades followDayIndex BARA liveNowMs,
+  // så computeCountdown körde mot det frusna now:et och rollovern uteblev. Efter
+  // fixen får dag-basen liveNowMs (fruset) men nästa-avspark-valet nowMs (färskt).
+  //
+  // Vi fejkar BARA Date (inte alla timers), så waitFor:s riktiga setTimeout-polling
+  // lever (känd fälla, playbook). Hooken monteras vid dygnets BÖRJAN (liveNowMs fryser
+  // där), sedan flyttar vi systemtiden fram till kvällen och låter sekund-ticken
+  // (setNowMs(Date.now())) bumpa nowMs , UTAN att korsa midnatt, så liveNowMs förblir
+  // fruset vid dygnets början medan nowMs blir kvällens färska tid. Det reproducerar
+  // exakt divergensen som gjorde rollovern osynlig i de injicerade-now-testerna.
+  beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }));
+  afterEach(() => vi.useRealTimers());
+
+  it('liveNowMs fruset vid dygnets början men nowMs framme på kvällen: rollar till nästa matchdag', async () => {
+    // Montera vid svensk midnatt 15 juni (= 14 juni 22:00Z). liveNowMs fryser här.
+    vi.setSystemTime(new Date('2026-06-14T22:00:00.000Z'));
+    const { result } = renderHook(() => useDailyWithStore(), {
+      wrapper: wrapperFor(fixturesEnv()),
+    });
+    await waitFor(() => expect(result.current.daily.status).toBe('ready'));
+
+    // Daniels match-data: alla 15-junimatcher spelade, nästa avspark ksa-uru på
+    // svenska 16 juni. civ-ecu (14T23:00Z) kickar EFTER den frusna liveNowMs , det är
+    // just det som lurade det gamla, delade-klock-beteendet att se den som "kommande".
+    act(() =>
+      result.current.setMatches([
+        finishedMatch('civ-ecu', '2026-06-14T23:00:00.000Z'), // svensk 15 juni 01:00, spelad
+        finishedMatch('esp-cpv', '2026-06-15T16:00:00.000Z'), // svensk 15 juni 18:00, spelad
+        finishedMatch('bel-egy', '2026-06-15T19:00:00.000Z'), // svensk 15 juni 21:00, spelad
+        sched('ksa-uru', '2026-06-15T22:00:00.000Z'), // svensk 16 juni 00:00, kommande
+      ])
+    );
+
+    // Flytta systemtiden till kvällen 15 juni (23:07 svensk = 21:07Z), SAMMA svenska
+    // dygn (ingen midnatt korsad), och låt sekund-ticken bumpa nowMs till den tiden.
+    // liveNowMs förblir fruset (useTodayKey ser samma dag -> ingen re-render där).
+    await act(async () => {
+      vi.setSystemTime(new Date('2026-06-15T21:07:00.000Z'));
+      vi.advanceTimersByTime(1000); // en sekund-tick: setNowMs(Date.now())
+    });
+
+    // Rollovern firar: vald dag rullar till 16 juni och hero pekar på ksa-uru, fast
+    // liveNowMs står kvar på dygnets början. Innan fixen hade vald dag stått kvar på
+    // 15 juni (frusna liveNowMs -> civ-ecu sågs som kommande -> nextKey = 15 juni).
+    await waitFor(() => expect(result.current.daily.selectedDay?.dateKey).toBe('2026-06-16'));
+    expect(result.current.daily.matchOfTheDay?.id).toBe('ksa-uru');
+    expect(result.current.daily.countdown.kind).toBe('upcoming');
+    if (result.current.daily.countdown.kind === 'upcoming') {
+      expect(result.current.daily.countdown.match.id).toBe('ksa-uru');
+    }
   });
 });
 
