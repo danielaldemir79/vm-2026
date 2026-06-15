@@ -19,8 +19,16 @@ relevanta. Befintliga vyer återanvänds oförändrat i sak; bara placering + na
 
 **Kopplat beslut , scroll/sticky:** scroll-modellen görs om i flik-strukturen, och sticky-buggen
 (komprimera-kontrollen följer inte sidans scroll, den fäster i ett inre fönster , se T82-del-4-
-beslutet nedan + `StickyFollowToggle` `top-16`) löses holistiskt där, på ALLA långa listor. De
-per-task design-besluten (routing-modell, scroll-container-ägande) loggas av senior-dev under bygget.
+beslutet nedan + `StickyFollowToggle` `top-16`) löses holistiskt där, på ALLA långa listor.
+
+**Öppna design-beslut som T83 äger (logga utfallet här under bygget):**
+- Routing-modell (state + history/hash vs router-dependency).
+- Scroll-container-ägande (vem äger scrollen per flik).
+- **SimulationFrame/what-if spänner nu över flera flikar:** sim-läget omsluter i dag daily +
+  gruppspel + "vad krävs" + slutspelsträd + resultatinmatning som EN zon med en sticky badge.
+  Flik-IA:n delar zonen mellan Idag (daily) och Turnering (tabeller/träd/scenario). T83 måste
+  besluta: sim-läget blir globalt state, varje flik som visar en simulerad vy bär sim-ramen/badgen,
+  och what-if-kontrollen (Start/Återställ/Avsluta) + `ResultEntryGate` får EN tydlig hemvist.
 
 **Orört i v2:** live-pollaren + bot-/seednings-lagret (live och fungerar).
 

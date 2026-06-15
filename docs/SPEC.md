@@ -233,11 +233,19 @@ Live-data-infrastrukturen finns redan (per-match-pollare som edge function + `ma
 med events/statistics/lineups + Realtime). v2 bygger UI och härledd statistik ovanpå den:
 - **Live-uppdaterad topplista under matcher:** placeringar rör sig i realtid när mål trillar
   (kärnan i tips-spänningen).
-- **Mål-push-notiser:** PWA-push "MÅL! Spanien 2-1" (bygger på push-infran från Fas 3).
+- **Mål-push-notiser:** PWA-push "MÅL! Spanien 2-1". OBS: push-stacken finns INTE i dag (ingen
+  VAPID-nyckel, ingen prenumerations-lagring, ingen service-worker-push-hanterare, ingen sändare ,
+  push var en planerad men ej byggd Fas 3-punkt). v2 bygger därför hela push-fundamentet från grunden
+  (eget fundament + mål-detektering ovanpå), inte ovanpå befintlig infra.
 - **Rik live-matchvy:** statistik-panel (bollinnehav/skott/hörnor) + laguppställning/formation +
   händelse-tidslinje (datan finns i `match_live_data`; bygger vidare på befintliga livekort).
 - **Skytteliga:** aggregera målskyttar ur event-datan.
 - **Turneringsstatistik:** flest mål/lag, skrällar och andra roliga VM-stat-vyer.
+
+**En sanning för mål-härledning (HARD):** alla features som räknar mål ur event-strömmen (live-
+topplista, mål-push, rik matchvy, skytteliga, turneringsstatistik) ska konsumera EN delad mål-
+härlednings-util (självmål/straff/VAR-ogiltigt hanteras på ETT ställe), så appen aldrig visar
+motsägande siffror för samma match.
 
 **13.4 Datakälla (tillägg till §8).**
 Live-resultat och matchstatistik: API-Football (v3, World Cup league-id 1), Pro-plan från
