@@ -72,7 +72,8 @@ Designat som en helhet, byggt i faser. Varje fas = egna tasks på boarden.
 
 ### Fas 3 , Polish och extra
 - **Delbara bildkort:** exportera resultat-/tabell-/trädkort som bild rakt in i gruppchatten.
-- **Push-notiser:** favoritmatch börjar, resultat inlagt.
+- **Push-notiser:** favoritmatch börjar, resultat inlagt. (Planerad men ALDRIG byggd i Fas 1-3 ,
+  byggs i v2, se §13.3 + T85/T89.)
 - **"Vad krävs"-scenarier:** vad ett lag behöver för att gå vidare.
 - **Pinnat favoritlag** per person.
 - **DR-webb-inbäddning:** möjlig integration på Direkten Ryd-premiären.
@@ -161,8 +162,8 @@ Bygget sker i fyra faser. **Den fullständiga, levande task-listan bor på GitHu
   "vad krävs"-kalkylator, what-if-simulator, Fas 1-deploy + installation + offline.
 - **Fas 2 , Socialt:** Supabase + auth + rumskod, tips-motor, slutspels-/gruppvinnar-tips,
   topplista + tips-avslöjande, realtid, gamification, mini-ligor.
-- **Fas 3 , Polish & viralitet:** delbara bildkort + länk-preview, push-notiser, personlig
-  statistik, reaktioner, prestanda-/E2E-/a11y-pass, DR-webb-inbäddning.
+- **Fas 3 , Polish & viralitet:** delbara bildkort + länk-preview, push-notiser (ej byggd i Fas 3,
+  flyttad till v2 §13.3), personlig statistik, reaktioner, prestanda-/E2E-/a11y-pass, DR-webb-inbäddning.
 
 Ordningen följer beroenden: fundament före kärna, kärna före socialt. Den kritiska data-tasken
 (§5) tidigt, allt annat bygger på dess verifierade data.
