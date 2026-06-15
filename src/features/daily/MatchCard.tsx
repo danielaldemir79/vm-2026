@@ -26,6 +26,9 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import type { Match, Team } from '../../domain/types';
+import type { LiveData } from '../../data/livescore';
+import { resolveApiTeamId } from '../../data/livescore';
+import { LiveMatchCard } from './LiveMatchCard';
 import { formatKickoffTime } from './format-datetime';
 import {
   formatFifaRanking,
@@ -77,6 +80,17 @@ export interface MatchCardProps {
    * design-frontend finputsar den visuella markeringen ovanpå data-favorite-haken.
    */
   favorite?: boolean;
+  /**
+   * Persisterad live-data för matchen (Bit 3b), eller null/undefined när ingen finns.
+   * När den finns BERIKAS kortet med ett livekort (live-minut/status + ställning +
+   * målskyttar/kort/byten + utfällbar statistik/laguppställning). Saknas den ser kortet
+   * ut precis som förr (faller tillbaka, bryter inte befintliga kort). Visas för BÅDE
+   * en pågående OCH en avslutad (frusen, bläddringsbar) match , överallt där det finns
+   * live-data. Default undefined = inget livekort (hero, enhetstester).
+   */
+  liveData?: LiveData | null;
+  /** Nuet (epoch-ms), vidarebefordras till livekortets klocka (test-injicerbart). */
+  now?: number;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -177,6 +191,8 @@ export function MatchCard({
   highlightLabel = 'Dagens match',
   footer = null,
   favorite = false,
+  liveData = null,
+  now,
 }: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
@@ -386,32 +402,50 @@ export function MatchCard({
         {/* Arena visas BARA om den är verifierad. Platshållaren ("Arena ej
             verifierad", #35) visas inte som om den vore data; den döljs här tills
             riktig arena-data finns.
-            BALANS (design-frontend, T4e #149): arena-namnet ("Arena, Stad, Land") är
-            redan långt; att glua kapaciteten inline efter det ("... Mexiko (80 824 platser)")
-            sprängde raden till två rader på 360/344 och läste rörigt (en löpande sträng).
-            Vi lägger därför kapaciteten på en EGEN, lugn rad UNDER arena-namnet, så
-            arenan skannas rent och kapaciteten är ett tydligt SEKUNDÄRT komplement, inte
-            en del av samma textsjok. Den hålls extra diskret (en grad mindre, fg-muted),
-            så den aldrig konkurrerar med arena-namnet. items-baseline gör att "Arena"-
-            etiketten linjerar med arena-namnets FÖRSTA rad även när dd:n blir tvårads.
-            data-venue-capacity + fg-muted (redan AA-mätt, ingen ny färg) är oförändrade. */}
+            KAPACITET INLINE (Daniels feedback): kapaciteten står i parentes DIREKT efter
+            arena-namnet på samma rad ("Estadio Azteca, Mexico City, Mexiko (80 824
+            platser)"), inte på en egen rad under. Vi använder INTE white-space: nowrap,
+            så hela frasen radbryter NATURLIGT när kort-bredden är trång (parentesen
+            hamnar då på en följande rad i samma textflöde, aldrig avkapad). Kapaciteten
+            hålls en grad mindre + fg-muted så den läses som ett SEKUNDÄRT komplement och
+            aldrig konkurrerar med arena-namnet. items-baseline gör att "Arena"-etiketten
+            linjerar med arena-namnets första rad även när dd:n radbryter. data-venue-
+            capacity + fg-muted (redan AA-mätt, ingen ny färg) är oförändrade. */}
         {showVenue ? (
           <div className="flex items-baseline gap-1">
             <dt className="font-semibold">Arena</dt>
             <dd className="min-w-0">
               <span>{match.venue}</span>
               {venueCapacity !== null ? (
-                <span
-                  data-venue-capacity=""
-                  className="block text-[0.6875rem] leading-tight text-fg-muted"
-                >
-                  {venueCapacity}
-                </span>
+                <>
+                  {' '}
+                  <span data-venue-capacity="" className="text-[0.6875rem] text-fg-muted">
+                    ({venueCapacity})
+                  </span>
+                </>
               ) : null}
             </dd>
           </div>
         ) : null}
       </dl>
+
+      {/* LIVEKORTET (Bit 3b): berikar kortet när det finns live-data för matchen. För
+          en pågående match: live-minut/status + ställning + skyttar/kort/byten + (utfällt)
+          statistik/laguppställning. För en avslutad (frusen) match: slutställning + skyttar
+          + utfällt statistik. Saknas live-data renderas inget (kortet ser ut som förr).
+          homeApiId härleds ur appens hemmalag via bryggan (källhänvisad, inte gissad) så
+          live-panelen vet vilken SIDA varje event/kolumn hör till. */}
+      {liveData ? (
+        <LiveMatchCard
+          data={liveData}
+          homeName={home}
+          awayName={away}
+          homeApiId={match.homeTeamId !== null ? resolveApiTeamId(match.homeTeamId) : null}
+          homeCode={homeCode}
+          awayCode={awayCode}
+          now={now}
+        />
+      ) : null}
 
       {/* Valfri fotrad (T24, #24): reaktions-raden injiceras här av dagens-vyn. En ren
           slot, så kortet är orört utan den (hero, tester). */}

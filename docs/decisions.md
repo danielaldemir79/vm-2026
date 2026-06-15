@@ -5,6 +5,251 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , Livescore pollare-v3: per-match-polling med fönster-gating (full rik data LIVE)
+
+Byter pollarens modell: en LIVE match får full rik data UNDER matchen (målskytt/assist/kort/
+byten/statistik/laguppställning), inte bara vid slutet, OCH pollaren slår bara mot API:t under
+match-tid (inga anrop mellan matcher). Daniels poll-modell. Ersätter v2:s "live=all varje tick +
+rik data bara vid freeze".
+
+**Beslut: FÖNSTER-GATING (`selectInWindowMatches`, ren + mirror).** Ur den inbäddade matchplanen
+väljs de matcher vars kickoff ligger i live-fönstret NU: `kickoff ∈ [now - 3,5h, now + 5min]`
+(`LIVE_WINDOW_AFTER_MS` / `LIVE_WINDOW_BEFORE_MS`). Ingen match i fönster OCH inga ofrysta att
+facit-kolla -> pollaren HOPPAR hela ticket (0 API-anrop). **Inga anrop mellan matcher** (Daniels
+HARD-krav , det är detta som gör att budgeten räcker). 3,5h efter kickoff: 90 min + paus + ev.
+förlängning 30 + straffar < 3h, 3,5h ger marginal för stoppat spel/VAR. Snävare än
+`FREEZE_LOOKBACK_MS` (4h) , den aktiva pollningen slutar när matchen rimligen är slut, men
+facit-skyddsnätet (robust-vägen) får ett extra bak-fönster.
+
+**Beslut: PER-MATCH FULL DATA (`buildPerMatchPollPlan` + `pollMatchFull`).** Varje MAPPAD
+in-fönster-match pollas med ETT `fixtures?id=<id>`-anrop, som bär status/ställning/elapsed OCH
+events/statistics/lineups INLINE (verifierat pollare-v2, `__fixtures__/fixture-aet-pen.json`: 35
+events/2 statistics/2 lineups på response[0]). Blobbarna kuvert-lindas (`shapeFrozenBlobs`, samma
+skarv-fix som v2) och skrivs VARJE poll med `frozen=false` medan matchen pågår, så live-kortet får
+rik data LIVE. Matchen avgjord i svaret -> `apply_auto_facit` (det manuella låset, oförändrat) +
+`frozen=true`. EN delad skriv-helper för per-match- och robust-vägen (en sanning för facit-regel +
+kuvert-form).
+
+**Beslut: DISCOVERY bara när det behövs.** En in-fönster-match som saknar rad i fixture_match_map
+-> ETT `live=all`-anrop + auto-mappning (`resolveFixtureToMatch`, oförändrad). När alla
+in-fönster-matcher är mappade behövs INGET live=all (sparar ett anrop per tick). En match som
+auto-mappas i discovery pollas först NÄSTA tick (planen kände inte dess fixture-id än) , gissar
+aldrig ett id.
+
+**Beslut (KÄLLA = Daniels budget-matte, HARD): cron */7 + hård 100/dag-vakt med FACIT-PRIO.**
+~625 match-minuter/dag (mest-aktiva VM-dygn) ÷ 100 anrop = ~6,25 min/anrop -> cron-intervall */7
+(sätts vid deploy). Dagsbudgeten (100, gratisnyckelns kvot) vaktas i `buildPerMatchPollPlan` (ren,
+testad) OCH av hårda kollar i pollaren: `callBudgetThisTick` kan ALDRIG ta summan över 100.
+FACIT-PRIO: en avgjord-men-ofryst match (status finished, frozen=false) får sitt fixtures?id FÖRE
+en pågående om budgeten tryter , facit får aldrig missas. Self-contained: även om cron tickar
+oftare än */7 kan summan aldrig spräcka taket. **Källa till siffrorna:** Daniels poll-modell denna
+session (match-min/dag ÷ kvot), API-Footballs gratiskvot 100 anrop/dag.
+
+**Beslut: mirror-paritet BEVISAS mekaniskt (inte bara synk-märkt).** De två nya rena funktionerna
+speglas i `supabase/functions/_shared/livescore-core.ts` (Deno kan inte importera src/), och
+`v3-mirror-parity.test.ts` esbuild-BUNDLAR mirror-filen och kör SAMMA diskriminerande assertioner
+mot src OCH mirror (fönster-urval, facit-prio, budget-vägg, fail-loud). En en-sidig redigering av
+mirror:n rödnar nu i CI (negativ-kontrollerat: muterad mirror -> rött). Det bygger det paritetstest
+`docs/patterns.md` redan föreskrev men som aldrig byggdes i v2 (lärdom). Testet kör i node-miljön
+(`// @vitest-environment node`) , esbuild kräver en TextEncoder/Uint8Array-invariant jsdom bryter;
+`src/test/setup.ts` gatar därför sin DOM-stubbning på `HAS_DOM`.
+
+**Avgränsning:** v3 rör BARA pollaren/data-logiken (backend). Live-kortets RENDERING (visa
+målskytt/kort direkt under matchen) är frontend och hör till en design-frontend-task, inte hit.
+
+## 2026-06-15 , Livescore pollare-v2: full lag-brygga + skarv-fix + auto-mappning + robust facit-fångst
+
+Gör livescore-pollaren fullt autonom för HELA turneringen och fixar skarv-buggen Bit 3a fann.
+
+**Beslut (KÄLLHÄNVISAD lag-brygga, gissas ALDRIG): full 48/48 app-lag-id -> API-Football team-id.**
+Ersätter Bit 1:s medvetet ofullständiga 4-lags-brygga i BÅDE `src/data/livescore/team-bridge.ts`
+(`WC2026_API_TEAM_BRIDGE`) OCH dess Deno-mirror `supabase/functions/_shared/livescore-core.ts`
+(`API_TEAM_BRIDGE`). 46 av 48 är CODE-matchade mot riktig API-Football-data; cuw (Curaçao) + cod
+(DR Kongo) har en API-kod-avvikelse men är ENTYDIGA (enda national-laget med det namnet, verifierat).
+**Källa:** API-Footballs national-team-id, framtaget via `teams?search=<lag>&national=true` +
+FIFA-trebokstavskod-match (appens lag-id = gemen FIFA-kod), cuw/cod via entydigt namn, 2026-06-15.
+Bryggan definieras app->API (så en oavsiktlig dubblett blir ett objekt-litteral-fel), den omvända
+API->app härleds en gång. Täcknings-/bijektions-test (48 unika API-id <-> 48 unika app-id) +
+invers-rundtur vaktar den. Mirror synk-märkt mot src.
+
+**Beslut: SKARV-FIX , kuvert-linda de lagrade blobbarna vid freeze.** Pollaren sparade tidigare
+`events: rich.events ?? null` (BARA arrayen ur fixtures?id), men läs-lagrets parsers (Bit 1:s
+parseEvents/parseStatistics/parseLineups) vill ha API:ts KUVERT-form `{ response: [...], errors: [] }`
+(requireResponseArray läser payload.response/.errors). Skarv-buggen gjorde att en frusen match hade
+visats UTAN events/statistik/laguppställning. Fix: `shapeFrozenBlobs` (ren modul `freeze-shape.ts` +
+mirror) lindar varje inline-array i ett kuvert vid lagring, så producent-form == konsument-form.
+**Verifierat mot riktig data:** `fixtures?id=<id>` returnerar events/statistics/lineups INLINE som
+arrayer på response[0] (`__fixtures__/fixture-aet-pen.json`: 35 events/2 statistics/2 lineups), så
+inga separata endpoint-anrop behövs (sparar 3 API-anrop). Skarv-test kör producent-form ->
+läs-lagrets parser och bevisar full rik utdata; negativ-kontroll (gamla nakna arrayen) ger tomt.
+
+**Beslut: AUTO-MAPPNING , självseedande fixture_match_map via inbäddad matchplan.** En live-fixture
+som saknar rad i fixture_match_map auto-resolveras (`resolveFixtureToMatch`, ren + mirror): gruppmatch
+via OMVÄND brygga (API-id -> app-id) + lag-par (oavsett hemma/borta) + kickoff inom 2h; slutspel (båda
+lag okända) via UNIK exakt kickoff. Exakt en träff -> insert; noll/flera/ett-känt-ett-okänt ->
+unresolved (gissa ALDRIG en koppling). Den kompakta planen (match_id + kickoff + lag-par) bäddas in i
+edge-funktionen (`supabase/functions/_shared/embedded-match-plan.ts`), GENERERAD ur matches.ts och
+VÄRDE-LÅST i CI (`match-plan.test.ts`: regenerera-och-diffa + mutationstest), samma källåkrings-mönster
+som kickoff-seed. **Viktig regel:** är BARA ETT lag känt är det en seedad match vars koppling inte kan
+bekräftas via bryggan -> unresolved (mappa aldrig på enbart tid när ett lag är känt, då kunde fel
+match mappas).
+
+**Beslut: ROBUST FACIT-FÅNGST , missa aldrig ett slutresultat.** Varje tick, EFTER live=all, väljer
+`selectFreezeChecks` (ren + mirror) de MAPPADE matcher vars kickoff passerat (inom ett 4h bak-fönster)
+och som ÄNNU INTE är frysta, och gör ett fixtures?id per styck för att härleda + frysa facit. Fångar
+g-F-1-buggen (en match som faller ur live=all mellan tick innan FT sågs). Budget-gatat (facit högst
+prio, spräck aldrig 100/dag) + kapat per tick (MAX_ROBUST_FREEZE_CHECKS_PER_TICK). Freeze-vägen är EN
+delad helper (`freezeFacit`) för både live=all- och robust-vägen, så facit-regeln + kuvert-lindningen
+är en sanning. Robust-vägen hoppar tyst-säkert en match som ännu inte är avgjord (deriveFacit
+fail-loud:ar bara på faktiskt avgjorda, vi statuskollar först).
+
+## 2026-06-15 , Livescore Bit 3a (T81): klient-läs-lager + realtime för live-data
+
+Bit 3a är LÄS-sidan (ingen UI än, det är Bit 3b/design-frontend): hämta `match_live_data` ur
+Supabase och projicera till en klient-vänlig modell (`LiveData`) via Bit 1:s parsers, plus en
+realtids-prenumeration + en klock-brygga, så Bit 3b kan rendera ett livekort direkt.
+
+**Beslut (KÄLLHÄNVISAD seam-regel, gissas ALDRIG): de jsonb-blobbarna (events/statistics/lineups) i
+`match_live_data` är HELA API-Football-svar (`RawApiResponse`-KUVERT: `{ get, results, response,
+errors, ... }`), inte bara `response`-arrayen.** Detta är den farligaste raden i hela Bit 3a (en gren
+vars korrekthet helt avgörs av blobbens form), så den källverifieras i stället för att gissas:
+- **Källa 1 (det pollaren SKRIVER):** `supabase/functions/livescore-poller/index.ts` rad 176-178
+  skriver `(rich as { events?: unknown }).events ?? null` direkt ur API-Football-svaret, dvs hela
+  kuvertet, inte en uppackad array.
+- **Källa 2 (det Bit 1:s parsers TAR):** `parseEvents`/`parseStatistics`/`parseLineups` i
+  `parse-live.ts` anropar `requireResponseArray(payload, ...)` som läser `payload.response` +
+  `payload.errors`, dvs de förväntar sig KUVERTET. Direktivet bekräftar samma kontrakt ("EXAKT samma
+  form som Bit 1:s parsers tar").
+- **Källa 3 (de committade sample-svaren):** `__fixtures__/events-rich.json` m.fl. har nycklarna
+  `{ get, parameters, errors, results, paging, response }` (verifierat 2026-06-15) , dvs kuvert-formen.
+  `live-read.test.ts` matar in DE RÅA sample-svaren som DB-blobbar (?raw, samma väg som fixtures.ts),
+  så testet bevisar skarven mot KÄLLANS form, inte en handskriven konsument-form (lärdomen
+  mock-foljer-konsumenttyp + bevisa-skarven).
+
+Därför kör `projectLiveData` blobben genom Bit 1:s parser. Tre fall: `null` (vanligt, live=all bär
+inte rika blobbar förrän freeze) -> tom sektion; giltigt kuvert -> parserns utdata; TRASIG blob ->
+fail-loud-logg i konsolen + tom sektion PER blob (en trasig events-blob släcker aldrig hela
+livekortet, status/ställning/klocka lever vidare). Ingen tyst maskering, men aldrig krasch (Daniels krav).
+
+**Beslut: två lager (samma som data-source.ts/supabase-client.ts).** `listLiveData(client)` /
+`projectLiveData(row)` är rena/klient-tagande (testbara med mock-klient, exakt som
+official-results-api.ts), och `getLiveData(env)` är den gate-medvetna ingången: live-läge ->
+Supabase, fixtures-läge -> Bit 1:s committade live-fixtures (fixtures-först, renderbart utan backend).
+
+**Beslut: klockan re-synkar via Bit 1:s `computeClock`, byggs inte om.** `liveClockFor(data, now)`
+översätter bara `LiveData` -> `computeClock(status, elapsedMinute, lastSyncedAt, now)`. computeClock
+tickar redan FRÅN `lastSyncedAt`, så varje realtids-push (ny `elapsed_minute` + `last_synced_at`)
+re-synkar klockan mot sanningen, ingen drift. Fail-safe: saknad/oparsbar `last_synced_at` -> `now`
+som bas (0 min sedan sync, ingen gissad tick-startpunkt, ingen NaN).
+
+**Migration (dirigenten applicerar): `20260615120000_t81_match_live_data_realtime.sql`** lägger
+`match_live_data` i `supabase_realtime`-publikationen. Verifierat read-only mot prod 2026-06-15 att
+tabellen INTE redan låg i publikationen (annars hade ADD TABLE gett ett fel). NB (lärdomen
+committad-migration-pastar-spegla-live): fil-versionen `...120000` är en placeholder, den FAKTISKA
+live-apply-versionen sätts när dirigenten kör den, repo == live-historik gäller först efter apply.
+
+---
+
+## 2026-06-14 , Livescore Bit 2 (T80): Supabase-backend (persisterad live-data, auto-facit-lås, budget-gate)
+
+Bit 2 ger livescore-featuren sin server-sida: en pollare (edge function) som under turneringen
+hämtar live-data från API-Football och persisterar den, plus AUTO-facit som fyller official_match_results
+när en match avslutas, utan att någonsin röra ett manuellt inmatat resultat.
+
+**Beslut: `match_live_data` persisteras PERMANENT + fryses vid FT** (`frozen=true`). Daniels krav:
+livescore ska vara bläddringsbar dagar tillbaka, så en avslutad matchs snapshot (RÅA API-blobbar i
+jsonb + extraherade fält) bevaras och fryses, raderas aldrig. RLS: SELECT öppen (publik live-data,
+som official_match_results), ingen skriv-policy => bara pollaren via service_role skriver.
+
+**Beslut: `official_match_results.source` ('manual'|'auto'), default 'manual'.** Default 'manual'
+SKYDDAR alla redan inmatade rader (de var per definition admin-inmatade). `upsertOfficialResult`
+sätter alltid `source='manual'` (admin matar in manuellt).
+
+**Beslut: VAR facit-härledningen bor (en sanning) , i pollaren, INTE i en plpgsql-trigger.**
+Facit-REGELN (goals, inte score.extratime) är den mest fel-gissbara raden i featuren och är redan
+implementerad, källhänvisad OCH testad i `parseFinalResult` (parse-live.ts). Att re-implementera den i
+plpgsql vore en andra kopia som kan drifta tyst (lärdomen lattgissad-domanregel-styr-otestad-gren).
+Pollaren återanvänder regeln (mirror i `supabase/functions/_shared/livescore-core.ts`, synk-märkt mot
+parse-live.ts) och har dessutom hela det råa fixtures?id-svaret (inkl. score.penalty). Migrationen
+äger i stället LÅSET (inte härledningen).
+
+**Beslut: auto-facit-LÅSET = `apply_auto_facit(...)` (SECURITY DEFINER, EXECUTE bara service_role).**
+Daniels HARD-krav "skriv aldrig över manuellt" är en DEKLARATIV SQL-invariant: upsertens on-conflict-gren
+har `where official_match_results.source = 'auto'`. En manuell rad matchar inte => uppdateringen hoppas
+=> det manuella facit står orört. INSERT-grenen fyller fortfarande TOMT. **Bevisat** med ett DO-block
+(transaktion + rollback, noll data kvar) i `supabase/proofs/t80_auto_facit_lock_proof.sql`: (1) auto
+fyller tomt, (2) auto uppdaterar auto, (3) auto rör ALDRIG manuellt, (4) manuell upsert vinner alltid.
+Samma anda som T42:s RLS-DO-block. Dirigenten kör beviset mot live vid deploy (RAISE EXCEPTION = rött).
+
+**Beslut: SJÄLV-budgeterande pollare (100/dag), budget i KODEN inte i cron-schemat.** `decidePollTick`
+(poll-gate.ts, ren + testad, återanvänder Bit 1:s planPolls) avgör per tick om vi får polla, med facit-
+fångst (freeze) prioriterad FÖRST och live=all (1 anrop) sedan, allt strikt under dagsbudgeten ur
+`poll_log` (dagens räknare). Även om cron tickar oftare än var 2:e minut kan summan aldrig spräcka taket
+(self-contained, negativ-kontroll körd: mutation av freeze-prioriteten rödnar testerna).
+
+**Beslut: nyckeln i `app_config` (RLS deny-all), aldrig i repot.** MCP kan troligen inte sätta edge-
+function-secrets, så API-Football-nyckeln + auto-facit-admin-id ligger i en privat tabell bara
+service_role når. Migrationen skapar tabellen TOM; dirigenten inserterar värdena vid deploy (HANDOFF).
+
+**Beslut: api_fixture_id -> appens match_id via `fixture_match_map` (inte resolveAppMatch i funktionen).**
+Bit 1:s resolveAppMatch behöver hela matchplanen + lag-bryggan (klient-bundlen), som edge-funktionen
+(Deno, deployar bara functions-trädet) inte kan importera utan att duplicera 104 matcher. En liten
+mappnings-tabell är renaste vägen: känd koppling slås upp deterministiskt, okänd fixture LOGGAS och
+hoppas (gissa aldrig). Kopplingarna seedas när en VM-fixtures id dyker upp i live=all (samma "fylls
+under go-live"-princip som lag-bryggan). DEPLOY GÖRS AV DIRIGENTEN via MCP (migrations, function,
+secret-insert, cron-finalisering), se HANDOFF.
+
+## 2026-06-14 , Livescore facit: slutresultatet kommer ur `goals`, ALDRIG ur `score.extratime` (korrigering)
+
+`parseFinalResult` (parse-live.ts) härleder en avgjord matchs facit ur API-Footballs `goals`-fält,
+inte ur `score.extratime`. Detta korrigerar en tidigare bugg där AET-grenen ersatte slutresultatet
+med `score.extratime` (och ett tidigare antagande i memory att extratime var KUMULATIVT).
+
+**Källhänvisad facit-regel (gissas aldrig, verifierad mot RIKTIG data 2026-06-14):**
+
+- `goals.home/away` = det AUKTORITATIVA slutresultatet, redan aggregerat (ordinarie + ev.
+  förlängning) men EXKLUSIVE straffar. Rätt för ALLA fall: FT (goals = fulltime), AET
+  (goals = fulltime + extratime) och PEN (goals = aggregatet före straffläggningen).
+- `score.extratime` = ENDAST de mål som gjordes UNDER förlängningsperioden (30 min), additivt,
+  ALDRIG det kumulativa slutresultatet. Får aldrig användas som facit.
+- `score.penalty` = straffläggningen separat (bärs i `FinalResult.penalties` vid PEN).
+- `decidedBy` härleds ur status: PEN -> 'penalties', AET -> 'extra-time', annars 'regulation'.
+
+**Källa:** probe mot riktiga 2022-VM-slutspelssvar (5 fångade straff-/förlängningsmatcher).
+Guld-fixturen `__fixtures__/fixture-aet-pen.json` är ett oförändrat API-svar för
+Argentina-Frankrike (VM-finalen 2022, status PEN): `goals` 3-3, `fulltime` 2-2, `extratime` 1-1,
+`penalty` 4-2. Den gamla koden hade skrivit 1-1 (bara extratime) som facit i stället för 3-3,
+vilket hade korrumperat slutspels-facit. Ett diskriminerande test (et != ft != goals) rödnar om
+extratime- eller fulltime-buggen återinförs (negativ-kontroll körd och bekräftad).
+
+## 2026-06-14 , Livescore Bit 1: API-Football status-mappning + lag-brygga (källhänvisade, gissas aldrig)
+
+Livescore-featurens datakälla är API-Football (api-sports.io). Bit 1 är den rena kärnan
+(parsers, match-identitet, poll-planerare, klock-logik) byggd och bevisad mot RIKTIGA fångade
+API-svar, committade oförändrade i form under `src/data/livescore/__fixtures__/` (inga
+hemligheter, bara request-headern bar nyckeln). Två regler här gissas aldrig och är källhänvisade
+så de kan BEKRÄFTAS mot källan, inte jagas:
+
+**Beslut: status-mappning `fixture.status.short` -> normaliserad `LiveStatus`** (parse-live.ts,
+`STATUS_BY_SHORT`). live = 1H/2H/ET; paused = HT/BT/P/SUSP/INT; finished = FT/AET/PEN; scheduled =
+NS/TBD; postponed = PST/CANC/ABD/AWD/WO; en okänd kod -> 'unknown' (fail-safe, ALDRIG 'live').
+**Källa (korsverifierad 2026-06-14):** API-Football v3 fixtures-status, mot två oberoende källor
+(API-Football "How to save calls"-guiden + Sportmonks/pilflo api-sports-status-listor), eftersom
+api-football.com/documentation-v3 svarar 403 mot automatisk hämtning. **Varför P klassas som
+paused (inte live):** Daniels spec listar uttryckligen "FRYS under paus (HT, BT, P, SUSP, INT)",
+matchklockan ska stå still under straffläggning, inte ticka (vattenpaus-oron).
+
+**Beslut: lag-brygga API-Football team-id -> appens lag-id** (team-bridge.ts,
+`WC2026_API_TEAM_BRIDGE`). Medvetet OFULLSTÄNDIG i Bit 1: bara lag vars API-id faktiskt setts i
+de fångade svaren seedas (Nederländerna 1118, Japan 12 ur live-all-svaret fixtures?league=1&live=all;
+England 10, Iran 22 ur 2022-fixturen 855735). **Varför numeriskt id, inte namn:** API-Footballs
+team-id är stabila mellan säsonger, namn skiljer mellan källor ("Netherlands"/"Nederländerna").
+**Full 48-lags-brygga kompletteras före go-live** (Bit 2 fyller på ur live=all under turneringen,
+där varje VM-lags id dyker upp verifierbart). `resolveAppMatch` blockeras inte av luckan: okända
+lag ger 'unresolved', aldrig en gissad koppling. Täckningen är testbar via `resolveMatchCoverage`.
+Match-identitet kräver BÅDE lag-paret (via bryggan) OCH kickoff inom ett 2 h-fönster (UTC), så
+g-F-1 (ned-jpn) löses mot den fångade live-matchen.
+
 ## 2026-06-13 , T79 (#167): responsiv sektions-nav (hamburgare-meny på mobil, chip-rad på desktop)
 
 **Daniels feedback på T78:** på mobil kunde man LÄTT MISSA sektioner eftersom chip-raden är swipe-bar i

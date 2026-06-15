@@ -1,132 +1,150 @@
 # VM 2026
 
-A polished, installable PWA for following the 2026 FIFA World Cup together with friends:
-a shared live tracker (fixtures, group tables, a dynamic knockout bracket, official result
-entry) and a full prediction game on top (match tips, group tips, champion tips, leaderboard,
-badges, reactions and comments). Built and run live for real friends during the tournament.
+🇬🇧 English version: [README.en.md](README.en.md)
 
-> A note on language: the README is in English to make the work easy to share. The app
-> itself ships in Swedish, that is its real audience (friends in Sweden), so the screenshots
-> and in-app copy below are Swedish by design.
+En proffsig, installerbar PWA för att följa fotbolls-VM 2026 tillsammans med vänner:
+en delad live-tracker (matcher, grupptabeller, ett dynamiskt slutspelsträd, inmatning av
+officiella resultat) och ett komplett tipsspel ovanpå (matchtips, grupptips, mästartips,
+resultattavla, märken, reaktioner och kommentarer). Byggd och körd live för riktiga vänner
+under turneringen.
 
-> Engineering note: this project was built task by task with a strict quality pipeline,
-> planning, tests, independent code review and a CI gate on every change. The architecture,
-> design decisions and verification below reflect that process.
+> En not om språk: appen är på svenska, det är dess riktiga publik (vänner i Sverige), så
+> skärmdumparna och texten i appen nedan är svenska med flit. En engelsk version av den här
+> README:n finns på [README.en.md](README.en.md).
+
+> Not om hur den byggdes: projektet byggdes task för task med en strikt kvalitets-pipeline,
+> planering, tester, oberoende kodgranskning och en CI-grind på varje ändring. Arkitekturen,
+> designbesluten och verifieringen nedan speglar den processen.
 
 ---
 
-## Screenshots
+## Skärmdumpar
 
-| Home (dark) | Home (light) |
+| Startsida (mörkt) | Startsida (ljust) |
 | --- | --- |
-| ![Home, dark theme](docs/screenshots/02-hero-daily-dark.png) | ![Home, light theme](docs/screenshots/03-hero-daily-light.png) |
+| ![Startsida, mörkt tema](docs/screenshots/02-hero-daily-dark.png) | ![Startsida, ljust tema](docs/screenshots/03-hero-daily-light.png) |
 
-| Group tables | Team profile |
+| Grupptabeller | Lagprofil |
 | --- | --- |
-| ![Group stage tables](docs/screenshots/04-group-stage.png) | ![Team profile modal](docs/screenshots/05-team-profile.png) |
+| ![Gruppspelets tabeller](docs/screenshots/04-group-stage.png) | ![Lagprofil-modal](docs/screenshots/05-team-profile.png) |
 
-| Mobile (the primary surface) | Full page |
+| Mobil (den primära ytan) | Hela sidan |
 | --- | --- |
-| ![Mobile home](docs/screenshots/06-mobile-home-dark.png) | ![Full scroll page](docs/screenshots/01-home-full-dark.png) |
+| ![Mobil startsida](docs/screenshots/06-mobile-home-dark.png) | ![Hela scroll-sidan](docs/screenshots/01-home-full-dark.png) |
 
-Screenshots are generated from the real built app in fixtures mode (no backend) via a
-Playwright capture script, see [Regenerating the screenshots](#regenerating-the-screenshots).
-
----
-
-## What it is, and what it was used for
-
-VM 2026 is a single-page, installable web app (PWA). It was shared with friends and
-classmates as a link, added to their phone home screens, and used actively through the 2026
-World Cup: people followed the daily matches, entered tips before kickoff, watched the group
-tables and bracket update live, and competed on the leaderboard in their own mini-league.
-
-It is deliberately one long scroll-page (no router): every section is on the page, the
-layout is mobile-first because the app lives on a phone in a group chat, and it works
-offline once installed.
+Skärmdumparna genereras från den faktiskt byggda appen i fixtures-läge (utan backend) via ett
+Playwright-skript, se [Regenerera skärmdumparna](#regenerera-skärmdumparna).
 
 ---
 
-## Feature tour (every screen)
+## Vad det är, och vad den användes till
 
-The app has two layers: a **live tracker** that everyone shares, and a **prediction game**
-on top of it. Plus a set of information screens around both.
+VM 2026 är en single-page, installerbar webbapp (PWA). Den delades med vänner och
+klasskompisar som en länk, lades till på deras hemskärmar på mobilen och användes flitigt
+genom hela VM 2026: man följde dagens matcher, la in tips före avspark, såg grupptabellerna
+och slutspelsträdet uppdateras live, och tävlade på resultattavlan i sin egen miniliga.
 
-### Live tracker
-
-- **Daily matches.** Today's matches with kickoff time (shown in Swedish local time), the
-  Swedish TV channel, the stage, and the venue. Browse day by day through the whole
-  tournament. A "match of the day" hero and a countdown to the next kickoff. The day's
-  accent theme shifts with the teams playing.
-- **Match cards** compress the information visually instead of a text row: team emblems, the
-  TV channel as a badge, the stage, and on each card the **venue (arena, city, country) with
-  its capacity** and the **FIFA ranking** of the teams.
-- **Group stage, 12 groups (A to L).** Live-computed standings (points, played, GD, goals
-  for/against) that update the instant a result is entered. Tables are derived, never stored
-  twice.
-- **Dynamic knockout bracket.** The Round of 32 to final tree is built and adjusted during
-  the group stage (who can meet whom), locks once the groups are decided, and animates the
-  advancing teams as knockout results come in. The seeding of the 8 best third-placed teams
-  follows FIFA's fixed, source-verified table, never guessed (this was its own dedicated,
-  reviewed data task).
-- **"What it takes" scenarios.** Live final-round scenarios: what a team needs to advance,
-  "if X wins, Y goes through", the most exciting minutes of a group stage.
-- **What-if simulator.** Play out hypothetical results and watch the tables and bracket
-  change, clearly badged as a simulation so nobody confuses the lab with real data.
-- **Team profiles.** Tap any team to see its FIFA ranking, star player, trivia, and the
-  team's path through the group, in a polished accessible modal.
-- **Official result entry (admin only).** The real, global tournament results (the source of
-  truth that the tables, bracket and scoring read from) can only be written by the admin.
-  This is enforced server-side by Postgres Row Level Security, not just hidden in the UI, and
-  it is proven with real sessions in integration tests.
-
-### Prediction game
-
-- **Match tips.** Each friend predicts the scoreline before kickoff. The per-match points
-  are shown for every match in the tips view, with a breakdown of why.
-- **Group tips.** Predict the group winners and runners-up before the group stage, for bonus
-  points.
-- **Champion / bracket tips.** Predict who advances each knockout round, and the World Cup
-  winner (20 points), for bonus points.
-- **Leaderboard.** Who is tipping best, with a summary at the top (total points and placing)
-  and the per-match points underneath.
-- **Tips reveal.** After the kickoff deadline locks, everyone sees what each person predicted.
-- **Badges.** Achievements (streaks, "called the upset", "perfect round" and more).
-- **Reactions.** A curated set of emoji on matches, one reaction per person per match, and
-  you can see who reacted with what.
-- **Per-match comments.** A short comment thread per match inside a room.
-- **Favorite team and personal stats.** Pin a favorite team (a per-device preference) so its
-  matches float to the top, and see your own prediction accuracy over time.
-
-### Rooms and onboarding
-
-- **Mini-leagues (rooms).** Several friend groups, each its own room with its own room code,
-  members and leaderboard. Friends join via a link or a code.
-- **Get started / install / PWA.** An onboarding tour on first visit, an honest "add to home
-  screen" guide that adapts to the browser (never a dead button), and offline support once
-  installed.
+Den är medvetet byggd som en enda lång scroll-sida (ingen router): varje sektion ligger på
+sidan, layouten är mobil-först eftersom appen lever på en telefon i en gruppchatt, och den
+fungerar offline när den väl är installerad.
 
 ---
 
-## Run it locally (important)
+## Funktionsturné (varje skärm)
 
-The live site is deployed during the tournament; it will not stay up long after. So this
-section is the durable way to see the app: clone and run it. It has been verified against the
-actual code (the data-source gate in `src/data/data-source.ts`, the env typing in
-`src/vite-env.d.ts`, `vite.config.ts` and `package.json`).
+Appen har två lager: en **live-tracker** som alla delar, och ett **tipsspel** ovanpå den.
+Plus en uppsättning informationsskärmar runt båda.
 
-### Prerequisites
+### Live-tracker
 
-- Node.js 22 or newer, and npm.
+- **Dagens matcher.** Dagens matcher med avsparkstid (i svensk lokal tid), svensk TV-kanal,
+  vilken omgång det gäller och arenan. Bläddra dag för dag genom hela turneringen. En hero
+  för "dagens match" och en nedräkning till nästa avspark. Dagens accent-tema skiftar med
+  lagen som spelar.
+- **Matchkort** komprimerar informationen visuellt i stället för en textrad: lagens emblem,
+  TV-kanalen som en badge, omgången, och på varje kort **arenan (arena, stad, land) med dess
+  kapacitet** och lagens **FIFA-ranking**.
+- **Livescore direkt på kortet.** Under pågående matcher berikas varje matchkort med en live-panel:
+  en mjukt tickande matchklocka (status-styrd och paus-säker, visar "Paus" under uppehåll, "45+"
+  eller "90+" vid tavlans gräns, "Slut" när matchen är klar, aldrig en påhittad tid), live-ställning,
+  målskyttar med assist, gula och röda kort samt byten. Allt direkt synligt utan att klicka.
+- **"Visa mer" (utfällbar statistik och laguppställning).** En tydlig expandera-knapp fäller ut
+  full matchstatistik (bollinnehav, skott, hörnor, offside och fler nyckeltal som jämförelse-staplar)
+  samt laguppställning och formationer för varje lag, bakom ett ärligt löfte: knappen visas bara
+  när det faktiskt finns data att visa.
+- **Bläddringsbar historik.** Live-datan sparas permanent och fryses när en match är klar. Man kan
+  bläddra tillbaka dagar efteråt och se statistik och målskyttar, inte bara för pågående matcher.
+- **Gruppspelet, 12 grupper (A till L).** Live-uträknade tabeller (poäng, spelade, målskillnad,
+  gjorda/insläppta mål) som uppdateras i samma stund ett resultat matas in. Tabellerna är
+  härledda, lagras aldrig dubbelt.
+- **Dynamiskt slutspelsträd.** Trädet från sextondelsfinal till final byggs och justeras under
+  gruppspelet (vem kan möta vem), låses när grupperna är avgjorda, och animerar de avancerande
+  lagen allteftersom slutspelsresultaten kommer in. Seedningen av de 8 bästa grupptreorna följer
+  FIFA:s fasta, källverifierade tabell, aldrig gissad (det var en egen dedikerad, granskad
+  data-task).
+- **"Vad krävs"-scenarier.** Levande scenarier för sista omgången: vad ett lag behöver för att
+  gå vidare, "om X vinner går Y vidare", de mest spännande minuterna i ett gruppspel.
+- **Vad händer om-simulator.** Spela upp hypotetiska resultat och se tabellerna och trädet
+  förändras, tydligt märkt som en simulering så att ingen blandar ihop laboratoriet med riktig
+  data.
+- **Lagprofiler.** Tryck på vilket lag som helst för att se dess FIFA-ranking, stjärnspelare,
+  kuriosa och lagets väg genom gruppen, i en proffsig och tillgänglig modal.
+- **Inmatning av officiella resultat (endast admin).** De riktiga, gemensamma turneringsresultaten
+  (sanningskällan som tabeller, träd och poäng läser från) kan bara skrivas av admin. Det är
+  framtvingat på serversidan av Postgres Row Level Security, inte bara dolt i gränssnittet, och
+  det bevisas med riktiga sessioner i integrationstester.
+- **Auto-facit med manuell override.** När en match avslutas skrivs slutresultatet automatiskt som
+  officiellt facit i tävlingen. Men admins manuella inmatning är alltid sista ordet: auto-facit fyller
+  bara tomt och uppdaterar bara sina egna automatiska rader. En manuellt inmatad rad rörs aldrig av
+  automatiken (varje resultat har en källa, och manuell vinner alltid). Det är en deklarativ SQL-regel,
+  inte bara ett löfte i koden.
+
+### Tipsspel
+
+- **Matchtips.** Varje vän tippar resultatet före avspark. Poängen per match visas för varje
+  match i tips-vyn, med en uppdelning av varför.
+- **Gruptips.** Tippa grupettorna och grupptvåorna före gruppspelet, för bonuspoäng.
+- **Mästar- / slutspelstips.** Tippa vilka som går vidare i varje slutspelsomgång, och vem som
+  vinner VM (20 poäng), för bonuspoäng.
+- **Resultattavla.** Vem som tippar bäst, med en sammanfattning överst (totala poäng och placering)
+  och poängen per match under.
+- **Tips-avslöjande.** När avsparks-deadlinen låser ser alla vad var och en har tippat.
+- **Märken.** Bedrifter (streaks, "förutspådde skrällen", "perfekt omgång" med flera).
+- **Reaktioner.** En kurerad uppsättning emoji på matcher, en reaktion per person och match, och
+  du ser vem som reagerade med vad.
+- **Kommentarer per match.** En kort kommentarstråd per match inne i ett rum.
+- **Favoritlag och personlig statistik.** Nåla fast ett favoritlag (en inställning per enhet) så
+  att dess matcher flyter upp överst, och se din egen träffsäkerhet över tid.
+
+### Rum och introduktion
+
+- **Miniligor (rum).** Flera vänkretsar, var och en sitt eget rum med sin egen rumskod, sina
+  medlemmar och sin resultattavla. Vänner går med via en länk eller en kod.
+- **Kom igång / installera / PWA.** En introduktionsturné vid första besöket, en ärlig
+  "lägg till på hemskärmen"-guide som anpassar sig till webbläsaren (aldrig en död knapp), och
+  offline-stöd när den väl är installerad.
+
+---
+
+## Kör lokalt (viktigt)
+
+Live-sajten driftsätts under turneringen; den kommer inte att stå uppe länge efteråt. Så det
+här avsnittet är det hållbara sättet att se appen: klona och kör den. Det är verifierat mot
+den faktiska koden (datakälls-grinden i `src/data/data-source.ts`, env-typningen i
+`src/vite-env.d.ts`, `vite.config.ts` och `package.json`).
+
+### Förkrav
+
+- Node.js 22 eller nyare, och npm.
 - Git.
 
-### Mode A, run with fixtures (no backend, default)
+### Läge A, kör med fixtures (ingen backend, standard)
 
-The app is **fixtures-first**: all the static tournament data (teams, groups, the full match
-schedule) is bundled in the app and source-verified. With no Supabase environment variables
-set, the data layer falls to fixtures automatically (with a visible console warning so the
-mode is never silent), and all social features (rooms, tips, leaderboard, admin) stay
-dormant. So the whole tracker runs with zero configuration:
+Appen är **fixtures-först**: all statisk turneringsdata (lag, grupper, hela spelschemat) är
+inbyggd i appen och källverifierad. Utan några Supabase-miljövariabler satta faller datalagret
+tillbaka på fixtures automatiskt (med en synlig konsol-varning så att läget aldrig är tyst),
+och alla sociala funktioner (rum, tips, resultattavla, admin) ligger vilande. Så hela trackern
+kör med noll konfiguration:
 
 ```bash
 git clone <repo-url> vm-2026
@@ -135,29 +153,29 @@ npm install
 npm run dev
 ```
 
-Open the printed local URL (Vite, typically `http://localhost:5173`). You get the full
-tracker: daily matches, group tables, the dynamic bracket, "what it takes", the what-if
-simulator, team profiles, install/offline, all on bundled fixtures data, no account, no
-network.
+Öppna den utskrivna lokala URL:en (Vite, vanligen `http://localhost:5173`). Du får hela
+trackern: dagens matcher, grupptabeller, det dynamiska trädet, "vad krävs", vad händer
+om-simulatorn, lagprofiler, installation/offline, allt på inbyggd fixtures-data, inget konto,
+inget nätverk.
 
-What the code does here: `getDataSource()` checks two conditions. (1) Are both
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set and non-empty? (2) Is the live client
-built (`LIVE_READY`)? Live is chosen only when both are true; otherwise it returns the
-fixture data source. With no `.env`, condition 1 is false, so you get fixtures.
+Vad koden gör här: `getDataSource()` kontrollerar två villkor. (1) Är både
+`VITE_SUPABASE_URL` och `VITE_SUPABASE_ANON_KEY` satta och inte tomma? (2) Är live-klienten
+byggd (`LIVE_READY`)? Live väljs bara när båda är sanna; annars returneras fixtures-källan.
+Utan någon `.env` är villkor 1 falskt, så du får fixtures.
 
-### Mode B, connect your own Supabase (full social features)
+### Läge B, koppla din egen Supabase (alla sociala funktioner)
 
-To run the prediction game, rooms, leaderboard, reactions, comments and admin result entry,
-point the app at your own Supabase project. The two environment variables are read via
-`import.meta.env` and must use Vite's `VITE_` prefix:
+För att köra tipsspelet, rum, resultattavla, reaktioner, kommentarer och admin-inmatning av
+resultat pekar du appen mot ditt eget Supabase-projekt. De två miljövariablerna läses via
+`import.meta.env` och måste använda Vites `VITE_`-prefix:
 
-| Variable | What it is |
+| Variabel | Vad det är |
 | --- | --- |
-| `VITE_SUPABASE_URL` | Your Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Your Supabase publishable (anon) key, public by design, protected by Row Level Security |
+| `VITE_SUPABASE_URL` | Din Supabase-projekt-URL |
+| `VITE_SUPABASE_ANON_KEY` | Din Supabase publishable (anon)-nyckel, publik med flit, skyddad av Row Level Security |
 
-There is no committed `.env` template (env files are gitignored, no secrets in the repo), so
-create the local file yourself:
+Det finns ingen incheckad `.env`-mall (env-filer är gitignorerade, inga hemligheter i repot), så
+skapa den lokala filen själv:
 
 ```bash
 # .env.local  (gitignored)
@@ -165,27 +183,28 @@ VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
 VITE_SUPABASE_ANON_KEY=YOUR-ANON-KEY
 ```
 
-Apply the database schema from `supabase/migrations/` to your project (tables, RLS policies,
-RPCs and realtime publication) using the Supabase CLI or dashboard, see
-[`supabase/README.md`](supabase/README.md). Then:
+Applicera databasschemat från `supabase/migrations/` på ditt projekt (tabeller, RLS-policyer,
+RPC:er och realtids-publikation) med Supabase-CLI:t eller dashboarden, se
+[`supabase/README.md`](supabase/README.md). Sedan:
 
 ```bash
 npm install
 npm run dev
 ```
 
-With both variables set and non-empty, `getDataSource()` selects the live client: an anonymous
-session is created (a stable per-device identity, so "join a room" persists across reloads),
-and the social layer (`src/data/rooms/`, predictions, official results) talks to your Supabase
-project under RLS.
+Med båda variablerna satta och inte tomma väljer `getDataSource()` live-klienten: en anonym
+session skapas (en stabil identitet per enhet, så "gå med i ett rum" består över omladdningar),
+och det sociala lagret (`src/data/rooms/`, tips, officiella resultat) pratar med ditt
+Supabase-projekt under RLS.
 
-Notes:
-- A half-configuration (URL but no key, or only whitespace) counts as not configured and
-  safely falls back to fixtures, rather than a silently broken live mode.
-- The static tracker data (teams, groups, schedule) stays bundled even in live mode; only the
-  shared, mutable state (rooms, tips, results, reactions, comments) goes through Supabase.
+Noter:
+- En halv konfiguration (URL men ingen nyckel, eller bara blanksteg) räknas som inte konfigurerad
+  och faller säkert tillbaka på fixtures, i stället för ett tyst trasigt live-läge.
+- Den statiska tracker-datan (lag, grupper, schema) förblir inbyggd även i live-läge; bara det
+  delade, föränderliga tillståndet (rum, tips, resultat, reaktioner, kommentarer) går genom
+  Supabase.
 
-### Build and preview the production bundle
+### Bygg och förhandsgranska produktionsbygget
 
 ```bash
 npm run build      # type-check (tsc -b) + Vite production build into dist/
@@ -194,87 +213,89 @@ npm run preview    # serve the built dist/ locally
 
 ---
 
-## Tech and architecture
+## Teknik och arkitektur
 
 **Stack**
 
 - **Frontend:** React + TypeScript + Vite.
-- **Styling and motion:** Tailwind CSS + Motion (the `motion` package, formerly Framer Motion);
-  the animations are what makes it feel alive.
-- **PWA:** vite-plugin-pwa (installable, offline app shell, manifest, icons, silent
-  auto-update service worker).
-- **Cloud:** Supabase (Postgres + Auth + Realtime + Row Level Security).
-- **Hosting:** Cloudflare Pages (git integration, no secrets in the repo). Production deploys
-  from `develop`; every pull request gets its own preview URL.
+- **Styling och rörelse:** Tailwind CSS + Motion (paketet `motion`, tidigare Framer Motion);
+  animationerna är det som får den att kännas levande.
+- **PWA:** vite-plugin-pwa (installerbar, offline app-skal, manifest, ikoner, tyst
+  auto-uppdaterande service worker).
+- **Moln:** Supabase (Postgres + Auth + Realtime + Row Level Security).
+- **Hosting:** Cloudflare Pages (git-integration, inga hemligheter i repot). Produktion
+  driftsätts från `develop`; varje pull request får sin egen preview-URL.
 
-**Architecture**
+**Arkitektur**
 
-- **Derived state from one source of truth.** Tables, the bracket, points and leaderboards
-  are never stored twice. They are computed by small, pure, heavily tested functions from the
-  match results plus predictions. This is the backbone that makes the tricky FIFA
-  third-place seeding testable and safe.
-- **Source-anchored data (gold source, regenerate-and-diff).** The static tournament data
-  (schedule, team profiles, venue capacities, third-place table) is generated from committed
-  source extracts (with URLs and fetch dates) by pure parsers, then value-locked and verified
-  by a regenerate-and-diff test, so the data in the app provably matches its source and cannot
-  drift.
-- **Fixtures-first environment gating.** All code is built and tested against typed fixtures;
-  a single gate switches to live Supabase via environment variables without changing any
-  call-site. That is what let the entire app be built and tested before, and independently of,
-  any backend account.
-- **Single scroll-page, no router.** Every section renders on the page; vendor code-splitting
-  (React, Motion, Supabase) keeps the initial load lean.
+- **Härlett tillstånd från en sanningskälla.** Tabeller, trädet, poäng och resultattavlor
+  lagras aldrig dubbelt. De räknas fram av små, rena, hårt testade funktioner från
+  matchresultaten plus tipsen. Det är ryggraden som gör den kniviga FIFA-seedningen av
+  grupptreor testbar och säker.
+- **Källankrad data (gold source, regenerera-och-diffa).** Den statiska turneringsdatan
+  (spelschema, lagprofiler, arenakapaciteter, grupptre-tabellen) genereras från incheckade
+  källutdrag (med URL:er och hämtdatum) av rena parsers, värdelåses sedan och verifieras av ett
+  regenerera-och-diffa-test, så att datan i appen bevisligen matchar sin källa och inte kan
+  driva.
+- **Fixtures-först med miljö-grind.** All kod byggs och testas mot typade fixtures; en enda grind
+  växlar till live-Supabase via miljövariabler utan att ändra något anropsställe. Det är vad som
+  lät hela appen byggas och testas före, och oberoende av, något backend-konto. Livekortet renderas
+  mot bundlad exempeldata i fixtures-läge; i live-läge läses datan ur Supabase (publik läsning,
+  realtidsuppdaterad) som matas av en budget-medveten schemalagd edge-funktion mot ett gratis
+  fotbolls-data-API (100 anrop per dag, kostnadsfritt).
+- **En scroll-sida, ingen router.** Varje sektion renderas på sidan; vendor-kodsplittning (React,
+  Motion, Supabase) håller den initiala laddningen lätt.
 
 ---
 
-## Quality
+## Kvalitet
 
-| What | Command |
+| Vad | Kommando |
 | --- | --- |
-| Build (type-check + bundle) | `npm run build` |
-| Unit / component tests (Vitest) | `npm test` |
+| Bygg (type-check + bundle) | `npm run build` |
+| Enhets- / komponenttester (Vitest) | `npm test` |
 | End-to-end (Playwright) | `npm run test:e2e` |
 | Lint | `npm run lint` |
-| Format check | `npm run format:check` |
+| Formatkontroll | `npm run format:check` |
 
-- **1867 passing tests** across 191 test files (Vitest) on a fresh clone, with 56 tests
-  skipped by design (the live Supabase RLS integration tests, which only run when Supabase
-  env is configured, see below). Verified by running `npm test`.
-- **Security proven, not assumed.** The Row Level Security model (only the admin can write
-  official results; only room members can read a room; nobody can forge another user's data)
-  is proven with real anonymous Supabase sessions in `*-rls.integration.test.ts`. These tests
-  run against a live project only when `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set
-  in the environment, and skip cleanly otherwise, so the unit suite is green on a fresh clone
-  with no secrets in the repo. A mock cannot prove RLS, which lives in the database, so these
-  use real sessions on purpose.
-- **End-to-end (Playwright).** Critical user flows plus an axe-core WCAG AA accessibility pass
-  in both light and dark themes, run against the built `dist/` (the artifact that deploys) in
-  fixtures mode, so E2E needs no secrets and is deterministic. First run needs Chromium:
-  `npx playwright install chromium`.
-- **Green CI gates.** GitHub Actions runs build, test and lint on every pull request targeting
-  `develop`. Hosting builds straight from the repo on Cloudflare Pages, so no deploy tokens live
-  in the codebase.
+- **2106 passerande tester** över 217 testfiler (Vitest) på en färsk klon, med 56 tester som
+  hoppas över med flit (live-Supabase RLS-integrationstesterna, som bara körs när Supabase-env
+  är konfigurerat, se nedan). Verifierat genom att köra `npm test`.
+- **Säkerhet bevisad, inte antagen.** Row Level Security-modellen (bara admin kan skriva
+  officiella resultat; bara rumsmedlemmar kan läsa ett rum; ingen kan förfalska en annan
+  användares data) bevisas med riktiga anonyma Supabase-sessioner i `*-rls.integration.test.ts`.
+  De testerna körs mot ett live-projekt bara när `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
+  är satta i miljön, och hoppas annars över rent, så att enhetssviten är grön på en färsk klon
+  utan hemligheter i repot. En mock kan inte bevisa RLS, som bor i databasen, så de använder
+  riktiga sessioner med flit.
+- **End-to-end (Playwright).** Kritiska användarflöden plus en axe-core WCAG AA-tillgänglighetskoll
+  i både ljust och mörkt tema, körda mot det byggda `dist/` (artefakten som driftsätts) i
+  fixtures-läge, så att E2E inte behöver några hemligheter och är deterministisk. Första körningen
+  behöver Chromium: `npx playwright install chromium`.
+- **Gröna CI-grindar.** GitHub Actions kör bygg, test och lint på varje pull request mot
+  `develop`. Hostingen bygger direkt från repot på Cloudflare Pages, så inga deploy-tokens lever
+  i kodbasen.
 
 ---
 
-## Regenerating the screenshots
+## Regenerera skärmdumparna
 
-The README screenshots in `docs/screenshots/` are generated from the real built app in
-fixtures mode (no backend), using the same setup as the E2E suite:
+README-skärmdumparna i `docs/screenshots/` genereras från den faktiskt byggda appen i
+fixtures-läge (utan backend), med samma upplägg som E2E-sviten:
 
 ```bash
 npx playwright test scripts/capture-screenshots.spec.ts --config scripts/screenshots.config.ts
 ```
 
-This builds the app, serves the built `dist/` with `vite preview`, and writes the PNGs to
-`docs/screenshots/`. It is a manual, one-off script (it is not part of CI).
+Det här bygger appen, serverar det byggda `dist/` med `vite preview`, och skriver PNG-filerna till
+`docs/screenshots/`. Det är ett manuellt engångs-skript (det är inte en del av CI).
 
 ---
 
-## Repository map
+## Repo-karta
 
-- App code: `src/` (features in `src/features/`, data layer in `src/data/`, domain logic in
+- App-kod: `src/` (funktioner i `src/features/`, datalager i `src/data/`, domänlogik i
   `src/domain/`).
-- Database: `supabase/migrations/` + [`supabase/README.md`](supabase/README.md).
-- Design and decisions: [`docs/SPEC.md`](docs/SPEC.md), [`docs/decisions.md`](docs/decisions.md),
+- Databas: `supabase/migrations/` + [`supabase/README.md`](supabase/README.md).
+- Design och beslut: [`docs/SPEC.md`](docs/SPEC.md), [`docs/decisions.md`](docs/decisions.md),
   [`docs/deploy.md`](docs/deploy.md).

@@ -18,6 +18,10 @@ Bara **delad, muterbar** state ligger i Supabase:
 | `bracket_predictions` (T16) | Slutspels-tips: vem går vidare per slot + VM-vinnaren. |
 | `room_comments` (T66 + T77) | Korta kommentarer (medlemmar snackar, live). match_id NULL = rums-chatt (T66), satt = en match-tråd (T77). |
 | `room_reactions` (T24) | Emoji-reaktioner på matcher per rum (en per användare+match, live). |
+| `match_live_data` (T80) | Persisterad live-data per match (råa API-blobbar + extraherade fält). SELECT öppen, skriv bara pollaren. Fryses vid FT (bläddringsbar dagar tillbaka). |
+| `app_config` (T80) | Privata server-hemligheter (API-Football-nyckel m.m.). RLS deny-all, bara service_role. |
+| `poll_log` (T80) | Pollarens dagliga API-anrops-räknare (budget-gate). RLS deny-all. |
+| `fixture_match_map` (T80) | api_fixture_id -> appens match_id (pollarens uppslag). RLS deny-all. |
 
 **Statisk turneringsdata (lag, grupper, spelschema) stannar i klient-bundlen.**
 Den är källåkrad och verifierad i Fas 1 (T4/T4b/T10), ändras aldrig av användare,
@@ -200,6 +204,35 @@ läsa OCH skriva; counts oförändrade efteråt (5/0/5), inga leftover. Klient-s
 **Migration-historik (T77):** den committade FILEN bär den FAKTISKA live-apply-versionen
 `20260613144345` (bekräftad med `list_migrations`), namn + innehåll 1:1 = fresh-replaybar
 till samma version (ingen placeholder-drift).
+
+## T80 (#180): Livescore Bit 2 , persisterad live-data + auto-facit + pollare
+
+Server-sidan för livescore. Fem migrationer + en edge function + ett bevis-skript:
+
+| Migration | Innehåll |
+|---|---|
+| `t80_match_live_data` | Tabell + RLS (SELECT öppen, skriv bara service_role). Råa jsonb-blobbar + extraherade fält + `frozen`. |
+| `t80_official_results_source` | ALTER official_match_results: `source text not null default 'manual'`. Skyddar manuella rader. |
+| `t80_auto_facit_lock` | `apply_auto_facit(...)` (SECURITY DEFINER, EXECUTE bara service_role). Låset: uppdaterar bara `source='auto'`. |
+| `t80_app_config` | Privat config-tabell (RLS deny-all). Skapas TOM, nyckeln inserteras vid deploy. |
+| `t80_poller_tables` | `poll_log` (budget-räknare) + `fixture_match_map` (api_fixture_id -> match_id). RLS deny-all. |
+| `t80_livescore_cron` | pg_cron + pg_net, schemalägger pollaren var 2:e min. PLATSHÅLLARE för URL + service_role (dirigenten fyller vid deploy). |
+
+**Edge function** `supabase/functions/livescore-poller/index.ts` (Deno, tunn): live=all -> match_live_data;
+nyss avslutade -> fixtures?id -> facit (Bit 1:s regel via `_shared/livescore-core.ts`) -> apply_auto_facit
++ freeze. Self-budgeterande (poll_log, 100/dag). Okänd fixture hoppas + loggas (gissa aldrig).
+
+**Auto-facit-låset BEVISAT** i `supabase/proofs/t80_auto_facit_lock_proof.sql` (DO-block, rollback, 4
+invarianter , dirigenten kör mot live vid deploy). Auto skriver ALDRIG över en manuell rad (Daniels HARD-krav).
+
+**Facit-regeln (källhänvisad, gissas aldrig):** slutresultat = `goals.home/away` (aggregat, exkl. straffar),
+straffar = `score.penalty` vid PEN, ALDRIG `score.extratime`. Speglar `parse-live.ts`/decisions.md 2026-06-14.
+
+**Migration-historik (T80):** filerna bär PLATSHÅLLAR-versioner (`20260614160000..160400`); de FAKTISKA
+live-apply-versionerna sätts av MCP vid deploy och kan skilja från filnamnen (samma nyans som T15/T16/T24,
+se lärdomen committad-migration-pastar-spegla-live). Namn + innehåll är 1:1, sluttillståndet är sanningen,
+verifiera mot `list_migrations` efter deploy. `t80_livescore_cron` har dessutom platshållare som dirigenten
+ERSÄTTER innan apply, så den filen är medvetet en halv-migration tills deploy.
 
 ## Migrationer
 

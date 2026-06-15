@@ -98,6 +98,10 @@ export async function upsertOfficialResult(
     penalties_home: input.penalties ? input.penalties.homeGoals : null,
     penalties_away: input.penalties ? input.penalties.awayGoals : null,
     status: input.status,
+    // T80 (#180): admin matar in MANUELLT. source='manual' SKYDDAR raden från
+    // auto-facit (apply_auto_facit-låset uppdaterar bara source='auto'-rader),
+    // så ett resultat Daniel skrivit aldrig skrivs över av live-härlett facit.
+    source: 'manual',
     updated_by: identity.userId,
     updated_at: new Date().toISOString(),
   };

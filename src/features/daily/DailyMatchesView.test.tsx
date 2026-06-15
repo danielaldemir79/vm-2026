@@ -5,7 +5,31 @@ import { ResultsProvider } from '../results/ResultsProvider';
 import { TeamProfileProvider } from '../team-profile';
 import { DailyMatchesView } from './DailyMatchesView';
 import type { DataSource } from '../../data';
+import type { LiveDataResult } from './use-live-data';
+import type { LiveData } from '../../data/livescore';
 import { createFailingDataSource } from '../../test/failing-data-source';
+
+// useLiveData mockas så HERO-/dags-tema-/etikett-testerna (no-live-vägen) är
+// DETERMINISTISKA. Fixtures-läget bär numera en PÅGÅENDE demo-match (g-F-1), så utan
+// mock leder live-blocket och hero:n renderas inte , och en grön hero-assertion skulle
+// bara bero på att den asynkrona live-laddningen inte hunnit klart (flaxigt). Default =
+// tom byMatchId (inget live). Live-blockets EGEN integration testas i ett separat block
+// nedan som sätter en pågående rad via denna mock. (Lessons: bevisa skarven, gissa aldrig
+// att ett grönt test rör rätt gren.)
+const liveDataMock = vi.fn(
+  (): LiveDataResult => ({
+    status: 'ready',
+    byMatchId: new Map<string, LiveData>(),
+    error: null,
+  })
+);
+vi.mock('./use-live-data', () => ({
+  useLiveData: (): LiveDataResult => liveDataMock(),
+}));
+
+function noLive(): LiveDataResult {
+  return { status: 'ready', byMatchId: new Map<string, LiveData>(), error: null };
+}
 
 function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
@@ -27,6 +51,12 @@ async function waitSettled() {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 }
+
+// Default per test: INGEN live-match (no-live-vägen). Live-blockets tester sätter en
+// pågående rad själva. Reset i beforeEach så ett test inte läcker live-läge till nästa.
+beforeEach(() => {
+  liveDataMock.mockImplementation(() => noLive());
+});
 
 describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () => {
   it('renderar i ett etiketterat section-landmark', async () => {
@@ -260,5 +290,78 @@ describe('DailyMatchesView, fel-väg (fail loud)', () => {
     expect(alert).toHaveTextContent(/Kunde inte ladda matcherna/i);
     // Ingen matchlista läcker fram i fel-läget.
     expect(screen.queryAllByRole('article')).toHaveLength(0);
+  });
+});
+
+// TOPP-FÄLTET, LÄGESMEDVETET (Bit 3c, Daniels live-feedback). När en match PÅGÅR ska
+// topp-fältet LEDA med live-blocket (det som händer NU) och flytta nedräkningen till en
+// SEPARAT "Nästa avspark"-pelare , den statiska "dagens match"-hero:n får INTE visa en
+// match som pågår. Vi sätter en pågående live-rad för en riktig schemamatch (g-F-1,
+// Nederländerna-Japan) via useLiveData-mocken (samma re-nyckling appen gör i fixtures).
+describe('DailyMatchesView, lägesmedvetet topp-fält när en match pågår (Bit 3c)', () => {
+  /** En pågående live-rad för en riktig schemamatch (g-F-1). */
+  function liveRow(matchId: string): LiveData {
+    return {
+      matchId,
+      apiFixtureId: 1489376,
+      status: 'live',
+      elapsedMinute: 30,
+      homeGoals: 1,
+      awayGoals: 0,
+      events: [],
+      statistics: [],
+      lineups: [],
+      frozen: false,
+      lastSyncedAt: new Date().toISOString(),
+    };
+  }
+
+  function withLive(matchId: string) {
+    liveDataMock.mockImplementation(() => ({
+      status: 'ready',
+      byMatchId: new Map<string, LiveData>([[matchId, liveRow(matchId)]]),
+      error: null,
+    }));
+  }
+
+  it('LEDER med live-blocket och visar INTE den statiska arena-hero:n', async () => {
+    withLive('g-F-1');
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-live-now]')).not.toBeNull();
+    });
+    // Den statiska "dagens match"-hero:n (som annars kunde visa en pågående match) är borta.
+    expect(container.querySelector('[data-daily-hero]')).toBeNull();
+    // Live-blocket är en etiketterad region.
+    expect(screen.getByRole('region', { name: /live nu/i })).toBeInTheDocument();
+  });
+
+  it('håller nedräkningen i en SEPARAT "Nästa avspark"-pelare (åtskild från live)', async () => {
+    withLive('g-F-1');
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-live-now]')).not.toBeNull();
+    });
+    // Nedräkningen bor i sin egen pelare, ETT eget block skilt från live-blocket.
+    const pillar = container.querySelector('[data-next-kickoff]');
+    expect(pillar).not.toBeNull();
+    // Pelaren ligger UTANFÖR live-blocket (inte nästlad i det), så de är två åtskilda block.
+    expect(pillar?.closest('[data-live-now]')).toBeNull();
+    // Och den bär faktiskt nedräknings-innehållet (eller sluttillståndet).
+    expect(pillar?.querySelector('[data-countdown]')).not.toBeNull();
+  });
+
+  it('INGEN live -> behåller den vanliga arena-hero:n (oförändrat)', async () => {
+    // Default-mocken (no-live) gäller: hero:n ska finnas, live-blocket inte.
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
+
+    expect(container.querySelector('[data-daily-hero]')).not.toBeNull();
+    expect(container.querySelector('[data-live-now]')).toBeNull();
   });
 });

@@ -4,6 +4,28 @@
 export { DailyMatchesView } from './DailyMatchesView';
 export { MatchCard } from './MatchCard';
 export type { MatchCardProps } from './MatchCard';
+export { LiveMatchCard } from './LiveMatchCard';
+export type { LiveMatchCardProps } from './LiveMatchCard';
+export { LiveNowSection } from './LiveNowSection';
+export type { LiveNowSectionProps } from './LiveNowSection';
+export { selectLiveFeed, type LiveFeedEntry } from './live-feed';
+export { useLiveData } from './use-live-data';
+export type { LiveDataResult, LiveDataStatus } from './use-live-data';
+export { useLiveClock } from './use-live-clock';
+export {
+  selectGoals,
+  selectCards,
+  selectSubs,
+  buildStatRows,
+  pairStatistics,
+  pairLineups,
+  formatEventMinute,
+  type GoalEntry,
+  type CardEntry,
+  type SubEntry,
+  type StatRow,
+  type MatchSide,
+} from './live-card-model';
 export { useDailyMatches, initialDayIndex } from './use-daily-matches';
 export type { DailyMatchesData } from './use-daily-matches';
 export { useTodayKey, type TodayKey } from './use-today-key';
