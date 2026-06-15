@@ -99,25 +99,6 @@
   border: 1px solid var(--vm-card-red-edge);
 }
 
-/* LAG-TILLHÖRIGHETS-BRICKAN på en mål-/kort-/byte-rad: lagets kod (eller initialer) som
- * TEXT i full fg (AA-säkert, INGEN text på en genererad färg, lessons), på en lugn yt-ton.
- * En liten färg-punkt (.vm-live-event-team-dot) skiljer hemma (accent) från borta (neutral
- * fg-ton) som CUE , men koden bär lag-tillhörigheten, färgen är bara förstärkning. */
-[data-live-card] .vm-live-event-team {
-  color: var(--color-fg);
-  background-color: color-mix(in srgb, var(--color-fg) 7%, var(--color-surface));
-}
-
-/* Punktens färg per sida: hemma = accent (matchar ställnings-/live-språket), borta = en
- * dämpad fg-ton. aria-hidden, ren cue, så den behöver inte nå text-AA. */
-[data-live-card] [data-live-event-team-side='home'] .vm-live-event-team-dot {
-  background-color: var(--color-accent);
-}
-
-[data-live-card] [data-live-event-team-side='away'] .vm-live-event-team-dot {
-  background-color: color-mix(in srgb, var(--color-fg-muted) 70%, var(--color-surface));
-}
-
 /* BYTES-PILARNA: in = accent (spelaren som kom in), ut = dämpad fg-ton. aria-hidden:
  * orden (in-/ut-spelaren) bär betydelsen, pilen är en riktnings-cue. */
 [data-live-card] .vm-live-sub-arrow {

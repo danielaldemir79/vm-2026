@@ -19,13 +19,14 @@
 //     sida (SIDAN bär laget). INGEN "gult kort"/"rött kort"-TEXT , färgen bär betydelsen.
 //     A11y bevaras: ikonen får en dold (sr-only) "gult kort"/"rött kort" så en skärmläsare
 //     ändå hör vilket kort.
-//   - LAG-KOD-BRICKAN (NED/JPN) lever kvar i BYTEN-blocket (expanderat, enkel-kolumn),
-//     där sidan inte speglas och brickan fortfarande hjälper, men inte på de speglade
-//     mål-/kort-raderna (positionen visar laget där, och brickan trängde namnet på mobil).
+//   - INGEN LAG-KOD-BRICKA (NED/JPN) på någon förlopps-rad: SIDAN bär lag-tillhörigheten
+//     överallt (mål, kort OCH byten), precis som statistik-panelen, så positionen visar
+//     laget utan att läsa en kod (brickan trängde dessutom namnen på smal skärm).
 //   - RESULTATET visas EN gång (överst). Ingen andra ställnings-visning någonstans.
 //   - "VISA MER" i ordning: (a) STATISTIK (hemma vänster | etikett | borta höger,
 //     jämförelse-staplar, UTAN kort-räkning , korten syns i förloppet), (b) LAGUPPSTÄLLNING,
-//     (c) BYTEN längst ned, under laguppställningen, namnen staplade (in/ut).
+//     (c) BYTEN längst ned, under laguppställningen, SPEGLADE (hemma vänster | borta höger),
+//     namnen staplade (in/ut).
 //   - AVSLUTAD match: "Slut" + slutställning, fryst, INGEN tickande klocka (klockan via
 //     liveClockFor: finished -> "Slut", ticking false).
 //   - ENHETLIG struktur: samma sektions-ordning oavsett antal mål/kort/byten , en match med
@@ -76,12 +77,13 @@ export interface LiveMatchCardProps {
    */
   homeApiId: number | null;
   /**
-   * Hemmalagets FIFA-landskod (t.ex. "NED"), för lag-tillhörighets-brickan i BYTEN-blocket
-   * (mål-/kort-raderna bär laget via SIDAN i stället, ingen bricka där). null -> ingen
-   * kod-bricka för hemma (en initial-fallback ur namnet används i stället).
+   * Hemmalagets FIFA-landskod (t.ex. "NED"). RESERVERAD i kontraktet men ritas inte längre:
+   * HELA förloppet (mål, kort OCH byten) bär nu lag-tillhörigheten via SIDAN (hemma vänster
+   * | borta höger), så ingen kod-bricka behövs på någon rad. Behålls som valfri prop så
+   * anroparna (MatchCard, LiveNowSection) inte behöver ändras, men konsumeras inte här.
    */
   homeCode?: string | null;
-  /** Bortalagets FIFA-landskod. null -> initial-fallback ur bortanamnet. */
+  /** Bortalagets FIFA-landskod. RESERVERAD (ritas inte, sidan bär laget), se homeCode. */
   awayCode?: string | null;
   /** Nuet (epoch-ms), injiceras för test. Default Date.now() i appen (klockan tickar). */
   now?: number;
@@ -92,27 +94,7 @@ function isLiveStatus(status: LiveData['status']): boolean {
   return status === 'live' || status === 'paused';
 }
 
-/**
- * En kompakt lag-tillhörighets-etikett för en händelse-rad: lagets FIFA-kod om den finns
- * (t.ex. "NED"), annars de tre första bokstäverna ur visningsnamnet (versalt). Så ett mål
- * eller kort ALLTID bär synlig lag-tillhörighet utan att gissa, även när koden saknas.
- */
-function teamTagText(code: string | null, name: string): string {
-  if (code !== null && code.length > 0) {
-    return code.toUpperCase();
-  }
-  return name.slice(0, 3).toUpperCase();
-}
-
-export function LiveMatchCard({
-  data,
-  homeName,
-  awayName,
-  homeApiId,
-  homeCode = null,
-  awayCode = null,
-  now,
-}: LiveMatchCardProps) {
+export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: LiveMatchCardProps) {
   const clock = useLiveClock(data, now);
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
@@ -131,11 +113,6 @@ export function LiveMatchCard({
   const finished = data.status === 'finished';
   const homeGoals = data.homeGoals ?? 0;
   const awayGoals = data.awayGoals ?? 0;
-
-  // Lag-tillhörighets-etikett per sida (kod om känd, annars initialer ur namnet). EN
-  // sanning, vidare till mål- och kort-raderna så de talar samma kod.
-  const tagForSide = (side: MatchSide): string =>
-    side === 'home' ? teamTagText(homeCode, homeName) : teamTagText(awayCode, awayName);
 
   // Tillgängligt namn: hela live-läget som en mening (status + ställning + klocka).
   const stateWord = finished ? 'Slutresultat' : live ? 'Live' : clock.label;
@@ -242,9 +219,9 @@ export function LiveMatchCard({
                   awayName={awayName}
                 />
               ) : null}
-              {/* BYTEN längst ned, under laguppställningen (Daniels ordning), namnen
-                  staplade (in/ut). */}
-              {subs.length > 0 ? <SubBlock subs={subs} tagForSide={tagForSide} /> : null}
+              {/* BYTEN längst ned, under laguppställningen (Daniels ordning): speglade
+                  (hemma vänster | borta höger), namnen staplade (in/ut). */}
+              {subs.length > 0 ? <SubBlock subs={subs} /> : null}
             </div>
           ) : null}
         </div>
@@ -254,39 +231,17 @@ export function LiveMatchCard({
 }
 
 /**
- * Lag-tillhörighets-brickan på en händelse-rad: lagets kod/initialer som TEXT i full fg
- * (AA-säkert, ingen text på en genererad färg) plus en liten dekorativ färg-punkt (cue).
- * data-live-event-team-side bär sidan så CSS:en kan tona punkten per lag (hemma = accent,
- * borta = neutral), färg-oberoende: koden bär lag-tillhörigheten, punkten är förstärkning.
- */
-function TeamTag({ side, text }: { side: MatchSide; text: string }) {
-  return (
-    <span
-      data-live-event-team=""
-      data-live-event-team-side={side}
-      className="vm-live-event-team inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 font-display text-[0.625rem] font-bold uppercase tracking-wide"
-    >
-      <span
-        aria-hidden="true"
-        className="vm-live-event-team-dot inline-block h-1.5 w-1.5 rounded-pill"
-      />
-      {text}
-    </span>
-  );
-}
-
-/**
  * En SPEGLAD händelse-rad (Daniels feedback): tre kolumner [hemma | minut-spine | borta].
- * Innehållet (ikon + namn + lag-bricka) hamnar i HEMMA-kolumnen om side === 'home', annars
- * i BORTA-kolumnen, så POSITIONEN visar laget , konsekvent med statistik-panelen (hemma
- * vänster, borta höger). Den motsatta kolumnen är tom. Minuten sitter i en smal central
- * spine, tydlig per rad. Hemma-innehållet läses inåt mot spinen (höger-ställt), borta utåt
+ * Innehållet (ikon + namn) hamnar i HEMMA-kolumnen om side === 'home', annars i BORTA-
+ * kolumnen, så POSITIONEN visar laget , konsekvent med statistik-panelen (hemma vänster,
+ * borta höger). Den motsatta kolumnen är tom. Minuten sitter i en smal central spine,
+ * tydlig per rad. Hemma-innehållet läses inåt mot spinen (höger-ställt), borta utåt
  * (vänster-ställt), så de två sidorna speglar varandra runt minuten. children är den
- * sid-specifika kärnan (mål eller kort); `side` styr i vilken kolumn den hamnar + flödet.
+ * sid-specifika kärnan (mål, kort eller byte); `side` styr i vilken kolumn den hamnar + flödet.
  *
- * VARFÖR ett delat radskal: mål- och kort-raderna delar EXAKT samma spegel-geometri
+ * VARFÖR ett delat radskal: mål-, kort- OCH byte-raderna delar EXAKT samma spegel-geometri
  * (grid + minut-spine + sido-placering), bara kärninnehållet skiljer (DRY, rule of three
- * uppfyllt: två kallare nu, geometrin bor på ETT ställe). Mobil: grid:en behåller de tre
+ * uppfyllt: tre kallare nu, geometrin bor på ETT ställe). Mobil: grid:en behåller de tre
  * kolumnerna även på smal bredd (1fr-kolumnerna krymper, minuten står fast), så raden är
  * en spegel även på en vikbar telefon, aldrig ett hopträngt enkel-flöde.
  */
@@ -434,16 +389,18 @@ function CardList({ cards }: { cards: readonly CardEntry[] }) {
 }
 
 /**
- * Byte-blocket: längst ned i "Visa mer", under laguppställningen. Namnen STAPLADE
- * (in på en rad, ut på raden under) så ett byte läses tydligt även när två namn är långa.
+ * Byte-blocket: längst ned i "Visa mer", under laguppställningen. SPEGLAT precis som
+ * mål-/kort-förloppet (hemma vänster | borta höger) , samma MirroredEventRow-skal, så
+ * SIDAN bär lag-tillhörigheten och hela kortet talar samma layout-språk. Ingen separat
+ * lag-kod-bricka längre (positionen visar laget, precis som på mål-/kort-raderna). Per
+ * byte är namnen STAPLADE: in-spelaren (in-pil) på en rad, ut-spelaren (ut-pil) på raden
+ * under, så ett byte läses tydligt även när två namn är långa. Minuten sitter i samma
+ * centrala spine som resten av förloppet.
+ *
+ * Mobil (enkel-kolumn): hemma-bytet hamnar i vänster-blocket, borta-bytet i höger, runt
+ * minut-spinen , aldrig ett hopträngt enkel-flöde (samma spegel-geometri som mål/kort).
  */
-function SubBlock({
-  subs,
-  tagForSide,
-}: {
-  subs: readonly SubEntry[];
-  tagForSide: (side: MatchSide) => string;
-}) {
+function SubBlock({ subs }: { subs: readonly SubEntry[] }) {
   return (
     <div data-live-subs="" className="flex flex-col gap-2.5">
       <h4 className="font-display text-xs font-bold uppercase tracking-[0.14em] text-fg-muted">
@@ -451,36 +408,31 @@ function SubBlock({
       </h4>
       <ul className="flex flex-col gap-2.5">
         {subs.map((s, i) => (
-          <li
-            key={`${s.minute}-${s.playerIn}-${i}`}
-            data-live-sub=""
-            data-live-sub-side={s.side}
-            className="flex items-baseline gap-2 text-sm"
-          >
-            <span aria-hidden="true" className="shrink-0 self-start text-sm leading-none">
-              🔁
-            </span>
-            <span className="w-9 shrink-0 text-right font-display text-xs font-bold tabular-nums text-fg-muted">
-              {formatEventMinute(s.minute, s.extra)}
-            </span>
-            <TeamTag side={s.side} text={tagForSide(s.side)} />
-            {/* Namnen STAPLADE: in (grön pil) på en rad, ut (dämpad) på raden under. */}
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="vm-live-sub-in font-medium" data-live-sub-in="">
-                <span aria-hidden="true" className="vm-live-sub-arrow">
-                  ▲
-                </span>{' '}
-                {s.playerIn}
+          <li key={`${s.minute}-${s.playerIn}-${i}`} data-live-sub="" data-live-sub-side={s.side}>
+            <MirroredEventRow side={s.side} minute={s.minute} extra={s.extra}>
+              <span aria-hidden="true" className="shrink-0 self-start text-sm leading-none">
+                🔁
               </span>
-              {s.playerOut !== null ? (
-                <span className="text-xs text-fg-muted" data-live-sub-out="">
-                  <span aria-hidden="true" className="vm-live-sub-arrow-out">
-                    ▼
+              {/* Namnen STAPLADE: in (accent-pil) på en rad, ut (dämpad) under. Ärver
+                  cellens text-justering (hemma höger mot spinen, borta vänster utåt), så
+                  stapeln speglar sidan. */}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="vm-live-sub-in font-medium" data-live-sub-in="">
+                  <span aria-hidden="true" className="vm-live-sub-arrow">
+                    ▲
                   </span>{' '}
-                  {s.playerOut}
+                  {s.playerIn}
                 </span>
-              ) : null}
-            </span>
+                {s.playerOut !== null ? (
+                  <span className="text-xs text-fg-muted" data-live-sub-out="">
+                    <span aria-hidden="true" className="vm-live-sub-arrow-out">
+                      ▼
+                    </span>{' '}
+                    {s.playerOut}
+                  </span>
+                ) : null}
+              </span>
+            </MirroredEventRow>
           </li>
         ))}
       </ul>

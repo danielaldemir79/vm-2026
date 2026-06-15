@@ -294,6 +294,59 @@ describe('LiveMatchCard, SPEGLAT förlopp (hemma vänster | borta höger)', () =
     // Minuten finns på raden (spine), tydligt formaterad ("23'").
     expect(homeGoal?.textContent).toContain("23'");
   });
+
+  it('byten: hemmalagets byte i VÄNSTER cell, bortalagets i HÖGER (samma spegel som mål/kort)', () => {
+    renderCard({
+      events: [
+        goalEvent({
+          kind: 'subst',
+          rawType: 'subst',
+          detail: 'Substitution 1',
+          minute: 60,
+          teamApiId: HOME,
+          playerName: 'Weghorst',
+          assistName: 'Memphis',
+        }),
+        goalEvent({
+          kind: 'subst',
+          rawType: 'subst',
+          detail: 'Substitution 2',
+          minute: 75,
+          teamApiId: AWAY,
+          playerName: 'Asano',
+          assistName: 'Mitoma',
+        }),
+      ],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Visa mer/i }));
+    const homeSub = screen
+      .getByRole('region')
+      .querySelector('[data-live-sub][data-live-sub-side="home"]');
+    const awaySub = screen
+      .getByRole('region')
+      .querySelector('[data-live-sub][data-live-sub-side="away"]');
+    expect(homeSub).not.toBeNull();
+    expect(awaySub).not.toBeNull();
+    // Hemma-bytet ligger i HEMMA-cellen (vänster kolumn), inte borta-cellen, och bär både
+    // in- (Weghorst) och ut-spelaren (Memphis) STAPLADE på sin sida.
+    const homeCell = homeSub?.querySelector('[data-live-event-cell="home"]');
+    expect(homeCell).not.toBeNull();
+    expect(homeSub?.querySelector('[data-live-event-cell="away"]')).toBeNull();
+    expect(homeCell?.querySelector('[data-live-sub-in]')?.textContent).toMatch(/Weghorst/);
+    expect(homeCell?.querySelector('[data-live-sub-out]')?.textContent).toMatch(/Memphis/);
+    // Borta-bytet ligger i BORTA-cellen (höger kolumn), inte hemma-cellen.
+    const awayCell = awaySub?.querySelector('[data-live-event-cell="away"]');
+    expect(awayCell).not.toBeNull();
+    expect(awaySub?.querySelector('[data-live-event-cell="home"]')).toBeNull();
+    expect(awayCell?.querySelector('[data-live-sub-in]')?.textContent).toMatch(/Asano/);
+    expect(awayCell?.querySelector('[data-live-sub-out]')?.textContent).toMatch(/Mitoma/);
+    // Ingen lag-kod-bricka på byte-raderna längre (sidan bär laget, som på mål/kort).
+    expect(homeSub?.querySelector('[data-live-event-team]')).toBeNull();
+    expect(awaySub?.querySelector('[data-live-event-team]')).toBeNull();
+    // Minuten ligger i den centrala spinen på varje byte-rad (tydlig per rad).
+    expect(homeSub?.textContent).toContain("60'");
+    expect(awaySub?.textContent).toContain("75'");
+  });
 });
 
 describe('LiveMatchCard, status-styrd klocka (vattenpaus-säker)', () => {
