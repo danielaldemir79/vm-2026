@@ -7,7 +7,7 @@
 // All logik som är värd att testa (antal, scopning, Rhodos-uteslutning, idempotens) bor
 // HÄR och testas mot fixtures, exekveringen hålls dum.
 //
-// RHODOS RÖRS ALDRIG (HARD): det befintliga 'Rhodos'-rummet (riktiga medlemmar) får
+// RHODOS RÖRS ALDRIG (HARD): det befintliga 'Rhodos Champs'-rummet (riktiga medlemmar) får
 // aldrig hamna i planen, varken som mål för nya medlemmar eller tips. Vi utesluter det
 // EXPLICIT på namn och bevisar det i testet. Samma för alla rum vi inte uttryckligen
 // seedar: planeraren rör BARA de nya rummen den själv skapar + de två namngivna
@@ -34,8 +34,13 @@ import type { PoolFacit } from '../../features/leaderboard/derive-facit';
 export const VM2026_ROOM_NAME = 'VM 2026';
 /** Namnet på det befintliga FSU-rummet som fsu-kohorten ska in i. */
 export const FSU_ROOM_NAME = 'Full Stack United';
-/** Rummet som ALDRIG får röras (riktiga medlemmar). Uteslutet explicit. */
-export const PROTECTED_ROOM_NAME = 'Rhodos';
+/**
+ * Rummet som ALDRIG får röras (riktiga medlemmar). Uteslutet explicit.
+ * Namnet verifierat mot prod-databasen 2026-06-15: det personliga rummet heter
+ * 'Rhodos Champs' (inte 'Rhodos'). Vakten (assertRhodosUntouched) slår upp rummet
+ * på detta namn, så det MÅSTE matcha det faktiska namnet för att skydda rätt rum.
+ */
+export const PROTECTED_ROOM_NAME = 'Rhodos Champs';
 
 /* ------------------------------------------------------------------ *
  * Snapshot-in / plan-ut-former.
