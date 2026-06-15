@@ -17,9 +17,10 @@
 //   6. ROBUST FACIT-FÅNGST (skyddsnät): matcher som föll UR fönstret innan FT sågs
 //      (selectFreezeChecks, 4h bak-fönster) facit-kollas ändå, budget-gatat med facit-prio.
 //
-// SJÄLV-BUDGETERANDE (Daniels HARD-krav, 100/dag): poll_log räknar dagens anrop;
-// buildPerMatchPollPlan + de hårda kollarna nedan släpper ALDRIG igenom mer än vad
-// som ryms. Daniels matte: ~625 match-min/dag / 100 = ~7 min, så cron körs */7.
+// SJÄLV-BUDGETERANDE: poll_log räknar dagens anrop; buildPerMatchPollPlan + de hårda
+// kollarna nedan släpper ALDRIG igenom mer än vad som ryms under DAILY_BUDGET. Pro-plan
+// (7500/dag) sedan 2026-06-15, kapat på 7000 -> cron körs */2 (var 2:a min) för tät
+// live-uppdatering. (Tidigare gratis 100/dag -> */7.)
 // FACIT-PRIO: en avgjord-men-ofryst match får sitt anrop före en pågående om budgeten
 // tryter , facit får aldrig missas. Även om cron tickar oftare än tänkt kan summan
 // aldrig spräcka taket.
@@ -53,7 +54,10 @@ import {
 
 const API_BASE = 'https://v3.football.api-sports.io';
 const WC_LEAGUE_ID = 1; // API-Football: World Cup
-const DAILY_BUDGET = 100; // gratisnyckelns kvot
+// Pro-plan (uppgraderad 2026-06-15): 7500 anrop/dag. Vi kapar på 7000 med marginal
+// (för manuella trigg + framtida bruk). Med cron var 2:a min ger det rikligt med
+// frekvent live-polling utan att nå taket (~105 anrop/match * några matcher/dag << 7000).
+const DAILY_BUDGET = 7000;
 const STOCKHOLM_TZ = 'Europe/Stockholm';
 // Tak för robust-facit-kollar per tick (skyddsnätet, utöver per-match-planen): så ett
 // enstaka tick aldrig bränner budgeten på gamla matcher. Normalt 0-1 matcher behöver det.
