@@ -9,6 +9,74 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### hand-rullad-fast-höjd-virtualisering-utan-dependency (VM 2026)
+
+**Problem:** en lista kan bli LÅNG (240+ rader, t.ex. den totala topplistan över alla rum), och att
+rendera alla på en gång ger en DOM-vägg (långsam, hög minnesåtgång). Ett virtualiserings-PAKET
+(`@tanstack/react-virtual` m.fl.) löser det men är ett nytt beroende för något som är en liten,
+väl förstådd beräkning (PRINCIPLES §11: lägg inte till ett paket för det triviala).
+
+**Recept (`src/components/collapsible-list/use-virtual-rows.ts`):** (flyttad hit från total-
+leaderboard i #173 T82 del 4 när den blev en DELAD husprimitiv, se collapsible-list-mönstret nedan.)
+1. Anta FAST radhöjd (`rowHeight`, matchad mot CSS). Totalhöjd = `count * rowHeight`.
+2. Mät den scrollande containerns höjd (ResizeObserver, fallback window-resize för jsdom/test).
+3. Vid en scroll-position: `startIndex = floor(scrollTop / rowHeight) - OVERSCAN`,
+   `endIndex = startIndex + ceil(viewportH / rowHeight) + OVERSCAN*2`, klampat i `[0, count]`.
+4. Rendera BARA spannet `[startIndex, endIndex)` absolut-positionerat på `startIndex * rowHeight`,
+   inuti en spacer-div med full höjd (scrollbaren stämmer mot hela listan).
+5. Bryt ut den RENA spann-matematiken (`computeRange`) så den testas utan DOM (tom lista, kortare än
+   viewporten, skrollad till botten, overscan-klamp, rowHeight 0). Hooken (DOM-delen) testas i
+   komponenten (mät att DOM:en bär en DELMÄNGD, inte hela listan).
+
+**A11y (viktigt):** virtualiseringen får INTE ljuga om listans storlek för en skärmläsare. Sätt
+`role="list"` på containern och `aria-setsize={total}` + `aria-posinset={absolutIndex+1}` på VARJE
+synlig rad (giltig list-ARIA), så AT vet att listan har N rader även när bara en delmängd är monterad.
+ANVÄND INTE `aria-rowcount`/`aria-rowindex`, de är grid/table-attribut, inte giltiga på en `role="list"`.
+
+**"Hoppa till"-genväg:** en knapp/sök som skrollar containern till `index * rowHeight` (en bit ner i
+viewporten, inte exakt i kanten, så raden känns "hittad"). `scrollTo({behavior:'smooth'})` respekterar
+OS:ets reduced-motion automatiskt (ingen Framer-anim att gata). Element utanför fönstret som ALLTID
+ska synas (egen rad i topp-3, en hjälte) renderas UTANFÖR det virtualiserade spannet, så de aldrig kan
+saknas ur DOM:en även om de skrollats förbi.
+
+**Varför:** fast-höjd-windowing är ~50 rader ren kod med en testbar kärna, inget paket behövs. Resultatet:
+240+ rader scrollar mjukt med ~20 rader i DOM:en (verifierat i browsern: 241 deltagare -> 21 monterade),
+och AT får hela listans storlek via aria-setsize.
+
+### sparsam-deterministisk-social-generering-med-tysthets-default (VM 2026)
+
+**Recept (generera "levande" social-data , reaktioner/kommentarer , från botar/agenter utan att spamma
+och utan att gissa data källan inte bär):**
+
+1. **Härled en KATEGORI ur källans EGNA form, gissa inte fält som saknas.** Klassa utfallet (här en
+   matchs "mood") ENBART ur det källan faktiskt bär (här `PoolFacit.matches[i].actual = Scoreline`), och
+   härled MEDVETET INTE kategorier som kräver data du inte har (här "skräll"/odds, "sen vinst"/minut).
+   Kategorin är EN sanning som alla generatorer läser (DRY). Testa prioritets-ordningen med DISKRIMINERANDE
+   fixturer (ett värde där fel ordning ger ett ANNAT svar) + operator-mutation som rödnar.
+2. **Reaktioner är primärt + billigt, kommentarer en sällsynt krydda.** Gata reaktioner på en MÅTTLIG
+   benägenhet, men SKALA NER kommentar-chansen hårt (här `commentChance * COMMENT_SCALE`), så kommentarer
+   blir få. Allt val (emoji, fras) ur KURERADE pooler som speglar en DB-CHECK / en enda sanning (här
+   `REACTION_EMOJIS`), aldrig en egen sträng som kan nekas live.
+3. **TYSTHETS-DEFAULT som beteende, inte som efterhandstanke.** Faller inte sannolikheten -> generera
+   INGET (var tyst). BEVISA sparsamheten kvantitativt (andel kommenterade enheter låg) OCH tysthets-
+   defaulten (lågbenägen aktör i ett "tråkigt" fall = 0), med en NEGATIV-KONTROLL (samma fall med hög
+   benägenhet ger > 0, annars vaktade testet inget).
+4. **Variation, inte mekaniska mallar.** Flera fras-varianter per (kategori, ton), valda deterministiskt,
+   så samma aktör inte upprepar identisk text och olika aktörer säger olika saker om samma händelse.
+5. **Determinism via separata seed-rymder per beteende.** Ge varje generator (tips/reaktion/kommentar/svar)
+   en EGEN seed-konstant XOR:ad med ett stabilt index, så beteendena inte korrelerar inom samma aktör men
+   ändå är reproducerbara (samma input -> samma output, dry-run == live).
+6. **Saknar schemat en koppling , approximera ärligt och dokumentera det.** Saknas en svars-/tråd-FK
+   (här room_comments utan parent_id) , approximera "svar" som en följd-rad i samma grupp (match-tråd) som
+   REDAN har en annan aktörs inlägg (giltig befintlig konversation), korsa aldrig grupper, och skriv ut
+   i decisions.md att det inte är en hård länk.
+
+**Varför:** social "atmosfär" från botar blir lätt antingen spam (för många, för mekaniska) eller falsk
+(hittar på utfall källan inte bär). Genom att härleda en kategori bara ur källans form, hålla kommentarer
+sällsynta med en bevisad tysthets-default, variera ur kurerade pooler, och approximera saknade kopplingar
+ärligt, blir resultatet diskret och naturligt , och varje "är det här sparsamt/sant?" är testbart, inte
+en gissning. Källa: T82 del 2 (`src/data/bots/match-mood.ts` + `react.ts` + `comment.ts` + `comment-pools.ts`).
+
 ### rå-api-kuvert-i-jsonb-projiceras-genom-kall-parsern-med-per-blob-isolering (VM 2026)
 
 **Recept (en DB-rad med RÅA externa svar i jsonb -> klient-modell, utan att gissa formen och utan att
@@ -1108,6 +1176,57 @@ kontroll med rätt a11y. Design-frontend stylar via de stabila `data-${name}-tog
 hakarna. Källa: T68 (#129), `src/components/CollapsibleSection.tsx` + wiring i groups/scenarios/bracket/
 group-predictions/bracket-predictions/admin/leaderboard.
 
+### sticky-kontroll-rad-som-foljer-med-i-en-lang-lista-plus-borja-komprimerad (React, VM 2026)
+
+**Problem (ägarens feedback, #173):** en lång RAD-lista (topplista, resultat, tips) ska (a) börja
+KOMPRIMERAD med några rader synliga, och (b) ha en komprimera-kontroll som FÖLJER MED i listan, så man
+kan fälla in/söka/hoppa från VILKEN scroll-position som helst utan att skrolla tillbaka till toppen.
+(Skiljer sig från höjd-klipp-mönstret ovan: det är för RESPONSIVA grid/träd, detta för platta rad-listor
+med en sann "N rader synliga"-preview.)
+
+**Två varianter, EN husplats (`src/components/collapsible-list/`), valda per lista:**
+
+1. **Virtualiserat scroll-fönster med en INRE sticky kontroll-rad** (`CollapsibleList` + `CollapsibleScrollList`),
+   för listor som kan bli MYCKET långa och vars rader är fristående (ingen osparad inmatning, ingen
+   layout-glide). `CollapsibleList` orkestrerar: komprimerat default = en preview (render-prop, de N
+   översta raderna, t.ex. en pall) + en "Visa alla M"-`ExpandToggle`; utfällt = `CollapsibleScrollList`,
+   ett `max-height`-begränsat `overflow-y-auto`-fönster med en `position: sticky; top:0`-kontroll-rad
+   INUTI fönstret. Den raden bär en KOMPRIMERA-knapp (alltid nåbar) + ett valfritt `controls`-slot
+   (sök/hoppa-till-mig). Vid satt `rowHeight` VIRTUALISERAS raderna (delad `use-virtual-rows`, bara
+   synliga + overscan i DOM:en); utan `rowHeight` renderas alla rader (kort lista). Den sticky raden har
+   en OPAK fond + skugga (`.vm-collapsible-controls`) så raderna under aldrig lyser igenom (ingen jitter).
+   Fokus-återföring vid komprimering: när den sticky kontrollen avmonteras förs fokus till "Visa alla M".
+   *Konsument:* den globala topplistan (`TotalLeaderboardList`/`TotalLeaderboardView`), 241 deltagare.
+
+2. **Sticky FÖLJ-MED-toggle över en lista som INTE kan virtualiseras** (`StickyFollowToggle`), för listor
+   där rader MÅSTE förbli mountade: dag-grupperade resultat/tips (osparad inmatning bevaras via `hidden`
+   på `<li>`, inte unmount) och den motion-animerade per-rums-topplistan (layout-glidet kräver mountade
+   rader). I stället för ett scroll-fönster wrappar den den befintliga `ExpandToggle` i en bar som blir
+   `position: sticky; top-16` (under sajt-headern, opak `.vm-sticky-follow-bar`-fond) ENBART i UTFÄLLT
+   läge, så komprimera följer med ner i listan; i komprimerat läge är den en vanlig inline-kontroll. Det
+   befintliga fönstret/inmatningen/sorteringen rörs INTE, bara kontrollens klister-position per läge.
+   *Konsumenter:* resultat-listan + tips-listan (3-dygns/dagens-fönster, oförändrat) + per-rums-topplistan
+   (börjar komprimerad topp-N över en tröskel, glidet bevarat).
+
+**A11y:** list-ARIA (`role="list"` + `aria-setsize`/`aria-posinset` per rad, INTE grid-attribut) bär hela
+storleken även när bara en delmängd renderas; komprimera/expandera bär `aria-expanded`/`aria-controls`;
+den sticky raden är bara en container (kontrollerna i den är vanliga fokuserbara knappar/fält, inget
+fokus-fångande). Kontrast MÄTT i webbläsaren på renderad yta (inte hex), båda teman: komprimera-knapp
+15.2/17.9, sök-fält 12.7/17.9, resultat-bar-knapp 9.8/13.4 (alla >> 4.5); de sticky radernas/barernas
+fond är OPAK och bär ingen egen text.
+
+**Test (per byggsten + per konsument):** byggstenen , komprimerat visar N, utfäll visar alla, sticky
+komprimera bor INUTI scroll-fönstret/baren och nås oavsett scroll, list-ARIA korrekt, fokus-återgång.
+Varje konsument , att den börjar komprimerad + fäller ut + behåller sina särdrag (egen rad markerad,
+inmatning bevarad, glidet kvar). jsdom saknar layout, så STRUKTUREN (sticky-klass + top-offset per läge)
+bevisas i test, den faktiska visuella stickyn i webbläsaren (`.vmshots/`). Negativ-kontroll på de nya
+beteende-testerna (mutera bort slicen/stickyn -> rött).
+
+**Varför:** ägaren gillade total-topplistans sticky kontroll-rad och ville ha den på alla långa listor.
+Rule-of-three uppfyllt (total + resultat + tips + per-rums), så mönstret bröts ut till EN husplats med två
+varianter, valda per lista efter dess tvång (virtualiserbar vs inmatnings-/glide-bunden), i stället för en
+parallell variant per vy. Källa: #173 T82 del 4, `src/components/collapsible-list/`.
+
 ### delad-modal-primitiv-agar-a11y-dialog-kontraktet-en-gang (React + motion, VM 2026)
 
 **Recept (EN primitiv som äger hela a11y-dialog-kontraktet, varje dialog behåller sin visuella identitet):**
@@ -1169,3 +1288,34 @@ Styling-slottarna + `children` bevarar varje dialogs distinkta visuella identite
 inline a11y-dialog ÄR nu `<Modal>`. Källa: T33 (#56), `src/components/Modal.tsx` (+ `Modal.test.tsx`),
 migrerade dialoger: `TeamProfilePanel` (T10), `OnboardingDialog` (T13), `SettingsControl` (T32),
 `ScoreGuide` (T34), `GetStartedDialog`/`GetStartedControl` (T54).
+
+### ren-planerare-plus-tunn-exekverare-med-dry-run-och-fore-efter-skydd (VM 2026)
+
+**Recept (ett skript som SKRIVER mot den delade DB:n , seeding, bulk-migrering, städning , utan att kunna
+röra riktig data av misstag):**
+
+1. **Dela i en REN PLANERARE och en TUNN EXEKVERARE.** Planeraren (`buildSeedPlan`, ingen I/O) tar
+   en ÖGONBLICKSBILD av DB-läget (read-only: vilka rum/rader finns) + indata och returnerar en PLAN
+   (vad som SKULLE skapas/ändras). Exekveraren gör bara I/O:t mot planen. ALL logik värd att testa
+   (antal, scopning, uteslutning av skyddad data, idempotens) bor i planeraren och enhetstestas mot
+   fixtures; exekveraren hålls dum. Källa: T82 (`src/data/bots/seed-plan.ts` + `scripts/seed-bots.ts`).
+2. **Dry-run är DEFAULT, skrivning kräver en explicit flagga.** Skriptet skriver INGET om man bara kör
+   det , det rapporterar planen (antal + stickprov). `--live`/`--teardown` krävs för att verkställa. Så
+   man kan aldrig RÅKA skriva. Dry-run kan dessutom planera mot en SYNTETISK snapshot om env saknas, så
+   planens FORM syns utan att röra DB:n alls.
+3. **Secrets ur ENV, fail loud om de saknas i skriv-läge.** service_role-nyckel + URL läses ur
+   `process.env` (aldrig committat), och `requireEnv` kastar med begriplig text om de saknas i
+   `--live`/`--teardown`. Inga secrets i koden (PRINCIPLES §7).
+4. **Uteslut skyddad data i PLANERAREN, inte bara i exekveraren.** Rader/rum som ALDRIG får röras (här
+   Rhodos-rummet) utesluts strukturellt i den rena planen (matchas på NAMN, aldrig på en gissad position),
+   och bevisas i testet (inget medlemskap/tips/nytt rum pekar någonsin dit). Så skyddet är testbart och
+   inte beroende av att exekveraren "kommer ihåg" det.
+5. **FÖRE/EFTER-skydd i skriv-läget.** Räkna RIKTIG (icke-bot/icke-mål) data FÖRE och EFTER körningen och
+   AVBRYT (kasta) om den ändrats. En bugg som mot förmodan rör riktig data fail-loud:ar i stället för att
+   tyst skada den. Idempotens dessutom på rad-nivå (upsert/onConflict + ett UNIQUE idempotens-ankare, här
+   `bot_accounts.persona_key`), så en omkörning aldrig dubblar.
+
+**Varför:** ett skript som skriver mot en DB med RIKTIGA användare är den farligaste kod-klassen i projektet.
+Genom att lägga all beslutslogik i en ren, testad planerare och hålla exekveraren tunn blir "vad händer?"
+bevisbart före en enda rad skrivs, och dry-run-default + env-gating + skyddad-data-uteslutning +
+före/efter-räkning gör att en oavsiktlig eller buggig körning inte kan skada riktig data tyst.

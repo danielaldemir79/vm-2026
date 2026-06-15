@@ -30,6 +30,7 @@ import { PredictionSection, PredictionsProvider } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
 import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
+import { TotalLeaderboardSection } from './features/total-leaderboard';
 import { FavoriteTeamProvider } from './features/favorite-team';
 import { AdminSection } from './features/admin';
 import {
@@ -394,6 +395,17 @@ function AppShell() {
               <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
             </Slide>
           </LeaderboardProvider>
+
+          {/* Den GLOBALA (cross-rum) topplistan (T82 del 3, #173): EN rankning av ALLA
+            deltagare (botar + riktiga) över ALLA rum, summan av varje deltagares poäng per
+            rum. "Din placering"-hjälten överst, pallen + "visa alla N" -> en virtualiserad,
+            sökbar full lista med "hoppa till mig". EGEN provider (TotalLeaderboardSection
+            äger den): till skillnad från den per-rums-topplistan ovan visas den ÄVEN i
+            DEMO/fixtures-läge, där den fylls med ~240 demo-deltagare (botar) , det validerar
+            UI:t + bot-datat visuellt. Live tänds samma kod mot Supabase (alla myRooms). */}
+          <Slide direction="up">
+            <TotalLeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
+          </Slide>
 
           <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
             {/* Footerns ledtext + appens SYNLIGA adress (T44, #75, Daniels feedback): appen

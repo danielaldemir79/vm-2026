@@ -45,4 +45,12 @@ export const SECTIONS = {
   groupPredictions: { id: 'group-predictions-heading', label: 'Grupp-tips', order: 60 },
   bracketPredictions: { id: 'bracket-predictions-heading', label: 'Mästare', order: 70 },
   leaderboard: { id: 'leaderboard-heading', label: 'Topplista', order: 80 },
+  // Den GLOBALA (cross-rum) topplistan (#173): i App.tsx MONTERAS <TotalLeaderboardSection>
+  // EFTER (fysiskt under) <LeaderboardSection> (per-rums, order 80), så dess order MÅSTE vara
+  // > 80 för att chip-raden ska spegla sid-ordningen. Tidigare 75 (semantisk närhet, "de två
+  // topplistorna ihop") gav en INVERTERAD chip-rad i live-läge: "Global" listades före
+  // "Topplista" men scrollade EFTER den, och scroll-spy:n hoppade baklänges (#173 T82 del 4-
+  // fix, F1). Reglen: order SPEGLAR monterings-ordningen, inte semantisk närhet. Det vaktas
+  // nu mekaniskt av section-order-mirrors-mount.test.ts.
+  totalLeaderboard: { id: 'total-leaderboard-heading', label: 'Global', order: 85 },
 } as const satisfies Record<string, SectionDescriptor>;

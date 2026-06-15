@@ -237,6 +237,40 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     });
   });
 
+  // #173 T82 del 4 (ägarens feedback "den där raden som följer med i listorna"): när
+  // resultat-listan (104 matcher) är UTFÄLLD ska den övre komprimera-kontrollen bli STICKY
+  // (följer med ner i listan), så KOMPRIMERA är ett tryck bort oavsett scroll-position. I
+  // KOMPRIMERAT läge (kort 3-dygnsfönster) är den en vanlig inline-kontroll (inget att följa
+  // med i). jsdom saknar layout, så vi bevisar STRUKTUREN (sticky-klassen + top-offset togglas
+  // per läge), inte den faktiska visuella stickyn (verifieras i webbläsaren, se .vmshots).
+  it('den övre komprimera-kontrollen blir STICKY (följer med) i UTFÄLLT läge, inline i komprimerat', async () => {
+    await renderView();
+    const bar = (): HTMLElement | null => document.querySelector('[data-results-toggle-bar]');
+
+    // KOMPRIMERAT: inte sticky (ingen lång lista att följa med i).
+    expect(bar()).not.toBeNull();
+    expect(bar()!.className).not.toContain('sticky');
+    expect(bar()!.hasAttribute('data-sticky')).toBe(false);
+
+    // Fäll ut -> baren blir sticky och pinnas under sajt-headern (top-16), så komprimera
+    // alltid är nåbar oavsett hur djupt man skrollat.
+    fireEvent.click(topToggle());
+    await waitFor(() => {
+      expect(bar()!.getAttribute('data-sticky')).toBe('true');
+    });
+    expect(bar()!.className).toContain('sticky');
+    expect(bar()!.className).toContain('top-16');
+    // Komprimera-kontrollen (ExpandToggle) bor INUTI den sticky baren, så den följer med.
+    expect(bar()!.querySelector('button[data-results-toggle-position="top"]')).not.toBeNull();
+
+    // Fäll ihop igen -> tillbaka till en vanlig inline-kontroll (ingen sticky).
+    fireEvent.click(topToggle());
+    await waitFor(() => {
+      expect(bar()!.hasAttribute('data-sticky')).toBe(false);
+    });
+    expect(bar()!.className).not.toContain('sticky');
+  });
+
   // Copilot R1, C2: ett kort UTANFÖR fönstret renderas (dolt med `hidden`), inte
   // bort-filtrerat, så dess lokala useState överlever en ihopfällning. Bevisar att
   // osparad inmatning INTE tappas när man fäller ihop och fäller ut igen.

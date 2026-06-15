@@ -26,6 +26,7 @@ import { useResultsStore } from './results-context';
 import { ResultEntryForm } from './ResultEntryForm';
 import { windowMatches } from './result-window';
 import type { ResultEntry } from './validate-result';
+import { StickyFollowToggle } from '../../components/collapsible-list';
 
 /** Bygg ett snabbt teamId -> Team-uppslag (en gång per lag-lista). */
 function indexTeams(teams: readonly Team[]): Map<string, Team> {
@@ -195,15 +196,25 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
           Den övre är dessutom fokus-MÅLET vid ihopfällning (se toggleExpanded), så
           användaren förs upp till listans topp. Syns bara när fönstret döljer något.
           Båda kontrollerna delar EN komponent (ExpandToggle), så deras semantik
-          (aria-expanded/-controls, etikett) aldrig kan drifta isär. */}
+          (aria-expanded/-controls, etikett) aldrig kan drifta isär.
+
+          STICKY "FÖLJ-MED"-KONTROLL i UTFÄLLT läge (#173 T82 del 4, ägarens feedback
+          "den där raden som följer med i listorna bör finnas på alla"): när listan är
+          utfälld (104 matcher = lång) klistrar den övre kontrollen direkt under sektions-
+          navet (--vm-section-nav-offset, samma offset rubrikerna rensar), så KOMPRIMERA
+          alltid är ett tryck bort oavsett hur djupt man skrollat , man behöver inte längre
+          skrolla tillbaka till listans topp. I KOMPRIMERAT läge (3-dygnsfönstret, kort) är
+          den en vanlig inline-kontroll (inget att följa med i). Den inre 3-dygns-
+          komprimeringen + hidden-bevarad inmatning är OFÖRÄNDRAD; bara kontrollens
+          klister-position ändras per läge (ren list-presentation, ingen inmatnings-/
+          validerings-logik rörd). data-results-sticky bär bara styling-/test-haken. */}
       {status === 'ready' && editable.length > 0 && hasHidden ? (
-        <ExpandToggle
+        <StickyFollowToggle
           expanded={expanded}
           hiddenCount={windowed.hiddenCount}
           controls={listId}
           onToggle={toggleExpanded}
           buttonRef={topToggleRef}
-          position="top"
           name="results"
         />
       ) : null}
@@ -245,7 +256,15 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
                   z-10 lägger den över korten (men under/jämsides headern, ingen
                   överlapp eftersom de inte delar y-rum). capitalize lyfter
                   veckodags-initialen. */}
-              <div className="sticky top-16 z-10 -mx-1 mb-3 bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] px-1 py-2 backdrop-blur-sm">
+              {/* I UTFÄLLT läge ligger en STICKY komprimera-bar ovanför listan (#173 T82 del 4),
+                  så dag-rubriken pinnas en bit LÄGRE (top-28) för att hamna UNDER baren i
+                  stället för bakom den. I komprimerat läge (ingen sticky bar) pinnar den som
+                  förr (top-16, precis under sajt-headern). */}
+              <div
+                className={`sticky z-10 -mx-1 mb-3 bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] px-1 py-2 backdrop-blur-sm ${
+                  expanded ? 'top-28' : 'top-16'
+                }`}
+              >
                 <h3
                   data-result-day-heading=""
                   className="flex items-center gap-2.5 font-display text-sm font-semibold capitalize tracking-tight text-fg"

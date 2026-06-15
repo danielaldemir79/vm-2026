@@ -12,7 +12,12 @@ export default tseslint.config(
   // runtime som deployas separat och INTE typas/lintas av app-grafen. De rena,
   // testbara bitarna bor i src/data/livescore/. Lintad här skulle Deno-importerna
   // + Deno.* flaggas falskt av browser/tseslint-konfigen.
-  { ignores: ['dist', 'dev-dist', 'coverage', 'supabase/functions'] },
+  //
+  // `.claude` är en git-ignorerad lokal katalog (se .gitignore) som kan innehålla
+  // hela repo-kopior i tillfälliga arbetsträd. Sådana lokala arbetsträd-kopior är
+  // aldrig en del av app-grafen och ska inte lintas , annars dubbel-flaggas koden i
+  // kopiorna (inkl. supabase/functions ovan, som bara ignoreras på rot-nivå).
+  { ignores: ['dist', 'dev-dist', 'coverage', 'supabase/functions', '.claude'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

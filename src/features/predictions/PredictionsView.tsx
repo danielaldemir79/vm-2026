@@ -16,6 +16,7 @@
 
 import { useId, useMemo, useRef, useState } from 'react';
 import { ExpandToggle } from '../../components/ExpandToggle';
+import { StickyFollowToggle } from '../../components/collapsible-list';
 import { ScoreGuide } from '../scoring-guide';
 import { useTodayKey } from '../daily';
 import { selectTodayMatches } from '../results/result-window';
@@ -250,16 +251,22 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
           toggle ALLTID nåbar utan att skrolla igenom en utfälld lista. Den övre är
           dessutom fokus-MÅLET vid ihopfällning (toggleExpanded), så användaren förs upp
           till listans topp. Syns bara när fönstret döljer något. Båda kontrollerna delar
-          EN komponent (ExpandToggle), så deras semantik aldrig kan drifta isär. */}
+          EN komponent (ExpandToggle), så deras semantik aldrig kan drifta isär.
+
+          STICKY "FÖLJ-MED" i UTFÄLLT läge (#173 T82 del 4, ägarens feedback): utfälld kan
+          tips-listan bli lång (alla kommande matcher), så den övre kontrollen klistrar då
+          under sajt-headern och följer med ner i listan , komprimera alltid ett tryck bort.
+          I komprimerat läge (dagens-fönstret, kort) en vanlig inline-kontroll. hidden-bevarad
+          inmatning + dagens-fönstret är oförändrade (samma StickyFollowToggle som resultat-
+          listan, EN sanning). */}
       {ready && predictable.length > 0 && hasHidden ? (
         <div className="mt-5">
-          <ExpandToggle
+          <StickyFollowToggle
             expanded={expanded}
             hiddenCount={windowed.hiddenCount}
             controls={listId}
             onToggle={toggleExpanded}
             buttonRef={topToggleRef}
-            position="top"
             name="predictions"
           />
         </div>

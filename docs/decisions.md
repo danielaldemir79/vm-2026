@@ -5,6 +5,254 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-15 , T82 del 4 (#173): "sticky kontroll-rad + börja-komprimerad" bruten till delad byggsten + applicerad på de långa listorna
+
+Ägaren gillade total-topplistans sticky kontroll-rad ("följer med i listan") + att listan börjar
+komprimerad, och ville ha SAMMA mönster på alla långa listor, samt att resultat-listan längst ned
+"börjar bli lång bör startas komprimerad med några resultat synliga".
+
+**Beslut 1: bryt ut mönstret till EN husplats med TVÅ varianter** (`src/components/collapsible-list/`),
+valda per lista efter dess tvång (rule-of-three uppfyllt: total + resultat + tips + per-rums):
+- **Virtualiserat scroll-fönster + inre sticky kontroll-rad** (`CollapsibleList`/`CollapsibleScrollList`,
+  + den FLYTTADE delade `use-virtual-rows`) för fristående rader. **Total-topplistan refaktorerades att
+  KONSUMERA den** , dess beteende + alla dess tester är OFÖRÄNDRADE (den var redan granskad).
+- **Sticky FÖLJ-MED-toggle** (`StickyFollowToggle`) för listor som INTE kan virtualiseras: dag-grupperade
+  resultat/tips (osparad inmatning bevaras via `hidden`, virtualisering skulle unmounta + tappa den) och
+  per-rums-topplistan (motion-layout-glidet kräver mountade rader). Den klistrar BARA komprimera-kontrollen
+  (top-16, under headern) i utfällt läge; fönster/inmatning/sortering oförändrade.
+
+**Beslut 2: resultat-listan + tips-listan får sticky FÖLJ-MED, inte ett scroll-fönster.** De "börjar redan
+komprimerade" (3-dygns- resp dagens-fönster, oförändrat); det nya är att den övre komprimera-kontrollen blir
+sticky i utfällt läge så den följer med ner i den långa listan. VIRTUALISERAS MEDVETET INTE: resultat-/tips-
+formulären håller osparad inmatning i lokal `useState` och bevaras via `hidden`-på-`<li>` , en virtualisering
+(som unmountar rader) skulle tappa den. Inmatning + validering rörda = noll (taskens hårda krav).
+
+**Beslut 3: per-rums-topplistan börjar komprimerad (topp-N) över en längd-tröskel, INTE virtualiserad.**
+Seedade rum kan ha ~200 deltagare (bot-seed-planen), så lång nog att tjäna på det. Men dess signatur är
+motion-layout-glidet (rader glider till ny plats vid poäng-ändring), som kräver mountade rader , därför
+slice:ar vi bara den renderade mängden (topp-N komprimerat, allt utfällt) och låter `AnimatePresence` sköta
+in/ut, ingen virtualisering. Korta rum (<= tröskeln) är OFÖRÄNDRADE (ingen toggle).
+
+**Medvetet ORÖRDA:** gruppspels-tips, slutspelsträd, scenarier, gruppspelstabellen och bracket-tips
+använder REDAN den delade höjd-klipp-primitiven (`CollapsibleSection`, T68) , de är RESPONSIVA grid/träd,
+inte platta rad-listor, så "sticky kontroll-rad som följer en lista" passar inte (höjd-klippet är rätt
+mönster för dem, och de börjar redan komprimerade). Kommentar-tråden har sin egen chat-/load-more-semantik.
+
+**Beslut 4 (F1, reviewer-fynd): nav-ordningen rättad + mekaniskt vaktad.** `totalLeaderboard.order` var 75
+men sektionen MONTERAS efter per-rums-topplistan (order 80), så chip-raden inverterades mot sidan i live-
+läge (Global listades före Topplista men scrollade efter den). Satt till **85** (speglar monterings-
+ordningen). Ett nytt test (`section-order-mirrors-mount.test.ts`) läser App.tsx, sorterar sektionerna på
+deras FAKTISKA mount-position och kräver strikt stigande `order`, så driften fångas mekaniskt framöver.
+
+Kontrast MÄTT i webbläsaren på renderad yta (båda teman): komprimera 15.2/17.9, sök-fält 12.7/17.9,
+resultat-bar-knapp 9.8/13.4 (alla >> 4.5). Visuellt verifierat i `.vmshots/` (total + resultat, komprimerad
++ sticky mitt i listan). Recept: `docs/patterns.md` (sticky-kontroll-rad-...-borja-komprimerad).
+
+## 2026-06-15 , Global topplista: sticky kontroll-rad (komprimera nåbar från alla scroll-lägen) (#173)
+
+UX-tillägg ovanpå T82 del 3. Ägaren testade UI:t och hittade en riktig miss: "Komprimera"-kontrollen
+satt bara OVANFÖR det utfällda scroll-fönstret, så stod man på plats ~100 i den utfällda listan tvingades
+man skrolla tillbaka till toppen för att fälla in den. Helt korrekt fynd.
+
+**Beslut: en STICKY kontroll-rad INUTI scroll-fönstret, inte en toggle ovanför det.** Sök-fältet,
+"Hoppa till mig" OCH en "Komprimera"-kontroll bor nu i en `position: sticky; top: 0`-rad högst upp i det
+scrollande fönstret (`.vm-total-controls`, tokens.css §26), så de FÖLJER MED när man bläddrar djupt i
+listan. Komprimera är därmed alltid ETT tryck bort, oavsett om man står på plats 3 eller 203. Den sticky
+raden har en OPAK surface-fond + hårfin nederkant + mjuk skugga, så raderna som skrollar under den aldrig
+lyser igenom eller flimrar (anti-jitter). Verifierat pinnat till fönstrets topp i ALLA bredder (280px
+vikbar cover -> 1920 ultrawide) + båda teman.
+
+**Varför sticky rad och INTE en flytande "Komprimera"-knapp:** appen har redan en flytande/diskret
+"Hoppa till mig", och en andra flytande knapp i samma hörn riskerar att krocka visuellt + skymma rader. En
+sticky kontroll-RAD samlar alla tre kontrollerna (sök/hoppa/komprimera) på ETT ställe som följer med,
+vilket är mindre visuellt brus och en tydligare mental modell ("kontrollerna sitter alltid överst i
+listan") än flytande knappar. På vikbar cover (~280px) WRAPPAR hoppa+komprimera till två full-bredds-pillar
+(flex-wrap + flex-1) så ingen knapp klipps; på sm+ sitter de inline.
+
+**Beslut: View duplicerar inte sin egen expand-toggle i utfällt läge.** I KOMPRIMERAT läge äger View:n
+"Visa alla N"-toggeln (med `aria-expanded`/`aria-controls`); i UTFÄLLT läge tar listans sticky
+"Komprimera" över som den kanoniska komprimera-kontrollen (samma `aria-controls`). Annars skulle View:ns
+toggle skrolla ur synhåll, vilket var hela problemet. Fokus återförs till "Visa alla N"-toggeln när listan
+komprimeras via den sticky kontrollen (en `useEffect` kör efter att toggeln åter-monterats), så ingen
+tangentbords-fokus tappas när den sticky kontrollen avmonteras.
+
+**A11y:** komprimera-kontrollen är en riktig `<button>` (tangentbords-nåbar, fokus-ring via befintlig
+`.vm-total-control:focus-visible`), bär `aria-expanded="true"` + `aria-controls="total-leaderboard-full"`,
+och kontrast på den faktiskt renderade sticky-raden uppmätt (knapp-etikett 15.24:1 mörkt / 17.91:1 ljust,
+getComputedStyle, inte mot hex). Ingen horisontell scroll vid 280px (scrollWidth 360 <= 375).
+
+---
+
+## 2026-06-15 , Total (cross-rum) topplista T82 del 3 (#173)
+
+Den GLOBALA topplistan: en enda rankning av ALLA deltagare (botar + riktiga) över ALLA rum, vid
+sidan av den befintliga per-rums-topplistan (T17). Bygger UI:t + demo-fixtures + wiringen ovanpå den
+redan testade aggregeringen (`aggregate-total.ts`, byggd i del 3 av tasken).
+
+**Beslut: aggregerings-regeln = SUMMA per rum, rangordna globalt.** En deltagares totala poäng =
+summan av deras poäng ÖVER ALLA rum de är medlem i. Vi räknar INTE poäng på nytt (DRY, en sanning):
+vi kör den befintliga, testade poäng-motorn (`buildLeaderboard`) PER RUM och summerar varje distinkt
+deltagares per-rums-totaler. Match-/grupp-/bracket-/mästar-reglerna, facit-mappningen och
+tiebreak-måttet (exakta träffar, sedan namn alfabetiskt; delad "1224"-rank vid lika poäng) ärvs
+oförändrade. **Varför summa per rum (inte sammanslagna tips-listor):** en deltagare kan vara med i
+flera rum och tippa SAMMA match i båda. Regeln är "summan över alla rum", så två rum ger poäng två
+gånger (en per rum). Att i stället slå ihop tips-arrayerna och poängsätta en gång skulle tappa det
+andra rummets bidrag (en match räknas en gång i `scoreMember`). N i "X:a av N" = antalet DISTINKTA
+deltagare i totalen (en deltagare i tre rum räknas EN gång i N, men får sina tre rums poäng
+summerade). Regeln + härledningen bor också som modul-doc överst i `aggregate-total.ts`.
+
+**Beslut: Rhodos (och alla andra rum) läses som vilket rum som helst, READ-only.** Aggregeringen rör
+ALDRIG data, den läser och summerar. Ingen tyst special-hantering av ett enskilt rum. Skulle en
+sådan regel behövas vore den explicit + dokumenterad här, inte gömd i summeringen. INGEN anledning
+funnen att special-hantera Rhodos i denna task (flaggas i handoff om det ändras).
+
+**Beslut: en EGEN `TotalLeaderboardProvider`, miljö-gatad, INTE en utökning av den per-rums
+`LeaderboardProvider`.** Per-rums-providern laddar bara DET AKTIVA rummets medlemmar + RLS-synliga
+tips; totalen behöver bidrag från ALLA `myRooms`. En egen provider håller den per-rums-vyn orörd
+(bryt inte T17) och bär totalens egna data-väg. I DEMO/fixtures-läge bygger den `RoomContribution[]`
+ur en deterministisk demo-fixturuppsättning (botar). I LIVE-läge skulle den hämta per-rums-tips för
+alla `myRooms` och bygga samma `RoomContribution[]`. **Ärlighet om live-vägen:** demo-vägen är den
+som visuellt + test-verifieras i denna task (off-season, inget live-backend). Live-hämtningen följer
+exakt samma per-rum-API:er som T17 redan använder (`listRoom*Predictions` + `listMembers`), så den
+tänds utan ny aggregerings-kod, men den live-grenen körs inte skarpt förrän VM och flera rum finns.
+
+**Beslut: DEMO-fixtures genereras ur bot-motorn (T82 del 1) mot ett DELVIS spelat facit.** För att
+totalen ska se FYLLD ut direkt (~240 deltagare med spridda poäng) i dev/demo genererar vi personas
+(`generatePersonas`) + tips (`generateBotPredictions`) mot ett facit där en del av gruppspelet
+markerats spelat. Botarna sprids över hela listan (capAccuracy 0.62 håller dem under en topp-spelare,
+T82 del 1). Fixtures uppfyller KÄLLANS schema-typer (`RoomMember`, `MemberPredictions` =
+`Prediction`/`GroupPrediction`/`BracketPrediction`), inte konsument-formen (lessons: fixtures mot
+källans schema, annars döljs mappnings-drift). Den DELADE, riktiga `derivePoolFacit` används för
+facit (samma form live väver in), så aggregeringen bevisas mot den riktiga skarven.
+
+**Beslut: virtualisering hand-rullad (ingen ny dependency).** Utfällt läge renderar 240+ rader som
+EN scroll men virtualiserad: bara synliga rader (+ overscan) ligger i DOM:en, mätt mot scroll-position
+och fast radhöjd. PRINCIPLES §11 (minimera beroenden, lägg inte till ett paket för något trivialt):
+fast-höjd-windowing är en liten, väl förstådd beräkning (scrollTop + viewport -> synligt index-spann),
+så vi skriver en fokuserad `useVirtualRows`-hook i stället för att dra in `@tanstack/react-virtual`.
+Egen rad + topp-3 ligger UTANFÖR det virtualiserade fönstret (alltid renderade), så "din placering"
+och pallen aldrig kan saknas ur DOM:en även om de skrollats förbi.
+
+**Beslut: placering = EGEN prominent sektion ("Global topplista") överst i tävlings-ytan.** Totalen
+får ett eget chip i sektions-navet (`SECTIONS.totalLeaderboard`) och renderas FÖRE den per-rums
+topplistan, men inom samma live-gate (syns bara i live-läge, som de andra sociala sektionerna).
+"Din placering"-hjälten överst i sektionen gör att den inloggade spelarens egen position aldrig är
+svår att hitta (ägarens uttryckliga krav). Egen rad är dessutom färg-OBEROENDE framhävd (accent-ring
++ "DU"-bricka + tint, återbrukar T17:s `.vm-board-row[data-self]`-recept) både i komprimerat och
+utfällt läge.
+
+---
+
+## 2026-06-15 , Bot-seedning T82 (#173): atmosfär-botar, datalager + säkert seed-skript
+
+Bygger datalagret + det säkra seed-skriptet för ~240 diskreta "atmosfär"-botar (del 1 av flera).
+Liv-lagret (kommentarer/reaktioner) är nästa task; persona-fälten för det definieras redan nu.
+
+**Beslut: fördelning ~240 botar = 200 (20 nya rum, ojämnt) + 35 ('VM 2026') + 5 ('Full Stack
+United', coola smeknamn).** Källa: Daniels bot-seeding-plan (memory `vm2026-bot-seeding-plan`,
+2026-06-15). New-room-botarna tippar ALLT inkl. spelade matcher (får poäng, sprids över hela
+topplistan); vm2026/fsu tippar bara kommande matcher (börjar på 0). Rhodos-rummet rörs ALDRIG.
+
+**Beslut: poäng-skiktningens TAK = capAccuracy 0.62 (konfigurerbart), floor 0.15.** Varför just ett
+tak under 1: en bot får ALDRIG kunna toppa topplistan (skulle döda tävlings-känslan mot riktiga
+vänner). 0.62 är satt under vad en stark riktig spelare rimligen når (~0.9 i referens-testet), och
+bevisas i predict.test.ts (60+ botar håller sig under en stark referens-spelare, topplistans 1:a är
+spelaren inte en bot). Skiktningen modelleras genom att, per poängsatt enhet, med sannolikhet
+`accuracy` (= skill_tier skalat in i [floor, cap]) kopiera FACIT, annars generera ett rimligt fel.
+Detta är MIN design (T82), inte en extern regel; poäng-VÄRDENA (3/1, grupp 3/2, bracket 1..5,
+mästare 20) återanvänds oförändrade ur den befintliga motorn (score.ts/bonus-score.ts), de gissas
+inte om.
+
+**Beslut: determinism via egen seedad PRNG (mulberry32).** Källa för algoritmen: mulberry32 (Tommy
+Ettinger, publik domän), inline-citerad i prng.ts. Vald för att seedningen ska vara reproducerbar
+(samma seed -> samma personas + tips), så en dry-run alltid matchar en senare live-körning och
+fördelningen kan testas. Medvetet INTE kryptografisk (ingen säkerhet hänger på oförutsägbarhet).
+
+**Beslut: idempotens-ankaret = `bot_accounts.persona_key` (UNIQUE).** Registret bot_accounts är
+hela seedningens ångerknapp (user_id FK -> auth.users ON DELETE CASCADE: radera kontot => cascade
+städar medlemskap + tips). persona_key (kohort#index, deterministisk) gör en omkörning idempotent
+(redan seedade personas hoppas över). RLS deny-all (ingen klient når registret), samma mönster som
+app_config (T80). Seed-skriptet: dry-run default, --live/--teardown bakom env (service_role aldrig
+committad), Rhodos uteslutet i den rena planeraren, och ett FÖRE/EFTER-skydd som räknar riktig
+(icke-bot) data och avbryter om den ändras. Byggaren kör aldrig live; koden är ändå körbar för ägaren.
+
+**Beslut (fix-pass): rumskoden för ett seedat rum härleds INJEKTIVT (bas-32-växling), inte via en
+siffer-bump.** rooms.code är UNIQUE (rooms_code_format `^[a-z2-9]{4,12}$`, T14-migrationen). Den
+första `roomCodeForIndex` byggde koden som `'liga' + String(index+22)` med en `<2 -> +2`-bump , den
+är INTE injektiv (index 8 och 10 gav båda `liga32`), så det 11:e rum-insertet hade kastat på UNIQUE
+mitt i en skarp körning. Fixen bas-växlar index till `ROOM_CODE_ALPHABET` (32 tecken, bijektion),
+noll-paddat till 3 tecken = 32^3 = 32 768 unika koder (`liga` + 3, längd 7, inom 4-12). Bor i
+`src/data/rooms/room-code.ts` (samma sanning som alfabetet, kan aldrig drifta), enhetstestat över
+hela domänen (alla N unika + format-regex, negativ-kontroll körd mot den gamla varianten -> rött).
+
+**Beslut (fix-pass): före/efter-skyddet räknar icke-bot-data SERVER-SIDE (RPC), inte via en
+NOT-IN-lista i URL:en.** Den första versionen fogade ~240 bot-UUID:er (~8,9 kB) i ett PostgREST
+`not in`-filter i GET-URL:en, nära/över URL-längd-taket , efter-räkningen (som körs EFTER
+skrivningarna) kunde då faila och lämna en halv-seedad DB. Fixen: en SECURITY DEFINER-RPC
+`count_non_bot_rows(p_table)` (migration `20260615140000_t82_count_non_bot_rows.sql`) som gör NOT-IN
+i SQL (`not exists`-subquery mot bot_accounts), så URL:en bär bara tabellnamnet. p_table allowlist:as
+till `room_members | predictions`, EXECUTE bara service_role (samma mönster som apply_auto_facit, T80).
+Skydds-BESLUTET (kasta vid ändrad räkning) bröts ut till en ren, enhetstestad funktion
+(`src/data/bots/seed-protection.ts`), så nätet bevisligen kan kasta (negativ-kontroll körd).
+
+**Beslut (fix-pass): Rhodos-vakten gjordes ÄKTA (kollar planen mot Rhodos id, kan faktiskt utlösa).**
+Den gamla `assertRhodosUntouched` jämförde `rhodos.name === VM2026_ROOM_NAME` , men `findRoomByName`
+hade redan matchat på namnet 'Rhodos', så jämförelsen var alltid falsk och vakten kunde ALDRIG kasta
+(PRINCIPLES §8: en fail-loud som inte kan faila är teater). Fixen kollar den FÄRDIGA planen: om Rhodos
+finns i snapshot:en, kasta om något planerat 'existing'-mål refererar Rhodos id. Finns Rhodos inte i
+snapshot:en är det en säker no-op (inget id att råka peka på). Negativ-kontroll körd (en plan som
+pekar på Rhodos id -> vakten kastar).
+
+## 2026-06-15 , Bot-liv-lagret T82 del 2 (#173): reaktioner + sparsamma kommentarer
+
+Liv-lagret som får sidan att kännas naturligt LEVANDE utan att spamma. Ägarens regel (HARD):
+kommenterar ibland, inte för mycket; blir en kommentar inte naturlig är det BÄTTRE att boten är tyst
+och bara reagerar. Reaktioner är primärt + billigt, kommentarer en sällsynt krydda.
+
+**Beslut: match-stämning (mood) härleds ENBART ur det facit faktiskt bär (ordinarie Scoreline).**
+`moodFromScoreline` (src/data/bots/match-mood.ts) klassar en spelad match som målfest / mållöst /
+oavgjort / rafflande / klar seger / knapp seger. Vi härleder MEDVETET INTE "skräll" (kräver
+odds/förväntan) eller "sen vinst" (kräver matchminut) , den datan finns inte i facit-formen
+(`PoolFacit.matches[i].actual = Scoreline`, derive-facit.ts), och att hitta på dem ur en ren siffra
+vore en gissning maskerad som fakta (lessons "lattgissad-domanregel-styr-otestad-gren"). Prioritets-
+ordningen (målfest före thriller osv.) är en VAL-invariant, testad med diskriminerande fixturer
+(en 4-3 = målfest, inte thriller) + negativ-kontroll (operator-mutation rödnar). Mood är EN sanning
+som både reaktions- och kommentar-genereringen läser (DRY).
+
+**Beslut: emoji-reaktioner styrs av mood + ton, ALLTID ur den kurerade 8-listan.** `generateBotReactions`
+(react.ts) väljer emoji ur en mood-palett (målfest -> ⚽/🎉, mållöst -> 🧊 osv.) med en liten ton-nyans,
+alltid ur klientens `REACTION_EMOJIS` (reactions-api.ts) som speglar DB:ns `room_reactions_emoji_allowed`
+-CHECK 1:1 (en sanning). Kadens via personans `reactionChance` (0..0.5), spritt (seed per index), en
+reaktion per (bot, match) = PK-invarianten. Kohort: new-room reagerar på SPELADE matcher (de var med),
+vm2026/fsu på KOMMANDE (de har inte sett facit) med en neutral "het match"-emoji 🔥.
+
+**Beslut: kommentarer är KURERADE svenska fraspooler per (mood, ton), med en TYSTHETS-DEFAULT.**
+Poolerna (comment-pools.ts) har FLERA varianter per (mood, ton) så texten varierar (inte mekaniska
+mallar som upprepas , det skulle se botigt ut). En bot kommenterar en spelad match bara om (a) den
+är new-room OCH (b) en dragning < `commentChance * COMMENT_SCALE` (0.35) faller , annars INGEN
+kommentar (boten är tyst). Sparsamheten är BEVISAD kvantitativt (en högt pratig bot kommenterar
+~5 % av matcherna, summan över alla botar < 15 % av taket) + tysthets-defaulten testad (lågbenägen
+bot i en mållös turnering = 0 kommentarer, med negativ-kontroll som rödnar). Det finns ingen extern
+"rätt" formulering att källåkra , poolerna är ett medvetet designval, inte en gissad regel.
+
+**Beslut: "svar mellan botar" approximeras som följd-fraser i samma match-tråd (schemat saknar svars-
+koppling).** room_comments har INGEN parent_id/reply-kolumn (bekräftat i migrationerna
+20260612103836_t66 + 20260613144345_t77: bara en nullable `match_id` som delar in i match-trådar,
+ingen rad-till-rad-referens). En bot kan alltså inte peka ett svar på en SPECIFIK kommentar. `planReplies`
+(comment.ts) lägger därför sparsamt en kort medhålls-fras i en tråd som REDAN har minst en ANNAN bots
+kommentar (en giltig befintlig konversation, aldrig ett svar i en tom/egen tråd), per rum (svar korsar
+aldrig rum). Ärlig avvägning: det läses som ett svar utan att vara en hård FK-länk. Vill vi senare ha
+äkta trådar krävs en parent_id-migration (ej i scope här).
+
+**Beslut: kommentar-idempotens via deterministisk id (room_comments saknar naturligt unik-index).**
+En bot kan ha flera kommentarer per match, så det finns ingen `(rum,bot,match)`-unikhet att upserta på.
+Exekvereraren (seed-bots.ts) härleder ett DETERMINISTISKT uuid (v5-stil SHA-1 över rum+bot+match+isReply
++body) och upsertar på `id`, så en omkörning byter raden i stället för att dubbla. Reaktioner upsertas på
+sin PK `(room_id,user_id,match_id)` (samma modell som klientens upsertMyReaction). Teardown städar båda
+via cascade (FK on delete cascade mot auth.users, verifierat i migrationerna). Rhodos-vakten utökad att
+täcka liv-lagret (reaktioner + kommentarer riktas också mot rum), negativ-kontroll körd: reaktions-/
+kommentar-grenen kan utlösa på egen hand (membership/prediction-grenen bortmuterad -> vakten kastar ändå).
+
 ## 2026-06-15 , Livescore pollare-v3: per-match-polling med fönster-gating (full rik data LIVE)
 
 Byter pollarens modell: en LIVE match får full rik data UNDER matchen (målskytt/assist/kort/

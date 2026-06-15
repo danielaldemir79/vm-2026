@@ -54,6 +54,41 @@ export type Database = {
         };
         Relationships: [];
       };
+      // T82 (#173): bot-register för seedning av tipsligan. RLS deny-all för anon/
+      // authenticated (bara service_role når raderna). persona_key är idempotens-
+      // ankaret (UNIQUE). user_id FK -> auth.users on delete cascade (ångra = radera
+      // auth.users-raden). Hand-tillagd för att spegla 20260615130000_t82_bot_accounts.sql
+      // (regenerera med generate_typescript_types när schemat nästa gång rörs).
+      bot_accounts: {
+        Row: {
+          cohort: string;
+          created_at: string;
+          display_name: string;
+          persona_key: string;
+          personality: string;
+          skill_tier: number;
+          user_id: string;
+        };
+        Insert: {
+          cohort: string;
+          created_at?: string;
+          display_name: string;
+          persona_key: string;
+          personality: string;
+          skill_tier: number;
+          user_id: string;
+        };
+        Update: {
+          cohort?: string;
+          created_at?: string;
+          display_name?: string;
+          persona_key?: string;
+          personality?: string;
+          skill_tier?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       // T16 (#16): bracket-/slutspels-tips (vem går vidare per slot + VM-vinnaren).
       bracket_predictions: {
         Row: {
@@ -587,6 +622,16 @@ export type Database = {
       // skriv nekas, andras tips dolda). Returns string | null, INTE string, av
       // exakt samma säkerhets-skäl som match_kickoff nedan.
       bracket_deadline_kickoff: { Args: { p_slot_id: string }; Returns: string | null };
+      // T82 (#173): räkna RIKTIGA (icke-bot) rader server-side för seedningens
+      // före/efter-skydd, utan en jätte-NOT-IN-lista i URL:en. p_table allowlist:as
+      // till 'room_members' | 'predictions' i SQL:en. SECURITY DEFINER, EXECUTE bara
+      // service_role. Hand-tillagd för att spegla
+      // 20260615140000_t82_count_non_bot_rows.sql (regenerera med
+      // generate_typescript_types när schemat nästa gång rörs).
+      count_non_bot_rows: {
+        Args: { p_table: 'room_members' | 'predictions' };
+        Returns: number;
+      };
       create_room: {
         Args: { p_code: string; p_display_name: string; p_name: string };
         Returns: {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generateRoomCode,
   normalizeRoomCode,
+  roomCodeForIndex,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
 } from './room-code';
@@ -60,6 +61,44 @@ describe('generateRoomCode', () => {
   it('fail loud:ar (kastar) för en längd ÖVER DB:ns maximum (13)', () => {
     // Randfall n+1 (över max).
     expect(() => generateRoomCode(13)).toThrow(/utanför tillåtet intervall/);
+  });
+});
+
+describe('roomCodeForIndex (deterministisk + UNIK, rooms.code är UNIQUE i DB)', () => {
+  it('ger en kod som matchar DB:ns format-constraint', () => {
+    expect(roomCodeForIndex(0)).toMatch(DB_CODE_PATTERN);
+    expect(roomCodeForIndex(19)).toMatch(DB_CODE_PATTERN);
+  });
+
+  it('är deterministisk (samma index -> samma kod)', () => {
+    expect(roomCodeForIndex(7)).toBe(roomCodeForIndex(7));
+  });
+
+  it('är INJEKTIV: alla koder över hela domänen är unika OCH formatgiltiga', () => {
+    // VAKTEN (F5): rooms.code är UNIQUE -> en icke-injektiv härledning kastar UNIQUE
+    // mitt i en skarp seed (den gamla siffer-bumpen gav bara 18 unika av 20: index
+    // 8&10 -> "liga32", 9&11 -> "liga33"). Vi genererar HELA index-rymden och kräver
+    // lika många unika koder som index. N >> de 20 rum T82 seedar, för marginal.
+    // NEGATIV-KONTROLL (bevisat manuellt): byts bas-växlingen mot den gamla
+    // String(index+22)+bump-varianten blir new Set(codes).size = 18 < 20 -> rött.
+    const N = 500;
+    const codes: string[] = [];
+    for (let i = 0; i < N; i++) {
+      const code = roomCodeForIndex(i);
+      expect(code).toMatch(DB_CODE_PATTERN);
+      codes.push(code);
+    }
+    expect(new Set(codes).size).toBe(N);
+  });
+
+  it('fail loud:ar för ett index utanför kodrymden (hellre stopp än tyst kollision)', () => {
+    // Övre randen: 32^3 = 32768 koder (index 0..32767). 32768 ryms inte i 3 tecken.
+    expect(() => roomCodeForIndex(ROOM_CODE_ALPHABET.length ** 3)).toThrow(/ryms inte/);
+  });
+
+  it('fail loud:ar för ett negativt eller icke-heltals-index', () => {
+    expect(() => roomCodeForIndex(-1)).toThrow(/icke-negativt heltal/);
+    expect(() => roomCodeForIndex(1.5)).toThrow(/icke-negativt heltal/);
   });
 });
 
