@@ -6,11 +6,22 @@
 // DANIELS DESIGN-SPEC (omdesign, kompakt + enhetlig, exakt följd):
 //   - DIREKT SYNLIGT på kortet: ställning + status/klocka (EN gång, överst), målskyttar
 //     (skytt på en rad, ASSIST på egen indenterad rad under), och kort (gul/röd). Inget mer.
-//   - MÅL: målskytt + lag-tillhörighet (lag-kod-bricka) på en rad; assisten på en EGEN,
-//     mindre, indenterad rad under, så raden läses snabbt och hierarkin är tydlig.
-//   - KORT (gul/röd): en FÄRGAD kort-ikon (gul = gul, röd = röd) + spelarnamn + lag-bricka.
-//     INGEN "gult kort"/"rött kort"-TEXT , färgen bär betydelsen. A11y bevaras: ikonen får
-//     en dold (sr-only) "gult kort"/"rött kort" så en skärmläsare ändå hör vilket kort.
+//   - FÖRLOPPET ÄR SPEGLAT (hemma vänster | borta höger): ett mål eller kort hamnar på
+//     den SIDA laget hör till, precis som statistik-panelen (hemma till vänster, borta
+//     till höger). Positionen i sig visar alltså laget, så man ser direkt vems händelse
+//     det är utan att läsa lag-koden. Minuten sitter i en central "spine" mellan sidorna,
+//     tydlig per rad. På mobil är varje rad fortfarande en spegel (vänster-block resp.
+//     höger-block runt minut-spinen), inte ett rörigt enkel-flöde.
+//   - MÅL: boll-ikon + målskytt på lagets sida (SIDAN bär lag-tillhörigheten, ingen kod-
+//     bricka på raden); assisten på en EGEN, mindre rad under skytten (på samma sida), så
+//     raden läses snabbt och hierarkin är tydlig.
+//   - KORT (gul/röd): en FÄRGAD kort-ikon (gul = gul, röd = röd) + spelarnamn på lagets
+//     sida (SIDAN bär laget). INGEN "gult kort"/"rött kort"-TEXT , färgen bär betydelsen.
+//     A11y bevaras: ikonen får en dold (sr-only) "gult kort"/"rött kort" så en skärmläsare
+//     ändå hör vilket kort.
+//   - LAG-KOD-BRICKAN (NED/JPN) lever kvar i BYTEN-blocket (expanderat, enkel-kolumn),
+//     där sidan inte speglas och brickan fortfarande hjälper, men inte på de speglade
+//     mål-/kort-raderna (positionen visar laget där, och brickan trängde namnet på mobil).
 //   - RESULTATET visas EN gång (överst). Ingen andra ställnings-visning någonstans.
 //   - "VISA MER" i ordning: (a) STATISTIK (hemma vänster | etikett | borta höger,
 //     jämförelse-staplar, UTAN kort-räkning , korten syns i förloppet), (b) LAGUPPSTÄLLNING,
@@ -32,6 +43,7 @@
 // minuten + namnen + den dolda kort-etiketten bär betydelsen, färgen är bara en cue.
 
 import { useId, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { LiveData, LiveLineup } from '../../data/livescore';
 import { ExpandToggle } from '../../components/ExpandToggle';
 import { useLiveClock } from './use-live-clock';
@@ -64,8 +76,9 @@ export interface LiveMatchCardProps {
    */
   homeApiId: number | null;
   /**
-   * Hemmalagets FIFA-landskod (t.ex. "NED"), för lag-tillhörighets-brickan på mål/kort.
-   * null -> ingen kod-bricka för hemma (en initial-fallback ur namnet används i stället).
+   * Hemmalagets FIFA-landskod (t.ex. "NED"), för lag-tillhörighets-brickan i BYTEN-blocket
+   * (mål-/kort-raderna bär laget via SIDAN i stället, ingen bricka där). null -> ingen
+   * kod-bricka för hemma (en initial-fallback ur namnet används i stället).
    */
   homeCode?: string | null;
   /** Bortalagets FIFA-landskod. null -> initial-fallback ur bortanamnet. */
@@ -192,12 +205,14 @@ export function LiveMatchCard({
         </span>
       </div>
 
-      {/* RAD 3 (KÄRNAN, alltid synlig): målskyttar (+ assist på egen rad) och kort.
-          Bytena ligger INTE här utan längst ned i "Visa mer" (Daniels ordning). Varje
-          lista visas bara om den har innehåll (en tidig 0-0 utan events ger ingen tom yta);
-          sektions-ORDNINGEN är alltid mål -> kort, så strukturen är enhetlig. */}
-      {goals.length > 0 ? <GoalList goals={goals} tagForSide={tagForSide} /> : null}
-      {cards.length > 0 ? <CardList cards={cards} tagForSide={tagForSide} /> : null}
+      {/* RAD 3 (KÄRNAN, alltid synlig): målskyttar (+ assist på egen rad) och kort,
+          SPEGLADE (hemma vänster | borta höger) runt en central minut-spine, så sidan
+          i sig visar laget , konsekvent med statistik-panelen. Bytena ligger INTE här
+          utan längst ned i "Visa mer" (Daniels ordning). Varje lista visas bara om den
+          har innehåll (en tidig 0-0 utan events ger ingen tom yta); sektions-ORDNINGEN
+          är alltid mål -> kort, så strukturen är enhetlig. */}
+      {goals.length > 0 ? <GoalList goals={goals} /> : null}
+      {cards.length > 0 ? <CardList cards={cards} /> : null}
 
       {/* "VISA MER": återbrukar den delade ExpandToggle (aria-expanded/-controls,
           fokus, chevron). Visas bara när det FINNS detaljer att fälla ut (ärligt
@@ -261,61 +276,136 @@ function TeamTag({ side, text }: { side: MatchSide; text: string }) {
 }
 
 /**
- * Mål-listan: en rad per mål med minut + lag-bricka + målskytt; ASSISTEN på en EGEN,
- * indenterad rad under (Daniels spec), så skytt och assist aldrig trängs på samma rad.
+ * En SPEGLAD händelse-rad (Daniels feedback): tre kolumner [hemma | minut-spine | borta].
+ * Innehållet (ikon + namn + lag-bricka) hamnar i HEMMA-kolumnen om side === 'home', annars
+ * i BORTA-kolumnen, så POSITIONEN visar laget , konsekvent med statistik-panelen (hemma
+ * vänster, borta höger). Den motsatta kolumnen är tom. Minuten sitter i en smal central
+ * spine, tydlig per rad. Hemma-innehållet läses inåt mot spinen (höger-ställt), borta utåt
+ * (vänster-ställt), så de två sidorna speglar varandra runt minuten. children är den
+ * sid-specifika kärnan (mål eller kort); `side` styr i vilken kolumn den hamnar + flödet.
+ *
+ * VARFÖR ett delat radskal: mål- och kort-raderna delar EXAKT samma spegel-geometri
+ * (grid + minut-spine + sido-placering), bara kärninnehållet skiljer (DRY, rule of three
+ * uppfyllt: två kallare nu, geometrin bor på ETT ställe). Mobil: grid:en behåller de tre
+ * kolumnerna även på smal bredd (1fr-kolumnerna krymper, minuten står fast), så raden är
+ * en spegel även på en vikbar telefon, aldrig ett hopträngt enkel-flöde.
  */
-function GoalList({
-  goals,
-  tagForSide,
+function MirroredEventRow({
+  side,
+  minute,
+  extra,
+  children,
 }: {
-  goals: readonly GoalEntry[];
-  tagForSide: (side: MatchSide) => string;
+  side: MatchSide;
+  minute: number;
+  extra: number | null;
+  children: ReactNode;
 }) {
+  // Hemma till vänster (justeras mot spinen, höger), borta till höger (justeras utåt,
+  // vänster). flex-row-reverse på hemma-sidan lägger ikonen ytterst och texten mot mitten,
+  // så de två sidorna är spegelbilder runt minut-spinen.
+  const isHome = side === 'home';
+  const cellClass = `flex min-w-0 items-baseline gap-2 text-sm ${
+    isHome ? 'flex-row-reverse text-right' : 'text-left'
+  }`;
+  return (
+    <div
+      data-live-event-side={side}
+      className="grid grid-cols-[1fr_auto_1fr] items-baseline gap-x-2"
+    >
+      {/* HEMMA-cellen (kolumn 1): innehåll bara på hemma-sidan, annars tom platshållare.
+          data-live-event-cell="home" är test-/design-haken så hemma-innehållet kan
+          bevisas ligga i VÄNSTER kolumn (spegel-layouten). */}
+      {isHome ? (
+        <div data-live-event-cell="home" className={cellClass}>
+          {children}
+        </div>
+      ) : (
+        <div aria-hidden="true" />
+      )}
+      {/* MINUT-SPINEN: alltid centrerad mellan sidorna, tydlig per rad. */}
+      <span className="shrink-0 px-1 text-center font-display text-xs font-bold tabular-nums text-fg-muted">
+        {formatEventMinute(minute, extra)}
+      </span>
+      {/* BORTA-cellen (kolumn 3): innehåll bara på borta-sidan, annars tom platshållare. */}
+      {isHome ? (
+        <div aria-hidden="true" />
+      ) : (
+        <div data-live-event-cell="away" className={cellClass}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Mål-listan: en SPEGLAD rad per mål (hemma vänster | borta höger) med boll-ikon +
+ * målskytt runt minut-spinen; ASSISTEN på en EGEN, mindre rad under skytten PÅ SAMMA SIDA
+ * (Daniels spec), så skytt och assist aldrig trängs på samma rad och hör tydligt ihop.
+ *
+ * INGEN lag-kod-bricka på raden längre: SIDAN (vänster = hemma, höger = borta) bär nu
+ * lag-tillhörigheten, precis som Daniels feedback ville (positionen visar laget). Att
+ * dessutom klämma in NED/JPN-brickan i den smala halvan tvingade namnet att radbryta
+ * ("Memphi / Depay") på mobil , så brickan är borttagen här för en ren, läsbar rad. Den
+ * finns kvar i byten-blocket (expanderat, enkel-kolumn, gott om plats) där den hjälper.
+ */
+function GoalList({ goals }: { goals: readonly GoalEntry[] }) {
   return (
     <ul data-live-goals="" className="flex flex-col gap-2">
-      {goals.map((g, i) => (
-        <li key={`${g.minute}-${g.scorer}-${i}`} data-live-goal="" data-live-goal-side={g.side}>
-          {/* Rad 1: ikon + minut + lag-bricka + skytt (+ ev. straff/självmål-markering). */}
-          <div className="flex items-baseline gap-2 text-sm">
-            <span aria-hidden="true" className="vm-live-icon-goal shrink-0 text-base leading-none">
-              ⚽
-            </span>
-            <span className="w-9 shrink-0 text-right font-display text-xs font-bold tabular-nums text-fg-muted">
-              {formatEventMinute(g.minute, g.extra)}
-            </span>
-            <TeamTag side={g.side} text={tagForSide(g.side)} />
-            <span className="min-w-0">
-              <span className="font-semibold">{g.scorer}</span>
-              {g.penalty ? <span className="text-fg-muted"> (str.)</span> : null}
-              {g.ownGoal ? <span className="text-fg-muted"> (självmål)</span> : null}
-            </span>
-          </div>
-          {/* Rad 2 (bara om assist finns): assisten, mindre + indenterad i linje med
-              skyttens namn (minut-bredd 2.25rem + ikon/lag-bricka-bredd) så hierarkin
-              läses i en blick. */}
-          {g.assist !== null ? (
-            <p data-live-goal-assist="" className="ml-[3.75rem] text-xs text-fg-muted">
-              assist: {g.assist}
-            </p>
-          ) : null}
-        </li>
-      ))}
+      {goals.map((g, i) => {
+        const isHome = g.side === 'home';
+        return (
+          <li
+            key={`${g.minute}-${g.scorer}-${i}`}
+            data-live-goal=""
+            data-live-goal-side={g.side}
+            className="flex flex-col gap-0.5"
+          >
+            {/* Skytte-raden, speglad: boll-ikon + skytt (+ ev. straff/självmål). */}
+            <MirroredEventRow side={g.side} minute={g.minute} extra={g.extra}>
+              <span
+                aria-hidden="true"
+                className="vm-live-icon-goal shrink-0 text-base leading-none"
+              >
+                ⚽
+              </span>
+              <span className="min-w-0">
+                <span className="font-semibold">{g.scorer}</span>
+                {g.penalty ? <span className="text-fg-muted"> (str.)</span> : null}
+                {g.ownGoal ? <span className="text-fg-muted"> (självmål)</span> : null}
+              </span>
+            </MirroredEventRow>
+            {/* Assist-raden (bara om assist finns): mindre + dämpad, på SAMMA sida som
+                skytten (hemma vänster / borta höger), så den hör tydligt ihop med målet.
+                Egen grid med samma tre kolumner så assisten linjerar under skyttens cell. */}
+            {g.assist !== null ? (
+              <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2">
+                <p
+                  data-live-goal-assist=""
+                  className={`text-xs text-fg-muted ${
+                    isHome ? 'text-right' : 'col-start-3 text-left'
+                  }`}
+                >
+                  assist: {g.assist}
+                </p>
+              </div>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
 /**
- * Kort-listan: minut + lag-bricka + en FÄRGAD kort-ikon (gul/röd) + spelare. INGEN
+ * Kort-listan: en SPEGLAD rad per kort (hemma vänster | borta höger) med en FÄRGAD kort-
+ * ikon (gul/röd) + spelare runt minut-spinen. SIDAN bär lag-tillhörigheten (ingen kod-
+ * bricka, samma motiv som mål-listan: positionen visar laget + håller raden ren). INGEN
  * "gult/rött kort"-text (färgen bär betydelsen); a11y bevaras via en dold (sr-only)
  * "gult kort"/"rött kort" på ikonen, så en skärmläsare ändå hör vilket kort det är.
  */
-function CardList({
-  cards,
-  tagForSide,
-}: {
-  cards: readonly CardEntry[];
-  tagForSide: (side: MatchSide) => string;
-}) {
+function CardList({ cards }: { cards: readonly CardEntry[] }) {
   return (
     <ul data-live-cards="" className="flex flex-col gap-2">
       {cards.map((c, i) => (
@@ -323,22 +413,20 @@ function CardList({
           key={`${c.minute}-${c.player}-${i}`}
           data-live-card-event=""
           data-live-card-color={c.color}
-          className="flex items-baseline gap-2 text-sm"
+          data-live-event-side={c.side}
         >
-          {/* Den färgade kort-ikonen. Färgen ÄR informationen (gul/röd); den dolda
-              etiketten ger samma besked till en skärmläsare (WCAG: inte enbart färg). */}
-          <span
-            className={`vm-live-card-pip shrink-0 self-center ${
-              c.color === 'red' ? 'vm-live-card-pip-red' : 'vm-live-card-pip-yellow'
-            }`}
-          >
-            <span className="sr-only">{c.color === 'red' ? 'rött kort' : 'gult kort'}</span>
-          </span>
-          <span className="w-9 shrink-0 text-right font-display text-xs font-bold tabular-nums text-fg-muted">
-            {formatEventMinute(c.minute, c.extra)}
-          </span>
-          <TeamTag side={c.side} text={tagForSide(c.side)} />
-          <span className="min-w-0 font-medium">{c.player}</span>
+          <MirroredEventRow side={c.side} minute={c.minute} extra={c.extra}>
+            {/* Den färgade kort-ikonen. Färgen ÄR informationen (gul/röd); den dolda
+                etiketten ger samma besked till en skärmläsare (WCAG: inte enbart färg). */}
+            <span
+              className={`vm-live-card-pip shrink-0 self-center ${
+                c.color === 'red' ? 'vm-live-card-pip-red' : 'vm-live-card-pip-yellow'
+              }`}
+            >
+              <span className="sr-only">{c.color === 'red' ? 'rött kort' : 'gult kort'}</span>
+            </span>
+            <span className="min-w-0 font-medium">{c.player}</span>
+          </MirroredEventRow>
         </li>
       ))}
     </ul>
