@@ -166,6 +166,42 @@ nästa mirror-funktion:
 Källa: pollare-v3 (`v3-mirror-parity.test.ts`, `live-window.ts` + `per-match-poll-plan.ts` + mirror i
 `_shared/livescore-core.ts`, decisions.md 2026-06-15).
 
+### genererad-edge-mirror-via-esbuild-bundle-nar-grafen-ar-stor-och-ren (VM 2026)
+
+**Recept (en edge-funktion behöver en STOR, ren domän-graf , för stor att hand-spegla utan drift):**
+
+När logiken edge-funktionen behöver är LITEN (några rena funktioner) räcker den hand-skrivna,
+synk-märkta mirror:n ovan. Men när grafen är STOR (T90: hela scoring-/facit-grafen ,
+`derivePoolFacit` + `compute-standings` + `derive-bracket` + FIFA-tiebreak + `buildTotalLeaderboard`,
+~3400 rader + den källåkrade statiska planen), är en hand-mirror en orimlig drift-yta. GENERERA den
+i stället:
+
+1. **Gör en TUNN, REN bundle-entrypoint i src** (`src/data/global-leaderboard/edge-entry.ts`) som
+   re-exporterar exakt den publika ytan edge-funktionen kallar + ev. inbäddad källåkrad data
+   (`EMBEDDED_STATIC_PLAN`). Använd DEEP imports (inte feature-barrels) , barrels re-exporterar
+   React-komponenter + CSS som annars bundlas in (verifiera med en trial-bundle: 0 React/CSS/node:).
+2. **GENERERA mirror:n med esbuild** (`scripts/generate-<core>.ts`, npm `gen:`-script via vite-node):
+   `build({ entryPoints:[entry], bundle:true, format:'esm', platform:'neutral', write:false })` ->
+   skriv `_shared/<core>.ts` med en `// GENERERAD , REDIGERA INTE`-banner + `@ts-nocheck`. Bundlingen
+   inlinear HELA grafen automatiskt , ingen rad skrivs för hand, alltså ingen hand-drift-yta.
+3. **Lägg den genererade filen i `.prettierignore`** (esbuild-output matchar inte prettier; det är ett
+   artefakt ingen redigerar). Paritet, inte formatering, är grinden.
+4. **VERIFIERA paritet behavioralt** (samma recept som hand-mirror:n, steg 3): ett node-env-test som
+   esbuild-BUNDLAR (a) den COMMITTADE mirror-filen och (b) src-entrypointen FÄRSKT, laddar båda via
+   `data:`-URL, och kör samma diskriminerande in->ut mot BÅDA + ett FÄRSK-vs-committad-fall (fångar en
+   glömd `npm run gen:`). Negativ-kontroll: mutera en konstant i den committade filen -> testet rödnar.
+5. **Edge-funktionen förblir TUNN** (`@ts-nocheck`, bara IO: läs DB sidindelat + gruppera + anropa den
+   bundlade rena funktionen + projicera till en SÄKER utåt-form). Inga domänregler i funktionen.
+
+**Varför:** en stor, ren, källhänvisad domän-graf får inte reimplementeras (SQL) eller hand-speglas
+(drift). En esbuild-bundle ur src ger "EN sanning" gratis , edge-funktionen kör bokstavligen samma
+kompilerade TS som klienten , och paritetstestet (committad bundle == färsk src-bundle) gör en glömd
+regenerering till ett CI-fel i stället för en prod-bugg. Skiljer sig från hand-mirror-receptet bara i
+HUR mirror:n produceras (genererad vs handskriven); välj generering när grafen är för stor att spegla
+för hand. Källa: T90 (#183) (`src/data/global-leaderboard/`, `scripts/generate-global-leaderboard-core.ts`,
+`supabase/functions/_shared/global-leaderboard-core.ts` + `global-leaderboard/index.ts`,
+`global-leaderboard-mirror-parity.test.ts`, decisions.md 2026-06-15 T90).
+
 ### server-harledd-dag-via-before-trigger-for-en-per-omgang-PK (Supabase, VM 2026)
 
 **Recept (upprätthåll "EN rad per användare och kalenderdag" STRUKTURELLT, oförfalskbart):**

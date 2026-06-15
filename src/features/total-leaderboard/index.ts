@@ -1,5 +1,6 @@
-// Publik yta för den TOTALA (cross-rum) topplistan (T82 del 3, #173). Konsumenter (App)
-// importerar härifrån så intern struktur kan ändras utan att bryta call-sites.
+// Publik yta för den GLOBALA (cross-rum) topplistan (T82 del 3, #173; RÄTTVIS + helt
+// global server-side i T90, #183). Konsumenter (App) importerar härifrån så intern struktur
+// kan ändras utan att bryta call-sites.
 
 export { TotalLeaderboardSection } from './TotalLeaderboardSection';
 export { TotalLeaderboardProvider } from './TotalLeaderboardProvider';
@@ -11,8 +12,8 @@ export {
   type TotalLeaderboardStatus,
 } from './total-leaderboard-context';
 
-// Ren aggregering (cross-rum-summering + rangordning + spelarens sammanfattning),
-// exporterad så den kan återanvändas/testas fristående.
+// Ren aggregering (RÄTTVIS: bästa rum per deltagare + global rangordning + spelarens
+// sammanfattning), exporterad så den kan återanvändas/testas fristående.
 export {
   buildTotalLeaderboard,
   deriveTotalSelfSummary,

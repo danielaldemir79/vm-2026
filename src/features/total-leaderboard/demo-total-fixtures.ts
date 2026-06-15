@@ -17,6 +17,11 @@
 //   4. Injicera den INLOGGADE spelaren (DEMO_SELF_USER_ID) i ett par rum med STARKA tips,
 //      så "din placering"-hjälten + den framhävda egna raden demoar sig själva högt upp.
 //
+// T90 (#183): demon kör den RÄTTVISA modellen (bästa rum, inte summa) via samma
+// buildTotalLeaderboard som live. Spelaren är med i flera rum med IDENTISKA tips just för
+// att DEMONSTRERA rättvisan: hen får sitt bästa enskilda rums poäng, inte en summa , antal
+// rum ger ingen fördel (demo-fixtures.test.ts bevisar seam-en mot live-modellen).
+//
 // FIXTURES MOT KÄLLANS SCHEMA (lessons, HARD): RoomMember + MemberPredictions =
 // Prediction/GroupPrediction/BracketPrediction är KÄLLANS typer (samma form
 // listRoom*-API:erna och rooms-lagret producerar live), inte en konsument-form, annars
@@ -186,8 +191,9 @@ export function buildDemoTotalContributions(): {
     predsByRoom.get(roomId)!.set(userId, memberPredictionsFor(userId, generated));
   }
 
-  // Injicera den inloggade spelaren i de två första demo-rummen (med i FLERA rum, så
-  // hjälten "med i N rum" + summan över rum demonstreras). Stark profil -> hög placering.
+  // Injicera den inloggade spelaren i de två första demo-rummen med IDENTISKA tips (med i
+  // FLERA rum, så RÄTTVISAN demonstreras: bästa rum, ingen rum-antals-fördel). Stark
+  // profil -> hög placering (1:a, bot-taket håller botar under).
   const selfPreds = buildSelfPredictions(playedMatches, facit);
   for (const roomId of ['demo-room-0', 'demo-room-1']) {
     ensureRoom(roomId);

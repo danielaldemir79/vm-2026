@@ -2,7 +2,12 @@
 //
 // Ägarens uttryckliga krav: den inloggade spelarens egen position ska ALDRIG vara svår
 // att hitta. Hjälten är därför det FÖRSTA, mest framträdande i sektionen: en stor
-// placerings-siffra ("2:a") + "av N", poängen, och hur många rum man räknas i.
+// placerings-siffra ("2:a") + "av N" + poängen.
+//
+// T90 (#183): "med i N rum"-kontexten BORTTAGEN. Under den RÄTTVISA modellen (bästa rum,
+// inte summa) ger antal rum INGEN fördel, så att visa rum-antalet bredvid placeringen vore
+// vilseledande (det antyder att rum-antalet påverkar poängen). Poängen ÄR deltagarens bästa
+// enskilda rum-resultat; vi visar bara placering + av N + poäng.
 //
 // FÄRG-OBEROENDE PREMIUM (lessons aa-...-varsta-fall): den stora placeringen står som
 // mörk/ljus ink på en SOLID accent-bricka (samma färg-oberoende solid-bricka-form som
@@ -12,8 +17,8 @@
 // glow:en sitter i ETT hörn och bär ingen text (motsatta-hörn-disciplinen, §17).
 //
 // SKÄRMLÄSARE: hela meningen läses i ord via en visuellt-gömd sammanfattning
-// (sr-only), så "andra plats av 240, 87 poäng, med i 3 rum" når en skärmläsar-användare
-// utan att tolka den visuella siffer-uppställningen. De synliga siffrorna är aria-hidden.
+// (sr-only), så "andra plats av 240, 87 poäng" når en skärmläsar-användare utan att tolka
+// den visuella siffer-uppställningen. De synliga siffrorna är aria-hidden.
 
 import type { TotalSelfSummary } from './aggregate-total';
 
@@ -30,10 +35,9 @@ function ordinalSuffix(rank: number): string {
 
 export function TotalSelfHero({ summary }: { summary: TotalSelfSummary }) {
   const ordinal = `${summary.rank}${ordinalSuffix(summary.rank)}`;
-  const roomLabel = summary.roomCount === 1 ? 'ett rum' : `${summary.roomCount} rum`;
   const spoken =
     `Din placering: ${ordinal} av ${summary.totalParticipants} deltagare, ` +
-    `${summary.points} poäng, du räknas i ${roomLabel}.`;
+    `${summary.points} poäng.`;
 
   return (
     <div
@@ -79,7 +83,7 @@ export function TotalSelfHero({ summary }: { summary: TotalSelfSummary }) {
           >
             {summary.points} poäng
           </span>
-          <span data-total-hero-rooms="">Räknas i {roomLabel}</span>
+          <span data-total-hero-best="">Ditt bästa rum</span>
         </p>
       </div>
     </div>

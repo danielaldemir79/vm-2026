@@ -7,8 +7,10 @@
 // + tint), ledaren = [data-leader] (guld-glow). Ingen ny färgkombination => ärver T17:s
 // uppmätta AA-värden (MIN 6.60:1 mörkt / 4.87:1 ljust, decisions.md T17-visuellt).
 //
-// SKILLNAD MOT T17-raden: en total-rad bär ETT EXTRA fält, "med i N rum"-kontexten
-// (roomCount), som en liten dämpad meta-text. Det är vad som gör totalen "total".
+// T90 (#183): "med i N rum"-meta-texten BORTTAGEN. Under den RÄTTVISA modellen (poäng =
+// deltagarens BÄSTA enskilda rum, inte summa) ger rum-antalet ingen fördel, så att visa det
+// per rad vore vilseledande. Raden bär nu bara placering + namn + poäng (deltagarens bästa
+// rum-resultat), samma form som per-rums-raden , det är just det som gör listan rättvis.
 
 import { MEDAL_CLASS } from './medal-class';
 import type { TotalLeaderboardEntry } from './aggregate-total';
@@ -32,8 +34,6 @@ export function TotalLeaderboardRow({
 }) {
   const isLeader = entry.rank === 1;
   const medalClass = MEDAL_CLASS[entry.rank];
-  // "Med i N rum": singular/plural korrekt svenskt. Bidrar bara med kontext, inte poäng.
-  const roomLabel = entry.roomCount === 1 ? '1 rum' : `${entry.roomCount} rum`;
 
   return (
     <div
@@ -60,16 +60,11 @@ export function TotalLeaderboardRow({
         {entry.rank}
       </span>
 
-      {/* Namn + "med i N rum"-meta. Namnet truncar (min-w-0), så det är det ENDA som
-          krymper när raden blir trång; brickan + poängen är shrink-0 SYSKON och kan
-          aldrig överlappa. Metan döljs på de allra smalaste skärmarna (sm:block) så
-          namnet får plats; placeringen + poängen bär ändå raden. */}
+      {/* Namn. Truncar (min-w-0), så det är det ENDA som krymper när raden blir trång;
+          brickan + poängen är shrink-0 SYSKON och kan aldrig överlappa. */}
       <span data-total-name-group="" className="flex min-w-0 flex-1 flex-col leading-tight">
         <span data-total-name="" className="truncate font-medium">
           {entry.displayName}
-        </span>
-        <span data-total-rooms="" className="hidden truncate text-xs text-fg-muted sm:block">
-          Med i {roomLabel}
         </span>
       </span>
 

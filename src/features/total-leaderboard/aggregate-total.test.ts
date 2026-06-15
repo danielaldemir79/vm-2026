@@ -1,8 +1,16 @@
-// Tester för den TOTALA (cross-rum) topplistans aggregering + rangordning (T82 del 3,
-// #173). FOKUS: en deltagares poäng SUMMERAS över ALLA rum, global rang är korrekt,
+// Tester för den GLOBALA (cross-rum) topplistans aggregering + rangordning (T90, #183,
+// RÄTTVIS modell). FOKUS: varje deltagare räknas EN gång på sin BÄSTA enskilda rum-poäng
+// (antal rum ger INGEN fördel , RÄTTVISE-regeln, ägarens fusk-fix), global rang är korrekt,
 // "X:a av N" räknar DISTINKTA deltagare, och edge: deltagare i 0/1/flera rum + delade
 // placeringar/tiebreak. Vi bevisar SKARVEN mot den RIKTIGA facit-formen (derivePoolFacit),
 // inte bara mot en handgjord PoolFacit-litteral (lessons: bevisa skarven, inte happy-path).
+//
+// NEGATIV-KONTROLL (befordrad regel "bevisa att testet faktiskt vaktar"): RÄTTVISE-testet
+// nedan är diskriminerande , under den GAMLA (buggiga) summa-regeln skulle en deltagare i
+// N rum få N gångers poäng, så testet skulle RÖDNA. Verifierat manuellt under bygget genom
+// att tillfälligt ändra isBetterRoom-valet till en summa (existing.points += entry.points);
+// testet "samma poäng i N rum som i 1 rum" rödnade då (6 != 3), och blev grönt igen när
+// best-room-regeln återställdes.
 
 import { describe, expect, it } from 'vitest';
 import type { RoomMember } from '../../data/rooms';
@@ -40,7 +48,7 @@ function room(
   };
 }
 
-/** En medlems tips: bara match-tips (räcker för poäng-summans logik). */
+/** En medlems tips: bara match-tips (räcker för poäng-logiken). */
 function matchPreds(
   userId: string,
   preds: ReadonlyArray<{ matchId: string; homeGoals: number; awayGoals: number }>
@@ -67,66 +75,114 @@ const FACIT: PoolFacit = {
 };
 
 const EXACT = { matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 }; // 3p
-const OUTCOME = { matchId: 'g-A-1', homeGoals: 3, awayGoals: 1 }; // rätt 1, 1p
+const OUTCOME = { matchId: 'g-A-1', homeGoals: 3, awayGoals: 1 }; // rätt 1X2, 1p
 const MISS = { matchId: 'g-A-1', homeGoals: 0, awayGoals: 2 }; // fel utfall, 0p
 
 /* ------------------------------------------------------------------ *
- * Summering över rum (kärnan).
+ * RÄTTVISA: antal rum ger INGEN fördel (kärnan i T90, ägarens fusk-fix).
  * ------------------------------------------------------------------ */
 
-describe('buildTotalLeaderboard, summa över ALLA rum', () => {
-  it('summerar en deltagares poäng från FLERA rum (samma match tippad i båda räknas i båda)', () => {
-    // u1 är med i två rum och tippar EXAKT (3p) i båda -> totalen ska bli 6, inte 3.
-    const rooms: RoomContribution[] = [
+describe('buildTotalLeaderboard, RÄTTVIS modell (bästa rum, ingen rum-antals-fördel)', () => {
+  it('en deltagare med IDENTISKA tips i N rum får SAMMA poäng som i 1 rum (diskriminerande mot summa-buggen)', () => {
+    // u1 tippar EXAKT (3p) i två rum. RÄTTVIST: global poäng = 3 (bästa rum), INTE 6 (summa).
+    // Detta är den befordrade negativ-kontrollens diskriminerande fall: under den GAMLA
+    // summa-regeln hade points blivit 6 -> testet rödnat. Best-room ger 3.
+    const twoRooms: RoomContribution[] = [
       room('r1', [{ member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) }]),
       room('r2', [{ member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) }]),
     ];
-    const total = buildTotalLeaderboard(rooms, FACIT);
-    expect(total).toHaveLength(1); // EN distinkt deltagare
-    expect(total[0]).toMatchObject({ userId: 'u1', points: 6, roomCount: 2 });
-  });
-
-  it('rangordnar deltagare GLOBALT på den summerade totalen', () => {
-    // u1: 3p (ett rum). u2: 1p+1p = 2p (två rum). u3: 3p (ett rum).
-    const rooms: RoomContribution[] = [
-      room('r1', [
-        { member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) },
-        { member: member('u2', 'Bob'), preds: matchPreds('u2', [OUTCOME]) },
-      ]),
-      room('r2', [
-        { member: member('u2', 'Bob'), preds: matchPreds('u2', [OUTCOME]) },
-        { member: member('u3', 'Cara'), preds: matchPreds('u3', [EXACT]) },
-      ]),
+    const oneRoom: RoomContribution[] = [
+      room('r1', [{ member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) }]),
     ];
-    const total = buildTotalLeaderboard(rooms, FACIT);
-    // u1 (3p) och u3 (3p) delar topp, u2 (2p) sist.
-    expect(total.map((e) => [e.userId, e.points, e.rank])).toEqual([
-      ['u1', 3, 1], // alfabetiskt före u3 vid lika poäng+exactHits (tiebreak: namn)
-      ['u3', 3, 1], // delad 1:a
-      ['u2', 2, 3], // 1224-stil: nästa distinkta poäng hoppar till absolut position 3
-    ]);
+    const totalTwo = buildTotalLeaderboard(twoRooms, FACIT);
+    const totalOne = buildTotalLeaderboard(oneRoom, FACIT);
+    expect(totalTwo).toHaveLength(1); // EN distinkt deltagare, oavsett rum-antal
+    expect(totalTwo[0]).toMatchObject({ userId: 'u1', points: 3, exactHits: 1 });
+    // Samma poäng som i ett enda rum , antal rum gav ingen fördel.
+    expect(totalTwo[0].points).toBe(totalOne[0].points);
   });
 
-  it('räknar exactHits summerat över rum (tiebreak-måttet ärvs)', () => {
-    // u1: exakt i två rum -> 6p, 2 exactHits. u2: exakt + outcome -> 4p.
+  it('väljer det BÄSTA rummet när en deltagare presterar olika i olika rum', () => {
+    // u1: miss (0p) i r1, exakt (3p) i r2 -> global = 3 (bästa). u2: outcome (1p) i ett rum.
     const rooms: RoomContribution[] = [
-      room('r1', [
-        { member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) },
-        { member: member('u2', 'Bob'), preds: matchPreds('u2', [EXACT]) },
-      ]),
+      room('r1', [{ member: member('u1', 'Alice'), preds: matchPreds('u1', [MISS]) }]),
       room('r2', [
         { member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) },
         { member: member('u2', 'Bob'), preds: matchPreds('u2', [OUTCOME]) },
       ]),
     ];
     const total = buildTotalLeaderboard(rooms, FACIT);
-    expect(total[0]).toMatchObject({ userId: 'u1', points: 6, exactHits: 2 });
-    expect(total[1]).toMatchObject({ userId: 'u2', points: 4, exactHits: 1 });
+    expect(total.find((e) => e.userId === 'u1')).toMatchObject({ points: 3, exactHits: 1 });
+    expect(total.find((e) => e.userId === 'u2')).toMatchObject({ points: 1 });
+  });
+
+  it('bästa rum bryts på fler EXAKTA träffar vid lika poäng (samma kvalitets-prioritet som rangordningen)', () => {
+    // Facit: tre avgjorda matcher. I r1 tippar u1 3 x rätt utfall (1+1+1 = 3p, 0 exakta).
+    // I r2 tippar u1 1 x exakt + 0 på resten (3p, 1 exakt). Samma poäng (3) i båda rummen,
+    // men r2 har fler exakta -> "bästa rum" ska välja r2 (exactHits 1), inte r1 (exactHits 0).
+    const matchFacit: PoolFacit = {
+      matches: [
+        { matchId: 'g-A-1', actual: { homeGoals: 2, awayGoals: 1 } },
+        { matchId: 'g-A-2', actual: { homeGoals: 1, awayGoals: 0 } },
+        { matchId: 'g-A-3', actual: { homeGoals: 0, awayGoals: 0 } },
+      ],
+      groups: [],
+      bracketSlots: [],
+      champion: null,
+    };
+    const rooms: RoomContribution[] = [
+      room('r1', [
+        {
+          member: member('u1', 'Alice'),
+          preds: matchPreds('u1', [
+            { matchId: 'g-A-1', homeGoals: 5, awayGoals: 1 }, // rätt utfall (home), ej exakt
+            { matchId: 'g-A-2', homeGoals: 4, awayGoals: 0 }, // rätt utfall (home), ej exakt
+            { matchId: 'g-A-3', homeGoals: 2, awayGoals: 2 }, // rätt utfall (draw), ej exakt
+          ]),
+        },
+      ]),
+      room('r2', [
+        {
+          member: member('u1', 'Alice'),
+          preds: matchPreds('u1', [{ matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 }]), // exakt
+        },
+      ]),
+    ];
+    const total = buildTotalLeaderboard(rooms, matchFacit);
+    // Bästa rum = r2: samma 3p men 1 exakt (mot r1:s 0). Global rad bär exactHits 1.
+    expect(total[0]).toMatchObject({ userId: 'u1', points: 3, exactHits: 1 });
   });
 });
 
 /* ------------------------------------------------------------------ *
- * Tiebreak vid HELT lika (poäng + exactHits) -> alfabetiskt namn.
+ * Global rangordning på bästa-rum-poängen.
+ * ------------------------------------------------------------------ */
+
+describe('buildTotalLeaderboard, global rangordning', () => {
+  it('rangordnar deltagare GLOBALT på bästa-rum-poängen, delad rank vid lika', () => {
+    // u1: 3p (bästa rum). u2: 1p (bästa). u3: 3p (bästa).
+    const rooms: RoomContribution[] = [
+      room('r1', [
+        { member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) },
+        { member: member('u2', 'Bob'), preds: matchPreds('u2', [OUTCOME]) },
+      ]),
+      room('r2', [
+        { member: member('u2', 'Bob'), preds: matchPreds('u2', [MISS]) }, // sämre rum, ignoreras
+        { member: member('u3', 'Cara'), preds: matchPreds('u3', [EXACT]) },
+      ]),
+    ];
+    const total = buildTotalLeaderboard(rooms, FACIT);
+    // u1 (3p) och u3 (3p) delar topp (alfabetiskt Alice före Cara), u2 (1p) sist på pos 3.
+    expect(total.map((e) => [e.userId, e.points, e.rank])).toEqual([
+      ['u1', 3, 1],
+      ['u3', 3, 1],
+      ['u2', 1, 3], // 1224-stil: två 1:or -> nästa distinkta poäng på absolut position 3
+    ]);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Tiebreak vid HELT lika (poäng + exactHits) -> alfabetiskt namn, DELAD rank.
  * ------------------------------------------------------------------ */
 
 describe('buildTotalLeaderboard, tiebreak + delad placering', () => {
@@ -138,7 +194,6 @@ describe('buildTotalLeaderboard, tiebreak + delad placering', () => {
       ]),
     ];
     const total = buildTotalLeaderboard(rooms, FACIT);
-    // Båda 3p + 1 exactHit -> samma rank 1, alfabetisk ordning Ann före Zeb.
     expect(total.map((e) => [e.displayName, e.rank])).toEqual([
       ['Ann', 1],
       ['Zeb', 1],
@@ -146,8 +201,6 @@ describe('buildTotalLeaderboard, tiebreak + delad placering', () => {
   });
 
   it('fler exactHits bryter sorterings-ordningen men inte den delade poäng-ranken', () => {
-    // Konstruera lika TOTAL men olika exactHits: omöjligt med en match, så använd en
-    // deltagare med outcome x3 (3p, 0 exactHits) mot en med exakt x1 (3p, 1 exactHit).
     const matchFacit: PoolFacit = {
       matches: [
         { matchId: 'g-A-1', actual: { homeGoals: 2, awayGoals: 1 } },
@@ -170,7 +223,7 @@ describe('buildTotalLeaderboard, tiebreak + delad placering', () => {
           ]),
         },
         {
-          // 1 x exakt (3p, 1 exakt), inget på de andra.
+          // 1 x exakt (3p, 1 exakt).
           member: member('uEx', 'Ex'),
           preds: matchPreds('uEx', [{ matchId: 'g-A-1', homeGoals: 2, awayGoals: 1 }]),
         },
@@ -201,10 +254,10 @@ describe('buildTotalLeaderboard, edge-fall', () => {
     ];
     const total = buildTotalLeaderboard(rooms, FACIT);
     expect(total).toHaveLength(1);
-    expect(total[0]).toMatchObject({ userId: 'u1', roomCount: 1 });
+    expect(total[0]).toMatchObject({ userId: 'u1', points: 3 });
   });
 
-  it('en medlem UTAN tips räknas (0p) och med i N', () => {
+  it('en medlem UTAN tips räknas (0p) och finns i listan', () => {
     const rooms: RoomContribution[] = [
       room('r1', [
         { member: member('u1', 'Alice'), preds: matchPreds('u1', [EXACT]) },
@@ -213,14 +266,16 @@ describe('buildTotalLeaderboard, edge-fall', () => {
     ];
     const total = buildTotalLeaderboard(rooms, FACIT);
     expect(total).toHaveLength(2);
-    expect(total.find((e) => e.userId === 'u2')).toMatchObject({ points: 0, roomCount: 1 });
+    expect(total.find((e) => e.userId === 'u2')).toMatchObject({ points: 0 });
   });
 
-  it('en miss-tippare får 0p men finns kvar i totalen', () => {
+  it('en deltagare med 0p i ALLA sina rum finns kvar (bästa rum = 0p)', () => {
     const rooms: RoomContribution[] = [
       room('r1', [{ member: member('u1', 'Alice'), preds: matchPreds('u1', [MISS]) }]),
+      room('r2', [{ member: member('u1', 'Alice'), preds: matchPreds('u1', [MISS]) }]),
     ];
     const total = buildTotalLeaderboard(rooms, FACIT);
+    expect(total).toHaveLength(1);
     expect(total[0]).toMatchObject({ userId: 'u1', points: 0 });
   });
 });
@@ -230,21 +285,21 @@ describe('buildTotalLeaderboard, edge-fall', () => {
  * ------------------------------------------------------------------ */
 
 describe('deriveTotalSelfSummary', () => {
-  it('ger rätt rang + total + N (distinkta deltagare) för en deltagare i flera rum', () => {
+  it('ger rätt rang + bästa-rum-poäng + N (distinkta deltagare) för en deltagare i flera rum', () => {
     const rooms: RoomContribution[] = [
       room('r1', [
-        { member: member('me', 'Daniel'), preds: matchPreds('me', [EXACT]) },
+        { member: member('me', 'Daniel'), preds: matchPreds('me', [EXACT]) }, // 3p (bästa)
         { member: member('u2', 'Bob'), preds: matchPreds('u2', [OUTCOME]) },
       ]),
       room('r2', [
-        { member: member('me', 'Daniel'), preds: matchPreds('me', [OUTCOME]) },
+        { member: member('me', 'Daniel'), preds: matchPreds('me', [OUTCOME]) }, // 1p (sämre)
         { member: member('u3', 'Cara'), preds: matchPreds('u3', [MISS]) },
       ]),
     ];
     const total = buildTotalLeaderboard(rooms, FACIT);
     const summary = deriveTotalSelfSummary(total, 'me');
-    // me: 3 + 1 = 4p, klar 1:a. N = 3 distinkta (me, u2, u3). roomCount 2.
-    expect(summary).toEqual({ points: 4, rank: 1, totalParticipants: 3, roomCount: 2 });
+    // me: bästa rum = 3p, klar 1:a. N = 3 distinkta (me, u2, u3). Ingen roomCount längre.
+    expect(summary).toEqual({ points: 3, rank: 1, totalParticipants: 3 });
   });
 
   it('null utan känd identitet', () => {
@@ -271,10 +326,7 @@ describe('deriveTotalSelfSummary', () => {
  * ------------------------------------------------------------------ */
 
 describe('buildTotalLeaderboard mot derivePoolFacit (riktig facit-form)', () => {
-  it('summerar match-poäng cross-rum mot ett facit härlett ur en spelad match', () => {
-    // Återanvänd den RIKTIGA matchplanen (fixtureMatches) och markera den FÖRSTA
-    // grupp-A-matchen som avgjord 2-1. Då härleds facit ur den verkliga matchformen
-    // (samma form live-datan väver in), inte ur en handgjord litteral.
+  it('väljer bästa rum-poäng cross-rum mot ett facit härlett ur en spelad match', () => {
     const first = fixtureMatches.find((m) => m.id === 'g-A-1');
     expect(first).toBeDefined();
     const finished: Match = {
@@ -283,7 +335,7 @@ describe('buildTotalLeaderboard mot derivePoolFacit (riktig facit-form)', () => 
       result: { homeGoals: 2, awayGoals: 1 },
     };
     const facit = derivePoolFacit(fixtureTeams, [], [finished]);
-    // Två rum: me tippar exakt i båda (3 + 3 = 6); en bot tippar fel (0p).
+    // me tippar exakt i båda rummen -> bästa rum = 3p (INTE 6, ingen summa). bot tippar fel.
     const rooms: RoomContribution[] = [
       room('r1', [
         {
@@ -303,7 +355,7 @@ describe('buildTotalLeaderboard mot derivePoolFacit (riktig facit-form)', () => 
       ]),
     ];
     const total = buildTotalLeaderboard(rooms, facit);
-    expect(total[0]).toMatchObject({ userId: 'me', points: 6, roomCount: 2 });
-    expect(total.find((e) => e.userId === 'bot1')).toMatchObject({ points: 0, roomCount: 1 });
+    expect(total.find((e) => e.userId === 'me')).toMatchObject({ points: 3 });
+    expect(total.find((e) => e.userId === 'bot1')).toMatchObject({ points: 0 });
   });
 });
