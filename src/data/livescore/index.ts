@@ -76,6 +76,17 @@ export {
 } from './live-events-read';
 export type { LiveMatchEvents } from './live-events-read';
 
+// T88: parallellt lättviktigt cross-match-STATISTICS-läs-lager (smalt SELECT match_id+
+// statistics, för turneringsstatistikens lag-aggregat: bollinnehav/skott/fouls över ALLA
+// matcher utan de tunga events/lineups-blobbarna). Spegelbild av live-events-read.
+export {
+  getLiveStats,
+  listLiveStats,
+  projectLiveStats,
+  fixtureLiveStatsData,
+} from './live-stats-read';
+export type { LiveMatchStats } from './live-stats-read';
+
 // Bit 3a: realtids-prenumeration på match_live_data + klock-brygga (re-sync mot push).
 export { liveClockFor, liveDataSubscription, MATCH_LIVE_DATA_TABLE } from './live-realtime';
 
