@@ -261,7 +261,7 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
           Matcher
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="dagens-matcher-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+          <h2 id="dagens-matcher-rubrik" className="font-display text-xl font-semibold sm:text-2xl">
             Dagens matcher
           </h2>
           {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}

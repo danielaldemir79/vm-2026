@@ -35,7 +35,7 @@ export function FavoriteTeamSection({ surface }: FavoriteTeamSectionProps) {
         <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
           Inställning
         </p>
-        <h2 className="font-display text-xl font-bold sm:text-2xl">Favoritlag</h2>
+        <h2 className="font-display text-xl font-semibold sm:text-2xl">Favoritlag</h2>
       </header>
       <FavoriteTeamPicker teams={teams} />
     </section>

@@ -44,7 +44,7 @@ function SectionHeader() {
       <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
         Notiser
       </p>
-      <h2 className="font-display text-xl font-bold sm:text-2xl">Mål-notiser</h2>
+      <h2 className="font-display text-xl font-semibold sm:text-2xl">Mål-notiser</h2>
       <p className="text-sm text-fg-muted">
         Få en pling på mobilen när det blir mål i matcherna du följer.
       </p>
