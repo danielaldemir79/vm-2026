@@ -21,6 +21,7 @@
 // den visuella siffer-uppställningen. De synliga siffrorna är aria-hidden.
 
 import type { TotalSelfSummary } from './aggregate-total';
+import type { SelfRankChange } from './self-rank-snapshot';
 
 /** Svensk ordningstalsändelse: 1:a/2:a ... men 11:e/12:e. Liten språklig finish. */
 function ordinalSuffix(rank: number): string {
@@ -33,7 +34,43 @@ function ordinalSuffix(rank: number): string {
   return last === 1 || last === 2 ? ':a' : ':e';
 }
 
-export function TotalSelfHero({ summary }: { summary: TotalSelfSummary }) {
+/**
+ * "DIN FÖRÄNDRING"-indikatorn (T92 del C): en FÄRG-OBEROENDE rank-rörelse sedan ditt senaste
+ * besök. Pil-FORMEN (▲/▼) + antalet bär betydelsen, färgen förstärker bara (WCAG 1.4.1). Visas
+ * bara vid en faktisk rörelse (up/down); 'new' (första besöket) och 'same' visar inget , vi
+ * pratar aldrig om en rörelse som inte hänt. En sr-only-mening ger skärmläsaren orden.
+ */
+function RankChangeIndicator({ change }: { change: SelfRankChange }) {
+  if (change.direction !== 'up' && change.direction !== 'down') {
+    return null;
+  }
+  const up = change.direction === 'up';
+  const word = up
+    ? `Upp ${change.delta} sedan ditt senaste besök`
+    : `Ner ${change.delta} sedan ditt senaste besök`;
+  return (
+    <span
+      data-total-hero-change=""
+      data-direction={change.direction}
+      className={`vm-total-hero-change inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-semibold tabular-nums ${
+        up ? 'vm-total-hero-change--up' : 'vm-total-hero-change--down'
+      }`}
+    >
+      <span aria-hidden="true">{up ? '▲' : '▼'}</span>
+      <span aria-hidden="true">{change.delta}</span>
+      <span className="sr-only">{word}</span>
+    </span>
+  );
+}
+
+export function TotalSelfHero({
+  summary,
+  change = null,
+}: {
+  summary: TotalSelfSummary;
+  /** Rank-förändring sedan senaste besök (T92 del C), eller null = visa ingen indikator. */
+  change?: SelfRankChange | null;
+}) {
   const ordinal = `${summary.rank}${ordinalSuffix(summary.rank)}`;
   const spoken =
     `Din placering: ${ordinal} av ${summary.totalParticipants} deltagare, ` +
@@ -75,6 +112,8 @@ export function TotalSelfHero({ summary }: { summary: TotalSelfSummary }) {
           <span className="font-display text-sm font-medium text-fg-muted">
             av {summary.totalParticipants}
           </span>
+          {/* DIN FÖRÄNDRING (del C): rank-rörelse sedan senaste besök, bara vid faktisk rörelse. */}
+          {change !== null ? <RankChangeIndicator change={change} /> : null}
         </p>
         <p className="m-0 flex flex-wrap items-baseline gap-x-3 text-sm text-fg-muted">
           <span

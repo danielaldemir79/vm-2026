@@ -1457,6 +1457,51 @@ body {
   border-left: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
+/* KOMPAKT AVSLÖJANDE-RAD (T92 del D): en klickbar matchrad i den paginerade "vad alla
+   tippade"-listan i Tips-fliken. Hela raden är en knapp (drill-in till matchvyn). En diskret
+   surface-yta + hårfin border; hover/focus tänder en accent-kant + lyfter ytan (samma
+   färg-only-hover-affordans som .vm-collapsible-control, bryter ingen reduced-motion).
+   Bär fg-text på opak surface (README-mätt fg-par), så raden sänker ingen text-kontrast. */
+.vm-reveal-row-button {
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-reveal-row-button {
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease;
+  }
+}
+
+.vm-reveal-row-button:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background-color: var(--color-surface-raised);
+}
+
+.vm-reveal-row-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* EGEN RAD (T92 del E): tippade DU matchen får raden samma färg-OBEROENDE accent-ring + svaga
+   accent-tint som topplistans egen rad (.vm-board-row[data-self]), så "det här är jag" är
+   konsekvent över ALLA listor (topplista, global, avslöjande). Markeringen sitter på <li>:n
+   (data-self), ringen läggs på knappen inuti via box-shadow. DU-brickan (.vm-board-self-badge,
+   återanvänd) bär samma signal som TEXT (färg-oberoende redundans). */
+.vm-reveal-row[data-self='true'] .vm-reveal-row-button {
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent);
+  background-image: radial-gradient(
+    120% 140% at 0% 50%,
+    color-mix(in srgb, var(--color-accent) 8%, transparent),
+    transparent 62%
+  );
+}
+
 /* =============================================================================
    18. UPPHOVS-SIGNATUREN, footerns avsändarrad (T38, issue #67).
    [VÄRDE, ej @theme-kontrakt]
@@ -2504,6 +2549,28 @@ body {
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.28),
     0 2px 10px -4px color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+
+/* "DIN FÖRÄNDRING"-INDIKATORN (T92 del C): rank-rörelse sedan senaste besök. FÄRG-OBEROENDE,
+   pil-FORMEN (▲/▼) + antalet bär betydelsen (WCAG 1.4.1), färgen förstärker bara. Texten är
+   alltid var(--color-fg) på en LÄTT tint mot surface-raised (samma lätt-tint-recept som pågår-
+   pillen §13: fg-text på en ~10% tint ligger långt över 4.5:1 i BÅDA teman), så indikatorn kan
+   aldrig sänka kontrasten , bara kant + en hårfin tint skiljer upp/ner. UPP = success-ton (klättrat),
+   NER = danger-ton (tappat), men en färgblind användare läser pilen + sr-only-orden. */
+.vm-total-hero-change {
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-display);
+}
+
+.vm-total-hero-change--up {
+  background-color: color-mix(in srgb, var(--color-success) 12%, var(--color-surface-raised));
+  border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border));
+}
+
+.vm-total-hero-change--down {
+  background-color: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface-raised));
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
 }
 
 /* KONTROLL-PILLARNA + DEN STICKY KONTROLL-RADEN + DET SCROLLANDE FÖNSTRET är GENERALISERADE

@@ -12,9 +12,12 @@ import { useTotalLeaderboardStore } from './total-leaderboard-context';
 import { TotalSelfHero } from './TotalSelfHero';
 import { TotalLeaderboardRow } from './TotalLeaderboardRow';
 import { TotalLeaderboardList } from './TotalLeaderboardList';
+import { useSelfRankChange } from './use-self-rank-change';
 
-/** Hur många toppdeltagare som visas i det KOMPRIMERADE läget (pallen + lite till). */
-const PODIUM_COUNT = 5;
+// Hur många toppdeltagare som visas i det KOMPRIMERADE läget (T92 del C, Daniels feedback:
+// "TOPP 10 + DIN placering + DIN FÖRÄNDRING"). Med 200+ deltagare ska default vara komprimerad:
+// topp-10 + hjälten (din placering + förändring) + "expandera till alla". Höjt från 5 till 10.
+const PODIUM_COUNT = 10;
 
 /** Id på den fulla listans region (delas av expand-toggeln + listans komprimera-kontroll). */
 const FULL_LIST_ID = 'total-leaderboard-full';
@@ -46,6 +49,11 @@ export function TotalLeaderboardView() {
   }, [expanded]);
 
   const ready = store.enabled && store.status === 'ready';
+
+  // DIN FÖRÄNDRING (del C): rank-rörelse sedan ditt senaste besök (per-device snapshot). null
+  // tills vi har en egen rad (selfSummary). Hooken läser-då-skriver snapshoten, så indikatorn
+  // är "sedan senaste besök", inte "sedan förra rendern".
+  const selfRankChange = useSelfRankChange(store.currentUserId, store.selfSummary?.rank ?? null);
 
   return (
     <section aria-labelledby="total-leaderboard-heading" data-total-leaderboard-view="">
@@ -97,10 +105,12 @@ export function TotalLeaderboardView() {
 
       {ready && store.total.length > 0 ? (
         <div className="mt-5 flex flex-col gap-5">
-          {/* 1) HJÄLTEN: din placering (om vi kan peka ut en egen rad). */}
-          {store.selfSummary !== null ? <TotalSelfHero summary={store.selfSummary} /> : null}
+          {/* 1) HJÄLTEN: din placering + din FÖRÄNDRING (om vi kan peka ut en egen rad). */}
+          {store.selfSummary !== null ? (
+            <TotalSelfHero summary={store.selfSummary} change={selfRankChange} />
+          ) : null}
 
-          {/* 2) KOMPRIMERAT: pallen / topp-5. Egen rad markerad. */}
+          {/* 2) KOMPRIMERAT: topp-10 (del C). Egen rad markerad. */}
           {!expanded ? (
             <div data-total-podium="" className="flex flex-col gap-2">
               {store.total.slice(0, PODIUM_COUNT).map((entry) => (

@@ -24,6 +24,7 @@
 
 import type { ReactNode, Ref } from 'react';
 import { ExpandToggle } from '../ExpandToggle';
+import { useCollapseScrollRestore } from './use-collapse-scroll-restore';
 import './collapsible-list.css';
 
 export interface StickyFollowToggleProps {
@@ -73,11 +74,33 @@ export function StickyFollowToggle({
   name,
   children,
 }: StickyFollowToggleProps) {
+  // KOLLAPS-SCROLL-FIX (T92 del F): klickar man "komprimera" LÅNGT NER i en utfälld lista ska
+  // sektionens ANKARE (denna regions topp) skrollas tillbaka i vy , annars står sid-scrollen
+  // kvar långt ner och man tappar orienteringen. anchorRef sätts på regionens wrapper (toppen).
+  const { anchorRef, scrollAnchorIntoView } = useCollapseScrollRestore<HTMLDivElement>();
+
+  // Wrappa onToggle: är listan UTFÄLLD nu, så KOMPRIMERAR det här klicket. Skrolla då tillbaka
+  // ankaret EFTER att kollapsen renderat (rAF), så vyn mäter mot det komprimerade läget. Vid
+  // expandering rör vi inte scrollen (man fäller ju ut, inget tomrum uppstår). Saknas rAF
+  // (jsdom-edge) faller vi till en direkt anrop.
+  const handleToggle = () => {
+    const willCollapse = expanded;
+    onToggle();
+    if (willCollapse) {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => scrollAnchorIntoView());
+      } else {
+        scrollAnchorIntoView();
+      }
+    }
+  };
+
   return (
     // Yttre wrapper = den GEMENSAMMA containing block:en för baren + listan. Sticky-
     // ytan kan bara följa med inom sin förälder, så listan MÅSTE ligga här inne (inte
     // som ett syskon), annars har baren ingen sträcka att klistra längs (F1-fixen).
-    <div {...{ [`data-${name}-follow-region`]: '' }}>
+    // anchorRef här = sektionens topp-ankare för kollaps-scroll-fixen (del F).
+    <div ref={anchorRef} {...{ [`data-${name}-follow-region`]: '' }}>
       <div
         {...{ [`data-${name}-toggle-bar`]: '' }}
         data-sticky={expanded ? 'true' : undefined}
@@ -93,7 +116,7 @@ export function StickyFollowToggle({
           hiddenCount={hiddenCount}
           labels={labels}
           controls={controls}
-          onToggle={onToggle}
+          onToggle={handleToggle}
           buttonRef={buttonRef}
           position="top"
           name={name}
