@@ -22,6 +22,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     error: null,
     activeRoomId: 'r1',
     leaderboard: [],
+    livePreliminary: false,
     reveal: [],
     teams: TEAMS,
     currentUserId: 'u1',

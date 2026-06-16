@@ -158,6 +158,14 @@ function buildSelfPredictions(
 export function buildDemoTotalContributions(): {
   rooms: RoomContribution[];
   facit: PoolFacit;
+  /**
+   * Demo-matchlistan (DEMO_PLAYED_COUNT första gruppmatcherna spelade). Exponeras så den
+   * TOTALA topplistan kan lägga den PRELIMINÄRA live-overlayn ovanpå (T84, #176): samma
+   * applyLiveResults -> derivePoolFacit -> buildTotalLeaderboard-väg som per-rums-listan, så
+   * demon visar live-rörelse OCH den live-medvetna derivationen är på plats för när den
+   * globala flaggan slås på. Bot-tipsen är redan genererade mot detta facit (oförändrat).
+   */
+  matches: Match[];
   currentUserId: string;
 } {
   const playedMatches = buildPlayedMatches();
@@ -212,5 +220,5 @@ export function buildDemoTotalContributions(): {
     predictionsByUser: predsByRoom.get(roomId)!,
   }));
 
-  return { rooms, facit, currentUserId: DEMO_SELF_USER_ID };
+  return { rooms, facit, matches: playedMatches, currentUserId: DEMO_SELF_USER_ID };
 }

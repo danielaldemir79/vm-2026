@@ -22,6 +22,21 @@
 export type LiveStatus = 'scheduled' | 'live' | 'paused' | 'finished' | 'postponed' | 'unknown';
 
 /**
+ * PÅGÅR matchen just nu? = 'live' (bollen rullar) ELLER 'paused' (HT/BT/straff-vila , spelet
+ * vilar men matchen är inte avgjord). En 'finished'/'scheduled'/'postponed'-match pågår INTE.
+ *
+ * EN SANNING för "pågår nu" (PRINCIPLES §4, rule-of-three): predikatet bodde tidigare som en
+ * lokal hjälpare på TVÅ ställen (daily/live-feed `isOngoing` + daily/LiveMatchCard
+ * `isLiveStatus`), och T84:s live-topplista är den tredje konsumenten (den preliminära
+ * poäng-overlayn lägger BARA på matcher som pågår). Vi lyfter därför hit, så LIVE-indikatorn i
+ * livekortet, "LIVE NU"-blocket OCH den preliminära topplistan aldrig kan dra isär om vad som
+ * räknas som "pågående" (en match i halvtidsvila ska behandlas likadant överallt).
+ */
+export function isMatchInProgress(status: LiveStatus): boolean {
+  return status === 'live' || status === 'paused';
+}
+
+/**
  * Den slags händelse ett LiveEvent är. Stängd union normaliserad från API:ts
  * case-inkonsekventa `type` ("Goal"/"Card"/"subst"/"Var"). Okänd typ blir 'other'
  * (fail-safe, bär den råa typen vidare i `rawType`).

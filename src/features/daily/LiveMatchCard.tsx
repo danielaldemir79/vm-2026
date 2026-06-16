@@ -45,7 +45,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { LiveData, LiveLineup } from '../../data/livescore';
+import { isMatchInProgress, type LiveData, type LiveLineup } from '../../data/livescore';
 import { ExpandToggle } from '../../components/ExpandToggle';
 import { useLiveClock } from './use-live-clock';
 import {
@@ -89,11 +89,6 @@ export interface LiveMatchCardProps {
   now?: number;
 }
 
-/** Är status ett pågående live-läge (driver LIVE-indikatorn)? */
-function isLiveStatus(status: LiveData['status']): boolean {
-  return status === 'live' || status === 'paused';
-}
-
 export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: LiveMatchCardProps) {
   const clock = useLiveClock(data, now);
   const [expanded, setExpanded] = useState(false);
@@ -109,7 +104,7 @@ export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: Live
   );
   const lineups = useMemo(() => pairLineups(data.lineups, homeApiId), [data.lineups, homeApiId]);
 
-  const live = isLiveStatus(data.status);
+  const live = isMatchInProgress(data.status);
   const finished = data.status === 'finished';
   const homeGoals = data.homeGoals ?? 0;
   const awayGoals = data.awayGoals ?? 0;

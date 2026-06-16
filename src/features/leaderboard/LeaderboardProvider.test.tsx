@@ -54,6 +54,40 @@ vi.mock('./use-leaderboard-data', () => ({
   useLeaderboardData: () => dataState,
 }));
 
+// Live-data-hooken (T84): mockas så vi kan injicera en löpande live-ställning och bevisa
+// den preliminära overlayn i provider-vävningen, utan Supabase/realtid. Default tom Map
+// (ingen match pågår) -> topplistan visar det officiella läget exakt som förr.
+const liveDataState = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'ready' | 'error',
+  byMatchId: new Map<string, import('../../data/livescore').LiveData>(),
+  error: null as string | null,
+}));
+vi.mock('../daily/use-live-data', () => ({
+  useLiveData: () => liveDataState,
+  LIVE_POLL_INTERVAL_MS: 20_000,
+}));
+
+/** En live-rad (status + ställning styr den preliminära overlayn). */
+function liveRow(
+  matchId: string,
+  overrides: Partial<import('../../data/livescore').LiveData> = {}
+): import('../../data/livescore').LiveData {
+  return {
+    matchId,
+    apiFixtureId: 1,
+    status: 'live',
+    elapsedMinute: 60,
+    homeGoals: 1,
+    awayGoals: 0,
+    events: [],
+    statistics: [],
+    lineups: [],
+    frozen: false,
+    lastSyncedAt: '2026-06-12T19:00:00Z',
+    ...overrides,
+  };
+}
+
 const fakeClient = {} as unknown as VmSupabaseClient;
 const env = {} as ImportMetaEnv;
 
@@ -106,6 +140,7 @@ function Probe() {
         {store.leaderboard.map((e) => `${e.displayName}:${e.points}:${e.rank}`).join('|')}
       </span>
       <span data-testid="reveal">{store.reveal.length}</span>
+      <span data-testid="live-preliminary">{String(store.livePreliminary)}</span>
       <span data-testid="error">{store.error ?? ''}</span>
       <span data-testid="self-breakdown">
         {store.selfBreakdown
@@ -127,6 +162,9 @@ beforeEach(() => {
   dataState.groups = WC2026_GROUPS;
   dataState.matches = [];
   dataState.error = null;
+  liveDataState.status = 'ready';
+  liveDataState.byMatchId = new Map();
+  liveDataState.error = null;
   api.listRoomPredictions.mockResolvedValue([]);
   api.listRoomGroupPredictions.mockResolvedValue([]);
   api.listRoomBracketPredictions.mockResolvedValue([]);
@@ -650,5 +688,81 @@ describe('LeaderboardProvider, T61 (#110): kopierings-invalidering hämtar om ru
     });
     expect(screen.getByTestId('status')).toHaveTextContent('ready');
     expect(statusLog.slice(seenReadyAt)).not.toContain('loading');
+  });
+});
+
+describe('LeaderboardProvider, T84 (#176): preliminär (live) topplista under matcher', () => {
+  // En PÅGÅENDE gruppmatch i grupp A (mex hemma vs kor borta), inget officiellt facit än.
+  const liveMatchId = 'A-mex-kor';
+  function setupLiveMatch() {
+    dataState.matches = [matchAt(liveMatchId, '2026-06-12T18:00:00Z', 'live')];
+    // u1 tippade 2-1 (träffar live 2-1 exakt), u2 tippade 0-0 (miss). Före live: båda 0p.
+    roomsState.members = [
+      { userId: 'u1', displayName: 'Anna' },
+      { userId: 'u2', displayName: 'Bo' },
+    ];
+    api.listRoomPredictions.mockResolvedValue([
+      { matchId: liveMatchId, userId: 'u1', homeGoals: 2, awayGoals: 1, updatedAt: '' },
+      { matchId: liveMatchId, userId: 'u2', homeGoals: 0, awayGoals: 0, updatedAt: '' },
+    ]);
+  }
+
+  it('ett live-mål ger u1 PRELIMINÄRA poäng + placering 1, och livePreliminary blir true', async () => {
+    setupLiveMatch();
+    liveDataState.byMatchId = new Map([
+      [liveMatchId, liveRow(liveMatchId, { homeGoals: 2, awayGoals: 1 })],
+    ]);
+
+    renderProvider(new Date('2026-06-12T18:30:00Z'));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    // u1 (exakt 2-1) leder preliminärt på den löpande ställningen, u2 (0-0 miss) under.
+    expect(screen.getByTestId('board')).toHaveTextContent('Anna:3:1');
+    expect(screen.getByTestId('board')).toHaveTextContent('Bo:0:2');
+    // Indikatorn är PÅ (en match pågår med en löpande ställning).
+    expect(screen.getByTestId('live-preliminary')).toHaveTextContent('true');
+  });
+
+  it('INGEN live-data: livePreliminary false, ingen poäng (matchen ej avgjord) , dagens beteende', async () => {
+    setupLiveMatch();
+    liveDataState.byMatchId = new Map(); // inget pågår
+
+    renderProvider(new Date('2026-06-12T18:30:00Z'));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    // Matchen är live men utan facit OCH utan live-overlay -> alla 0p, delad rank 1.
+    expect(screen.getByTestId('board')).toHaveTextContent('Anna:0:1');
+    expect(screen.getByTestId('board')).toHaveTextContent('Bo:0:1');
+    expect(screen.getByTestId('live-preliminary')).toHaveTextContent('false');
+  });
+
+  it('KONVERGENS i provider: preliminär (live 2-1) == officiell (facit 2-1), indikatorn släcks', async () => {
+    setupLiveMatch();
+    // PRELIMINÄRT: live 2-1.
+    liveDataState.byMatchId = new Map([
+      [liveMatchId, liveRow(liveMatchId, { homeGoals: 2, awayGoals: 1 })],
+    ]);
+    const prelim = renderProvider(new Date('2026-06-12T18:30:00Z'));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+    const preliminaryBoard = screen.getByTestId('board').textContent;
+    expect(screen.getByTestId('live-preliminary')).toHaveTextContent('true');
+    prelim.unmount();
+
+    // OFFICIELLT: admin matar in EXAKT 2-1 (matchen finished). Live-raden ligger kvar (frusen
+    // eller ej), men officiell status finished -> overlayn hoppar matchen, indikatorn släcks.
+    dataState.matches = [
+      {
+        ...matchAt(liveMatchId, '2026-06-12T18:00:00Z', 'live'),
+        status: 'finished',
+        result: { homeGoals: 2, awayGoals: 1 },
+      } as Match,
+    ];
+    renderProvider(new Date('2026-06-12T22:00:00Z'));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    // Samma topplista som det preliminära läget (konvergens), och indikatorn är AV.
+    expect(screen.getByTestId('board').textContent).toBe(preliminaryBoard);
+    expect(screen.getByTestId('board')).toHaveTextContent('Anna:3:1');
+    expect(screen.getByTestId('live-preliminary')).toHaveTextContent('false');
   });
 });

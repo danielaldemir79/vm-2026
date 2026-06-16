@@ -5,6 +5,65 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T84 (#176): Live-uppdaterad (preliminär) topplista under matcher
+
+**Beslut (en seam, ingen parallell poäng-motor, HARD DRY):** den live-uppdaterade topplistan är
+INTE en ny poäng-väg. Hela poäng-pipelinen är `Match[] -> derivePoolFacit -> buildLeaderboard`, och
+det ENDA som skiljer officiell från preliminär är vilken `Match[]` man matar in. En NY ren funktion
+`applyLiveResults(officialMatches, liveByMatchId)` (`src/features/leaderboard/apply-live-results.ts`)
+lägger den löpande live-ställningen (`match_live_data.home_goals/away_goals`, via `useLiveData`) ovanpå
+de officiella matcherna BARA för matcher som pågår just nu, och matar den preliminära listan genom
+SAMMA derivePoolFacit/buildLeaderboard. Poäng-modellen är alltså helt orörd (T84-direktivet: scoring
+låst). Overlayn återanvänder `applyMatchResult` (T6:s validerade state-transition, samma som det
+officiella `applyRoomResults`-vävandet), så preliminära listan är formad EXAKT som den officiella.
+
+**DATA-INTEGRITET (HARD, T84-direktivet):** live-lagret är PRELIMINÄRT och skriver ALDRIG det
+officiella facit (`official_match_results`, T42-källan). `applyLiveResults` är en REN funktion (data
+in -> ny data ut), tar ingen Supabase-klient, har ingen skriv-väg och muterar aldrig sina indata.
+Bevisat med test (overlayn returnerar nya objekt, indata oförändrade) + negativ-kontroll (mutera bort
+overwrite-vakten -> testet rödnar). Reveal, käll-uppdelning, märken och personlig statistik läser
+ALLTID det officiella facit (de är retrospektiva), aldrig live-lagret , bara topplistans placeringar
++ "live"-indikatorn är preliminära.
+
+**KONVERGENS-GARANTIN (acceptanskriterium):** overlayn lägger BARA på live-ställningen för en match
+vars OFFICIELLA status INTE redan är `finished`. Så snart admin matat in det officiella resultatet är
+matchen `finished` och overlayn hoppar den (officiellt vinner alltid), så preliminär == officiell
+BITVIS , konvergens by construction, inte en extra avstämning. Bevisat i både provider- och
+demo-total-testerna (live 2-1 == officiellt inmatad 2-1 ger identisk lista, indikatorn släcks).
+
+**ÄRLIG GRÄNS (dokumenterad, gissas inte):** en pågående OAVGJORD slutspelsmatch (t.ex. live 1-1)
+faller TYST ur overlayn. En slutspelsmatch kan inte bli ett giltigt `finished`-resultat utan en
+straff-vinnare (FIFA Article 14, `validate-result.ts` `knockout-tie-needs-penalties`), och vi gissar
+ALDRIG en vinnare , `applyMatchResult` avvisar då inmatningen och overlayn isolerar matchen
+(fail-safe, samma hållning som `applyRoomResults` mot en trasig rad). Följd: en oavgjord live-slutspels-
+match rör inga preliminära poäng förrän ställningen blir oavgjord-skild eller det officiella facit
+landar. Gruppspel (alla gruppmatcher, där oavgjort står sig) påverkas inte , draws är giltiga där, så
+hela gruppspelet rör sig live som tänkt. Avgjorda live-slutspelsmatcher (icke-lika) får sin preliminära
+ställning som vanligt.
+
+**INDIKATOR (ärligt märkt, samma anda som T56:s preliminära slutspelsträd):** "Live, preliminära
+placeringar medan matcher pågår" (med pulsande `vm-live-dot`, reduced-motion-säker) visas ENDAST när
+minst en match faktiskt pågår (`hasLivePreliminaryMatch`, samma reachbarhets-villkor som overlayn).
+Ingen match pågår -> ingen indikator, topplistan är det officiella läget exakt som förr.
+
+**RÖRELSE (återanvänd, inget nytt):** rad-glidet är den BEFINTLIGA `motion.li layout='position'` +
+rank-pulsen i `LeaderboardView` (gatad på `useReducedMotion`), helt oförändrad , de preliminära
+poängen byter bara `leaderboard`-datan, så raderna glider till nya platser med samma animation.
+
+**EN SANNING för "pågår nu" (rule-of-three):** predikatet `'live' || 'paused'` bodde på TVÅ ställen
+(daily/live-feed + LiveMatchCard) och lyftes till `isMatchInProgress` i `data/livescore/live-types.ts`
+(T84 är tredje konsumenten), så LIVE-indikatorn, "LIVE NU"-blocket och den preliminära topplistan
+aldrig kan dra isär om vad som räknas som pågående (en match i halvtidsvila behandlas likadant överallt).
+
+**SCOPE för den TOTALA (globala) listan:** live-overlayn wirades in i den totala komponentens
+KLIENT-derivation (demo-vägen: `applyLiveResults` -> facit -> `buildTotalLeaderboard`), så demon rör
+sig live OCH den live-medvetna derivationen är på plats. I LIVE-läge byggs den globala listan
+SERVER-SIDE (edge-funktionen `loadGlobalLeaderboard`, T90), så den preliminära overlayn hör hemma DÄR
+(pollaren/edge-funktionen) , out of scope per direktiv (rör inte pollaren, un-hide:a inte global). Den
+globala flaggan (`GLOBAL_LEADERBOARD_ENABLED=false`) lämnas av.
+
+---
+
 ## 2026-06-16 , T85 (#177): Web-push FUNDAMENT (VAPID + prenumerationer + SW + sender)
 
 **Beslut (secret-uppdelning):** VAPID-nyckelparet genererat med `npx web-push generate-vapid-keys

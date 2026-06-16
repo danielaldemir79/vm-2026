@@ -16,7 +16,7 @@
 // den är historik och visas i dagslistan med sitt frusna livekort som förr.
 
 import type { Match, Team } from '../../domain/types';
-import type { LiveData } from '../../data/livescore';
+import { isMatchInProgress, type LiveData } from '../../data/livescore';
 import { teamDisplayName } from './match-display';
 
 /** FIFA-landskoden för ett lag (lag-tillhörighet i livekortet), null när laget är okänt. */
@@ -44,11 +44,6 @@ export interface LiveFeedEntry {
   homeCode: string | null;
   /** Bortalagets FIFA-landskod, null om okänt. */
   awayCode: string | null;
-}
-
-/** Pågår matchen just nu (live eller halvtidsvila)? En frusen/avslutad match gör det inte. */
-function isOngoing(status: LiveData['status']): boolean {
-  return status === 'live' || status === 'paused';
 }
 
 /**
@@ -81,7 +76,7 @@ export function selectLiveFeed(
 ): LiveFeedEntry[] {
   const entries: LiveFeedEntry[] = [];
   for (const [matchId, live] of liveByMatchId) {
-    if (!isOngoing(live.status)) {
+    if (!isMatchInProgress(live.status)) {
       continue; // avslutad/ej startad: hör inte hemma i live-blocket
     }
     const match = matchById.get(matchId);
