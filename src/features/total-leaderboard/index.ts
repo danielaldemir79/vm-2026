@@ -21,3 +21,11 @@ export {
   type TotalLeaderboardEntry,
   type TotalSelfSummary,
 } from './aggregate-total';
+
+// T92 (del C): egen rank-FÖRÄNDRING "sedan ditt senaste besök" (per-device snapshot + ren delta).
+export {
+  computeRankChange,
+  type SelfRankChange,
+  type RankChangeDirection,
+} from './self-rank-snapshot';
+export { useSelfRankChange } from './use-self-rank-change';

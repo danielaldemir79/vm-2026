@@ -46,8 +46,11 @@ function manyEntries(n: number): TotalLeaderboardEntry[] {
 
 // jsdom har ingen layout, så scrollToIndex/scroll-mätningen är inert; det räcker för att
 // bevisa att fönstret renderar en DELMÄNGD. Stubba scrollTo så smooth-scrollen inte kastar.
+// Nollställ localStorage: vyn skriver nu ett rank-snapshot (T92 del C) när en egen rad finns,
+// så ett tidigare tests sparade rank får inte läcka in i ett annat (falsk förändring).
 beforeEach(() => {
   Element.prototype.scrollTo = vi.fn();
+  window.localStorage.clear();
 });
 
 describe('TotalLeaderboardView, lägen', () => {
@@ -129,11 +132,11 @@ describe('TotalLeaderboardView, egen rad markerad', () => {
 });
 
 describe('TotalLeaderboardView, komprimerat -> utfällt', () => {
-  it('komprimerat visar BARA topp-5 (pallen), inte hela listan', () => {
+  it('komprimerat visar BARA topp-10 (T92 del C), inte hela listan', () => {
     const { container } = renderView(store({ total: manyEntries(240) }));
     const podium = container.querySelector('[data-total-podium]')!;
     const rows = podium.querySelectorAll('[data-total-row]');
-    expect(rows.length).toBe(5); // pallen = 5, inte 240
+    expect(rows.length).toBe(10); // topp-10 default (Daniels feedback), inte 5, inte 240
     // Den utfällda listan finns INTE än.
     expect(container.querySelector('[data-total-full]')).not.toBeInTheDocument();
   });
