@@ -31,6 +31,7 @@ import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryGate, ResultsProvider } from './features/results';
 import { ScenarioView } from './features/scenarios';
+import { ScorerTableView } from './features/tournament-stats';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import {
@@ -322,6 +323,15 @@ function AppShell() {
                           />
                         </Slide>
                       </SimulationFrame>
+
+                      {/* Skytteligan (T87, #179) , den första roliga turnerings-stat-delen.
+                      UTANFÖR SimulationFrame: den härleds ur den VERKLIGA live-event-datan
+                      (near-live via cross-match-hooken), inte ur det lokala what-if-läget, så
+                      den ska aldrig bära sim-markeringen. I fixtures-läge renderas en demo-
+                      skytteliga ur committade events (ingen backend). */}
+                      <Slide direction="up">
+                        <ScorerTableView />
+                      </Slide>
                     </TabPanel>
 
                     {/* ===================== MER ===================== */}
