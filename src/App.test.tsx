@@ -1,4 +1,11 @@
-import { act, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.tsx';
 import { ThemeProvider, THEME_ATTRIBUTE } from './theme';
@@ -15,6 +22,9 @@ import {
 beforeEach(() => {
   window.localStorage.clear();
   document.documentElement.removeAttribute(THEME_ATTRIBUTE);
+  // Nollställ flik-hashen (T83): useTabRouting läser location.hash vid montering, så en
+  // hash kvar från ett tidigare test skulle kall-ladda fel flik. Tom hash => default (Idag).
+  window.history.replaceState(null, '', '/');
   // Markera onboarding-touren som redan sedd (T13): annars öppnar App:n
   // första-gångs-modalen ovanpå skalet, vilket inte är det dessa smoke-tester
   // mäter. Onboardingen testas separat i app-settings/OnboardingDialog.test.tsx.
@@ -79,11 +89,15 @@ describe('App-skalet', () => {
     await waitForAppSettled();
   });
 
-  it('renderar gruppspelsvyn (T5) med de 12 grupptabellerna', async () => {
+  it('renderar gruppspelsvyn (T5) med de 12 grupptabellerna i Turnering-fliken (T83)', async () => {
     renderApp();
 
-    // Vyn kopplas in i app-skalet och visar gruppspelet, T5:s leverans live.
+    // FLIK-IA (T83): grupptabellerna bor nu i Turnering-fliken, inte på Idag (default).
+    // En dold flik-panel är `hidden` (ur a11y-trädet), så getAllByRole('table') ser dem
+    // inte förrän man bytt till fliken , vilket också bevisar att flik-växlingen kopplar
+    // in rätt vy. Klicka fliken (samma väg en användare tar) och vänta in tabellerna.
     await waitForAppSettled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Turnering' }));
     await waitFor(() => {
       expect(screen.getAllByRole('table')).toHaveLength(12);
     });
@@ -171,6 +185,105 @@ describe('App-skalet', () => {
     // titel-raden ska nå DOM:en, så promotion-elementet inte tyst försvinner i en refaktor.
     expect(screen.getByText('.NET-systemutvecklare')).toBeInTheDocument();
     await waitForAppSettled();
+  });
+});
+
+// FLIK-NAVIGERING på app-nivå (T83, #175): bevisar vy-växlingen END-TO-END genom hela
+// app-trädet (inte bara TabBar isolerat) , rätt flik visas vid kall-laddning, ett klick
+// byter vald panel + URL, och en djuplänk-hash öppnar rätt flik direkt.
+describe('App-skalet, flik-navigering (T83)', () => {
+  it('startar på Idag-fliken (default) , Idag-panelen synlig, övriga panelers a11y-träd dolt', async () => {
+    renderApp();
+    await waitForAppSettled();
+
+    // Idag-fliken är aktiv (aria-selected) och dess panel är synlig (inte hidden).
+    expect(screen.getByRole('tab', { name: 'Idag' }).getAttribute('aria-selected')).toBe('true');
+    const idagPanel = document.querySelector('[data-tab-panel="idag"]');
+    expect(idagPanel?.hasAttribute('hidden')).toBe(false);
+    // Turnering-panelen är monterad men `hidden` (dess innehåll ej i a11y-trädet).
+    const turneringPanel = document.querySelector('[data-tab-panel="turnering"]');
+    expect(turneringPanel?.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('klick på en flik byter aktiv panel OCH uppdaterar URL-hashen (delbar länk + bakåt-knapp)', async () => {
+    renderApp();
+    await waitForAppSettled();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Topplista' }));
+
+    expect(screen.getByRole('tab', { name: 'Topplista' }).getAttribute('aria-selected')).toBe(
+      'true'
+    );
+    expect(document.querySelector('[data-tab-panel="topplista"]')?.hasAttribute('hidden')).toBe(
+      false
+    );
+    expect(document.querySelector('[data-tab-panel="idag"]')?.hasAttribute('hidden')).toBe(true);
+    // URL speglar fliken (delbar/bakåt-bar). #/topplista är den kanoniska formen.
+    expect(window.location.hash).toBe('#/topplista');
+  });
+
+  it('DJUPLÄNK vid kall-laddning: en hash satt FÖRE montering öppnar rätt flik direkt', async () => {
+    // Simulera att appen öppnas på en delad fliklänk (#/turnering) , ska landa på
+    // Turnering-fliken vid första render, utan ett klick.
+    window.history.replaceState(null, '', '#/turnering');
+    renderApp();
+    await waitForAppSettled();
+
+    expect(screen.getByRole('tab', { name: 'Turnering' }).getAttribute('aria-selected')).toBe(
+      'true'
+    );
+    expect(document.querySelector('[data-tab-panel="turnering"]')?.hasAttribute('hidden')).toBe(
+      false
+    );
+  });
+});
+
+// DESIGN-POLISHEN (design-frontend, T83): U2 (avlastad Idag) + U2-relocations + F3.
+// Vaktar att Idag-fliken inte återfår sin marknads-vägg, att favoritlags-väljaren +
+// install bor i Mer, och att den svävande "ny version"-prompten lyfts ovanför flik-
+// raden (F3) i stället för att lägga sig över den.
+describe('App-skalet, Idag avlastad (U2) + Mer-relocations + toast-placering (F3)', () => {
+  it('U2: Idag-panelen har INTE längre marknads-heron (paragraf + 48 lag-pills)', async () => {
+    renderApp();
+    await waitForAppSettled();
+
+    const idagPanel = document.querySelector('[data-tab-panel="idag"]');
+    expect(idagPanel).not.toBeNull();
+    // Den långa marknads-paragrafen ("plus tips-ligan med kompisarna ... delar med en
+    // länk") låg i Idag-heron och tryckte ner matcherna. Den ska vara borta från Idag.
+    expect(idagPanel?.textContent).not.toContain('tips-ligan med kompisarna');
+    // Marknads-pillsen ("48 lag · 12 grupper" / "Installeras som app") är också borta.
+    expect(idagPanel?.textContent).not.toContain('48 lag · 12 grupper');
+    // h1:an (appens namn) finns ändå kvar som en lugn flik-titel (tillgängligt namn).
+    expect(screen.getByRole('heading', { level: 1, name: 'VM 2026' })).toBeInTheDocument();
+  });
+
+  it('U2: favoritlags-väljaren bor i Mer-panelen, inte i Idag-panelen', async () => {
+    renderApp();
+    await waitForAppSettled();
+
+    const idagPanel = document.querySelector('[data-tab-panel="idag"]');
+    const merPanel = document.querySelector('[data-tab-panel="mer"]');
+    // Väljaren (data-favorite-team-control) ska INTE finnas i Idag (avlastat) ...
+    expect(idagPanel?.querySelector('[data-favorite-team-control]')).toBeNull();
+    // ... men FINNAS i Mer (inställningar), via favoritlags-sektionen.
+    expect(merPanel?.querySelector('[data-favorite-team-section]')).not.toBeNull();
+    expect(merPanel?.querySelector('[data-favorite-team-control]')).not.toBeNull();
+  });
+
+  it('F3: "ny version"-prompten bär vm-above-tab-bar så den aldrig krockar med flik-raden', async () => {
+    // Tvinga fram prompten genom att injicera ett needRefresh-tillstånd. Vi importerar
+    // UpdatePrompt direkt och ger den ett pinnat api (samma testväg som dess egna tester).
+    const { UpdatePrompt } = await import('./features/app-settings');
+    const { container } = render(
+      <UpdatePrompt
+        api={{ needRefresh: true, offlineReady: false, updateApp: () => {}, dismiss: () => {} }}
+      />
+    );
+    const prompt = container.querySelector('[data-update-prompt]');
+    expect(prompt).not.toBeNull();
+    // Klassen som lyfter prompten ovanför den fasta mobil-flikraden (F3).
+    expect(prompt?.className).toContain('vm-above-tab-bar');
   });
 });
 

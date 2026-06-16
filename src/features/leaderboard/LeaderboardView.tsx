@@ -29,7 +29,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 import { StickyFollowToggle } from '../../components/collapsible-list';
 import { ExpandToggle } from '../../components/ExpandToggle';
 
@@ -141,9 +140,6 @@ function LeaderboardRow({
 
 export function LeaderboardView() {
   const store = useLeaderboardStore();
-  // Anmäl sektionen till chip-navet (T78, #165). Vyn monteras bara i live-läge (skalet
-  // gatar på rooms.enabled), så "Topplista"-chipet finns bara då.
-  useRegisterSection(SECTIONS.leaderboard);
   const reduceMotion = useReducedMotion();
   // Animera placerings-ändringar bara om användaren inte valt minska rörelse.
   const animateLayout = !reduceMotion;
@@ -278,47 +274,54 @@ export function LeaderboardView() {
                 ? store.leaderboard.slice(0, COLLAPSED_VISIBLE)
                 : store.leaderboard;
             const hiddenCount = store.leaderboard.length - COLLAPSED_VISIBLE;
+            // Listan byggs EN gång (DRY) och placeras antingen inuti StickyFollowToggle
+            // (lång lista => sticky följ-med-bar som följer med ner i listan, F1-fix:
+            // bar + lista delar EN containing block) eller renderas naken (kort rum, ingen
+            // toggle, oförändrat). Samma `<ol id={listId}>` i båda fallen.
+            const list = (
+              <ol
+                id={listId}
+                data-leaderboard-list=""
+                data-expanded={hasMore ? (expanded ? 'true' : 'false') : undefined}
+                className="mt-5 flex list-none flex-col gap-2 p-0"
+              >
+                <AnimatePresence initial={false}>
+                  {visible.map((entry) => (
+                    <LeaderboardRow
+                      key={entry.userId}
+                      entry={entry}
+                      animateLayout={animateLayout}
+                      isSelf={store.currentUserId !== null && entry.userId === store.currentUserId}
+                      rankChanged={animateLayout && changedIds.has(entry.userId)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </ol>
+            );
             return (
               <>
                 {/* ÖVRE kontroll: i UTFÄLLT läge en STICKY följ-med-bar (komprimera alltid ett
                   tryck bort oavsett scroll), i komprimerat en vanlig "Visa alla N"-inline-
-                  kontroll. Bara när listan är längre än tröskeln. */}
+                  kontroll. Bara när listan är längre än tröskeln. Listan ligger som `children`
+                  i baren (F1-fix T83): bar + lista delar EN containing block, så den sticky
+                  baren följer med ner i listan i stället för att glida ur vy. */}
                 {hasMore ? (
-                  <div className="mt-5">
-                    <StickyFollowToggle
-                      expanded={expanded}
-                      labels={{
-                        expand: `Visa alla ${store.leaderboard.length}`,
-                        collapse: 'Komprimera',
-                      }}
-                      controls={listId}
-                      onToggle={toggleExpanded}
-                      buttonRef={topToggleRef}
-                      name="leaderboard"
-                    />
-                  </div>
-                ) : null}
-
-                <ol
-                  id={listId}
-                  data-leaderboard-list=""
-                  data-expanded={hasMore ? (expanded ? 'true' : 'false') : undefined}
-                  className="mt-5 flex list-none flex-col gap-2 p-0"
-                >
-                  <AnimatePresence initial={false}>
-                    {visible.map((entry) => (
-                      <LeaderboardRow
-                        key={entry.userId}
-                        entry={entry}
-                        animateLayout={animateLayout}
-                        isSelf={
-                          store.currentUserId !== null && entry.userId === store.currentUserId
-                        }
-                        rankChanged={animateLayout && changedIds.has(entry.userId)}
-                      />
-                    ))}
-                  </AnimatePresence>
-                </ol>
+                  <StickyFollowToggle
+                    expanded={expanded}
+                    labels={{
+                      expand: `Visa alla ${store.leaderboard.length}`,
+                      collapse: 'Komprimera',
+                    }}
+                    controls={listId}
+                    onToggle={toggleExpanded}
+                    buttonRef={topToggleRef}
+                    name="leaderboard"
+                  >
+                    {list}
+                  </StickyFollowToggle>
+                ) : (
+                  list
+                )}
 
                 {/* NEDRE kontroll (dubblerad, bara i UTFÄLLT läge): så man kan fälla ihop utan att
                   skrolla tillbaka upp. Identisk semantik som den övre (samma ExpandToggle), och

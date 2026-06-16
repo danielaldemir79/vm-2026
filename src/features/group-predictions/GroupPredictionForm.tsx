@@ -519,7 +519,7 @@ export function GroupPredictionForm({
               <button
                 type="submit"
                 data-group-prediction-save=""
-                className="h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
+                className="h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-[var(--vm-shadow-button)] transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
               >
                 {/* ALLTID "Spara grupptips", aldrig "Ändra" (T68/#129 punkt 13, Daniels
                     uttryckliga krav). Ett tips ändras genom att man Sparar om, så samma

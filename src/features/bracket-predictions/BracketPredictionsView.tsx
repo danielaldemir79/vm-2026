@@ -33,7 +33,6 @@ import { BracketPredictionForm } from './BracketPredictionForm';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
 import { teamCode } from '../../domain/team-code';
 import type { BracketSlotState } from '../bracket';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 
 export interface BracketPredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -89,9 +88,6 @@ export function BracketPredictionsView({
   now = new Date(),
 }: BracketPredictionsViewProps) {
   const store = useBracketPredictionsStore();
-  // Anmäl sektionen till chip-navet (T78, #165). Vyn monteras bara i live-läge (skalet
-  // gatar på rooms.enabled), så "Mästare"-chipet finns bara då.
-  useRegisterSection(SECTIONS.bracketPredictions);
   const { status, bracket, teams, matches, error } = useBracketPredictableData(env);
 
   // Deadline-medveten re-render (samma minut-tick som T15/T16): låst-statusen

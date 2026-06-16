@@ -5,6 +5,31 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T83 (F4): ResultEntryView-testets formulär-räkning bytt från getAllByRole('group') till stabil markör
+
+**Beslut:** I `src/features/results/ResultEntryView.test.tsx` räknas synliga matchformulär via en
+ny hjälpare `visibleFormCount()` som använder den stabila markören `form[data-match-id]` (vars
+innersta `<li>` inte är `hidden`), i stället för `screen.getAllByRole('group').length` i de heta
+`waitFor`-looparna och fönster-/utfäll-jämförelserna.
+
+**Varför (samma patologi T90 fixade i App.test.tsx, north-star-specen tilldelar F4 till T83):**
+vyn renderar ALLA 104 matchformulär (out-of-window dolda med `hidden`, inte bortfiltrerade, C2),
+så trädet är stort. `getAllByRole('group')` tvingar Testing Library att för VARJE kandidat både
+matcha rollen OCH avgöra synlighet via `dom-accessibility-api`s `isInaccessible` -> jsdom
+`getComputedStyle`, vars kostnad växer med DOM-storleken; i en `waitFor`-loop betalas den om och
+om igen. Det blåste upp filen till ~31 s under full parallell svit-last (under 20 s-blockens
+timeout men sårbart). Markör-räkningen är ett O(n) `querySelectorAll` + en `hidden`-koll per nod
+(ingen a11y-namnberäkning), så den är billig och deterministisk. Mätt isolerat: filens test-tid
+~14,2 s -> ~9,2 s (~35 % ner), tyngsta testet ~2,8 s -> ~1,5 s.
+
+**Ekvivalent, inte svagare:** "synlig" definieras EXAKT som produktionskoden gör (kommentar i
+`ResultEntryView.tsx`: "getAllByRole('group') räknar bara de synliga"), nämligen ett kort vars
+innersta `<li>` inte är `hidden`. Markören sitter 1:1 med fieldset:en (role=group), så antalet är
+detsamma, och fönster-/utfäll-assertionerna behåller sin diskriminerande kraft (utfälld lista har
+strikt fler synliga formulär än fönstret; ihopfälld går tillbaka till fönster-antalet). De
+genuint a11y-semantiska enskilda queries:na (heading/region/alert/table/rowheader + scoped
+`getByLabelText`) lämnades orörda , de är enträffs- eller subträd-scopade och därmed billiga.
+
 ## 2026-06-16 , T90 re-review-fix: App-testets install-knapp-query bytt från getByRole({name}) till stabil markör
 
 **Beslut:** I `src/App.test.tsx` hittas den kompakta install-knappen (onboarding-klar-grenen) via
@@ -133,6 +158,88 @@ nedräkning). VARFÖR: en PWA-flik öppen hela dagen fryser `liveNowMs` vid dygn
 grenen aldrig kördes. Nytt test (use-daily-matches.test.tsx): den dag-frusna grenen körs MEDVETET
 (kalender-klocka fryst vid dygnets början, realtids-klocka på kvällen) på både enhets- och hook-nivå;
 negativ-kontroll: delad klocka -> hook-testet rödnar (`'2026-06-15'` i st f `'2026-06-16'`).
+
+## 2026-06-15 , T83 (#175): flik-app , routning, scroll-modell, sim-läge över flikar (utfall av v2-inceptionens öppna beslut)
+
+T83 byggde flik-IA:n och avgjorde de tre öppna design-besluten v2-inceptionen listade nedan.
+
+**Beslut 1 , routning: hash + history.pushState, INGEN router-dependency (YAGNI, PRINCIPLES §11).**
+Appen har EN navigerings-axel (en av fem flikar), inga nästlade rutter, inga route-parametrar,
+ingen route-baserad kod-splitting (alla paneler är ändå monterade, se beslut 4). En `location.hash`
+(`#/idag`) + `history.pushState` räcker EXAKT för alla tre krav: delbar fliklänk, bakåt-knapp (en
+history-post per flik-byte), djuplänk vid kall-laddning (initial flik läses ur hashen vid montering).
+Ett router-paket (react-router m.fl.) vore bärvikt vi inte behöver. **Hash framför path** eftersom
+appen är en statiskt hostad SPA (Cloudflare Pages) utan server-rewrite: en path-rutt (`/tips`) ger
+404 vid direkt-laddning, medan en hash alltid serveras av index.html. Ren mappnings-logik i
+`tab-routing.ts` (testbar fristående), window/history-IO i `use-tab-routing.ts`.
+
+**Beslut 2 , scroll-container: EN sid-scroll, ingen nästlad scroll per flik.** Varje flik scrollar
+i sidans egna scroll (window), ingen flik äger en egen inre scroll-container. Den enda inre scrollen
+i appen är total-topplistans virtualiserade fönster (`CollapsibleScrollList`, T82 del 4, oförändrad).
+Eftersom bara EN flik-panel är synlig åt gången (resten `hidden`/display:none, tar ingen höjd) blir
+varje fliks scroll ren av sig själv. Detta är förutsättningen för F1-fixen (sticky följer sid-scroll).
+
+**Beslut 3 , sim-läge över flikar: GLOBALT state, frame per simulerad flik, EN hemvist för kontrollen.**
+What-if-läget bor redan globalt i den delade results-storen (`ResultsProvider` omsluter hela skalet,
+oförändrat). Flik-IA:n delar den gamla sammanhängande sim-zonen mellan Idag (daily) och Turnering
+(tabeller/träd/"vad krävs"). Beslut: VARJE flik som visar en simulerad vy bär sin egen `SimulationFrame`
+(ring + tint + sticky "Simuleringsläge"-badge när läget är PÅ) , Idag och Turnering har var sin frame.
+Frame:n är en REN wrapper som läser sim-seamen (`simulating`) ur storen, så två frames kan stå i två
+flikar utan dubblerad state (en sanning). What-if-KONTROLLEN (`SimulationBanner`: Starta/Återställ/
+Avsluta) + resultatinmatnings-grinden (`ResultEntryGate`) får EN tydlig hemvist: **Turnering**, direkt
+ovanför inmatningen (där sim-läget är mest meningsfullt , man spelar ut tänkta resultat och ser
+tabeller/träd ändras). Inga regressions: sim-flödet (starta/avbryt, badge, frame-attribut) bevisat i
+e2e (flows.spec, Turnering-scopat) + de oförändrade simulation-enhetstesterna.
+
+**Beslut 4 , alla flik-paneler MONTERADE samtidigt (inaktiv = `hidden`), inte villkorlig rendering.**
+Att rendera bara den aktiva fliken skulle (a) TAPPA vy-state vid flik-byte (formulär-inmatning, sök,
+utfällt läge, motion-layout-position lever i lokal useState , samma klass T82 del 4 skyddade genom
+`hidden` i stället för unmount), och (b) göra topplistan "kall" vid byte (ny hämtning). Med alla
+paneler monterade delas providers + live-data, och en `hidden` panel är ur layout OCH ur a11y-trädet
+(display:none), så skärmläsaren ser bara den aktiva fliken och varje flik scrollar rent. Bonus: de
+befintliga smoke-/integrationstesterna hittar allt innehåll i DOM:en (men `getByRole` ser inte roller
+i en `hidden` panel , därför navigerar App.test/e2e till rätt flik före roll-assertioner, vilket
+också bevisar vy-växlingen end-to-end).
+
+**Sektions-navet (T78/T79) avvecklat:** hela `src/features/section-nav/` borttaget (chip-rad, mobil-
+hamburgare, scroll-spy, sticky-band-offset, self-registrering), inga döda referenser kvar.
+
+## 2026-06-15 , T83 (#175): F1 sticky "följ-med"-kontroll , root cause + fix (containing block)
+
+**F1-buggen (Daniel + T82 del 4-entryn nedan):** den sticky komprimera-/"visa färre"-baren följde inte
+sidans scroll , den "fäste i ett inre fönster och gled ur vy", och fanns bara i några sektioner.
+
+**Root cause (verifierat):** `StickyFollowToggle` renderade den sticky baren (`position: sticky; top-16`)
+och den långa listan som SKILDA SYSKON. En `position: sticky`-yta kan bara klistra och FÖLJA MED inom
+sin egen CONTAINING BLOCK = föräldraelementets innehållsbox (CSS Positioned Layout L3 §6.2). När baren
+låg ensam i en wrapper med bara sin egen höjd fanns NOLL sträcka att följa med längs, så den skrollade
+ur synhåll direkt. (Det var INTE en faktisk nästlad overflow-scroll , den enda sådana är total-
+topplistans avsiktliga fönster.)
+
+**Fix:** baren OCH listan delar nu EN containing block , listan skickas som `children` till
+`StickyFollowToggle` och renderas i SAMMA wrapper EFTER baren. Då sträcker sig containing block:en över
+hela listans höjd, så `sticky top-16` klistrar baren under sajt-headern (~64px) och följer med ända ner
+i listan. **Bevisat:** (a) enhetstest på den strukturella invarianten (bar + lista delar parent) med en
+negativ-kontroll som rödnar om listan åter blir ett syskon; (b) browser-probe , bar-topp 337px före
+scroll, 64px efter att ha scrollat 800px ner (klistrad under headern, inte bortglidd). Tillämpat på ALLA
+tre konsumenter (resultat-listan, per-rums-topplistan, tips-listan), så täckningen är komplett där
+mönstret hör hemma. Källa: `src/components/collapsible-list/StickyFollowToggle.tsx` + `.test.tsx`.
+
+**Sticky-TÄCKNINGS-inventering (alla långa listor/sektioner per flik):**
+- Tips: match-tips-listan (`PredictionsView`, StickyFollowToggle , fixat) ✓; grupp-tips + bracket-tips
+  använder höjd-klipp-primitiven `CollapsibleSection` (T68, responsiva grid/träd, inte platta listor ,
+  rätt mönster, MEDVETET ingen StickyFollowToggle, se T82 del 4 nedan); rums-sektionen ingen lång lista.
+- Topplista: per-rums-topplistan (`LeaderboardView`, StickyFollowToggle , fixat) ✓; total-topplistan
+  (`CollapsibleScrollList`, eget virtualiserat fönster + inre sticky kontroll-rad, oförändrad) ✓.
+- Turnering: gruppspel/"vad krävs"/slutspelsträd använder `CollapsibleSection` (höjd-klipp, medvetet);
+  resultatinmatningen (`ResultEntryView`, StickyFollowToggle , fixat) ✓.
+- Idag: daily har datum-bläddring (inte en lång platt lista).
+- `ScoreGuide` (poäng-förklaringen, i Tips + Topplista): är en MODAL-dialog med egen inre scroll
+  (`max-h-[92dvh]` + overflow-y-auto), INTE en lång inline-lista , StickyFollowToggle är därför inte
+  rätt mönster för den (modalens egen scroll är rätt). Ärligt noterat: täckningen gäller inline-listor;
+  ScoreGuide täcks av sitt eget dialog-mönster (se Findings F2 i handoff).
+
+---
 
 ## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
 

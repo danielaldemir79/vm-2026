@@ -169,7 +169,7 @@ export function OnboardingDialog({ onboarding }: { onboarding?: OnboardingApi } 
             type="button"
             data-onboarding-next={onLastStep ? 'finish' : 'next'}
             onClick={next}
-            className="rounded-pill bg-accent px-5 py-2 font-display text-sm font-semibold text-accent-fg shadow-md outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_88%,black)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+            className="rounded-pill bg-accent px-5 py-2 font-display text-sm font-semibold text-accent-fg shadow-[var(--vm-shadow-button)] outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_88%,black)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
           >
             {onLastStep ? 'Klart' : 'Nästa'}
           </button>

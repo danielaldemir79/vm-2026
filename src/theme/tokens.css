@@ -279,9 +279,16 @@
   --vm-radius-pill: 9999px;
 
   /* Skuggor (dekorativt värde). Mjuk elevation som bär djup i ljust tema och
-     ger premium-lyft i mörkt. Egna nivåer för kort och svävande element. */
+     ger premium-lyft i mörkt. Egna nivåer för kort och svävande element.
+     ALLA skuggor i appen ska gå via dessa tokens (aldrig Tailwinds default
+     shadow-md/sm/lg, den generiska AI-tell:en D4 pekar ut, så elevationen är
+     konsekvent och tema-medveten). */
   --vm-shadow-card: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.08);
   --vm-shadow-raised: 0 4px 12px rgb(0 0 0 / 0.1), 0 16px 48px rgb(0 0 0 / 0.14);
+  /* Knapp-elevation: en stram, fokuserad skugga för fyllda knappar/brickor (mer
+     samlad än kort-skuggan, så en knapp läser som "tryckbar/upphöjd" utan att
+     sväva). Ersätter spridda shadow-md/shadow-sm på accent-knappar (D4). */
+  --vm-shadow-button: 0 1px 2px rgb(0 0 0 / 0.12), 0 4px 10px rgb(0 0 0 / 0.1);
 
   /* color-scheme synkas så webbläsarens egna kontroller matchar temat. */
   color-scheme: dark;

@@ -25,7 +25,6 @@ import { usePredictableData } from './use-predictable-matches';
 import { selectPredictableMatches } from './predictable-matches';
 import { PredictionForm } from './PredictionForm';
 import { useDeadlineTick } from './use-deadline-tick';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 
 export interface PredictionsViewProps {
   /** Injicerbar env (testbarhet), default = import.meta.env. */
@@ -41,10 +40,6 @@ export interface PredictionsViewProps {
 // läsbart, ingen konsument behöver gissa att undefined "blir" nuet/env.
 export function PredictionsView({ env = import.meta.env, now = new Date() }: PredictionsViewProps) {
   const store = usePredictionsStore();
-  // Anmäl sektionen till chip-navet (T78, #165). Vyn monteras bara i live-läge (dess skal
-  // PredictionSection gatar på rooms.enabled), så "Match-tips"-chipet finns bara då, aldrig
-  // ett dött chip i fixtures-läge.
-  useRegisterSection(SECTIONS.predictions);
   const { status, matches, teams, error } = usePredictableData(env);
 
   // Deadline-medveten re-render: låst-statusen (now >= kickoff) räknas om varje
@@ -247,62 +242,69 @@ export function PredictionsView({ env = import.meta.env, now = new Date() }: Pre
         </p>
       ) : null}
 
-      {/* ÖVRE ihopfäll-/expandera-kontroll (Daniels begäran, dubblerad som #42): en
-          toggle ALLTID nåbar utan att skrolla igenom en utfälld lista. Den övre är
-          dessutom fokus-MÅLET vid ihopfällning (toggleExpanded), så användaren förs upp
-          till listans topp. Syns bara när fönstret döljer något. Båda kontrollerna delar
-          EN komponent (ExpandToggle), så deras semantik aldrig kan drifta isär.
-
-          STICKY "FÖLJ-MED" i UTFÄLLT läge (#173 T82 del 4, ägarens feedback): utfälld kan
-          tips-listan bli lång (alla kommande matcher), så den övre kontrollen klistrar då
-          under sajt-headern och följer med ner i listan , komprimera alltid ett tryck bort.
-          I komprimerat läge (dagens-fönstret, kort) en vanlig inline-kontroll. hidden-bevarad
-          inmatning + dagens-fönstret är oförändrade (samma StickyFollowToggle som resultat-
-          listan, EN sanning). */}
-      {ready && predictable.length > 0 && hasHidden ? (
-        <div className="mt-5">
-          <StickyFollowToggle
-            expanded={expanded}
-            hiddenCount={windowed.hiddenCount}
-            controls={listId}
-            onToggle={toggleExpanded}
-            buttonRef={topToggleRef}
-            name="predictions"
-          />
-        </div>
-      ) : null}
-
       {/* Tips-listan: en kupong per tippbar match, kommande överst, låsta nedtill.
           ALLA tippbara matcher renderas alltid; out-of-window-korten DÖLJS med `hidden`
           (display:none + borttaget ur a11y-trädet), de UNMOUNTAS inte. VARFÖR `hidden`
           och inte filtrering: PredictionForm håller osparad inmatning i lokal useState
           (samma som resultatformuläret), filtrerar vi bort ett kort vid ihopfällning
           tappas den inmatningen. `hidden` bevarar React-instansen, så ett pågående tips
-          (och låst-/sekretess-/epoch-läget i storen) överlever expandera/ihopfäll. */}
+          (och låst-/sekretess-/epoch-läget i storen) överlever expandera/ihopfäll.
+
+          STICKY "FÖLJ-MED"-KONTROLL (#173 T82 del 4 + F1-fix T83): när fönstret döljer
+          något wrappar StickyFollowToggle den övre kontrollen OCH listan i EN container,
+          så den sticky baren (utfällt läge) klistrar under sajt-headern och FÖLJER MED
+          ner i listan (komprimera alltid ett tryck bort, oavsett scroll-position). Listan
+          ligger som `children` (inte ett syskon) just för att en sticky-yta bara följer
+          med inom sin egen containing block , det var F1-buggen (baren gled ur vy). Den
+          övre kontrollen är dessutom fokus-MÅLET vid ihopfällning (toggleExpanded). */}
       {ready ? (
         predictable.length > 0 ? (
-          <ol
-            id={listId}
-            data-predictions-list=""
-            className="mt-5 flex list-none flex-col gap-3 p-0"
-          >
-            {predictable.map(({ match, locked }) => {
-              const mine = store.myPredictions.get(match.id) ?? null;
-              return (
-                <li key={match.id} hidden={!isInWindow(match.id)}>
-                  <PredictionForm
-                    match={match}
-                    teamsById={teamsById}
-                    current={mine ? { homeGoals: mine.homeGoals, awayGoals: mine.awayGoals } : null}
-                    locked={locked}
-                    onSubmit={async (matchId, homeGoals, awayGoals) => {
-                      await store.savePrediction({ matchId, homeGoals, awayGoals });
-                    }}
-                  />
-                </li>
-              );
-            })}
-          </ol>
+          (() => {
+            // Listan byggs EN gång (DRY) och placeras antingen inuti StickyFollowToggle
+            // (när fönstret döljer något => sticky följ-med-bar) eller renderas naken
+            // (kort lista, ingen toggle). Samma `<ol id={listId}>` i båda fallen, så
+            // listans id/data-attribut/innehåll är oförändrade.
+            const list = (
+              <ol
+                id={listId}
+                data-predictions-list=""
+                className="mt-5 flex list-none flex-col gap-3 p-0"
+              >
+                {predictable.map(({ match, locked }) => {
+                  const mine = store.myPredictions.get(match.id) ?? null;
+                  return (
+                    <li key={match.id} hidden={!isInWindow(match.id)}>
+                      <PredictionForm
+                        match={match}
+                        teamsById={teamsById}
+                        current={
+                          mine ? { homeGoals: mine.homeGoals, awayGoals: mine.awayGoals } : null
+                        }
+                        locked={locked}
+                        onSubmit={async (matchId, homeGoals, awayGoals) => {
+                          await store.savePrediction({ matchId, homeGoals, awayGoals });
+                        }}
+                      />
+                    </li>
+                  );
+                })}
+              </ol>
+            );
+            return hasHidden ? (
+              <StickyFollowToggle
+                expanded={expanded}
+                hiddenCount={windowed.hiddenCount}
+                controls={listId}
+                onToggle={toggleExpanded}
+                buttonRef={topToggleRef}
+                name="predictions"
+              >
+                {list}
+              </StickyFollowToggle>
+            ) : (
+              list
+            );
+          })()
         ) : (
           // Aktivt rum men inga tippbara matcher (t.ex. alla framtida matcher saknar
           // ännu kända lag): en lugn, vänlig tom-ruta i stället för en tom sektion.

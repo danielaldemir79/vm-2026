@@ -163,6 +163,34 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
   });
 });
 
+// U2 (design-frontend): favoritlags-väljaren är en INSTÄLLNING. Idag-fliken döljer
+// den (showFavoritePicker=false) och visar den i Mer i stället, så Idag avlastas.
+// Default (ingen prop) bevarar tidigare beteende (väljaren synlig), för standalone-
+// render / fixtures. Vaktar BÅDA grenarna av flaggan.
+describe('DailyMatchesView, favoritlags-väljarens synlighet (U2)', () => {
+  it('visar favoritlags-väljaren som DEFAULT (showFavoritePicker ej satt)', async () => {
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => {
+      expect(container.querySelector('[data-favorite-team-control]')).not.toBeNull();
+    });
+  });
+
+  it('DÖLJER favoritlags-väljaren när showFavoritePicker={false} (Idag-fliken, U2)', async () => {
+    const { container } = renderView(
+      fixturesEnv(),
+      <DailyMatchesView showFavoritePicker={false} />
+    );
+    await waitSettled();
+    // Vänta in att matchkorten är på plats (data redo) och bekräfta sedan att väljaren
+    // ALDRIG renderats (den är gatad på flaggan, inte på data-laddning).
+    await waitFor(() => {
+      expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+    });
+    expect(container.querySelector('[data-favorite-team-control]')).toBeNull();
+  });
+});
+
 describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
   it('hero:n bär dags-temats data-attribut + en --vm-day-hue när en dag har lag', async () => {
     const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
