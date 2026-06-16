@@ -5,6 +5,37 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T101 (#issue): ENGÅNGS-backfill av event-data för de 9 opollade avgjorda matcherna
+
+**Problem:** T100 source:ade score-/antals-stats ur facit (täcker 16/16), men de SPELAR-nivå-stats som
+PER NATUR bara kan läsa `match_live_data.events` , skytteliga, assist, kort-liga, snabbaste mål, mål-per-
+15min-fördelning , täckte bara 7 av 16 matcher (de auto-pollade). De 9 första gruppmatcherna (g-A-1..g-E-1,
+inkl. 7-1:an g-E-1) avgjordes innan pollarens per-match-fönster var igång, så deras events/statistics/lineups
+hämtades aldrig och facit matades in för hand. Pollaren kan inte backfilla dem (den pollar bara matcher i
+sitt live-fönster; robust-facit-vägen täcker bara redan MAPPADE matcher i ett 4h-bak-fönster). Coverage-noten
+("Baseras på N matcher", T100) stod därför på 7.
+
+**Beslut (engångs edge function `livescore-backfill`, REN ADDITIV):** En ny Deno-funktion hämtar EN gång
+de rika blobbarna (events/statistics/lineups) för avgjorda matcher som saknar event-data och skriver dem
+till `match_live_data` i EXAKT pollarens form (`shapeFrozenBlobs` ur den DELADE `_shared/livescore-core.ts`,
+samma kuvert-lindning konsument-läs-lagret parsar). RÖR ALDRIG `official_match_results` och anropar ALDRIG
+`apply_auto_facit` , de manuella facit-raderna är korrekta + admin-låsta (Daniels HARD-krav). Säsongen
+HÄRLEDS ur API:t (`/fixtures?id=1489375` -> `league.season`), gissas/hårdkodas aldrig. Auto-mappning via
+samma `resolveFixtureToMatch` som pollaren (entydig träff resolvas, tvetydig/okänd hoppas). Dry-run är
+DEFAULT (tom kropp = ingen skrivning); `{dryRun:false}` skriver. Idempotent (upsert på match_id,
+fixture_map-insert sväljer 23505), fail-loud (500) på äkta fel. Anropen bokförs mot `poll_log` (budget-ärligt).
+
+**KÄLLHÄNVISAD regel (gissas aldrig) , mål-event-räkningen i decision-gaten:** funktionens `goalEventCount`
+(paritets-kollen mot facit-totalen) räknar ett event som mål om dess `type` normaliseras till 'goal'
+(`rawType.toLowerCase() === 'goal'`), EXAKT som `normalizeEventKind` (parse-live.ts:151) + `extractGoals`
+(match-stats.ts:59-61) , en sanning, ingen parallell regel. Ett MISSAT straff är INTE ett mål-event i
+API-Football v3 (det är ett "Var"/"Missed Penalty"-event), så det faller bort redan på type-filtret (samma
+regel som match-stats.ts:33-40 redan källhänvisar). Egenmål ÄR ett 'goal'-event och räknas mot ställningen
+(skytteligan filtrerar bort dem ur SKYTT-tallyn, inte ur måltotalen), så `goalEventCount` ska = home+away
+för en korrekt match. Den paritets-kollen är decision-gaten: skriv bara om alla 9 är resolvade, finished,
+apiScore == officialScore OCH goalEventCount == måltotalen; annars stopp + rapportera (fixa aldrig en
+avvikelse , facit är låst).
+
 ## 2026-06-16 , T100 (#207): DATA-INTEGRITET , turneringsstatistikens mål-stats source:as ur officiellt facit, inte events
 
 **Problem (P0, förstörde förtroende):** "Flest mål per lag", "Mål per match" (total + snitt + snabbaste
