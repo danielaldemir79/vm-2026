@@ -62,10 +62,28 @@ import {
   useOnboarding,
 } from './features/app-settings';
 import { TabBar, TabPanel, useTabRouting } from './features/tabs';
+import { SectionNav, type SectionNavItem } from './components/section-nav';
 import { VersionStamp } from './components/VersionStamp';
 
 /** Id-bas för flik-panelerna (TabBar:s aria-controls + TabPanel:s id pekar hit). */
 const TAB_PANEL_BASE = 'vm-tabpanel';
+
+/**
+ * Sektions-navet i Turnering (T103, Daniels önskemål: en meny som hoppar direkt till
+ * rätt sektion). Ordningen + id:na MÅSTE matcha sektionernas ankare i Turnering-panelen
+ * nedan (en sanning: navet skrollar till exakt dessa id:n, scroll-spy:n läser dem).
+ * What-if-kontrollen + resultatinmatningen är en SIM-kontroll, inte en "statistik-
+ * sektion", så de utelämnas medvetet ur navet (läser renast , man navigerar till det
+ * man vill TITTA på, inte till en inmatnings-widget).
+ */
+const TURNERING_SECTIONS: readonly SectionNavItem[] = [
+  { id: 'turnering-grupper', label: 'Grupper' },
+  { id: 'turnering-vad-kravs', label: 'Vad krävs' },
+  { id: 'turnering-slutspel', label: 'Slutspel' },
+  { id: 'turnering-skytteligan', label: 'Skytteligan' },
+  { id: 'turnering-statistik', label: 'Statistik' },
+  { id: 'turnering-avstangda', label: 'Avstängda' },
+];
 
 /**
  * GLOBALA (cross-rum) TOPPLISTAN TILLFÄLLIGT DÖLJD (T96, #193).
@@ -378,13 +396,25 @@ function AppShell() {
 
                     {/* ===================== TURNERING ===================== */}
                     <TabPanel tabId="turnering" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      {/* SEKTIONS-NAV (T103, Daniels önskemål): en sticky genvägs-meny överst i den
+                      LÅNGA Turnering-fliken, så man (a) ser vilka sektioner som finns och (b) hoppar
+                      direkt dit. Pinnar under app-baren (header på mobil; header + flik-rad på
+                      desktop, se section-nav.css). Chipsen skrollar till ankarna nedan (under nav-
+                      kanten, reduced-motion-gatat) och den aktiva chippen följer scrollen (scroll-
+                      spy). Sektions-listan är en sanning i TURNERING_SECTIONS ovan. */}
+                      <SectionNav
+                        items={TURNERING_SECTIONS}
+                        ariaLabel="Hoppa till sektion i Turnering"
+                      />
                       {/* SAMMA TOPP-NIVÅ-RYTM SOM ÖVRIGA FLIKAR (gap-12): Turnering saknade förr
                       en delad flex-gap-behållare, så avståndet mellan sim-zonen (SimulationFrame)
                       och stat-sektionerna (skytteliga/turneringsstatistik/avstängda) , och mellan
                       stat-sektionerna inbördes , blev noll (bara det `Slide`-wrapparna råkade ge).
                       Tips/Topplista/Mer omsluter sina toppsektioner i `flex flex-col gap-12`; nu gör
-                      Turnering det med, så ALLA flikar har EXAKT samma luft mellan sina kort. */}
-                      <div className="flex flex-col gap-12">
+                      Turnering det med, så ALLA flikar har EXAKT samma luft mellan sina kort.
+                      scroll-mt-32: ett ankar-marginal-fallback (sektionerna bär stabila id:n nedan)
+                      så även en ren #hash-navigering landar under app-baren, inte bakom den. */}
+                      <div className="flex flex-col gap-12 [&_[data-section-anchor]]:scroll-mt-32">
                         {/* SimulationFrame runt HELA turnerings-zonen: tabeller + "vad krävs" +
                       slutspelsträd + what-if-kontrollen + resultatinmatningen är alla
                       simulerings-PÅVERKADE, så ramen/badgen omsluter dem som EN zon (precis
@@ -398,20 +428,27 @@ function AppShell() {
                             slutspelsträdet på en oväntad ställning) degraderar zonen lugnt i
                             stället för att släcka hela appen. */}
                           <ErrorBoundary label="turneringsvyn" resetKey={activeTab}>
-                            {/* Gruppspelstabellerna (T5): härledda ur den delade storen. */}
-                            <Slide direction="up">
-                              <GroupStageView />
-                            </Slide>
+                            {/* Gruppspelstabellerna (T5): härledda ur den delade storen.
+                              data-section-anchor + id = sektions-navets hoppmål (T103). */}
+                            <div id="turnering-grupper" data-section-anchor="">
+                              <Slide direction="up">
+                                <GroupStageView />
+                              </Slide>
+                            </div>
 
                             {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
-                            <Slide direction="up">
-                              <ScenarioView />
-                            </Slide>
+                            <div id="turnering-vad-kravs" data-section-anchor="">
+                              <Slide direction="up">
+                                <ScenarioView />
+                              </Slide>
+                            </div>
 
                             {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
-                            <Slide direction="up">
-                              <BracketView />
-                            </Slide>
+                            <div id="turnering-slutspel" data-section-anchor="">
+                              <Slide direction="up">
+                                <BracketView />
+                              </Slide>
+                            </div>
 
                             {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
                         här i Turnering DIREKT ovanför resultatinmatningen (T32, #54). Sim-
@@ -442,11 +479,13 @@ function AppShell() {
                       den ska aldrig bära sim-markeringen. I fixtures-läge renderas en demo-
                       skytteliga ur committade events (ingen backend). Egen boundary: en krasch
                       här (t.ex. en oväntad live-data-form) får aldrig släcka hela appen. */}
-                        <Slide direction="up">
-                          <ErrorBoundary label="skytteligan" resetKey={activeTab}>
-                            <ScorerTableView />
-                          </ErrorBoundary>
-                        </Slide>
+                        <div id="turnering-skytteligan" data-section-anchor="">
+                          <Slide direction="up">
+                            <ErrorBoundary label="skytteligan" resetKey={activeTab}>
+                              <ScorerTableView />
+                            </ErrorBoundary>
+                          </Slide>
+                        </div>
 
                         {/* Turneringsstatistiken (T88, #180) , den rika "roliga VM-stats"-delen
                       (kort-liga, mål-fördelning, lag-mål, lag-medel, clean sheets, skrällar).
@@ -456,11 +495,13 @@ function AppShell() {
                       korten (clean sheets/skrällar) gatas i vyn på att what-if-läget är AV, så
                       de aldrig speglar sandlåde-resultat (se F2 + vyns simulating-grind). Egen
                       boundary, isolerad från skytteligan ovan. */}
-                        <Slide direction="up">
-                          <ErrorBoundary label="turneringsstatistiken" resetKey={activeTab}>
-                            <TournamentStatsView />
-                          </ErrorBoundary>
-                        </Slide>
+                        <div id="turnering-statistik" data-section-anchor="">
+                          <Slide direction="up">
+                            <ErrorBoundary label="turneringsstatistiken" resetKey={activeTab}>
+                              <TournamentStatsView />
+                            </ErrorBoundary>
+                          </Slide>
+                        </div>
 
                         {/* Avstängda spelare (T99, #200) , härledd ur kort-datan (rött / 2 gula),
                       uppskattad längd, auto-bort när avtjänad. UTANFÖR SimulationFrame (samma val
@@ -468,11 +509,13 @@ function AppShell() {
                       datan via cross-match-hooken, inte what-if-läget). Egen boundary, isolerad
                       från statistiken ovan: en krasch här får aldrig släcka hela appen (hotfix-
                       mönstret). Skador byggs INTE (ny datakälla, medvetet skippat, se decisions). */}
-                        <Slide direction="up">
-                          <ErrorBoundary label="avstangda" resetKey={activeTab}>
-                            <SuspensionsView />
-                          </ErrorBoundary>
-                        </Slide>
+                        <div id="turnering-avstangda" data-section-anchor="">
+                          <Slide direction="up">
+                            <ErrorBoundary label="avstangda" resetKey={activeTab}>
+                              <SuspensionsView />
+                            </ErrorBoundary>
+                          </Slide>
+                        </div>
                       </div>
                     </TabPanel>
 

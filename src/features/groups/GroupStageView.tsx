@@ -88,8 +88,10 @@ function GroupCard({
           </span>
         </div>
 
-        {/* Tabellen. overflow-x-auto fångar ev. överflöd på riktigt smala skärmar
-            utan att klippa innehåll (a11y: inget göms, alla kolumner kvar). */}
+        {/* Tabellen. Den responsiva kolumn-avslöjningen (GroupTable, T103) håller raden
+            inom kort-bredden ner till 360px , poäng-kolumnen P klipps aldrig. overflow-x-auto
+            blir bara en sista skyddsnät-rem mot oväntat långa lag-namn (inget göms, P förblir
+            synlig utan att skrolla eftersom de breda stöd-kolumnerna fälls bort först). */}
         <div className="overflow-x-auto px-3 py-2">
           <GroupTable groupId={table.groupId} standings={table.standings} teamsById={teamsById} />
         </div>

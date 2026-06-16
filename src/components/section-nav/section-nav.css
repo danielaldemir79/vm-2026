@@ -1,0 +1,115 @@
+/* Sektions-navets layout + utseende (T103).
+ *
+ * Förfinar appens befintliga språk (flik-raden tabs.css + pill-idiomet), designar inte
+ * om: samma frostade app-bar-fond, samma accent-på-aktiv, samma fokus-ring-recept. Det
+ * här bandet är navigationens ANDRA våning , app-baren väljer flik, det här navet väljer
+ * sektion inom fliken , så det pinnar DIREKT under app-baren och läser som en del av den.
+ */
+
+.vm-section-nav {
+  position: sticky;
+  /* MOBIL: flik-raden ligger LÄNGST NER (tabs.css), så app-baren upptill = bara headern.
+     Navet pinnar därför under header-höjden. */
+  top: var(--vm-header-height);
+  /* z-20: under app-baren (header + flik-rad, z-30) så den aldrig lägger sig ÖVER
+     navigationen, men ÖVER vanligt sid-innehåll som skrollar förbi. */
+  z-index: 20;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+  /* Samma frostade fond som app-headern/flik-raden (color-mix mot surface), så
+     innehåll som skrollar under navet inte lyser igenom och de tre banden (header,
+     flik-rad, sektions-nav) läses som EN sammanhållen topp. */
+  background-color: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  /* Negativ inline-marginal + matchande padding drar bandet ut till flik-innehållets
+     kant (main har px-4/sm:px-8), så den frostade fonden går kant-till-kant precis som
+     app-baren, medan chipsen själva håller sidans inre marginal. */
+  margin-inline: -1rem;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .vm-section-nav {
+    /* DESKTOP: app-baren = header + sticky flik-rad. Pinna under HELA app-baren
+       (--vm-app-bar-height, en sanning delad med StickyFollowToggle), aldrig under
+       bara headern (då skulle flik-raden skära navet). */
+    top: var(--vm-app-bar-height);
+    margin-inline: -2rem; /* main har sm:px-8 = 2rem. */
+    padding-inline: 2rem;
+    margin-bottom: 0.5rem;
+  }
+}
+
+.vm-section-nav-list {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.5rem 0;
+  list-style: none;
+  /* HORISONTELL skroll på smal skärm (filter-chip-mönster: swipa raden) utan att tvinga
+     en sid-skroll. Scrollbaren göms (ren chip-rad), men raden är fortfarande
+     tangentbords-/touch-skrollbar. */
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox. */
+  -webkit-overflow-scrolling: touch;
+}
+
+.vm-section-nav-list::-webkit-scrollbar {
+  display: none; /* WebKit/Blink. */
+}
+
+/* Chippet: pill-formen + flik-radens accent-språk. En lugn, läsbar genväg. */
+.vm-section-nav-chip {
+  flex: 0 0 auto; /* Krymper aldrig , behåller sin etikett-bredd, raden skrollar i stället. */
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem; /* Bekvämt touch-mål utan att bandet blir tjockt. */
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, var(--color-fg) 4%, transparent);
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* AKTIV chip (scroll-spy): accent-fylld pill med ink-färg PÅ accent , samma "tydlig,
+   flerkanalig markering" som flik-raden (färg + vikt + fyllning, inte bara en ton). */
+.vm-section-nav-chip[data-active='true'] {
+  border-color: transparent;
+  background-color: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-weight: 700;
+  box-shadow: 0 1px 8px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+/* Hover på en INAKTIV chip: lyft texten mot fg + en aning starkare yt-ton (lugn
+   affordans, ingen färgklick), samma recept som inaktiv flik på desktop. */
+@media (hover: hover) {
+  .vm-section-nav-chip:not([data-active='true']):hover {
+    color: var(--color-fg);
+    background-color: color-mix(in srgb, var(--color-fg) 8%, transparent);
+  }
+}
+
+/* Synlig tangentbords-fokus (WCAG 2.4.7), samma accent-ring som appens övriga
+   kontroller. focus-visible => musklick ger ingen ring, tangentbord gör det. */
+.vm-section-nav-chip:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-section-nav-chip {
+    transition:
+      color 0.18s ease,
+      background-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+}
