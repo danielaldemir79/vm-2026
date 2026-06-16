@@ -70,8 +70,15 @@ create policy push_subscriptions_delete_own
   on public.push_subscriptions for delete
   using (user_id = (select auth.uid()));
 
--- INGEN UPDATE-policy med flit: en prenumeration ÄNDRAS inte i fält, den ersätts.
--- Klientens upsert (on conflict endpoint) träffar bara den egna raden (samma user),
--- och on conflict do update kräver att den befintliga raden passerar insert-checken
--- (egen rad), så ingen kan kapa en annans endpoint-rad. (Skulle två användare dela
--- exakt samma endpoint vore det ändå samma fysiska enhet.)
+-- UPDATE: bara dina egna. Klientens upsert (on conflict endpoint) kör en UPDATE-gren
+-- när enheten redan är prenumererad (samma användare re-aktiverar, eller nycklarna
+-- roterats), och Postgres KRÄVER att en UPDATE-policy EXISTERAR för att den grenen ska
+-- släppas igenom , även när raden ägs av samma auth.uid() (en insert-check räcker INTE).
+-- using binder VILKEN rad som får uppdateras (egen), with check binder RESULTATET (egen),
+-- så ingen kan kapa en annans endpoint-rad: krockar upsert mot en annans rad nekar using-
+-- ledet. Samma mönster som predictions (T15), vars upsert funkar just tack vare sin
+-- egen UPDATE-policy.
+create policy push_subscriptions_update_own
+  on public.push_subscriptions for update
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));

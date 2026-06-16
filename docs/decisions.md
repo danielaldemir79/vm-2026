@@ -47,9 +47,12 @@ kopieras till dist-roten). INTE byte till injectManifest. **Verifierat:** `dist/
 kan inte importera src/), speglad från `sw-payload.ts` och vaktad av `sw-mirror-parity.test.ts`.
 
 **Beslut (RLS):** `push_subscriptions` (en rad per enhet, endpoint UNIQUE) , RLS på `auth.uid()`:
-en användare ser/skapar/raderar bara sina egna rader; ingen UPDATE-policy (en prenumeration ersätts,
-upsert on conflict träffar bara egen rad); service_role (sender) förbigår RLS för att kunna skicka.
-Samma mönster som predictions (T15). Sender-funktionen löser user ur JWT:n (aldrig ur bodyn) och
+en användare ser/skapar/uppdaterar/raderar bara sina egna rader (4 policies: select/insert/update/
+delete, alla `user_id = auth.uid()`); service_role (sender) förbigår RLS för att kunna skicka.
+UPDATE-policyn KRÄVS: klientens upsert (on conflict endpoint) kör en UPDATE-gren när enheten redan
+är prenumererad, och Postgres släpper den grenen bara om en UPDATE-policy finns , även för egen rad
+(en insert-check räcker inte). Detta är exakt varför predictions (T15) , vars upsert vi speglar ,
+HAR en egen UPDATE-policy; en tidig version här utelämnade den och blockerades av RLS (granskar-fynd). Sender-funktionen löser user ur JWT:n (aldrig ur bodyn) och
 filtrerar prenumerationerna på den lösta user_id:t (self-scope). CORS + OPTIONS tidigt (global-
 leaderboards 503 berodde delvis på saknad CORS , upprepas inte).
 

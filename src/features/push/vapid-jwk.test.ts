@@ -2,14 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { rawVapidToJwkPair } from './vapid-jwk';
 import { VAPID_PUBLIC_KEY } from './vapid';
 
-// Det FAKTISKA nyckelparet (publik = den committade konstanten; privat = den i app_config).
-// Privatnyckeln är PUBLIK PER TEST här bara som testfixtur , den är INTE en hemlighet i
-// koden (hemligheten lever i app_config; detta är samma nyckel men testet bevisar bara
-// konverteringen, det committas ingen produktionshemlighet via denna sträng eftersom den
-// publika konstanten + en testskalar inte räcker för att... nej: detta ÄR privatnyckeln.)
-// VIKTIGT: vi committar INTE privatnyckeln. Testet genererar därför sitt EGET nyckelpar
-// (subtle.generateKey + exportKey raw) och konverterar DET, så ingen produktionshemlighet
-// hamnar i repot. Konverteringen är nyckel-agnostisk, så det bevisar regeln lika väl.
+// Testet committar INTE produktionens VAPID-privatnyckel (den lever bara i app_config).
+// I stället genererar testet sitt EGET, kastbara nyckelpar (subtle.generateKey + exportKey
+// raw) och konverterar DET med rawVapidToJwkPair. Konverteringen är nyckel-agnostisk, så ett
+// kastnyckelpar bevisar regeln lika väl , och ingen hemlighet hamnar i repot.
 
 const subtle = globalThis.crypto.subtle;
 const ECDSA = { name: 'ECDSA', namedCurve: 'P-256' } as const;
