@@ -66,12 +66,16 @@ export function TipsScoreSummary() {
     return null;
   }
 
+  // mt-4 borttaget (Daniels spacing-feedback 2026-06-16): PredictionSection samlar nu
+  // poäng-summeringen + statistik-panelen + tippnings-vyn i en `flex flex-col gap-4`,
+  // så luften mot Panelens topp + nästa panel bärs av gap-behållaren (en sanning), inte
+  // av ett toppmarginal-knep här. Panelen själv är oförändrad i sak.
   return (
     <div
       data-tips-score-summary=""
       data-rank={summary.rank}
       data-points={summary.points}
-      className="vm-tips-score-summary mt-4 flex flex-col gap-4 rounded-card p-4 sm:p-5"
+      className="vm-tips-score-summary flex flex-col gap-4 rounded-card p-4 sm:p-5"
     >
       {/* SKYLTFÖNSTRET: en liten eyebrow + "Dina poäng" till vänster, totalen + placeringen
           till höger , så ögat landar på "så här ligger JAG till" på en sekund. */}

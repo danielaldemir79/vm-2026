@@ -149,7 +149,7 @@ export function MetricListCard({
           }}
           getItemKey={(item) => item.key}
           renderPreview={({ previewItems }) => (
-            <ol data-tournament-stat-preview="" className="flex flex-col gap-1">
+            <ol data-tournament-stat-preview="" className="flex flex-col gap-2">
               {previewItems.map((item, i) => (
                 <MetricRow key={item.key} item={item} rank={i + 1} />
               ))}
