@@ -5,6 +5,57 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T88 (#180): turneringsstatistik (rik uppsättning härledda VM-stats, near-live)
+
+**Beslut (vilka stats + varifrån de härleds, EN sanning per siffra):** Turneringsstatistiken i
+Turnering-fliken (under skytteligan) bygger en rik uppsättning aggregat, allt härlett ur befintlig
+data, aldrig en gissad siffra:
+- EVENTS-härlett (near-live via `useCrossMatchEvents`, T87): kort-liga (spelare + lag), snabbaste
+  mål, mål-per-15min-fördelning, flest mål per lag, turneringens mål-total + målsnitt.
+- STATISTICS-härlett (near-live via nya `useCrossMatchStats`): mest bollinnehav, flest skott, mest
+  fouls (null-medvetna lag-medel).
+- RESULTAT-härlett (den resolvade matchplanen ur ResultsProvider, dvs officiellt facit, slutgiltigt
+  vid FT): flest hållna nollor (clean sheets), största skrällarna (upsets).
+
+**Beslut (egenmål i "flest mål per lag", F1 , KÄLLHÄNVISAT, gissa aldrig):** Ett egenmål är gjort
+AV en spelare men räknas FÖR motståndarlaget; API-Footballs `team`-fält är tvetydigt och de stora
+fotbolls-API:erna är OENIGA om konventionen (kunde ej källverifieras, v3-doc 403; se T86-raden nedan).
+Vi tolkar därför ALDRIG om team-fältet: ett egenmål krediteras INTE till något lags mål-tally, det
+noteras bara separat (ownGoals). Ett lags `goals` = mål av lagets spelare EXKLUSIVE egenmål (öppet
+spel + straffmål, vars teamApiId är det icke-tvetydiga, gjorda-för-laget). MEN turneringens mål-TOTAL
+(`totalGoals`/målsnitt) RÄKNAR egenmålet (FIFA räknar egenmål i en turnerings måltotal , det föll ett
+mål), bara LAG-krediteringen av just egenmålet vågar vi inte. Källa: `isOwnGoalDetail` (detail "Own
+Goal", match-stats T86). Inline-källhänvisat i `tournament-stats-events.ts` (G1/G2) + empirisk
+NEGATIV-KONTROLL (ta bort egenmåls-gardet -> 3 F1-tester rödnar, verifierat 2026-06-16).
+
+**Beslut (skräll/upset-regel , KÄLLHÄNVISAT):** En skräll = en färdig match där det LÄGRE rankade
+laget (HÖGRE FIFA-rankingtal) vann; gapet = vinnarens rankingtal − förlorarens. Oavgjort = ingen
+skräll. Vinnaren avgörs av ordinarie+förlängning, vid lika av straffarna (samma vinnar-härledning som
+slutspels-trädet). Källa (ranking): FIFA/Coca-Cola Men's World Ranking, juniutgåvan 2026, samma
+källåkrade tabell som `team-profiles.ts` (`fifaRanking`, värde-låst i CI). Ett lag utan känd ranking
+hoppas (gissar aldrig ett gap). Clean sheet: motståndaren gjorde 0 mål i ordinarie+förlängning (straff-
+läggning räknas aldrig som insläppt; MatchResult bär redan mål exkl. straffar). Inline i
+`tournament-stats-tables.ts` (C1/U1).
+
+**Beslut (parallellt smalt cross-match-STATISTICS-läs-lager + delad near-live-spine, DRY rule-of-
+three):** Lag-medlen läser statistics via ett EGET smalt läs-lager (`live-stats-read.ts`,
+`getLiveStats`) som SELECTar bara `match_id, statistics` (spegelbild av T87:s `live-events-read.ts`,
+parser-skarven delas). Near-live-mekaniken (Realtime + 20 s poll + fokus/online/visibility) var nu
+upprepad en TREDJE gång (use-live-data T91, use-cross-match-events T87, denna), så den extraherades
+till en DELAD generisk hook `useNearLiveCollection`; `useCrossMatchEvents` (T87) skrevs om att
+delegera dit utan beteende-ändring (dess test = oförändrad negativ-kontroll, grönt). `useLiveData`
+delar idén men inte laddningen (drar `*` + indexerar per app-match-id för dagsvyn), så den lämnades
+utanför (KISS/YAGNI, ingen fel-abstraktion).
+
+**Beslut (placering UTANFÖR SimulationFrame + sim-grind, F2):** Vyn mountas i Turnering-fliken men
+utanför SimulationFrame, samma val som skytteligan. Event-/statistik-korten är oberoende av results-
+storen (egna live-hookar). De resultat-härledda korten läser results-storens matchlista, som i what-
+if-läge är de EFFEKTIVA (sim-overlaid) matcherna; vyn GATAR därför clean sheets/skrällar på att what-
+if-läget är AV (`simulating === false`) och visar en lugn "visas med verkliga resultat"-notering i
+sim-läge, så turneringsstatistiken aldrig speglar sandlåde-resultat.
+
+---
+
 ## 2026-06-16 , T87 (#179): skytteliga + assist-liga (cross-match-aggregering, near-live)
 
 **Beslut (skytteliga-reglerna, KÄLLHÄNVISADE):** Skytteligan aggregeras ur live-event-datan över

@@ -31,7 +31,7 @@ import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryGate, ResultsProvider } from './features/results';
 import { ScenarioView } from './features/scenarios';
-import { ScorerTableView } from './features/tournament-stats';
+import { ScorerTableView, TournamentStatsView } from './features/tournament-stats';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import {
@@ -331,6 +331,17 @@ function AppShell() {
                       skytteliga ur committade events (ingen backend). */}
                       <Slide direction="up">
                         <ScorerTableView />
+                      </Slide>
+
+                      {/* Turneringsstatistiken (T88, #180) , den rika "roliga VM-stats"-delen
+                      (kort-liga, mål-fördelning, lag-mål, lag-medel, clean sheets, skrällar).
+                      UTANFÖR SimulationFrame, samma val som skytteligan (T87): de
+                      event-/statistik-härledda korten kommer ur den VERKLIGA live-datan (egna
+                      cross-match-hookar, oberoende av what-if-läget), och de resultat-härledda
+                      korten (clean sheets/skrällar) gatas i vyn på att what-if-läget är AV, så
+                      de aldrig speglar sandlåde-resultat (se F2 + vyns simulating-grind). */}
+                      <Slide direction="up">
+                        <TournamentStatsView />
                       </Slide>
                     </TabPanel>
 
