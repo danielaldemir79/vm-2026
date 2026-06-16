@@ -65,6 +65,17 @@ export {
 } from './live-read';
 export type { LiveData } from './live-read';
 
+// T87: lättviktigt cross-match-events-läs-lager (smalt SELECT match_id+events, för
+// skytteliga/turneringsstatistik som aggregerar mål/assist/kort över ALLA matcher utan de
+// tunga statistics/lineups-blobbarna). T88 lutar sig på samma loader.
+export {
+  getLiveEvents,
+  listLiveEvents,
+  projectLiveEvents,
+  fixtureLiveEventsData,
+} from './live-events-read';
+export type { LiveMatchEvents } from './live-events-read';
+
 // Bit 3a: realtids-prenumeration på match_live_data + klock-brygga (re-sync mot push).
 export { liveClockFor, liveDataSubscription, MATCH_LIVE_DATA_TABLE } from './live-realtime';
 

@@ -5,6 +5,49 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T87 (#179): skytteliga + assist-liga (cross-match-aggregering, near-live)
+
+**Beslut (skytteliga-reglerna, KÄLLHÄNVISADE):** Skytteligan aggregeras ur live-event-datan över
+ALLA matcher med dessa regler:
+- **Egenmål räknas ALDRIG som skyttens mål.** Vi filtrerar `isOwnGoal === false` innan en spelares
+  mål-tally räknas. **Källa:** den regeln är universell och provider-oberoende (till skillnad från
+  egenmålets LAG-kreditering, som de stora fotbolls-API:erna är oeniga om och vi aldrig tolkar om ,
+  se T86-raden nedan + match-stats-types.ts MatchGoal-doc). `isOwnGoal` härleds ur API-Footballs
+  detail "Own Goal" (match-stats `isOwnGoalDetail`).
+- **Straffmål RÄKNAS som mål** (och noteras separat som "varav N straff"). **Källa:** så räknar
+  FIFA:s officiella skyttekungs-statistik (straffar i öppet spel ingår; bara straffläggning EFTER
+  120 min, dvs penalty shoot-out, räknas inte , och de kommer aldrig in i aggregeringen eftersom de
+  inte är ordinarie `goal`-events). `isPenalty` ur API-Footballs detail "Penalty" (match-stats
+  `isPenaltyGoal`).
+- **Grupperings-nyckel = spelar-id, inte namn** (namn stavas olika mellan svar, id:t är stabilt; en
+  mål/assist utan känt id hoppas , gissar aldrig att två okända skyttar är samma). **Källa:**
+  live-types `LiveEvent.playerId`-doc ("STABIL nyckel för cross-match-aggregering").
+- **Ranknings-sorteringen** (mål desc -> färre matcher -> fler assists -> namn) är en PRESENTATIONS-
+  konvention (rimlig tie-break), inte en officiell FIFA-regel, och hävdas inte som källhänvisad
+  sanning. Reglerna är inline-källhänvisade i `src/features/tournament-stats/scorer-table.ts` (R1-R4)
+  och bevisade med diskriminerande tester + en empiriskt verifierad negativ-kontroll (filtret borta
+  -> 3 R1-tester rödnar).
+
+**Beslut (lättviktigt cross-match-events-läs-lager, smalt SELECT):** Skytteligan/turneringsstatistiken
+läser events via ett EGET smalt läs-lager (`src/data/livescore/live-events-read.ts`,
+`getLiveEvents`) som SELECTar bara `match_id, events` , inte `*` (live-read.ts:s `getLiveData` drar
+ALLA tre blobbarna events+statistics+lineups per rad). **Varför:** en cross-match-aggregering rör
+bara events; att dra ner statistics/lineups för hundratals matcher är onödigt nät + parse. Parser-
+skarven (RawApiResponse-kuvert -> `parseEvents`) delas med live-read, så ingen tolknings-drift. T88
+återanvänder samma loader + den återanvändbara hooken `useCrossMatchEvents`.
+
+**Beslut (near-live = SAMMA T91-spine):** `useCrossMatchEvents` återanvänder dagsvyns auto-
+uppdaterings-spine (Realtime på `match_live_data` + 20 s poll-fallback + fokus/online/visibility-
+refetch), så aggregaten räknas om inom sekunder när ett mål skrivs. Gatat bakom live-läge; i
+fixtures/demo-läge en initial hämtning, sedan vila (ingen backend att väcka). **Varför:** EN sanning
+för "hur håller vi live-data färsk" (DRY), och samma robusthet som löste T91:s stale-score-bugg.
+
+**Beslut (placering UTANFÖR SimulationFrame):** Skytteligan mountas i Turnering-fliken men utanför
+`SimulationFrame`. **Varför:** den härleds ur den VERKLIGA live-event-datan, inte ur det lokala
+what-if-läget, så den ska aldrig bära sim-markeringen.
+
+---
+
 ## 2026-06-16 , T86 (#178): rik live-matchvy , drill-in + delad match-stats-projektion
 
 **Beslut (drill-in = MODAL, inte route eller inline-expand):** Den rika matchvyn (tidslinje +
