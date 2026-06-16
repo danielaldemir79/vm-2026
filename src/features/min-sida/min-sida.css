@@ -1,0 +1,96 @@
+/* "MIN SIDA" , profil-hubbens finish (T97). [VÄRDE, ej @theme-kontrakt]
+   =============================================================================
+
+   VISUELL IDENTITET ÄR LÅST (brief): den här filen inför INGA nya idiom och INGA nya
+   text-bärande färgkombinationer. Profilen ÅTERANVÄNDER kodbasens redan AA-proven idiom
+   via klasserna i TSX:en (.vm-rooms-hero-glow:en, .vm-rooms-avatar-färgreceptet,
+   .vm-tips-score-summary-panelen, .vm-tips-summary-total/-rank-badge-brickorna). Det som
+   bor HÄR är bara det som saknades: profil-avatarens STORLEK (en större monogram-bricka än
+   medlemslistans 7x7), den neutrala tom-avataren, en hårfin divider, live-pricken och rums-
+   radens aktiv-markör , alla DEKOR eller färg-oberoende, så ingen läsbarhet hänger på dem. */
+
+/* PROFIL-AVATAREN: samma färg-recept som medlemslistans avatar (.vm-rooms-avatar, hue ur
+   user-id, ink-på-tint AA-låst per tema över alla hue:er , redan uppmätt, oförändrat här),
+   men en STÖRRE bricka för profil-toppen (hero). Bara storlek/typografi sätts här; färgen
+   ärvs av .vm-rooms-avatar (kombineras i TSX), så ingen ny färg införs. */
+.vm-min-sida-avatar {
+  width: 3rem;
+  height: 3rem;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+@media (min-width: 640px) {
+  .vm-min-sida-avatar {
+    width: 3.5rem;
+    height: 3.5rem;
+    font-size: 1.125rem;
+  }
+}
+
+/* TOM PROFIL-AVATAR (ingen identitet än): en lugn, neutral bricka i stället för ett gissat
+   monogram. Surface-raised-yta + dämpad fg-muted-ink (den neutrala, alltid-AA token-paret),
+   ingen hue. Dekor (aria-hidden i TSX); rubriken bär betydelsen. */
+.vm-min-sida-avatar-empty {
+  background-color: var(--color-surface-raised);
+  color: var(--color-fg-muted);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+/* HÅRFIN DIVIDER över träffsäkerhets-raden: samma guld-tonade divider-värme som tips-
+   summeringens käll-lista (.vm-tips-source-list), så ställnings-kortet hör ihop med tips-
+   världen. Bär ingen text (ren dekor). */
+.vm-min-sida-divider {
+  border-top: 1px solid color-mix(in srgb, var(--vm-gold) 22%, var(--color-border));
+}
+
+/* LIVE-PRICKEN i "preliminär ställning"-noten: en liten accent-prick som lugnt signalerar
+   "det rör sig". Dekor (aria-hidden); noten bär betydelsen i text, så ingen kontrast hänger
+   på pricken. Pulsen respekterar reduced-motion (stängs av nedan). */
+.vm-min-sida-live-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 55%, transparent);
+  animation: vm-min-sida-live-pulse 2s ease-out infinite;
+}
+
+@keyframes vm-min-sida-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 50%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 0.375rem transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* RUMS-RADEN: en lugn list-rad i appens kort-språk. Det aktiva rummet får en aning starkare
+   yta + accent-kant (samma "ditt direkt"-markering som rums-väljaren, .vm-rooms-pick / den
+   egna medlemmens chip), buret av FORM (kanten/pricken) + TEXT ("Aktivt"-pillen), inte enbart
+   färg. Den lilla pricken är dekor. */
+.vm-min-sida-room[data-active='true'] {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+
+.vm-min-sida-room-dot {
+  background-color: color-mix(in srgb, var(--color-fg-muted) 45%, transparent);
+}
+
+.vm-min-sida-room-dot[data-active='true'] {
+  background-color: var(--color-accent);
+}
+
+/* REDUCED-MOTION (north-star, WCAG 2.3.3): ingen pulsande live-prick för den som bett om
+   mindre rörelse , pricken står still (betydelsen bärs ändå av texten). */
+@media (prefers-reduced-motion: reduce) {
+  .vm-min-sida-live-dot {
+    animation: none;
+  }
+}

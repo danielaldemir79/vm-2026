@@ -52,6 +52,7 @@ import { LeaderboardProvider, LeaderboardSection, RevealSection } from './featur
 import { MatchDetailProvider } from './features/match-detail';
 import { TotalLeaderboardSection } from './features/total-leaderboard';
 import { FavoriteTeamProvider, FavoriteTeamSection } from './features/favorite-team';
+import { MinSidaSection } from './features/min-sida';
 import { PushOptInSection } from './features/push';
 import { AdminSection } from './features/admin';
 import {
@@ -526,6 +527,13 @@ function AppShell() {
                           arrangörs-/inställnings-yta degraderar fliken lugnt utan att släcka appen. */}
                       <ErrorBoundary label="Mer-fliken" resetKey={activeTab}>
                         <div className="flex flex-col gap-12">
+                          {/* MIN SIDA (T97): den personliga profil-hubben , vem du är + din
+                        ställning + dina rum + favoritlag. Leder Mer ("om mig") och gatar
+                        honest: inget i fixtures/lokalt läge eller utan identitet + rum. */}
+                          <Slide direction="up">
+                            <MinSidaSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
+
                           {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
                         arrangören och gäller GLOBALT. Hör hemma i Mer (hjälp-/arrangörsytor). */}
                           <Slide direction="up">
