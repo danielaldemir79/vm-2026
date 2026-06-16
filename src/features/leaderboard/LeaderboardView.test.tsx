@@ -3,6 +3,9 @@ import { act, render, screen, within } from '@testing-library/react';
 import { LeaderboardView } from './LeaderboardView';
 import { LeaderboardStoreContext, type LeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
+import { RoomsStoreContext } from '../rooms/rooms-context';
+import type { RoomsStore } from '../rooms';
+import type { RoomSummary } from '../../data/rooms';
 
 function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
   return {
@@ -21,11 +24,39 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
   };
 }
 
-function renderView(s: LeaderboardStore) {
+// LeaderboardView läser nu det AKTIVA RUMMETS namn ur rums-storen (T92 del A), så testerna
+// ger en minimal rums-store-stub via context (samma mönster som rooms egna tester). Default:
+// ett aktivt rum "VM 2026" så eyebrow:n visar ett rumsnamn; överskrid activeRoom för andra fall.
+const ROOM_VM2026: RoomSummary = { id: 'r1', name: 'VM 2026', code: 'ABC123' };
+
+function roomsStore(activeRoom: RoomSummary | null): RoomsStore {
+  return {
+    enabled: true,
+    status: 'ready',
+    error: null,
+    userId: null,
+    myRooms: activeRoom ? [activeRoom] : [],
+    activeRoom,
+    members: [],
+    results: [],
+    tipsRefreshNonce: 0,
+    createRoom: async () => {},
+    joinRoom: async () => true,
+    selectRoom: async () => {},
+    leaveRoom: async () => {},
+    refresh: async () => {},
+    saveResult: async () => {},
+    copyMyTips: vi.fn(),
+  };
+}
+
+function renderView(s: LeaderboardStore, activeRoom: RoomSummary | null = ROOM_VM2026) {
   return render(
-    <LeaderboardStoreContext.Provider value={s}>
-      <LeaderboardView />
-    </LeaderboardStoreContext.Provider>
+    <RoomsStoreContext.Provider value={roomsStore(activeRoom)}>
+      <LeaderboardStoreContext.Provider value={s}>
+        <LeaderboardView />
+      </LeaderboardStoreContext.Provider>
+    </RoomsStoreContext.Provider>
   );
 }
 
@@ -62,6 +93,37 @@ describe('LeaderboardView, lägen', () => {
   it('TOM lista (inga medlemmar) visar tom-text', () => {
     const { container } = renderView(store({ leaderboard: [] }));
     expect(container.querySelector('[data-leaderboard-empty]')).toBeInTheDocument();
+  });
+});
+
+describe('LeaderboardView, per-rums-tydlighet (T92 del A: eyebrow = aktiva rummets namn)', () => {
+  it('visar det AKTIVA RUMMETS namn i eyebrow:n (inte den generiska "VM-poolen")', () => {
+    const { container } = renderView(store({ leaderboard: [entry('u1', 'Anna', 5, 1)] }), {
+      id: 'r9',
+      name: 'Kompisligan',
+      code: 'XYZ999',
+    });
+    const eyebrow = container.querySelector('[data-leaderboard-room]');
+    expect(eyebrow).toHaveTextContent('Kompisligan');
+    // NEGATIV-KONTROLL: den gamla generiska etiketten ska INTE längre stå där (annars hade
+    // den här ändringen inte gjort något , beviset att rumsnamnet faktiskt tog över).
+    expect(eyebrow).not.toHaveTextContent('VM-poolen');
+  });
+
+  it('faller till en generisk etikett när inget rum kan namnges (gissar aldrig ett namn)', () => {
+    const { container } = renderView(store({ leaderboard: [entry('u1', 'Anna', 5, 1)] }), null);
+    const eyebrow = container.querySelector('[data-leaderboard-room]');
+    // Utan aktivt rum visas "Ditt rum" (lugn fallback), aldrig ett påhittat rumsnamn.
+    expect(eyebrow).toHaveTextContent('Ditt rum');
+  });
+
+  it('faller till den generiska etiketten om rummets namn är tomt/blanksteg', () => {
+    const { container } = renderView(store({ leaderboard: [entry('u1', 'Anna', 5, 1)] }), {
+      id: 'r1',
+      name: '   ',
+      code: 'ABC123',
+    });
+    expect(container.querySelector('[data-leaderboard-room]')).toHaveTextContent('Ditt rum');
   });
 });
 
@@ -175,9 +237,11 @@ describe('LeaderboardView, placerings-puls (data-rank-changed nollas så den kan
       const rerenderWith = (leaderboard: LeaderboardEntry[]) =>
         act(() => {
           rerender(
-            <LeaderboardStoreContext.Provider value={store({ leaderboard })}>
-              <LeaderboardView />
-            </LeaderboardStoreContext.Provider>
+            <RoomsStoreContext.Provider value={roomsStore(ROOM_VM2026)}>
+              <LeaderboardStoreContext.Provider value={store({ leaderboard })}>
+                <LeaderboardView />
+              </LeaderboardStoreContext.Provider>
+            </RoomsStoreContext.Provider>
           );
         });
 

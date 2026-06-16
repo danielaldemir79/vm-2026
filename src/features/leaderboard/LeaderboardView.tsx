@@ -29,8 +29,15 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
-import { StickyFollowToggle } from '../../components/collapsible-list';
+import { useRoomsStore } from '../rooms';
+import { StickyFollowToggle, useCollapseScrollRestore } from '../../components/collapsible-list';
 import { ExpandToggle } from '../../components/ExpandToggle';
+
+// Etikett (eyebrow) ovanför per-rums-topplistans rubrik när INGET aktivt rum kan namnges
+// (utan rum / namnet saknas). Med ett aktivt rum visas rummets NAMN i stället (T92 del A),
+// så det är otvetydigt VILKET rum listan gäller (Daniels feedback: den generiska
+// "VM-poolen" sa inget om vilket rum man tittade på).
+const GENERIC_ROOM_EYEBROW = 'Ditt rum';
 
 // Hur många rader topplistan visar i KOMPRIMERAT default-läge (toppen). En per-rums-topplista
 // kan bli lång (seedade rum har upp till ~200 deltagare, bot-seed-planen), så vi börjar
@@ -140,9 +147,18 @@ function LeaderboardRow({
 
 export function LeaderboardView() {
   const store = useLeaderboardStore();
+  const rooms = useRoomsStore();
   const reduceMotion = useReducedMotion();
   // Animera placerings-ändringar bara om användaren inte valt minska rörelse.
   const animateLayout = !reduceMotion;
+
+  // PER-RUMS-TYDLIGHET (T92 del A): eyebrow:n visar det AKTIVA RUMMETS namn så det är
+  // otvetydigt vilket rum listan gäller. activeRoom är källan (Rooms-providern, EN sanning
+  // för "vilket rum är jag i"). Utan ett aktivt rum (eller om namnet saknas) faller vi till
+  // en generisk etikett , vi gissar aldrig ett rumsnamn. Trimmar för att inte visa en tom
+  // eyebrow om ett rum råkar ha bara blanksteg som namn.
+  const activeRoomName = rooms.activeRoom?.name?.trim();
+  const roomEyebrow = activeRoomName ? activeRoomName : GENERIC_ROOM_EYEBROW;
 
   // KOMPRIMERA/UTFÄLL (#173 T82 del 4): en lång per-rums-topplista börjar komprimerad (topp-N)
   // och fälls ut på begäran, med en STICKY följ-med-komprimera-kontroll i utfällt läge. Vi
@@ -155,6 +171,11 @@ export function LeaderboardView() {
   // toggeln kan ligga långt ner i en utfälld lista. Fäller man ihop därifrån ska fokus föras
   // upp till den ÖVRE (sticky) kontrollen vid listans topp.
   const topToggleRef = useRef<HTMLButtonElement>(null);
+  // KOLLAPS-SCROLL-FIX (T92 del F): den NEDRE toggeln ligger långt ner; fäller man ihop därifrån
+  // ska sektionens ankare också skrollas tillbaka i vy (inte bara fokus flyttas), annars står
+  // sid-scrollen kvar långt ner. Den ÖVRE (sticky) toggeln sköter sin egen scroll via
+  // StickyFollowToggle, så vi scrollar BARA från den nedre här (ingen dubbel-scroll).
+  const { anchorRef, scrollAnchorIntoView } = useCollapseScrollRestore<HTMLElement>();
   function toggleExpanded() {
     setExpanded((prev) => {
       const next = !prev;
@@ -162,6 +183,14 @@ export function LeaderboardView() {
         requestAnimationFrame(() => topToggleRef.current?.focus());
       }
       return next;
+    });
+  }
+  // Kollaps från den NEDRE toggeln: fäll ihop + skrolla ankaret tillbaka i vy (del F).
+  function collapseFromBottom() {
+    setExpanded(false);
+    requestAnimationFrame(() => {
+      topToggleRef.current?.focus();
+      scrollAnchorIntoView();
     });
   }
 
@@ -210,10 +239,17 @@ export function LeaderboardView() {
   }, [store.leaderboard, ready]);
 
   return (
-    <section aria-labelledby="leaderboard-heading" data-leaderboard-view="">
+    // anchorRef = sektionens topp-ankare för kollaps-scroll-fixen (del F): kollaps från den
+    // nedre toggeln skrollar hit tillbaka, så man inte blir kvar långt ner i ett tomrum.
+    <section ref={anchorRef} aria-labelledby="leaderboard-heading" data-leaderboard-view="">
       <header className="flex flex-col gap-2">
-        <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-warning">
-          VM-poolen
+        {/* Eyebrow = AKTIVA RUMMETS namn (T92 del A), så det syns vilket rum listan gäller.
+            data-leaderboard-room = stabil krok för test + design-frontend. */}
+        <p
+          data-leaderboard-room=""
+          className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-warning"
+        >
+          {roomEyebrow}
         </p>
         <h2 id="leaderboard-heading" className="font-display text-xl font-semibold sm:text-2xl">
           Topplista
@@ -324,8 +360,10 @@ export function LeaderboardView() {
                 )}
 
                 {/* NEDRE kontroll (dubblerad, bara i UTFÄLLT läge): så man kan fälla ihop utan att
-                  skrolla tillbaka upp. Identisk semantik som den övre (samma ExpandToggle), och
-                  vid ihopfällning förs fokus upp till den övre (sticky) kontrollen. */}
+                  skrolla tillbaka upp. Identisk semantik som den övre (samma ExpandToggle); vid
+                  ihopfällning förs fokus upp till den övre (sticky) kontrollen OCH sektionens
+                  ankare skrollas tillbaka i vy (del F, collapseFromBottom), så man inte blir kvar
+                  i ett tomrum långt ner. */}
                 {hasMore && expanded ? (
                   <div className="mt-4 flex">
                     <ExpandToggle
@@ -336,7 +374,7 @@ export function LeaderboardView() {
                         collapse: 'Komprimera',
                       }}
                       controls={listId}
-                      onToggle={toggleExpanded}
+                      onToggle={collapseFromBottom}
                       position="bottom"
                       name="leaderboard"
                     />
