@@ -5,6 +5,31 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T83 (F4): ResultEntryView-testets formulär-räkning bytt från getAllByRole('group') till stabil markör
+
+**Beslut:** I `src/features/results/ResultEntryView.test.tsx` räknas synliga matchformulär via en
+ny hjälpare `visibleFormCount()` som använder den stabila markören `form[data-match-id]` (vars
+innersta `<li>` inte är `hidden`), i stället för `screen.getAllByRole('group').length` i de heta
+`waitFor`-looparna och fönster-/utfäll-jämförelserna.
+
+**Varför (samma patologi T90 fixade i App.test.tsx, north-star-specen tilldelar F4 till T83):**
+vyn renderar ALLA 104 matchformulär (out-of-window dolda med `hidden`, inte bortfiltrerade, C2),
+så trädet är stort. `getAllByRole('group')` tvingar Testing Library att för VARJE kandidat både
+matcha rollen OCH avgöra synlighet via `dom-accessibility-api`s `isInaccessible` -> jsdom
+`getComputedStyle`, vars kostnad växer med DOM-storleken; i en `waitFor`-loop betalas den om och
+om igen. Det blåste upp filen till ~31 s under full parallell svit-last (under 20 s-blockens
+timeout men sårbart). Markör-räkningen är ett O(n) `querySelectorAll` + en `hidden`-koll per nod
+(ingen a11y-namnberäkning), så den är billig och deterministisk. Mätt isolerat: filens test-tid
+~14,2 s -> ~9,2 s (~35 % ner), tyngsta testet ~2,8 s -> ~1,5 s.
+
+**Ekvivalent, inte svagare:** "synlig" definieras EXAKT som produktionskoden gör (kommentar i
+`ResultEntryView.tsx`: "getAllByRole('group') räknar bara de synliga"), nämligen ett kort vars
+innersta `<li>` inte är `hidden`. Markören sitter 1:1 med fieldset:en (role=group), så antalet är
+detsamma, och fönster-/utfäll-assertionerna behåller sin diskriminerande kraft (utfälld lista har
+strikt fler synliga formulär än fönstret; ihopfälld går tillbaka till fönster-antalet). De
+genuint a11y-semantiska enskilda queries:na (heading/region/alert/table/rowheader + scoped
+`getByLabelText`) lämnades orörda , de är enträffs- eller subträd-scopade och därmed billiga.
+
 ## 2026-06-16 , T90 re-review-fix: App-testets install-knapp-query bytt från getByRole({name}) till stabil markör
 
 **Beslut:** I `src/App.test.tsx` hittas den kompakta install-knappen (onboarding-klar-grenen) via
