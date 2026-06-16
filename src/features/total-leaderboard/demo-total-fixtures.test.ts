@@ -12,7 +12,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { buildDemoTotalContributions, DEMO_SELF_USER_ID } from './demo-total-fixtures';
-import { buildLeaderboard } from '../leaderboard';
+import { applyLiveResults, buildLeaderboard, derivePoolFacit } from '../leaderboard';
+import { fixtureTeams, fixtureGroups } from '../../data';
+import type { LiveData } from '../../data/livescore';
 import { buildTotalLeaderboard, deriveTotalSelfSummary } from './aggregate-total';
 
 describe('buildDemoTotalContributions', () => {
@@ -70,6 +72,92 @@ describe('buildDemoTotalContributions', () => {
     const totalAgain = buildTotalLeaderboard(again.rooms, again.facit);
     expect(totalAgain.map((e) => [e.userId, e.points, e.rank])).toEqual(
       total.map((e) => [e.userId, e.points, e.rank])
+    );
+  });
+
+  it('exponerar demo-matchlistan (för den preliminära live-overlayn, T84)', () => {
+    expect(Array.isArray(demo.matches)).toBe(true);
+    // Minst DEMO_PLAYED_COUNT matcher är spelade -> facit har poäng (annars vore demon platt).
+    expect(demo.matches.filter((m) => m.status === 'finished').length).toBeGreaterThanOrEqual(16);
+  });
+});
+
+describe('TotalLeaderboard, preliminär (live) overlay i demo-derivationen (T84, #176)', () => {
+  const demo = buildDemoTotalContributions();
+
+  /** En live-rad för en demo-match (status live, valbar ställning). */
+  function liveRow(matchId: string, homeGoals: number, awayGoals: number): LiveData {
+    return {
+      matchId,
+      apiFixtureId: 1,
+      status: 'live',
+      elapsedMinute: 60,
+      homeGoals,
+      awayGoals,
+      events: [],
+      statistics: [],
+      lineups: [],
+      frozen: false,
+      lastSyncedAt: '2026-06-15T19:00:00Z',
+    };
+  }
+
+  /** Bygg den totala listan mot demo-matcherna + en live-overlay (samma väg som providern). */
+  function totalWithLive(liveBy: ReadonlyMap<string, LiveData>) {
+    const preliminaryMatches = applyLiveResults(demo.matches, liveBy);
+    const facit = derivePoolFacit(fixtureTeams, fixtureGroups, preliminaryMatches);
+    return buildTotalLeaderboard(demo.rooms, facit);
+  }
+
+  it('en live-match (ännu ospelad i demon) ändrar den totala listans poäng-spridning', () => {
+    // Plocka en ÄNNU OSPELAD gruppmatch med två kända lag (en demo-match efter DEMO_PLAYED_COUNT).
+    const candidate = demo.matches.find(
+      (m) =>
+        m.status === 'scheduled' &&
+        m.stage === 'group' &&
+        m.homeTeamId !== null &&
+        m.awayTeamId !== null
+    );
+    expect(candidate).toBeDefined();
+
+    const baseline = buildTotalLeaderboard(demo.rooms, demo.facit);
+    const withLive = totalWithLive(new Map([[candidate!.id, liveRow(candidate!.id, 2, 1)]]));
+
+    // Live-resultatet på en tidigare ospelad match ger NÅGON deltagare nya match-tips-poäng,
+    // så den totala poäng-summan över listan ökar (placeringar rör sig). Diskriminerande mot
+    // baslinjen (utan overlay), så det är overlayn , inte fixturen , som driver rörelsen.
+    const sum = (rows: { points: number }[]) => rows.reduce((a, r) => a + r.points, 0);
+    expect(sum(withLive)).toBeGreaterThan(sum(baseline));
+  });
+
+  it('INGEN live-data: den totala listan är IDENTISK med den officiella (overlayn rör inget)', () => {
+    const withoutLive = totalWithLive(new Map());
+    const baseline = buildTotalLeaderboard(demo.rooms, demo.facit);
+    expect(withoutLive.map((e) => [e.userId, e.points, e.rank])).toEqual(
+      baseline.map((e) => [e.userId, e.points, e.rank])
+    );
+  });
+
+  it('KONVERGENS: live-resultat == samma officiellt inmatat resultat ger samma totala lista', () => {
+    const candidate = demo.matches.find(
+      (m) =>
+        m.status === 'scheduled' &&
+        m.stage === 'group' &&
+        m.homeTeamId !== null &&
+        m.awayTeamId !== null
+    )!;
+    // PRELIMINÄRT: matchen live 2-1.
+    const preliminary = totalWithLive(new Map([[candidate.id, liveRow(candidate.id, 2, 1)]]));
+    // OFFICIELLT: matchen inmatad som finished 2-1 (live-overlayn hoppar den då, facit vinner).
+    const officialMatches = demo.matches.map((m) =>
+      m.id === candidate.id
+        ? ({ ...m, status: 'finished', result: { homeGoals: 2, awayGoals: 1 } } as const)
+        : m
+    );
+    const officialFacit = derivePoolFacit(fixtureTeams, fixtureGroups, officialMatches);
+    const official = buildTotalLeaderboard(demo.rooms, officialFacit);
+    expect(preliminary.map((e) => [e.userId, e.points, e.rank])).toEqual(
+      official.map((e) => [e.userId, e.points, e.rank])
     );
   });
 

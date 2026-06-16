@@ -16,6 +16,10 @@ export type {
   LiveTeamStatistics,
 } from './live-types';
 
+// Delat predikat: pågår matchen just nu (live/paus)? EN sanning, delad av LIVE-indikatorn,
+// "LIVE NU"-blocket och den preliminära live-topplistan (T84).
+export { isMatchInProgress } from './live-types';
+
 // Rena parsers (API-Footballs råa svar -> normaliserade typer).
 export {
   normalizeStatus,

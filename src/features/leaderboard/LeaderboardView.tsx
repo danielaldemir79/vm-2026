@@ -254,6 +254,28 @@ export function LeaderboardView() {
         <h2 id="leaderboard-heading" className="font-display text-xl font-semibold sm:text-2xl">
           Topplista
         </h2>
+
+        {/* LIVE/PRELIMINÄR-indikator (T84, #176): syns ENDAST när minst en match pågår just nu
+            och dess löpande ställning räknas in i placeringarna. Ärligt märkt , poängen är
+            PRELIMINÄR (kan ändras tills matchen är klar och det officiella resultatet matats in),
+            samma ärliga "preliminärt läge"-anda som det levande slutspelsträdet (T56). När ingen
+            match pågår visas inget av detta och topplistan är det officiella läget exakt som förr.
+            Den pulsande pricken (vm-live-dot) stannar vid reducerad rörelse (index.css). aria-live
+            polite så en skärmläsare hör när läget slår om till live utan att stjäla fokus. */}
+        {store.livePreliminary ? (
+          <p
+            data-leaderboard-live=""
+            aria-live="polite"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-accent"
+          >
+            <span
+              aria-hidden="true"
+              className="vm-live-dot inline-block h-2 w-2 rounded-pill bg-accent"
+            />
+            <span>Live, preliminära placeringar medan matcher pågår</span>
+          </p>
+        ) : null}
+
         <p className="max-w-2xl text-sm text-fg-muted">
           Vem tippar bäst? Poängen tickar in när matcher avgörs, från match-resultat, gruppvinnare
           och slutspel. Lika poäng delar placering.

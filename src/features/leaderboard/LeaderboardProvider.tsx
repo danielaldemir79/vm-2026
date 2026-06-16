@@ -29,7 +29,9 @@ import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-br
 import { isSupabaseConfigured, LIVE_READY } from '../../data';
 import { useRoomsStore } from '../rooms';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
+import { useLiveData } from '../daily/use-live-data';
 import { useLeaderboardData } from './use-leaderboard-data';
+import { applyLiveResults, hasLivePreliminaryMatch } from './apply-live-results';
 import { derivePoolFacit } from './derive-facit';
 import { buildLeaderboard, scoreMemberBreakdown, type MemberPredictions } from './aggregate-scores';
 import { deriveMemberBadges } from './derive-badges';
@@ -84,6 +86,11 @@ export function LeaderboardProvider({
 }: LeaderboardProviderProps) {
   const rooms = useRoomsStore();
   const data = useLeaderboardData(env);
+  // LIVE-DATA (T84, #176): den persisterade live-ställningen per match-id, färsk via samma
+  // realtid/poll/fokus-skyddsnät som dagsvyn (useLiveData, en sanning för "hur live-data hålls
+  // färsk" , vi bygger ingen egen hämtning). En ny live-ställning -> ny byMatchId-referens ->
+  // den preliminära overlayn + topplistan räknas om, så placeringarna rör sig i realtid.
+  const liveData = useLiveData(env, liveReady);
   const activeRoomId =
     activeRoomIdProp !== undefined ? activeRoomIdProp : (rooms.activeRoom?.id ?? null);
   // Tips-invaliderings-räknaren ur rooms-storen (T61 #110): bumpas efter en lyckad
@@ -216,10 +223,34 @@ export function LeaderboardProvider({
 
   const error = data.error ?? predictionsError;
 
-  // Härled facit ur den DELADE matchlistan (rummets resultat redan invävda).
+  // Härled det OFFICIELLA facit ur den delade matchlistan (officiella resultat invävda, T42).
+  // Detta är den OFFICIELLA sanningen: reveal, käll-uppdelningen, märken och personlig statistik
+  // läser ALLTID detta (de är retrospektiva, mot avgjorda officiella resultat), aldrig live-lagret.
   const facit = useMemo(
     () => derivePoolFacit(data.teams, data.groups, data.matches),
     [data.teams, data.groups, data.matches]
+  );
+
+  // PRELIMINÄR (live) overlay (T84, #176): lägg den löpande live-ställningen ovanpå de OFFICIELLA
+  // matcherna BARA för matcher som pågår just nu och ännu saknar officiellt facit (REN funktion,
+  // ingen skriv-väg, konvergerar mot facit när det matas in , se apply-live-results.ts). Det
+  // preliminära facit härleds via SAMMA derivePoolFacit, så topplistan poängsätts identiskt , bara
+  // matchlistan skiljer (live-ställningar för pågående matcher). När INGEN match pågår är de
+  // preliminära matcherna === de officiella (samma referens), och preliminaryFacit === facit.
+  const preliminaryMatches = useMemo(
+    () => applyLiveResults(data.matches, liveData.byMatchId),
+    [data.matches, liveData.byMatchId]
+  );
+  const preliminaryFacit = useMemo(
+    () => derivePoolFacit(data.teams, data.groups, preliminaryMatches),
+    [data.teams, data.groups, preliminaryMatches]
+  );
+  // Är topplistan PRELIMINÄR just nu? Sant ENBART när minst en match faktiskt pågår med en
+  // löpande ställning (samma reachbarhets-villkor som overlayn), så indikatorn aldrig tänds utan
+  // att overlayn faktiskt lagt på något. Annars false -> vyn visar det officiella läget som förut.
+  const livePreliminary = useMemo(
+    () => hasLivePreliminaryMatch(data.matches, liveData.byMatchId),
+    [data.matches, liveData.byMatchId]
   );
 
   // Gruppera tipsen per medlem (userId) för aggregeringen.
@@ -245,10 +276,12 @@ export function LeaderboardProvider({
     return byUser;
   }, [predictions]);
 
-  // Bygg topplistan (alla medlemmar, även de utan tips -> 0p, med i listan).
+  // Bygg topplistan (alla medlemmar, även de utan tips -> 0p, med i listan). Mot det
+  // PRELIMINÄRA facit (T84): placeringarna rör sig i realtid när mål trillar. När ingen match
+  // pågår är preliminaryFacit === facit, så listan är då identisk med den officiella.
   const leaderboard = useMemo(
-    () => buildLeaderboard(rooms.members, predictionsByUser, facit),
-    [rooms.members, predictionsByUser, facit]
+    () => buildLeaderboard(rooms.members, predictionsByUser, preliminaryFacit),
+    [rooms.members, predictionsByUser, preliminaryFacit]
   );
 
   // Bygg avslöjandet (per avgjord+låst match), med medlemmarnas namn.
@@ -309,6 +342,8 @@ export function LeaderboardProvider({
       error,
       activeRoomId,
       leaderboard,
+      // T84 (#176): är topplistan preliminär (minst en match pågår)? Driver "live"-indikatorn.
+      livePreliminary,
       reveal,
       teams: data.teams,
       // "Du"-framhävningens seam: rummets auth-identitet (null tills sessionen klar).
@@ -326,6 +361,7 @@ export function LeaderboardProvider({
       error,
       activeRoomId,
       leaderboard,
+      livePreliminary,
       reveal,
       data.teams,
       rooms.userId,

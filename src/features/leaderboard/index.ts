@@ -40,6 +40,10 @@ export {
   type GroupFacit,
   type BracketFacit,
 } from './derive-facit';
+
+// T84 (#176): PRELIMINÄR (live) resultat-overlay + dess "pågår nu?"-predikat. REN, ingen
+// skriv-väg, konvergerar mot facit. Delas av per-rums-topplistan + den totala (demo-derivationen).
+export { applyLiveResults, hasLivePreliminaryMatch } from './apply-live-results';
 export {
   buildMatchReveal,
   type RevealedMatch,

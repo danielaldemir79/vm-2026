@@ -23,8 +23,10 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getSupabaseClient, type VmSupabaseClient } from '../../data/supabase-browser';
-import { isSupabaseConfigured, LIVE_READY } from '../../data';
+import { fixtureTeams, fixtureGroups, isSupabaseConfigured, LIVE_READY } from '../../data';
 import { loadGlobalLeaderboard } from '../../data/global-leaderboard';
+import { applyLiveResults, derivePoolFacit } from '../leaderboard';
+import { useLiveData } from '../daily/use-live-data';
 import { useRoomsStore } from '../rooms';
 import {
   buildTotalLeaderboard,
@@ -60,10 +62,37 @@ export function TotalLeaderboardProvider({
   const rooms = useRoomsStore();
   const liveConfigured = isSupabaseConfigured(env) && liveReady;
 
+  // LIVE-DATA (T84, #176): samma färska live-ställning som per-rums-topplistan + dagsvyn
+  // (useLiveData). Driver den PRELIMINÄRA overlayn i DEMO-derivationen nedan.
+  const liveData = useLiveData(env, liveReady);
+
   // DEMO: bygg den RÄTTVISA totalen lokalt ur fixtures (deterministiskt, EN gång). Bara i
   // demo-läge; i live-läge är den oanvänd. useMemo med tom dep = stabil.
   const demo = useMemo(() => buildDemoTotalContributions(), []);
-  const demoTotal = useMemo(() => buildTotalLeaderboard(demo.rooms, demo.facit), [demo]);
+  // PRELIMINÄR (live) demo-derivation (T84): lägg live-overlayn ovanpå demo-matchlistan och
+  // härled ett preliminärt facit via SAMMA väg som per-rums-listan (applyLiveResults ->
+  // derivePoolFacit), så den totala listan rör sig i realtid under matcher OCH den live-medvetna
+  // derivationen är korrekt på plats för när den globala flaggan slås på. När ingen match pågår
+  // är preliminaryDemoFacit === demo.facit (overlayn rör inget), så demon är då oförändrad.
+  //
+  // VIKTIGT, SCOPE (out of scope: ändra pollaren / un-hide global): i LIVE-läge byggs den globala
+  // listan SERVER-SIDE (loadGlobalLeaderboard, edge-funktion) av samma TS-motor, så den
+  // preliminära live-overlayn hör hemma DÄR (pollaren/edge-funktionen), inte i klienten. Vi rör
+  // alltså inte live-vägen här , bara demo-derivationen, som ÄR den totala komponentens
+  // klient-derivation (och det enda som körs medan den globala flaggan är av).
+  const preliminaryDemoFacit = useMemo(
+    () =>
+      derivePoolFacit(
+        fixtureTeams,
+        fixtureGroups,
+        applyLiveResults(demo.matches, liveData.byMatchId)
+      ),
+    [demo, liveData.byMatchId]
+  );
+  const demoTotal = useMemo(
+    () => buildTotalLeaderboard(demo.rooms, preliminaryDemoFacit),
+    [demo.rooms, preliminaryDemoFacit]
+  );
 
   // LIVE: den server-byggda, rättvisa, säkra listan (edge-funktionen). EPOCH-vakt (samma
   // mönster som T17): ett föråldrat svar får aldrig visa fel lista.

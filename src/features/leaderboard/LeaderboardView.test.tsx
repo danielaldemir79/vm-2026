@@ -14,6 +14,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     error: null,
     activeRoomId: 'r1',
     leaderboard: [],
+    livePreliminary: false,
     reveal: [],
     teams: [],
     currentUserId: null,
@@ -93,6 +94,24 @@ describe('LeaderboardView, lägen', () => {
   it('TOM lista (inga medlemmar) visar tom-text', () => {
     const { container } = renderView(store({ leaderboard: [] }));
     expect(container.querySelector('[data-leaderboard-empty]')).toBeInTheDocument();
+  });
+});
+
+describe('LeaderboardView, live/preliminär-indikator (T84, #176)', () => {
+  it('visar live-indikatorn ENBART när livePreliminary är true (en match pågår)', () => {
+    const { container } = renderView(
+      store({ leaderboard: [entry('u1', 'Anna', 3, 1)], livePreliminary: true })
+    );
+    const indicator = container.querySelector('[data-leaderboard-live]');
+    expect(indicator).toBeInTheDocument();
+    expect(indicator).toHaveTextContent('Live, preliminära placeringar medan matcher pågår');
+  });
+
+  it('döljer live-indikatorn när ingen match pågår (livePreliminary false = dagens beteende)', () => {
+    const { container } = renderView(
+      store({ leaderboard: [entry('u1', 'Anna', 5, 1)], livePreliminary: false })
+    );
+    expect(container.querySelector('[data-leaderboard-live]')).not.toBeInTheDocument();
   });
 });
 
