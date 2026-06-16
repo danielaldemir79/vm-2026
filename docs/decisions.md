@@ -5,6 +5,35 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T96 (#193): Rum-kontext , RoomSection överst i Tips + persistent rum-pill i app-baren + globala topplistan dold
+
+**Beslut (RoomSection överst i Tips):** Hela RoomSection flyttades till TOPPEN av Tips-fliken (låg
+förr sist, efter match-/grupp-/bracket-tipsen). **Varför:** rum-valet är PRIMÄRT , man väljer rum
+först (vem tippar man mot) och rum-kontexten styr både tipsen OCH Topplistan, så att gömma rum-valet
+längst ner var bakvänt (Daniels live-feedback). Skapa rum / gå med via kod + T94:s komprimerade
+medlems-rutnät bor kvar i RoomSection, bara placeringen ändrades (återanvänd, bygg inte om).
+
+**Beslut (persistent rum-pill i app-baren, RoomPill):** Det aktiva rummet visas , och kan bytas ,
+via en liten pill i app-bar-headern (utanför flik-panelerna), så den syns på ALLA flikar
+(Idag/Tips/Topplista/Turnering/Mer), inte bara i RoomSection (Tips). **En sanning:** pillen är en
+tunn konsument av samma rums-store som RoomSection (`useRoomsStore`), så ett byte i pillen är samma
+`activeRoom` som ett byte i RoomSection , de rum-scopade vyerna (Tips + Topplista) följer med direkt.
+**Synlighets-grenar (taskens 1-vs-N-krav):** rummen vilande ELLER inget aktivt rum -> pillen är null
+(app-baren ser ut som förr); exakt 1 rum -> en STILLA etikett (ingen växlare , en knapp som "byter"
+mellan 1 rum vore en död affordans); 2+ rum -> en knapp (`aria-haspopup=menu`) som öppnar en liten
+meny (`role=menu` + `menuitemradio`, aktivt rum bär `aria-checked` + `aria-current`), byte på ett tap.
+**Varför en lättviktig meny, inte den delade Modal:** ett snabbt rum-byte ska vara ETT tap utan
+modal-ceremoni (KISS); menyn äger ändå full a11y (tangentbord, fokus-flytt till aktivt rum vid
+öppning, Escape + klick-utanför stänger och returnerar fokus till knappen, reduced-motion-gated CSS).
+
+**Beslut (globala topplistan dold bakom flagga):** Den globala (cross-rum) TotalLeaderboardSection
+renderas inte längre ovillkorligt utan bakom `const GLOBAL_LEADERBOARD_ENABLED = false` (App.tsx).
+**Varför:** dess edge-funktion (global-leaderboard) BOOT-KRASCHAR (503, trasig sedan T90) i live-läge,
+och vi vill inte visa en trasig/fel-ruta för den globala topplistan. **Tänd igen:** flippa flaggan
+till `true` när edge-funktionen är fixad (eget spår) , inget annat behöver röras, render-grenen tänder
+sektionen oförändrad. Per-rums-topplistan (LeaderboardSection) + "vad alla tippade"-listan
+(RevealSection) är KVAR och opåverkade , bara den globala cross-rum-rankningen togs bort ur Topplista.
+
 ## 2026-06-16 , T94 (#187): Medlemslista , komprimera + linjerat rutnät (egen rad pinnad överst)
 
 **Beslut (linjerat rutnät i stället för flex-wrap):** Medlemslistan är nu ett CSS grid

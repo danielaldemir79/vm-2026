@@ -287,6 +287,43 @@ describe('App-skalet, Idag avlastad (U2) + Mer-relocations + toast-placering (F3
   });
 });
 
+// T96 (#193): den GLOBALA (cross-rum) topplistan DÖLJD bakom flaggan GLOBAL_LEADERBOARD_ENABLED
+// (edge-funktionen 503:ar, trasig sedan T90). Den ska INTE renderas i Topplista-fliken, men
+// per-rums-topplistan + reveal-listan ska vara KVAR. Tänd igen genom att flippa flaggan i App.tsx.
+describe('App-skalet, globala topplistan dold bakom flagga (T96, #193)', () => {
+  it('renderar INTE den globala (total) topplistan i Topplista-fliken (flagga av)', async () => {
+    renderApp();
+    await waitForAppSettled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Topplista' }));
+
+    const topplistaPanel = document.querySelector('[data-tab-panel="topplista"]');
+    expect(topplistaPanel).not.toBeNull();
+    // Den globala vyn (data-total-leaderboard-view) renderades FÖRR i fixtures-läge (~240
+    // demo-deltagare); med flaggan av ska den vara helt borta, ingen trasig/fel-ruta heller.
+    expect(topplistaPanel?.querySelector('[data-total-leaderboard-view]')).toBeNull();
+    // Ingen fel-/boundary-ruta för den globala topplistan ska heller synas.
+    expect(topplistaPanel?.textContent).not.toContain('den globala topplistan');
+  });
+
+  it('Topplista-panelen renderar lugnt utan globala sektionen (ingen fel-/fallback-ruta)', async () => {
+    // Att gömma globala sektionen får inte lämna Topplista-fliken trasig: panelen ska
+    // finnas, rendera utan en ErrorBoundary-fallback (data-error-boundary), och utan den
+    // globala vyn. (Per-rums-topplistan + reveal-listan gatas på sina stores enabled och
+    // renderar inget INNEHÅLL i fixtures-läge oavsett T96; deras faktiska rendering vaktas
+    // i deras egna komponent-tester. Här bevisar vi att globala-borttaget är ofarligt.)
+    renderApp();
+    await waitForAppSettled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Topplista' }));
+
+    const topplistaPanel = document.querySelector('[data-tab-panel="topplista"]');
+    expect(topplistaPanel).not.toBeNull();
+    // Ingen krasch-fallback i panelen (boundaryn renderar bara en ruta VID fel).
+    expect(topplistaPanel?.querySelector('[data-error-boundary]')).toBeNull();
+    // Och den globala vyn är borta (kärn-ändringen).
+    expect(topplistaPanel?.querySelector('[data-total-leaderboard-view]')).toBeNull();
+  });
+});
+
 // Den kompakta install-knappen (T63, #113) gatas bakom onboarding-touren (T39/#68, F1):
 // touren är en z-50 helskärms-overlay vid första besöket och ligger ÖVER ytan, så knappen
 // skulle se ut att "inte göra något". Medan touren är öppen ska install-knappen alltså

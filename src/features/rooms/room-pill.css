@@ -1,0 +1,209 @@
+/* =============================================================================
+   APP-BAR RUM-PILLEN (T96, #193).
+   =============================================================================
+
+   Den persistenta rum-väljaren i app-baren: visar aktivt rum på ALLA flikar och
+   (vid 2+ rum) låter en byta rum med ett tap. Stilen följer appens etablerade
+   form-språk , en lugn, accent-tonad pill i samma familj som rums-UI:ts action-
+   knappar (.vm-rooms-action) och de övriga app-bar-kontrollerna, aldrig en grell
+   egen stil.
+
+   ÄGARSKAP: RoomPill.tsx äger semantiken (role/aria, data-room-pill-*, fokus-/
+   tangentbords-mekaniken). Detta lager STYLAR ovanpå hakarna (samma seam-princip
+   som resten av rums-UI:t) och rör inte logiken.
+
+   KONTRAST (WCAG AA): ALL text (rum-namnet) står på en OPAK yta (surface + en låg-
+   alfa accent-tint = nästan-opak) i fg (full kontrast). Accent-tonen lever bara i
+   yta + kant, aldrig som text-färg, så ingen text-kontrast hänger på den. Menyns
+   alternativ står på surface-raised (samma opaka yta som appens popovers/pickers,
+   redan AA-mätt). Glyfer/chevron/bock är aria-hidden dekor (currentColor = fg).
+
+   RÖRELSE: den enda animationen är menyns mjuka in-känsla, gatad på
+   prefers-reduced-motion (no-preference). Pillens hover/fokus är delade övergångar
+   som den svepande reduced-motion-grinden i index.css nollar.
+   ========================================================================== */
+
+/* Grund-pillen (delad form för den stilla etiketten + den bytbara knappen): en lugn
+   accent-tonad pill, kompakt så den får plats i app-baren bredvid kugghjul + tema. */
+.vm-room-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 11rem;
+  height: 2.25rem;
+  padding-inline: 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Rum-namnet: huggs med ellipsis så ett långt rum-namn aldrig spränger app-baren
+   (min-w-0 + truncate-recept). Namnet bär identiteten; glyf/chevron är dekor. */
+.vm-room-pill-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Glyfen + chevronen: dämpad (men AA-säker) accent-ton, ren dekor (aria-hidden). */
+.vm-room-pill-glyph,
+.vm-room-pill-chevron {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--color-accent) 70%, var(--color-fg));
+}
+
+/* Den STILLA etiketten (exakt 1 rum): inte interaktiv, så ingen hover/cursor-affordans
+   , den ska INTE se ut som en knapp man kan trycka på (det finns inget att fälla ut). */
+.vm-room-pill-static {
+  cursor: default;
+}
+
+/* Den BYTBARA knappen (2+ rum): en riktig knapp med hover-lyft + fokus-ring. */
+.vm-room-pill-trigger {
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.vm-room-pill-trigger:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+  box-shadow: var(--vm-shadow-card);
+}
+
+/* Synlig tangentbords-fokus (WCAG 2.4.7), samma accent-ring-recept som appens övriga
+   kontroller. focus-visible => musklick ger ingen ring, tangentbord gör det. */
+.vm-room-pill-trigger:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
+/* Chevronen vrids när menyn är öppen (form-buren "nu öppen", utöver aria-expanded). */
+.vm-room-pill-trigger[aria-expanded='true'] .vm-room-pill-chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-room-pill-chevron {
+    transition: transform 0.18s ease;
+  }
+}
+
+/* Wrappern bär den absolut-placerade menyn (stacking-kontext + ankarpunkt). */
+.vm-room-pill-wrap {
+  position: relative;
+}
+
+/* MENYN: en liten popover-yta under pillen. surface-raised (samma opaka yta som
+   appens övriga popovers/pickers) + en mjuk höjd, så den läser som ett svävande
+   lager. Höger-justerad mot pillen (app-baren ligger till höger på desktop) men
+   klampad så den aldrig sticker ut ur viewporten på smal skärm. z-40: under
+   modaler/onboarding (z-50) men över sid-innehåll + flik-raden (z-30). */
+.vm-room-pill-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 40;
+  min-width: max(11rem, 100%);
+  max-width: min(16rem, calc(100vw - 1.5rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.375rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-raised);
+  box-shadow:
+    var(--vm-shadow-raised),
+    inset 0 1px 0 0 color-mix(in srgb, var(--vm-gold) 14%, transparent);
+}
+
+/* MENY-ALTERNATIVET (en rad per rum): en lugn list-rad. Text = fg (full kontrast på
+   surface-raised). Hover/fokus får en mjuk yt-ton, det aktiva en accent-tint. */
+.vm-room-pill-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.vm-room-pill-item:hover,
+.vm-room-pill-item:focus-visible {
+  background-color: color-mix(in srgb, var(--color-fg) 6%, var(--color-surface-raised));
+}
+
+/* Fokus-ring (WCAG 2.4.7) på den tangentbords-fokuserade raden, utöver hover-tonen. */
+.vm-room-pill-item:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+/* Det AKTIVA rummets rad: en lugn accent-tint + accent-tonad bock. Markeringen är
+   FÄRG-OBEROENDE (aria-checked + aria-current + bock-glyfen bär den), tinten är bara
+   förstärkning. font-semibold ger den lite mer närvaro. */
+.vm-room-pill-item[data-room-pill-active='true'] {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-raised));
+  font-weight: 600;
+}
+
+.vm-room-pill-item[data-room-pill-active='true']:hover,
+.vm-room-pill-item[data-room-pill-active='true']:focus-visible {
+  background-color: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface-raised));
+}
+
+.vm-room-pill-item-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Bock-markören: en fast liten kolumn så raderna ligger i linje med/utan bock. Den
+   aktiva radens bock är accent-tonad (AA mot tinten ej kritiskt , glyf är dekor, men
+   den hålls läsbar). */
+.vm-room-pill-check {
+  flex-shrink: 0;
+  width: 0.9rem;
+  text-align: center;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
+/* Menyns mjuka in-känsla: en kort fade + nedglid FRÅN pillen, gatad på reduced-motion
+   (no-preference). Den som bett om minskad rörelse får menyn direkt i vilo-läget. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-room-pill-menu {
+    transform-origin: top right;
+    animation: vm-room-pill-menu-in 0.14s ease-out;
+  }
+
+  @keyframes vm-room-pill-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}

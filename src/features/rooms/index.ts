@@ -2,6 +2,8 @@
 
 export { RoomsProvider, type RoomsProviderProps } from './RoomsProvider';
 export { RoomPanel, RoomSection } from './RoomPanel';
+// T96 (#193): persistent rum-väljare i app-baren (aktivt rum + snabbyte på alla flikar).
+export { RoomPill } from './RoomPill';
 export {
   useRoomsStore,
   useRoomsSync,
