@@ -5,6 +5,32 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T94 (#187): Medlemslista , komprimera + linjerat rutnät (egen rad pinnad överst)
+
+**Beslut (linjerat rutnät i stället för flex-wrap):** Medlemslistan är nu ett CSS grid
+(`.vm-rooms-member-grid` i rooms.css) med **fast responsivt kolumnantal** (2 kol mobil ->
+3 vid >=640px -> 4 vid >=1024px) och `grid-template-columns: repeat(N, minmax(0, 1fr))`, så alla
+chips blir exakt lika breda och raderna ligger i linje. Det gamla `flex-wrap`:et gav olika breda
+chips som radbröt raggat (Daniels skärmdump 2026-06-16). **Varför `minmax(0, 1fr)` och inte `1fr`:**
+`1fr` = `minmax(auto, 1fr)`, och `auto`-miniminet är cellens min-content, så ett långt namn vägrar
+krympa och spränger sin kolumn (då hjälper inte `truncate` på chip:en). `minmax(0, ...)` låter
+cellen krympa under sitt innehåll så ellipsis (`truncate`) faktiskt slår in. Brytpunkterna matchar
+Tailwinds sm/lg, samma skala som resten av appen.
+
+**Beslut (komprimering via CollapsibleBody, inte CollapsibleList):** Rutnätet komprimeras med den
+delade **CollapsibleBody** (höjd-klipp + gradient-fade + EN expandera-kontroll), samma primitiv som
+appens övriga grid-sektioner (GroupStage/Bracket/Admin). **Varför inte CollapsibleList:s render-
+subset:** rutnätet är responsivt (2/3/4 kol per skärmbredd) och en render-subset kan inte veta
+brytpunkten vid render-tid , exakt motivet CollapsibleBody dokumenterades för i T68. Höjd-klipp +
+egen rad pinnad överst ger den ärliga "ett par medlemmar synliga"-teasern oavsett bredd. Komprimerar
+bara vid 4+ medlemmar (`COLLAPSE_THRESHOLD = 3`); 1-3 ryms utan vägg och visas direkt.
+
+**Beslut (egen rad pinnad överst + "DU"-markering återanvänd):** Den egna raden sorteras FÖRST
+(stabil sort i MemberGrid, presentationslager , rör inte rums-/medlems-datalogiken) och bär den
+BEFINTLIGA "DU"-markeringen (MemberChip `data-self` + "(du)" + accent-kant i rooms.css, north-star
+§5). `selfUserId` kan vara null (anonym auth inte etablerad) , då matchar ingen rad och inget pinnas
+(vi gissar aldrig vem användaren är).
+
 ## 2026-06-16 , T92 (#185): Topplista-UX-städning (ordning, per-rums-tydlighet, global topp-10 + förändring, reveal-flytt, egen-rad, kollaps-scroll)
 
 **Beslut (Topplista-flikens ordning + per-rums-tydlighet, del A):** Topplista-fliken = per-rums-

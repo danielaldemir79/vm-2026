@@ -137,6 +137,32 @@
   background-color: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
 }
 
+/* LINJERAT MEDLEMS-RUTNÄT (T94, #187): ett ENHETLIGT CSS grid i stället för det gamla
+   flex-wrap:et (olika breda chips som radbröt raggat , Daniels skärmdump). FAST responsivt
+   kolumnantal (2 -> 3 -> 4 vid brytpunkterna) med `minmax(0, 1fr)`-celler, så ALLA chips
+   blir EXAKT lika breda och raderna ligger i linje. `minmax(0, ...)` (inte bara `1fr`) är
+   det som låter cellens innehåll KRYMPA under sitt intrinsic min-content , utan det skulle
+   ett långt namn vägra krympa och spränga sin kolumn (då hjälper inte truncate på chip:en).
+   Långa namn klipps sedan med ellipsis (.vm-rooms-member .truncate i TSX). Brytpunkterna
+   matchar Tailwinds sm/lg (640/1024px), samma skala som resten av appen. */
+.vm-rooms-member-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .vm-rooms-member-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .vm-rooms-member-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 /* -----------------------------------------------------------------------------
    5. MINA RUM-VÄLJAREN: aktiv-pricken tänds (accent) för det valda rummet, släckt
    (dämpad kant-ton) annars. Markeringen är form-/text-buren (aria-pressed + en
