@@ -8,20 +8,25 @@
 // rum med ETT tap, oavsett vilken flik man står på.
 //
 // SKAPA/GÅ MED FRÅN PILLEN (Daniels tillägg 2026-06-16): menyn bär OCKSÅ "Skapa rum"
-// och "Gå med i rum", så man kommer åt rum-hanteringen från VILKEN flik som helst.
-// De två valen byter inte rum här , de navigerar till RoomSection (överst i Tips) och
-// scrollar/fokuserar RÄTT formulär (skapa vs gå med), så man "hamnar på rätt sektion
-// för det" utan att leta. Själva formulären bor kvar i RoomSection (en sanning); pillen
-// är bara en genväg dit (onOpenRooms, ägd av App-skalet som äger flik-navigeringen).
+// och "Gå med i rum", så man kommer åt rum-hanteringen från VILKEN flik som helst , och
+// ÄVEN när man inte är med i något rum än (då är pillen en "Rum"-CTA: enda menyvalen är
+// skapa/gå-med, så en ny användare kan gå med den vägen). De två valen byter inte rum ,
+// de navigerar till RoomSection (överst i Tips) och scrollar/fokuserar RÄTT formulär
+// (skapa vs gå med), så man "hamnar på rätt sektion för det" utan att leta. Själva
+// formulären bor kvar i RoomSection (en sanning); pillen är bara en genväg dit
+// (onOpenRooms, ägd av App-skalet som äger flik-navigeringen).
 //
 // SYNLIGHETS-GRENAR:
-//   * Rummen inaktiva (enabled=false, fixtures-/lokalt läge) ELLER inget aktivt rum:
-//     pillen renderar NULL (ingen tom platta, inget att välja , appen ser ut som förr).
-//   * Aktivt rum (1 eller flera): pillen är en KNAPP (aria-haspopup=menu) som öppnar en
-//     liten meny. Vid 2+ rum listar menyn rummen (byt aktivt med ett tap, aktivt rum
-//     markerat) FÖRE skapa/gå-med-valen; vid exakt 1 rum finns inget att byta MELLAN, så
-//     menyn visar bara skapa/gå-med-valen (ingen meningslös 1-rads-växlare). Pillens
-//     etikett bär alltid det aktiva rummets namn, så "var är jag" syns utan att öppna.
+//   * Rummen INAKTIVA (enabled=false, fixtures-/lokalt läge): pillen renderar NULL , det
+//     sociala lagret är vilande, app-baren ser ut precis som förr.
+//   * Aktiverade men INGET aktivt rum (ny användare, inte med någonstans än): pillen är
+//     en "Rum"-CTA , en menyknapp vars enda val är skapa/gå-med (så man kan gå med via
+//     pillen). Visas bara när App gett en hemvist att navigera till (onOpenRooms), annars
+//     null (ingen död knapp).
+//   * AKTIVT rum (1 eller flera): pillen visar rummets namn och är en menyknapp
+//     (aria-haspopup=menu). Vid 2+ rum listar menyn rummen (byt aktivt med ett tap,
+//     aktivt rum markerat) FÖRE skapa/gå-med-valen; vid exakt 1 rum finns inget att byta
+//     MELLAN, så menyn visar bara skapa/gå-med-valen (ingen meningslös 1-rads-växlare).
 //
 // A11Y: knappen bär aria-haspopup + aria-expanded; menyn är en role="menu". Rum-raderna
 // är role="menuitemradio" (radio: exakt ETT aktivt rum), det aktiva bär aria-checked +
@@ -43,26 +48,27 @@ export type RoomFormTarget = 'create' | 'join';
 /**
  * App-bar-pillen: aktivt rum + snabbyte + genväg till skapa/gå-med. Tunn konsument av
  * rums-storen (ett byte här är samma activeRoom som RoomSection byter , en sanning).
- * Renderar null när det inte finns något rum att visa, så app-baren ser ut precis som
- * förr i fixtures-/lokalt läge.
  *
  * `onOpenRooms` (ägs av App-skalet, som äger flik-navigeringen): navigerar till
  * RoomSection och fokuserar rätt formulär. Valfri , utan den faller skapa/gå-med-valen
  * tyst bort (de visas bara när det finns en hemvist att navigera till), så pillen kan
- * renderas isolerat (tester) utan att veta om flik-routern.
+ * renderas isolerat (tester) utan att veta om flik-routern. Utan aktivt rum OCH utan
+ * onOpenRooms finns inget att visa -> null.
  */
 export function RoomPill({ onOpenRooms }: { onOpenRooms?: (target: RoomFormTarget) => void }) {
   const store = useRoomsStore();
 
-  // Inget att visa: rummen vilande (fixtures/lokalt) ELLER inget aktivt rum valt än.
-  // Då bär app-baren ingen pill (ingen tom platta, ingen växlare som pekar på inget).
-  if (!store.enabled || store.activeRoom === null) {
+  // Rummen vilande (fixtures/lokalt): det sociala lagret är av, app-baren ser ut som förr.
+  if (!store.enabled) {
     return null;
   }
 
-  // Aktivt rum (1 eller flera): den bytbara/handlings-bärande menyn. Vid exakt 1 rum
-  // finns inget att byta MELLAN, men menyn bär ändå skapa/gå-med-valen (Daniels krav:
-  // nå rum-hanteringen från pillen oavsett antal rum).
+  // Utan aktivt rum kan pillen ändå vara en "gå med / skapa rum"-CTA , men bara om App
+  // gett en hemvist att navigera till (onOpenRooms). Saknas den finns inget att visa.
+  if (store.activeRoom === null && onOpenRooms === undefined) {
+    return null;
+  }
+
   return (
     <RoomPillMenu
       rooms={store.myRooms}
@@ -77,7 +83,7 @@ export function RoomPill({ onOpenRooms }: { onOpenRooms?: (target: RoomFormTarge
  * Menyn: en knapp som öppnar en liten meny för att byta aktivt rum (vid 2+ rum) och/
  * eller skapa/gå med i ett rum. All a11y-mekanik (haspopup/expanded, role=menu +
  * menuitemradio/menuitem, tangentbord, fokus-flytt, Escape/klick-utanför, aria-current
- * på aktivt) bor här.
+ * på aktivt) bor här. `activeRoom` kan vara null (CTA-läget: ingen är vald än).
  */
 function RoomPillMenu({
   rooms,
@@ -86,7 +92,7 @@ function RoomPillMenu({
   onOpenRooms,
 }: {
   rooms: readonly RoomSummary[];
-  activeRoom: RoomSummary;
+  activeRoom: RoomSummary | null;
   onSelect: (roomId: string) => void;
   onOpenRooms?: (target: RoomFormTarget) => void;
 }) {
@@ -103,8 +109,8 @@ function RoomPillMenu({
 
   // Alla fokuserbara menyrader i DOM-ORDNING (rum-radfilerna + skapa/gå-med). Läses ur
   // den renderade menyn så tangentbords-navigeringen funkar oavsett vilka rader som
-  // finns (1 rum: bara handlingar; 2+ rum: rum + handlingar) utan att spegla strukturen
-  // i en parallell ref-lista (en sanning: DOM:en).
+  // finns (CTA-läge: bara handlingar; 1 rum: bara handlingar; 2+ rum: rum + handlingar)
+  // utan att spegla strukturen i en parallell ref-lista (en sanning: DOM:en).
   function menuItems(): HTMLElement[] {
     const root = menuRef.current;
     if (root === null) {
@@ -116,8 +122,8 @@ function RoomPillMenu({
   }
 
   // Vid öppning: flytta fokus till det AKTIVA rummets rad om den finns (så användaren
-  // landar på "var jag är" och kan pila därifrån), annars första raden (1-rums-fallet:
-  // ingen rum-rad, landa på första handlingen). Stängnings-fokus hanteras av den
+  // landar på "var jag är" och kan pila därifrån), annars första raden (CTA-/1-rums-
+  // fallet: ingen rum-rad, landa på första handlingen). Stängnings-fokus hanteras av den
   // handling som stängde (Escape/val returnerar till knappen explicit nedan).
   useEffect(() => {
     if (!open) {
@@ -162,7 +168,7 @@ function RoomPillMenu({
   function handleSelect(roomId: string) {
     // Byt bara om det FAKTISKT är ett annat rum (ett "val" av det redan aktiva rummet
     // ska inte trigga en onödig re-fetch i storen). Stäng + returnera fokus oavsett.
-    if (roomId !== activeRoom.id) {
+    if (activeRoom === null || roomId !== activeRoom.id) {
       onSelect(roomId);
     }
     close();
@@ -233,6 +239,17 @@ function RoomPillMenu({
     items[nextIndex]?.focus();
   }
 
+  // Pillens etikett + tillgängliga namn. Med aktivt rum bär den rummets namn (så "var är
+  // jag" syns utan att öppna); utan aktivt rum är den en kort "Rum"-CTA (chevron + menyn
+  // signalerar att man väljer skapa/gå-med, ärlig affordans , inte "tryck = gå med direkt").
+  const pillText = activeRoom !== null ? activeRoom.name : 'Rum';
+  const pillLabel =
+    activeRoom !== null
+      ? canSwitch
+        ? `Byt rum, aktivt: ${activeRoom.name}`
+        : `Rummeny, aktivt rum: ${activeRoom.name}`
+      : 'Skapa eller gå med i ett rum';
+
   return (
     <div className="vm-room-pill-wrap" data-room-pill="">
       <button
@@ -242,20 +259,13 @@ function RoomPillMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        // Tillgängligt namn bär BÅDE funktionen och nuvarande värde, så en skärmläsare
-        // hör kontext, inte bara ett namn. Vid 2+ rum är huvud-funktionen "byt rum";
-        // vid 1 rum finns inget att byta mellan, så namnet säger "rummeny".
-        aria-label={
-          canSwitch
-            ? `Byt rum, aktivt: ${activeRoom.name}`
-            : `Rummeny, aktivt rum: ${activeRoom.name}`
-        }
+        aria-label={pillLabel}
         onClick={() => (open ? close() : setOpen(true))}
         onKeyDown={onButtonKeyDown}
         className="vm-room-pill vm-room-pill-trigger"
       >
         <RoomGlyph />
-        <span className="vm-room-pill-name">{activeRoom.name}</span>
+        <span className="vm-room-pill-name">{pillText}</span>
         {/* Chevron: en färg-OBEROENDE "går att fälla ut / nu öppen"-affordans (formen
             bär den, aria-expanded bär den för skärmläsare). Vrids när menyn är öppen. */}
         <svg
@@ -287,7 +297,7 @@ function RoomPillMenu({
           {/* RUM-RADERNA (bara vid 2+ rum): byt aktivt rum med ett tap. */}
           {canSwitch &&
             rooms.map((room) => {
-              const isActive = room.id === activeRoom.id;
+              const isActive = room.id === activeRoom?.id;
               return (
                 <button
                   key={room.id}

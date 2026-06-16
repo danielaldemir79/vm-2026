@@ -58,13 +58,8 @@
   color: color-mix(in srgb, var(--color-accent) 70%, var(--color-fg));
 }
 
-/* Den STILLA etiketten (exakt 1 rum): inte interaktiv, så ingen hover/cursor-affordans
-   , den ska INTE se ut som en knapp man kan trycka på (det finns inget att fälla ut). */
-.vm-room-pill-static {
-  cursor: default;
-}
-
-/* Den BYTBARA knappen (2+ rum): en riktig knapp med hover-lyft + fokus-ring. */
+/* Menyknappen: en riktig knapp med hover-lyft + fokus-ring (pillen är alltid en
+   menyknapp när den syns , aktivt rum, 1 rum eller CTA-läget). */
 .vm-room-pill-trigger {
   cursor: pointer;
   outline: none;

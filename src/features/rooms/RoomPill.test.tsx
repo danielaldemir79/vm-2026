@@ -58,11 +58,37 @@ describe('RoomPill, synlighets-grenar', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renderar NULL när det inte finns något aktivt rum (inget valt än)', () => {
-    // enabled men activeRoom=null: man har inte gått med/valt ett rum, då finns inget
-    // att visa eller byta , app-baren ska se ut precis som förr (ingen tom platta).
+  it('renderar NULL utan aktivt rum OCH utan onOpenRooms (ingen hemvist, inget att visa)', () => {
+    // enabled men activeRoom=null och ingen navigerings-callback: inget att visa eller
+    // navigera till , app-baren ska se ut precis som förr (ingen tom/död platta).
     const { container } = renderWith(stubStore({ myRooms: [], activeRoom: null }));
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('utan aktivt rum men MED onOpenRooms: en "Rum"-CTA med bara skapa/gå-med', () => {
+    // Ny användare som inte är med i något rum: pillen blir en CTA så man kan gå med via
+    // pillen (Daniels krav), routad till rätt sektion. Ingen rum-rad (inget att byta mellan).
+    renderWith(stubStore({ myRooms: [], activeRoom: null }), () => {});
+    const trigger = screen.getByRole('button', { name: /Skapa eller gå med i ett rum/i });
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(screen.getByText('Rum')).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('menu');
+    expect(within(menu).queryAllByRole('menuitemradio')).toHaveLength(0);
+    expect(within(menu).getByRole('menuitem', { name: 'Skapa rum' })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Gå med i rum' })).toBeInTheDocument();
+  });
+
+  it('CTA-menyns "Gå med i rum" anropar onOpenRooms("join")', () => {
+    const onOpenRooms = vi.fn();
+    renderWith(stubStore({ myRooms: [], activeRoom: null }), onOpenRooms);
+    fireEvent.click(screen.getByRole('button', { name: /Skapa eller gå med/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Gå med i rum' }));
+
+    expect(onOpenRooms).toHaveBeenCalledTimes(1);
+    expect(onOpenRooms).toHaveBeenCalledWith('join');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('visar en menyknapp (haspopup) med rummets namn även vid EXAKT 1 rum', () => {

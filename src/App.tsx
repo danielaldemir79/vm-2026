@@ -41,6 +41,7 @@ import {
   RoomsProvider,
   ReactionsProvider,
   MatchCommentsProvider,
+  focusRoomForm,
   useRoomsStore,
 } from './features/rooms';
 import { OfficialResultsProvider } from './features/official-results';
@@ -143,36 +144,21 @@ function AppShell() {
   const { activeTab, selectTab } = useTabRouting();
 
   // GENVÄG TILL RUM-HANTERINGEN (T96, #193): rum-pillen i app-baren (RoomPill) kan
-  // skicka en hit "skapa rum" / "gå med i rum" från VILKEN flik som helst. Vi byter till
-  // Tips (där RoomSection ligger överst) och scrollar + fokuserar RÄTT formulär (skapa
-  // vs gå med). Tips-panelen är alltid monterad men `hidden` tills fliken är aktiv, så
-  // målet får layout först EFTER flik-bytets commit + paint , därför dubbel rAF innan vi
-  // scrollar/fokuserar (annars är formuläret ännu utan layout och scroll/focus blir
-  // no-op). data-rooms-create-form / data-rooms-join-form = RoomPanels stabila krokar.
+  // skicka en hit "skapa rum" / "gå med i rum" från VILKEN flik som helst (även när man
+  // inte är med i något rum än). Vi byter till Tips (där RoomSection ligger överst) och
+  // scrollar + fokuserar RÄTT formulär via focusRoomForm. Tips-panelen är alltid monterad
+  // men `hidden` tills fliken är aktiv, så målet får layout först EFTER flik-bytets commit
+  // + paint , därför dubbel rAF innan vi scrollar/fokuserar (annars är formuläret ännu utan
+  // layout och scroll/focus blir no-op). Själva DOM-delen bor i focusRoomForm (testbar seam).
   const openRooms = useCallback(
     (target: 'create' | 'join') => {
       selectTab('tips');
-      const focusForm = () => {
-        if (typeof document === 'undefined') {
-          return;
-        }
-        const selector =
-          target === 'create' ? '[data-rooms-create-form]' : '[data-rooms-join-form]';
-        const form = document.querySelector<HTMLElement>(selector);
-        if (form === null) {
-          return;
-        }
-        const reduceMotion =
-          typeof window !== 'undefined' &&
-          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-        form.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
-        // Fokusera första fältet, så tangentbord/skärmläsare landar direkt i formuläret.
-        form.querySelector<HTMLElement>('input')?.focus({ preventScroll: true });
-      };
       if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(() => window.requestAnimationFrame(focusForm));
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => focusRoomForm(target))
+        );
       } else {
-        focusForm();
+        focusRoomForm(target);
       }
     },
     [selectTab]
