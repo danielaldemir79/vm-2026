@@ -5,6 +5,35 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T91 (#184): live-score auto-uppdatering , poll + fokus/online-skyddsnät ovanpå Realtime
+
+**Rotorsak (fastställd, inte gissad):** en pågående match uppdaterades inte i appen förrän en
+MANUELL omladdning (mål föll, ställningen stod stilla). `useLiveData` (src/features/daily/
+use-live-data.ts) hade ENBART Realtime-prenumerationen på `match_live_data` , inget skyddsnät om
+postgres_changes-WebSocketen missar eller tappar. Verifierat mot prod 2026-06-16: tabellen ligger
+korrekt i `supabase_realtime`-publikationen (T81-migrationen) OCH pollaren skriver färsk data
+(g-G-2 live, uppdaterad 16 s tidigare), så backend var friskt , felet var rent på läs-sidan.
+Realtime-loggen visade dessutom återkommande "Tenant has no connected users / shutdown", dvs
+klienter höll inte streamen öppen. Och `subscribeToTableChanges` förlitar sig EXPLICIT på "nästa
+fokus-refetch" som skyddsnät , men det skyddsnätet saknades i useLiveData (OfficialResultsProvider
+har det, live-vyn hade det inte). SW/HTTP-cache UTESLUTET som orsak: workbox-globben precachar bara
+statiska bygg-assets, ingen `runtimeCaching` rör Supabase-fetchar, och PostgREST-svaren bär inget
+`Cache-Control`/`ETag` , inget lager cachar live-läsningen.
+
+**Beslut:** Lägg till TVÅ skyddsnät i useLiveData ovanpå Realtime (som förblir primär väg), båda
+kör samma tysta re-fetch (bumpar refetch-nonce): (1) en periodisk POLL var 20 s medan live-läget är
+aktivt, (2) en om-hämtning vid `online` + `visibilitychange` (visible). Bara i live-läge; fixtures
+har ingen backend (negativ-kontroll i testet).
+
+**Varför poll-cadensen är 20 s (källhänvisad, inte godtycklig):** livescore-pollaren skriver
+`match_live_data` var ~30:e sekund under live (cron `'30 seconds'`, se supabase/functions/
+livescore-poller + memory "vm2026-livescore-feasibility"). En klient-poll på 20 s fångar därför
+varje ny snapshot inom några sekunder efter skrivning (kravet "inom några sekunder"), och eftersom
+Realtime normalt levererar pushen FÖRST är pollen i praktiken bara redundans. Lasten är en lätt,
+öppen-RLS Supabase-SELECT per vaken live-flik , ingen API-Football-kostnad (den ligger på pollaren,
+som vi inte rör). Ingen SW-/cache-ändring behövdes: live-vägen cachas inte av något lager (se
+rotorsak), så network-first vore en åtgärd mot ett icke-existerande problem (KISS/YAGNI).
+
 ## 2026-06-16 , T83 (F4): ResultEntryView-testets formulär-räkning bytt från getAllByRole('group') till stabil markör
 
 **Beslut:** I `src/features/results/ResultEntryView.test.tsx` räknas synliga matchformulär via en
