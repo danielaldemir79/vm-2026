@@ -10,10 +10,16 @@
 // den delade TeamFlag-discen , konsekvent med skytteligan och resten av appen.
 //
 // DATA (en sanning, gissa aldrig en siffra):
-//   - events-härledda stats (kort-liga, mål-tidning, lag-mål) <- useCrossMatchEvents (T87)
-//   - statistics-härledda lag-medel (innehav/skott/fouls) <- useCrossMatchStats (T88)
-//   - tabell-härledda stats (clean sheets, skrällar) <- den resolvade matchplanen
-//     (useResultsStore, vävt ur official_match_results) + lagens källåkrade FIFA-ranking
+//   - events-härledda stats (kort-liga, snabbaste mål, mål-tidning) <- useCrossMatchEvents (T87).
+//     VIKTIGT (T100, #207): events täcker bara en DELMÄNGD matcher (match_live_data, de auto-
+//     pollade), så dessa kort coverage-MÄRKS ("baseras på N matcher med detaljerad spelardata").
+//   - statistics-härledda lag-medel (innehav/skott/fouls) <- useCrossMatchStats (T88), samma
+//     event-täcknings-förbehåll (coverage-märks).
+//   - facit-härledda stats (Flest mål per lag, Mål per match, Flest mål i en match, clean sheets,
+//     skrällar) <- den resolvade matchplanen (useResultsStore, vävt ur official_match_results) +
+//     lagens källåkrade FIFA-ranking. T100 (#207) FLYTTADE "Flest mål per lag" + "Mål per match"
+//     hit FRÅN events: de måste täcka ALLA färdiga matcher, annars blir en match utan event-rad
+//     (t.ex. en 7-1 utan auto-poll) osynlig och stat:en fel.
 //
 // A11y: laddning = role=status, fel = role=alert (fail-loud), listor är <ol> med rank-aria.
 // Motion ärvs av husets primitiver (reduced-motion-gatat där). Responsiv: namn truncar,
@@ -25,13 +31,13 @@ import { resolveAppTeamId } from '../../data/livescore';
 import { useResultsStore } from '../results';
 import { useCrossMatchEvents } from './use-cross-match-events';
 import { useCrossMatchStats } from './use-cross-match-stats';
-import {
-  aggregateCardLeague,
-  aggregateGoalTiming,
-  aggregateTeamGoals,
-} from './tournament-stats-events';
+import { aggregateCardLeague, aggregateGoalTiming } from './tournament-stats-events';
 import { aggregateTeamMetric } from './tournament-stats-team-metrics';
-import { aggregateCleanSheets, aggregateUpsets } from './tournament-stats-tables';
+import {
+  aggregateCleanSheets,
+  aggregateTeamScoreGoals,
+  aggregateUpsets,
+} from './tournament-stats-tables';
 import {
   GoalTimingCard,
   HighlightStatRow,
@@ -77,10 +83,17 @@ export function TournamentStatsView() {
   const nameOf = (teamId: string): string => teamById.get(teamId)?.name ?? teamId;
   const codeOf = (teamId: string): string | null => teamById.get(teamId)?.code ?? null;
 
+  // COVERAGE-COUNT (T100, #207): hur många matcher har detaljerad event-/spelardata? Varje post i
+  // events.matches är EN match med event-rad (match_live_data), så längden ÄR antalet matcher med
+  // sådan data , härledd, aldrig hårdkodad. Driver coverage-noteringen på de event-täckande korten.
+  const eventCoverageCount = events.matches.length;
+
   // --- Aggregat (rena, memoiserade: räknas om bara när råvaran faktiskt ändras) ---
   const cardLeague = useMemo(() => aggregateCardLeague(events.matches), [events.matches]);
   const goalTiming = useMemo(() => aggregateGoalTiming(events.matches), [events.matches]);
-  const teamGoals = useMemo(() => aggregateTeamGoals(events.matches), [events.matches]);
+  // T100 (#207): lag-mål + turnerings-mål ur OFFICIELLT facit (planMatches), inte events , så en
+  // match utan event-rad (t.ex. 7-1 utan auto-poll) räknas och stat:en blir sann.
+  const teamScoreGoals = useMemo(() => aggregateTeamScoreGoals(planMatches), [planMatches]);
   const possession = useMemo(
     () => aggregateTeamMetric(stats.matches, 'possession'),
     [stats.matches]
@@ -109,11 +122,13 @@ export function TournamentStatsView() {
     valueUnit: t.total === 1 ? 'kort' : 'kort',
     note: noteForCards(t.yellow, t.red),
   }));
-  const teamGoalItems: MetricListItem[] = teamGoals.teams.map((t) => ({
-    key: `g-${t.teamApiId}`,
-    title: t.teamName,
+  // "Flest mål per lag" ur facit (T100): app-lag-id -> nameOf/codeOf (samma uppslag som clean
+  // sheets), INTE API-id-bryggan. Så här matchar siffran grupptabellens GM-kolumn (compute-standings).
+  const teamGoalItems: MetricListItem[] = teamScoreGoals.teams.map((t) => ({
+    key: `g-${t.teamId}`,
+    title: nameOf(t.teamId),
     subtitle: `${t.matches} ${t.matches === 1 ? 'match' : 'matcher'}`,
-    teamCode: flagFromApiId(t.teamApiId),
+    teamCode: codeOf(t.teamId),
     value: String(t.goals),
     valueUnit: 'mål',
     note: null,
@@ -142,6 +157,16 @@ export function TournamentStatsView() {
 
   const eventsReady = events.status === 'ready';
   const statsReady = stats.status === 'ready';
+  // COVERAGE-NOTERING (T100, #207, truth-in-labeling): de event-/statistik-täckande korten ser bara
+  // matcher med detaljerad spelardata (match_live_data, en delmängd). En lugn en-rads-not gör det
+  // ärligt varför en skytt/ett mål från en manuell-facit-match (t.ex. 7-1:an) inte syns här. N
+  // härleds (events.matches.length), aldrig hårdkodad. Null när inget täcks än (inget att förklara).
+  const eventCoverageNote =
+    eventCoverageCount > 0
+      ? `Baseras på ${eventCoverageCount} ${
+          eventCoverageCount === 1 ? 'match' : 'matcher'
+        } med detaljerad spelardata.`
+      : null;
   // De resultat-härledda korten är "klara" bara när vi har VERKLIGT facit (inte i what-if-läge,
   // se sim-grinden ovan). I sim-läge visas en lugn notering i stället för sandlåde-siffror.
   const planReady = realResultsAvailable;
@@ -183,45 +208,71 @@ export function TournamentStatsView() {
                 : 'Inget mål än'
             }
           />
+          {/* Mål per match: ur OFFICIELLT facit (T100, #207), gatat på planReady (verkligt facit,
+              inte what-if), så snittet räknar ALLA färdiga matcher , inte bara de event-pollade. */}
           <HighlightStatRow
             label="Mål per match"
-            ready={eventsReady}
+            ready={planReady}
             value={
-              teamGoals.matchesPlayed > 0
-                ? teamGoals.goalAverage.toFixed(2).replace('.', ',')
+              teamScoreGoals.matchesPlayed > 0
+                ? teamScoreGoals.goalAverage.toFixed(2).replace('.', ',')
                 : null
             }
             detail={
-              teamGoals.matchesPlayed > 0
-                ? `${teamGoals.totalGoals} mål på ${teamGoals.matchesPlayed} ${
-                    teamGoals.matchesPlayed === 1 ? 'match' : 'matcher'
-                  }${teamGoals.ownGoals > 0 ? `, varav ${teamGoals.ownGoals} självmål` : ''}`
+              teamScoreGoals.matchesPlayed > 0
+                ? `${teamScoreGoals.totalGoals} mål på ${teamScoreGoals.matchesPlayed} ${
+                    teamScoreGoals.matchesPlayed === 1 ? 'match' : 'matcher'
+                  }`
                 : 'Inga matcher spelade än'
             }
+            notReadyText={simulating ? 'Visas med verkliga resultat (tänk-om-läge).' : undefined}
+          />
+          {/* Flest mål i en match: den färdiga matchen med högst total scoreline (ur facit), som
+              Daniel uttryckligen efterfrågade , den hör hemma i facit-källan, inte i events. */}
+          <HighlightStatRow
+            label="Flest mål i en match"
+            ready={planReady}
+            value={
+              teamScoreGoals.biggestMatch
+                ? `${teamScoreGoals.biggestMatch.homeGoals}-${teamScoreGoals.biggestMatch.awayGoals}`
+                : null
+            }
+            detail={
+              teamScoreGoals.biggestMatch
+                ? `${nameOf(teamScoreGoals.biggestMatch.homeTeamId)} mot ${nameOf(
+                    teamScoreGoals.biggestMatch.awayTeamId
+                  )}`
+                : 'Ingen match spelad än'
+            }
+            notReadyText={simulating ? 'Visas med verkliga resultat (tänk-om-läge).' : undefined}
           />
         </section>
 
-        {/* ===== Mål-fördelning över matchtiden (15-min-hinkar) ===== */}
-        <GoalTimingCard timing={goalTiming} ready={eventsReady} />
+        {/* ===== Mål-fördelning över matchtiden (15-min-hinkar, event-täckt) ===== */}
+        <GoalTimingCard timing={goalTiming} ready={eventsReady} coverageNote={eventCoverageNote} />
 
-        {/* ===== Flest mål per lag ===== */}
+        {/* ===== Flest mål per lag (ur OFFICIELLT facit, T100 , matchar grupptabellens GM) ===== */}
         <MetricListCard
           title="Flest mål per lag"
-          description="Lagens mål genom turneringen (självmål räknas inte på laget)."
+          description="Lagens gjorda mål genom turneringen, ur de officiella resultaten."
           items={teamGoalItems}
-          ready={eventsReady}
+          ready={planReady}
           emptyText="Inga mål gjorda än."
+          notReadyText={
+            simulating ? 'Visas med verkliga resultat (du är i tänk-om-läge).' : 'Laddar...'
+          }
           listId={`${listId}-team-goals`}
           collapsedVisibleCount={COLLAPSED_VISIBLE}
         />
 
-        {/* ===== Kort-liga (spelare + lag) ===== */}
+        {/* ===== Kort-liga (spelare + lag, event-täckt) ===== */}
         <MetricListCard
           title="Flest kort, spelare"
           description="Gula och röda kort räknas båda."
           items={cardPlayerItems}
           ready={eventsReady}
           emptyText="Inga kort utdelade än."
+          coverageNote={eventCoverageNote}
           listId={`${listId}-card-players`}
           collapsedVisibleCount={COLLAPSED_VISIBLE}
         />
@@ -231,17 +282,19 @@ export function TournamentStatsView() {
           items={cardTeamItems}
           ready={eventsReady}
           emptyText="Inga kort utdelade än."
+          coverageNote={eventCoverageNote}
           listId={`${listId}-card-teams`}
           collapsedVisibleCount={COLLAPSED_VISIBLE}
         />
 
-        {/* ===== Lag-medel ur matchstatistiken (near-live) ===== */}
+        {/* ===== Lag-medel ur matchstatistiken (near-live, event-täckt) ===== */}
         <MetricListCard
           title="Mest bollinnehav"
           description="Snittinnehav per match, för lag med rapporterad statistik."
           items={possessionItems}
           ready={statsReady}
           emptyText="Ingen bollinnehav-statistik än."
+          coverageNote={eventCoverageNote}
           listId={`${listId}-possession`}
           collapsedVisibleCount={COLLAPSED_VISIBLE}
         />
@@ -251,6 +304,7 @@ export function TournamentStatsView() {
           items={shotsItems}
           ready={statsReady}
           emptyText="Ingen skott-statistik än."
+          coverageNote={eventCoverageNote}
           listId={`${listId}-shots`}
           collapsedVisibleCount={COLLAPSED_VISIBLE}
         />
@@ -260,6 +314,7 @@ export function TournamentStatsView() {
           items={foulsItems}
           ready={statsReady}
           emptyText="Ingen fouls-statistik än."
+          coverageNote={eventCoverageNote}
           listId={`${listId}-fouls`}
           collapsedVisibleCount={COLLAPSED_VISIBLE}
         />

@@ -1,4 +1,4 @@
-// Tester för skytteliga-vyn (T87, #179). Mockar useCrossMatchEvents så varje tillstånd
+// Tester för skytteliga-vyn (T87, #179; T100, #207). Mockar useCrossMatchEvents så varje tillstånd
 // (loading/error/ready) + datamängd drivs deterministiskt , vyn själv aggregerar via den
 // rena aggregateScoring (redan hårt testad), så här bevisar vi PRESENTATIONEN:
 //   - laddning = role=status, fel = role=alert (fail-loud)
@@ -6,6 +6,8 @@
 //   - tom data (inga mål än) = lugn rad (ingen tom ruta, ingen krasch)
 //   - segment-växel byter till assist-ligan
 //   - lång lista börjar KOMPRIMERAD (topp-N) + "Visa alla"-utfäll finns
+//   - COVERAGE-NOT (T100): "Baseras på N matcher med detaljerad spelardata", N härlett ur
+//     matches.length (skytteligan ser bara event-täckta matcher)
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within, cleanup, fireEvent } from '@testing-library/react';
@@ -100,6 +102,35 @@ describe('ScorerTableView , innehåll', () => {
     expect(container.querySelector('[data-scorer-empty]')).toBeInTheDocument();
     // Inga rad-element.
     expect(container.querySelector('[data-scorer-row]')).toBeNull();
+  });
+
+  it('COVERAGE-NOT (T100): "Baseras på N matcher med detaljerad spelardata", N härlett', () => {
+    // 3 matcher med event-data -> N = 3 (matches.length), aldrig hårdkodad.
+    mockUseCrossMatchEvents.mockReturnValue(
+      ready([
+        { matchId: 'm1', events: [goal({ playerId: 100 })] },
+        { matchId: 'm2', events: [goal({ playerId: 101 })] },
+        { matchId: 'm3', events: [goal({ playerId: 102 })] },
+      ])
+    );
+    const { container } = render(<ScorerTableView />);
+    expect(container.querySelector('[data-scorer-coverage]')).toHaveTextContent(
+      'Baseras på 3 matcher med detaljerad spelardata.'
+    );
+  });
+
+  it('coverage-not: N=1 ger singular "1 match"', () => {
+    mockUseCrossMatchEvents.mockReturnValue(ready([{ matchId: 'm1', events: [goal()] }]));
+    const { container } = render(<ScorerTableView />);
+    expect(container.querySelector('[data-scorer-coverage]')).toHaveTextContent(
+      'Baseras på 1 match med detaljerad spelardata.'
+    );
+  });
+
+  it('ingen coverage-not när inga event-täckta matcher finns', () => {
+    mockUseCrossMatchEvents.mockReturnValue(ready([]));
+    const { container } = render(<ScorerTableView />);
+    expect(container.querySelector('[data-scorer-coverage]')).toBeNull();
   });
 
   it('segment-växel byter till assist-ligan', () => {

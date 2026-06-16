@@ -37,11 +37,12 @@ export {
   type AssistRow,
 } from './scorer-table';
 
-// De rena turneringsstatistik-aggregaten (events-, statistik- och tabell-härledda).
+// De rena turneringsstatistik-aggregaten (events-, statistik- och tabell-härledda). Lag-mål +
+// turnerings-mål source:as ur officiellt facit (aggregateTeamScoreGoals i -tables), INTE events
+// (T100, #207): events täcker bara en delmängd matcher.
 export {
   aggregateCardLeague,
   aggregateGoalTiming,
-  aggregateTeamGoals,
   GOAL_TIMING_BUCKETS,
   type CardLeague,
   type CardPlayerRow,
@@ -50,14 +51,16 @@ export {
   type GoalTimingBucket,
   type GoalTimingBucketLabel,
   type FastestGoal,
-  type TeamGoals,
-  type TeamGoalRow,
 } from './tournament-stats-events';
 export { aggregateTeamMetric, type TeamMetricRow } from './tournament-stats-team-metrics';
 export {
   aggregateCleanSheets,
   aggregateUpsets,
+  aggregateTeamScoreGoals,
   type CleanSheetRow,
   type UpsetRow,
   type RankLookup,
+  type TeamScoreGoals,
+  type TeamScoreGoalRow,
+  type BiggestMatch,
 } from './tournament-stats-tables';

@@ -8,7 +8,7 @@
 // matcher , exakt som T87:s skytteliga gör för mål/assist.
 //
 // =====================================================================================
-// DOMÄNREGLER (KÄLLHÄNVISADE , gissas aldrig; se även docs/decisions.md 2026-06-16 T88):
+// DOMÄNREGLER (KÄLLHÄNVISADE , gissas aldrig; se även docs/decisions.md 2026-06-16 T88 + T100):
 //
 //  K1. KORT-LIGA: gult OCH rött räknas som ett kort (flest kort = flest tillsägelser). En
 //      spelare utan känt id HOPPAS i spelar-tally:n (gissar aldrig att två okända är samma,
@@ -24,20 +24,12 @@
 //      "90+3" inte trycks ihop med ordinarie 76-90. PRESENTATIONS-konvention (rimlig), inte en
 //      officiell FIFA-indelning, så den motiveras men hävdas inte som källhänvisad sanning.
 //
-//  G1. FLEST MÅL PER LAG (F1, VIKTIGT , egenmåls-lag-kreditering OVERIFIERAD): ett egenmål är
-//      gjort AV en spelare men räknas FÖR motståndarlaget; API-Footballs `team`-fält är
-//      tvetydigt och de stora API:erna är oeniga (kunde ej källverifieras, doc 403). Vi tolkar
-//      därför ALDRIG om team-fältet: ett egenmål krediteras INTE till något lags mål-tally,
-//      det noteras bara separat (ownGoals). Ett lags `goals` = mål av lagets spelare EXKLUSIVE
-//      egenmål (det öppna spelets mål + straffmål, vars teamApiId är det icke-tvetydiga,
-//      gjorda-för-laget). KÄLLA: docs/decisions.md 2026-06-16 (T86 + T88), match-stats
-//      `isOwnGoalDetail`.
-//
-//  G2. TURNERINGENS MÅL-TOTAL + SNITT: totalGoals = ALLA mål i matcherna INKLUSIVE egenmål
-//      (FIFA räknar egenmål i en turnerings måltotal , det föll ett mål). goalAverage =
-//      totalGoals / matchesPlayed (matcher med minst ett mål-event), 0 vid 0 matcher (ingen
-//      division med noll). Detta är medvetet SKILT från lag-tally:n (G1): totalen räknar målet,
-//      men lag-krediteringen av just egenmålet vågar vi inte (team-fältet overifierat).
+//  COVERAGE (T100, #207): ALLA aggregat i denna fil kan PER NATUR bara se de matcher som har
+//  event-data (match_live_data, en delmängd , de auto-pollade). En match utan event-rad är
+//  osynlig här. Därför är det HÄR vi placerar event-täckande stats (snabbaste mål, mål-tidning,
+//  kort-liga) , men de coverage-MÄRKS i vyn ("baseras på N matcher med detaljerad spelardata").
+//  Score-/antals-stats som ska täcka ALLA matcher (lag-mål, mål-per-match) bor i stället i
+//  tournament-stats-tables.ts (`aggregateTeamScoreGoals`), source:ade ur officiellt facit.
 // =====================================================================================
 
 import { extractCards, extractGoals } from '../../data/match-stats';
@@ -276,86 +268,10 @@ export function aggregateGoalTiming(matches: readonly LiveMatchEvents[]): GoalTi
   return { fastest, buckets };
 }
 
-// ---------------------------------------------------------------------------------------
-// Flest mål per lag + turneringens mål-total/snitt (G1, G2)
-// ---------------------------------------------------------------------------------------
-
-/** En rad i lag-mål-tabellen: ett lags mål (EXKLUSIVE egenmål, G1). */
-export interface TeamGoalRow {
-  teamApiId: number;
-  teamName: string;
-  /** Mål av lagets spelare, egenmål EXKLUDERAT (F1/G1). Straffmål INGÅR. */
-  goals: number;
-  /** Distinkta matcher laget gjort mål i. */
-  matches: number;
-}
-
-/** Lag-mål-aggregatet + turneringens mål-total och snitt. */
-export interface TeamGoals {
-  /** Lag rankade på flest mål (egenmål-medvetet, G1). */
-  teams: TeamGoalRow[];
-  /** ALLA mål i matcherna INKLUSIVE egenmål (FIFA:s turneringstotal, G2). */
-  totalGoals: number;
-  /** Antal egenmål (noteras separat, krediteras inget lag, F1/G1). */
-  ownGoals: number;
-  /** Matcher med minst ett mål-event (G2:s nämnare). */
-  matchesPlayed: number;
-  /** totalGoals / matchesPlayed, 0 vid 0 matcher (ingen division med noll, G2). */
-  goalAverage: number;
-}
-
-interface TeamGoalAcc {
-  teamApiId: number;
-  teamName: string;
-  goals: number;
-  matchIds: Set<string>;
-}
-
-/**
- * Aggregera flest mål per lag (egenmåls-medvetet, G1) + turneringens mål-total/snitt (G2).
- * Ett lags `goals` exkluderar egenmål; turneringens `totalGoals` inkluderar dem.
- */
-export function aggregateTeamGoals(matches: readonly LiveMatchEvents[]): TeamGoals {
-  const byTeam = new Map<number, TeamGoalAcc>();
-  let totalGoals = 0;
-  let ownGoals = 0;
-  let matchesPlayed = 0;
-
-  for (const { matchId, events } of matches) {
-    const goals = extractGoals(events);
-    if (goals.length > 0) {
-      matchesPlayed += 1; // matchen "spelades" (hade minst ett mål-event)
-    }
-    for (const goal of goals) {
-      totalGoals += 1; // FIFA:s turneringstotal: varje mål-event räknas (G2)
-      if (goal.isOwnGoal) {
-        ownGoals += 1;
-        continue; // G1: krediteras INTE till något lags mål-tally (team-fältet overifierat)
-      }
-      const acc = byTeam.get(goal.teamApiId) ?? {
-        teamApiId: goal.teamApiId,
-        teamName: goal.teamName,
-        goals: 0,
-        matchIds: new Set<string>(),
-      };
-      acc.teamName = goal.teamName;
-      acc.goals += 1;
-      acc.matchIds.add(matchId);
-      byTeam.set(goal.teamApiId, acc);
-    }
-  }
-
-  const teams: TeamGoalRow[] = [...byTeam.values()].map((t) => ({
-    teamApiId: t.teamApiId,
-    teamName: t.teamName,
-    goals: t.goals,
-    matches: t.matchIds.size,
-  }));
-  teams.sort(
-    (a, b) =>
-      b.goals - a.goals || a.matches - b.matches || a.teamName.localeCompare(b.teamName, 'sv')
-  );
-
-  const goalAverage = matchesPlayed === 0 ? 0 : totalGoals / matchesPlayed;
-  return { teams, totalGoals, ownGoals, matchesPlayed, goalAverage };
-}
+// NOTERA (T100, #207): "flest mål per lag" + turneringens mål-total/snitt FLYTTADES härifrån till
+// tournament-stats-tables.ts (`aggregateTeamScoreGoals`), source:at ur det OFFICIELLA facit i
+// stället för events. Roten: events-lagret (match_live_data) täcker bara en delmängd matcher, så en
+// match utan event-rad (t.ex. en 7-1 utan auto-poll) var osynlig och stat:en blev fel (visade fel
+// lag som etta + fel målsnitt). De EVENTS-härledda stats:en ovan (snabbaste mål, mål-per-15min,
+// kort-liga) stannar event-baserade men ska coverage-märkas i vyn ("baseras på N matcher med
+// detaljerad spelardata"), eftersom de per natur bara kan se de matcher som HAR event-data.

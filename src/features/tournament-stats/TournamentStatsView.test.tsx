@@ -1,12 +1,15 @@
-// Tester för turneringsstatistik-vyn (T88, #180). Mockar de tre datakällorna
+// Tester för turneringsstatistik-vyn (T88, #180; T100, #207). Mockar de tre datakällorna
 // (useCrossMatchEvents, useCrossMatchStats, useResultsStore) så varje tillstånd drivs
 // deterministiskt , vyn aggregerar via de RENA funktionerna (redan hårt testade), så här
 // bevisar vi PRESENTATIONEN + wiringen:
 //   - rubrik + intro renderas
-//   - kort-liga, mål-fördelning, lag-mål renderas ur events
+//   - kort-liga, mål-fördelning renderas ur events
+//   - "Flest mål per lag" + "Mål per match" + "Flest mål i en match" renderas ur OFFICIELLT
+//     facit (planMatches), INTE events (T100, #207 , annars missas en match utan event-rad)
 //   - lag-medel (innehav) renderas ur statistics
 //   - clean sheets + skrällar renderas ur den resolvade matchplanen + ranking
-//   - SIM-GRIND (F2): i what-if-läge döljs de resultat-härledda korten (visar sim-notering)
+//   - COVERAGE-NOT (T100): event-/statistik-täckta kort märks "Baseras på N matcher..."
+//   - SIM-GRIND (F2): i what-if-läge döljs de facit-härledda korten (visar sim-notering)
 //   - fel fail-loud:ar i en role=alert
 //   - tom data ger lugna rader (ingen krasch)
 
@@ -82,6 +85,8 @@ const TEAMS = [
   { id: 'swe', name: 'Sverige', code: 'SWE', group: 'A', fifaRanking: 38 },
   { id: 'ksa', name: 'Saudiarabien', code: 'KSA', group: 'B', fifaRanking: 61 },
   { id: 'arg', name: 'Argentina', code: 'ARG', group: 'A', fifaRanking: 1 },
+  { id: 'ger', name: 'Tyskland', code: 'GER', group: 'E', fifaRanking: 9 },
+  { id: 'cuw', name: 'Curaçao', code: 'CUW', group: 'E', fifaRanking: 90 },
 ] as unknown as Team[];
 
 function finishedMatch(
@@ -242,5 +247,144 @@ describe('TournamentStatsView , tabell-härledda kort (clean sheets + skrällar)
     // Inga rader: sandlåde-resultat visas inte, en sim-notering står i stället.
     expect(card?.querySelector('[data-tournament-stat-row]')).toBeNull();
     expect(card).toHaveTextContent(/tänk-om-läge/);
+  });
+});
+
+describe('TournamentStatsView , facit-härledda mål-stats (T100, #207)', () => {
+  // Den centrala bugg-fixen: events-lagret saknade g-E-1 (7-1), så den events-härledda "Flest mål
+  // per lag" missade 7-måls-laget och visade fel lag som etta. Här bevisar vi att vyn nu source:ar
+  // ur planMatches (officiellt facit), så 7-måls-laget (Tyskland) hamnar överst , ÄVEN när events
+  // bara känner till g-F-2 (Sverige 5), exakt prod-scenariot.
+  it('"Flest mål per lag" source:ar ur facit, inte events: 7-måls-laget toppar', () => {
+    // events ser BARA g-F-2 (Sverige 5-1 Tunisien) , g-E-1 saknar event-rad i prod.
+    mockEvents.mockReturnValue(
+      eventsReady([{ matchId: 'api-1', events: [goal({ teamApiId: 5, teamName: 'Sverige' })] }])
+    );
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(
+      resultsStore({
+        matches: [
+          finishedMatch('g-F-2', 'swe', 'tun', 5, 1),
+          finishedMatch('g-E-1', 'ger', 'cuw', 7, 1), // FINNS i facit men INTE i events
+        ],
+      })
+    );
+    const { container } = render(<TournamentStatsView />);
+    const card = container.querySelector(
+      '[data-tournament-stat-card][aria-label="Flest mål per lag"]'
+    );
+    // Första raden (rank 1) ska vara Tyskland med 7 mål, INTE Sverige (5).
+    const firstRow = card?.querySelector('[data-tournament-stat-row][data-rank="1"]');
+    expect(firstRow).toHaveTextContent('Tyskland');
+    expect(firstRow).toHaveTextContent('7 mål');
+  });
+
+  it('"Mål per match" source:ar ur facit (alla färdiga matcher), inte event-subsetet', () => {
+    mockEvents.mockReturnValue(eventsReady([])); // inga events alls
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(
+      resultsStore({
+        matches: [
+          finishedMatch('g-E-1', 'ger', 'cuw', 7, 1), // 8 mål
+          finishedMatch('g-H-1', 'esp', 'bra', 0, 0), // 0 mål, räknas ändå
+        ],
+      })
+    );
+    const { container } = render(<TournamentStatsView />);
+    const highlights = container.querySelectorAll('[data-tournament-highlight]');
+    const perMatch = [...highlights].find((h) => h.textContent?.includes('Mål per match'));
+    // 8 mål / 2 matcher = 4,00 (svenskt komma), detalj "8 mål på 2 matcher".
+    expect(perMatch).toHaveTextContent('4,00');
+    expect(perMatch).toHaveTextContent('8 mål på 2 matcher');
+  });
+
+  it('"Flest mål i en match" visar den största matchen ur facit (7-1)', () => {
+    mockEvents.mockReturnValue(eventsReady([]));
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(
+      resultsStore({
+        matches: [
+          finishedMatch('g-F-2', 'swe', 'tun', 5, 1),
+          finishedMatch('g-E-1', 'ger', 'cuw', 7, 1),
+        ],
+      })
+    );
+    const { container } = render(<TournamentStatsView />);
+    const highlights = container.querySelectorAll('[data-tournament-highlight]');
+    const biggest = [...highlights].find((h) => h.textContent?.includes('Flest mål i en match'));
+    expect(biggest).toHaveTextContent('7-1');
+    expect(biggest).toHaveTextContent('Tyskland mot Curaçao');
+  });
+
+  it('SIM-GRIND (F2): i what-if-läge döljs de facit-höjdpunkterna med en sim-notering', () => {
+    mockEvents.mockReturnValue(eventsReady([]));
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(
+      resultsStore({ simulating: true, matches: [finishedMatch('g-E-1', 'ger', 'cuw', 7, 1)] })
+    );
+    const { container } = render(<TournamentStatsView />);
+    const highlights = container.querySelectorAll('[data-tournament-highlight]');
+    const biggest = [...highlights].find((h) => h.textContent?.includes('Flest mål i en match'));
+    // Ingen siffra , en sim-notering i stället (samma anda som clean sheets/skrällar).
+    expect(biggest).not.toHaveTextContent('7-1');
+    expect(biggest).toHaveTextContent(/tänk-om-läge/);
+  });
+});
+
+describe('TournamentStatsView , coverage-notering på event-täckta kort (T100, #207)', () => {
+  it('märker event-täckta kort "Baseras på N matcher med detaljerad spelardata" (N härlett)', () => {
+    // 2 matcher med event-data -> N = 2 (events.matches.length), aldrig hårdkodad.
+    mockEvents.mockReturnValue(
+      eventsReady([
+        { matchId: 'api-1', events: [card({ playerId: 7, playerName: 'Bråkstaken' })] },
+        { matchId: 'api-2', events: [card({ playerId: 8, playerName: 'Hårding' })] },
+      ])
+    );
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(resultsStore());
+    const { container } = render(<TournamentStatsView />);
+    const playerCard = container.querySelector(
+      '[data-tournament-stat-card][aria-label="Flest kort, spelare"]'
+    );
+    const coverage = playerCard?.querySelector('[data-tournament-stat-coverage]');
+    expect(coverage).toHaveTextContent('Baseras på 2 matcher med detaljerad spelardata.');
+  });
+
+  it('N=1 ger singular "1 match"', () => {
+    mockEvents.mockReturnValue(
+      eventsReady([{ matchId: 'api-1', events: [card({ playerId: 7, playerName: 'Ensam' })] }])
+    );
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(resultsStore());
+    const { container } = render(<TournamentStatsView />);
+    const playerCard = container.querySelector(
+      '[data-tournament-stat-card][aria-label="Flest kort, spelare"]'
+    );
+    expect(playerCard?.querySelector('[data-tournament-stat-coverage]')).toHaveTextContent(
+      'Baseras på 1 match med detaljerad spelardata.'
+    );
+  });
+
+  it('facit-kortet "Flest mål per lag" har INGEN coverage-not (det täcker alla matcher)', () => {
+    mockEvents.mockReturnValue(
+      eventsReady([{ matchId: 'api-1', events: [goal({ teamApiId: 5 })] }])
+    );
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(
+      resultsStore({ matches: [finishedMatch('g-E-1', 'ger', 'cuw', 7, 1)] })
+    );
+    const { container } = render(<TournamentStatsView />);
+    const teamGoalsCard = container.querySelector(
+      '[data-tournament-stat-card][aria-label="Flest mål per lag"]'
+    );
+    expect(teamGoalsCard?.querySelector('[data-tournament-stat-coverage]')).toBeNull();
+  });
+
+  it('ingen coverage-not när inga event-täckta matcher finns (inget att förklara)', () => {
+    mockEvents.mockReturnValue(eventsReady([])); // 0 matcher med event-data
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(resultsStore());
+    const { container } = render(<TournamentStatsView />);
+    expect(container.querySelector('[data-tournament-stat-coverage]')).toBeNull();
   });
 });
