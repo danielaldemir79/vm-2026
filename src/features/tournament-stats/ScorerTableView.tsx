@@ -167,7 +167,7 @@ function LeagueList({ rows, tab, listId }: { rows: DisplayRow[]; tab: LeagueTab;
       }}
       getItemKey={(row) => String(row.playerId)}
       renderPreview={({ previewItems }) => (
-        <ol data-scorer-preview="" className="flex flex-col gap-1">
+        <ol data-scorer-preview="" className="flex flex-col gap-2">
           {previewItems.map((row, i) => (
             <LeagueRow key={row.playerId} row={row} rank={i + 1} tab={tab} />
           ))}

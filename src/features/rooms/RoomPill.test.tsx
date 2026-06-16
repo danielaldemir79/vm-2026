@@ -101,6 +101,20 @@ describe('RoomPill, synlighets-grenar', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('bär en "Rum"-kicker före rum-namnet (så namnet inte läses som app-namnet)', () => {
+    // Daniels feedback: ett rum som heter "VM 2026" kan tas för appens namn. Kickern
+    // "Rum" före namnet gör tydligt att pillen visar vilket RUM man är i.
+    renderWith(
+      stubStore({
+        myRooms: [{ id: 'r9', name: 'VM 2026', code: 'vm111' }],
+        activeRoom: { id: 'r9', name: 'VM 2026', code: 'vm111' },
+      }),
+      () => {}
+    );
+    expect(screen.getByText('Rum')).toBeInTheDocument(); // kickern
+    expect(screen.getByText('VM 2026')).toBeInTheDocument(); // rum-namnet
+  });
+
   it('1-rums-menyn har INGA rum-rader att byta mellan, bara skapa/gå-med', () => {
     renderWith(stubStore({ myRooms: [ONE_ROOM], activeRoom: ONE_ROOM }), () => {});
     fireEvent.click(screen.getByRole('button', { name: /Rummeny/i }));

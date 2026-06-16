@@ -151,7 +151,7 @@ export function SuspensionsView() {
             }}
             getItemKey={(item) => item.key}
             renderPreview={({ previewItems }) => (
-              <ol data-suspensions-preview="" className="flex flex-col gap-1">
+              <ol data-suspensions-preview="" className="flex flex-col gap-2">
                 {previewItems.map((item) => (
                   <SuspensionRow key={item.key} item={item} />
                 ))}
