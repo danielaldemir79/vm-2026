@@ -9,24 +9,12 @@
 import { describe, expect, it } from 'vitest';
 import { TABS, DEFAULT_TAB, tabById, tabBySlug, type TabIconName } from './tab-config';
 
-const ICON_NAMES: readonly TabIconName[] = [
-  'today',
-  'coupon',
-  'leaderboard',
-  'tournament',
-  'more',
-];
+const ICON_NAMES: readonly TabIconName[] = ['today', 'coupon', 'leaderboard', 'tournament', 'more'];
 
 describe('flik-katalogen (tab-config)', () => {
   it('har exakt de fem flikarna i Daniels ordning (U4): Idag, Tips, Topplista, Turnering, Mer', () => {
     expect(TABS.map((t) => t.id)).toEqual(['idag', 'tips', 'topplista', 'turnering', 'mer']);
-    expect(TABS.map((t) => t.label)).toEqual([
-      'Idag',
-      'Tips',
-      'Topplista',
-      'Turnering',
-      'Mer',
-    ]);
+    expect(TABS.map((t) => t.label)).toEqual(['Idag', 'Tips', 'Topplista', 'Turnering', 'Mer']);
   });
 
   it('default-fliken är Idag (hemmet)', () => {

@@ -32,14 +32,7 @@ const ACTIVE_FILL = 'color-mix(in srgb, currentColor 16%, transparent)';
 function TodayGlyph({ active }: { active: boolean }) {
   return (
     <>
-      <rect
-        x="3"
-        y="4.5"
-        width="18"
-        height="16"
-        rx="2.5"
-        fill={active ? ACTIVE_FILL : 'none'}
-      />
+      <rect x="3" y="4.5" width="18" height="16" rx="2.5" fill={active ? ACTIVE_FILL : 'none'} />
       <path d="M3 9h18" />
       <path d="M8 3v3M16 3v3" />
       {/* Dagens markör: en liten ifylld prick (aktiv) eller kontur. */}
@@ -76,10 +69,7 @@ function LeaderboardGlyph({ active }: { active: boolean }) {
 function TournamentGlyph({ active }: { active: boolean }) {
   return (
     <>
-      <path
-        d="M7 4h10v4a5 5 0 0 1-10 0z"
-        fill={active ? ACTIVE_FILL : 'none'}
-      />
+      <path d="M7 4h10v4a5 5 0 0 1-10 0z" fill={active ? ACTIVE_FILL : 'none'} />
       <path d="M7 5.5H4.5V7a3 3 0 0 0 3 3M17 5.5h2.5V7a3 3 0 0 1-3 3" />
       <path d="M12 13v3.5" />
       <path d="M8.5 20.5h7M9.5 20.5l.6-4h3.8l.6 4" />

@@ -124,9 +124,7 @@ export function TabBar({ activeTab, onSelect, panelIdBase }: TabBarProps) {
                   flik. Renderas bara på den aktiva fliken; CSS placerar den (topp-
                   stav på mobil, underlinje på desktop) och tonar in den mjukt
                   (gatat på reduced-motion). aria-hidden, ren dekor. */}
-              {selected ? (
-                <span aria-hidden="true" className="vm-tab-indicator" />
-              ) : null}
+              {selected ? <span aria-hidden="true" className="vm-tab-indicator" /> : null}
             </button>
           );
         })}

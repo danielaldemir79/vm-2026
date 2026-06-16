@@ -177,7 +177,10 @@ describe('DailyMatchesView, favoritlags-väljarens synlighet (U2)', () => {
   });
 
   it('DÖLJER favoritlags-väljaren när showFavoritePicker={false} (Idag-fliken, U2)', async () => {
-    const { container } = renderView(fixturesEnv(), <DailyMatchesView showFavoritePicker={false} />);
+    const { container } = renderView(
+      fixturesEnv(),
+      <DailyMatchesView showFavoritePicker={false} />
+    );
     await waitSettled();
     // Vänta in att matchkorten är på plats (data redo) och bekräfta sedan att väljaren
     // ALDRIG renderats (den är gatad på flaggan, inte på data-laddning).
