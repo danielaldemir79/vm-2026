@@ -111,3 +111,44 @@ describe('TabBar, klick + tangentbords-navigering', () => {
     expect(onSelect).toHaveBeenLastCalledWith('idag');
   });
 });
+
+// PREMIUM-FINISHEN (design-frontend, T83): ikoner (D1) + aktiv-indikator (D2).
+// Vaktar att varje flik bär sin glyf och att aktiv-markeringen INTE bara är färg
+// (en indikator-nod + det tillgängliga namnet är fortfarande etiketten, inte ikonen).
+describe('TabBar, ikoner (D1) + aktiv-indikator (D2)', () => {
+  it('renderar EN ikon-glyf per flik, kopplad till flikens ikon-namn', () => {
+    const { getByRole } = render(
+      <TabBar activeTab="idag" onSelect={() => {}} panelIdBase={PANEL_BASE} />
+    );
+    for (const tab of TABS) {
+      const button = getByRole('tab', { name: tab.label });
+      // Varje flik har exakt en ikon-glyf med rätt data-tab-icon (D1).
+      const icon = button.querySelector(`[data-tab-icon="${tab.icon}"]`);
+      expect(icon).not.toBeNull();
+    }
+  });
+
+  it('ikonen är aria-hidden, så flikens tillgängliga namn förblir ENBART etiketten', () => {
+    const { getByRole } = render(
+      <TabBar activeTab="idag" onSelect={() => {}} panelIdBase={PANEL_BASE} />
+    );
+    const button = getByRole('tab', { name: 'Idag' });
+    const icon = button.querySelector('[data-tab-icon]');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    // Det tillgängliga namnet är etiketten (ikonen läcker inte in i namnet).
+    expect(button).toHaveAccessibleName('Idag');
+  });
+
+  it('aktiv-indikatorn renderas BARA på den aktiva fliken (inte de inaktiva)', () => {
+    const { getByRole } = render(
+      <TabBar activeTab="turnering" onSelect={() => {}} panelIdBase={PANEL_BASE} />
+    );
+    const active = getByRole('tab', { name: 'Turnering' });
+    expect(active.querySelector('.vm-tab-indicator')).not.toBeNull();
+
+    for (const tab of TABS.filter((t) => t.id !== 'turnering')) {
+      const inactive = getByRole('tab', { name: tab.label });
+      expect(inactive.querySelector('.vm-tab-indicator')).toBeNull();
+    }
+  });
+});

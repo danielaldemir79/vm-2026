@@ -13,6 +13,15 @@
 // en ny/ändrad flik ändras på ETT ställe. Samma "en sanning"-mönster som SECTIONS
 // bar för chip-navet, men för den nya flik-IA:n.
 
+/**
+ * Stabilt ikon-NAMN per flik (D1, #175). Bara en sträng-nyckel bor i katalogen
+ * (en ren data-modul, ingen JSX), så TabBar (och ev. andra konsumenter) slår upp
+ * själva SVG-glyfen via tab-icon.tsx. Namnen är semantiska (vad fliken ÄR), inte
+ * geometriska, så glyfen kan finjusteras utan att katalogen rörs. EN sanning för
+ * vilken ikon en flik bär, precis som label/slug/order.
+ */
+export type TabIconName = 'today' | 'coupon' | 'leaderboard' | 'tournament' | 'more';
+
 /** En fliks stabila identitet: intern id, synlig etikett, URL-slug, ordning, ikon-namn. */
 export interface TabDescriptor {
   /** Intern, stabil nyckel (data-attribut, aria-controls-bas, test-krok). */
@@ -27,6 +36,12 @@ export interface TabDescriptor {
   readonly slug: string;
   /** Stabil ordning i flik-raden (vänster->höger på desktop, vänster->höger nere på mobil). */
   readonly order: number;
+  /**
+   * Ikon-namnet (D1): vilken inline-SVG-glyf flik-raden ritar bredvid etiketten.
+   * Ikon + etikett = en premium sport-app-känsla (Sofascore-mönstret) och ett
+   * snabbare ögon-ankare än text ensam. Glyfen slås upp i tab-icon.tsx.
+   */
+  readonly icon: TabIconName;
 }
 
 /** De fem flik-id:na (typad union, så App.tsx + routningen aldrig stavar fel). */
@@ -36,13 +51,17 @@ export type TabId = 'idag' | 'tips' | 'topplista' | 'turnering' | 'mer';
  * Katalogen, EN post per flik, i flik-rads-ordning. Ordningen är medvetet den
  * Daniel angav (Idag/Tips/Topplista/Turnering/Mer): Idag är hemmet (default), och
  * "Mer" sist som en lugn samlingsplats för hjälp-/arrangörsytor.
+ *
+ * Ikon-valet (D1) speglar varje fliks BETYDELSE: Idag = en kalender-/dag-glyf,
+ * Tips = en ifylld kupong, Topplista = ett pall-/rank-stapel-diagram, Turnering =
+ * ett slutspelsträd/pokal, Mer = den universella tre-prickars-meny.
  */
 export const TABS = [
-  { id: 'idag', label: 'Idag', slug: 'idag', order: 10 },
-  { id: 'tips', label: 'Tips', slug: 'tips', order: 20 },
-  { id: 'topplista', label: 'Topplista', slug: 'topplista', order: 30 },
-  { id: 'turnering', label: 'Turnering', slug: 'turnering', order: 40 },
-  { id: 'mer', label: 'Mer', slug: 'mer', order: 50 },
+  { id: 'idag', label: 'Idag', slug: 'idag', order: 10, icon: 'today' },
+  { id: 'tips', label: 'Tips', slug: 'tips', order: 20, icon: 'coupon' },
+  { id: 'topplista', label: 'Topplista', slug: 'topplista', order: 30, icon: 'leaderboard' },
+  { id: 'turnering', label: 'Turnering', slug: 'turnering', order: 40, icon: 'tournament' },
+  { id: 'mer', label: 'Mer', slug: 'mer', order: 50, icon: 'more' },
 ] as const satisfies readonly TabDescriptor[];
 
 /** Default-fliken vid kall-laddning utan en giltig hash (hemmet). */

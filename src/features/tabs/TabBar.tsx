@@ -23,6 +23,7 @@
 
 import { useRef } from 'react';
 import { TABS, tabButtonId, tabPanelId, type TabId } from './tab-config';
+import { TabIcon } from './tab-icon';
 import './tabs.css';
 
 export interface TabBarProps {
@@ -114,7 +115,18 @@ export function TabBar({ activeTab, onSelect, panelIdBase }: TabBarProps) {
               onClick={() => onSelect(tab.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
             >
-              {tab.label}
+              {/* Ikon + etikett (D1): glyfen ankrar fliken visuellt (Sofascore-
+                  mönstret), etiketten bär det tillgängliga namnet. På aktiv flik
+                  fylls glyfen (D2, extra tyngd utöver färgen). */}
+              <TabIcon name={tab.icon} active={selected} />
+              <span className="vm-tab-label">{tab.label}</span>
+              {/* Glidande aktiv-indikator (D2): en accent-stav som markerar aktiv
+                  flik. Renderas bara på den aktiva fliken; CSS placerar den (topp-
+                  stav på mobil, underlinje på desktop) och tonar in den mjukt
+                  (gatat på reduced-motion). aria-hidden, ren dekor. */}
+              {selected ? (
+                <span aria-hidden="true" className="vm-tab-indicator" />
+              ) : null}
             </button>
           );
         })}

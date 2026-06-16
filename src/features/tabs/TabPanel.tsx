@@ -27,6 +27,7 @@
 
 import type { ReactNode } from 'react';
 import { tabButtonId, tabPanelId, type TabId } from './tab-config';
+import './tabs.css';
 
 export interface TabPanelProps {
   /** Vilken flik denna panel hör till. */
@@ -48,6 +49,10 @@ export function TabPanel({ tabId, activeTab, panelIdBase, children }: TabPanelPr
       aria-labelledby={tabButtonId(tabId)}
       data-tab-panel={tabId}
       data-active={active ? 'true' : undefined}
+      // vm-tab-panel: bär den mjuka flik-övergången (en kort fade/lyft IN när en
+      // panel blir aktiv), gatad på reduced-motion i tabs.css. Övergången är RENT
+      // dekorativ , `hidden` (display:none) styr fortfarande synlighet + a11y-trädet.
+      className="vm-tab-panel"
       // Dold panel: `hidden` (display:none) => ur layout + ur a11y-trädet. Aktiv
       // panel är fokuserbar (tabIndex 0) så fokus kan flyttas in efter flik-raden.
       hidden={!active}

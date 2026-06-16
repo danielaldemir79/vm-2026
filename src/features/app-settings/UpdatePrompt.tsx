@@ -87,7 +87,11 @@ export function UpdatePrompt({ api }: UpdatePromptProps) {
   return (
     <div
       data-update-prompt={showRefresh ? 'refresh' : 'offline-ready'}
-      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+      // F3: `vm-above-tab-bar` lyfter prompten OVANFÖR den fasta mobil-flikraden
+      // (annars låg den z-40 RAKT ÖVER raden och dolde navigationen). På desktop
+      // (flik-raden i toppen) nollas lyftet och prompten sitter vid botten-kanten.
+      // z-30 = samma nivå som flik-raden, så den aldrig kan dölja en modal (z-50).
+      className="vm-above-tab-bar fixed inset-x-0 z-30 flex justify-center px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
     >
       <section
         className="flex w-full max-w-md flex-col gap-3 rounded-card border border-border bg-surface p-4 shadow-[var(--vm-shadow-card)] sm:flex-row sm:items-center sm:justify-between sm:gap-4"
@@ -115,7 +119,7 @@ export function UpdatePrompt({ api }: UpdatePromptProps) {
               type="button"
               data-update-action=""
               onClick={updateApp}
-              className="rounded-pill bg-accent px-4 py-2 font-display text-sm font-semibold text-accent-fg shadow-md outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_88%,black)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+              className="rounded-pill bg-accent px-4 py-2 font-display text-sm font-semibold text-accent-fg shadow-[var(--vm-shadow-button)] outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_88%,black)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
             >
               Ladda om
             </button>
