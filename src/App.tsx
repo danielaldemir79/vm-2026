@@ -568,7 +568,7 @@ function AppShell() {
                                     <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
                                       Appen
                                     </p>
-                                    <h2 className="font-display text-xl font-bold sm:text-2xl">
+                                    <h2 className="font-display text-xl font-semibold sm:text-2xl">
                                       Installera som app
                                     </h2>
                                     <p className="text-sm text-fg-muted">

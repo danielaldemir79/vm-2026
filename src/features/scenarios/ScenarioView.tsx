@@ -193,9 +193,9 @@ export function ScenarioView() {
 
   return (
     <section aria-labelledby="vad-kravs-rubrik" className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="vad-kravs-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+          <h2 id="vad-kravs-rubrik" className="font-display text-xl font-semibold sm:text-2xl">
             Vad krävs
           </h2>
           {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}

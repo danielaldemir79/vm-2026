@@ -157,7 +157,10 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
         <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
           Resultat
         </p>
-        <h2 id="resultatinmatning-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+        <h2
+          id="resultatinmatning-rubrik"
+          className="font-display text-xl font-semibold sm:text-2xl"
+        >
           Mata in resultat
         </h2>
         <p className="max-w-2xl text-sm text-fg-muted">

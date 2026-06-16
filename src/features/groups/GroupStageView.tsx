@@ -134,9 +134,9 @@ export function GroupStageView() {
 
   return (
     <section aria-labelledby="gruppspel-rubrik" className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="gruppspel-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+          <h2 id="gruppspel-rubrik" className="font-display text-xl font-semibold sm:text-2xl">
             Gruppspelet
           </h2>
           {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}
