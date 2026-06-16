@@ -5,6 +5,28 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T102 (#210): Aktiv SW-uppdaterings-koll (PWA fastnar på gammal version)
+
+**Problem:** en testare startade om appen ~10 ggr utan att få nya versionen. Appen kör (sedan white-
+screen-hotfixen) `registerType: 'autoUpdate'` (skipWaiting + clientsClaim + `controllerchange` ->
+auto-reload i register-sw.ts) , INTE längre 'prompt' som den ursprungliga T43-raden beskrev (T43 är
+alltså supersedad på den punkten). Den kedjan tar i bruk en ny SW automatiskt, MEN bara efter att
+webbläsaren UPPTÄCKT en ny sw.js. Webbläsaren hämtar sw.js vid navigering + ~var 24:e timme. En
+installerad PWA som öppnas igen från hemskärmen återupptas ofta FRUSEN (iOS) utan en färsk navigering,
+så uppdaterings-kollen körs aldrig och användaren fastnar på gammal version.
+
+**Beslut:** kolla AKTIVT efter en ny SW via `registration.update()` , direkt + på ett 60s-intervall +
+när appen blir synlig/fokuserad igen (`sw-update-scheduler.ts`, wirad via `registerSW`s `onRegisteredSW`-
+callback i register-sw.ts). Hittar update() en ny sw.js går den befintliga kedjan igång (skipWaiting ->
+controllerchange -> reload), så nya versionen tas i bruk inom ~en minut efter att appen öppnas, utan
+handgrepp. **Varför poll + synlighet/fokus, inte bara intervall:** en frusen PWA-återöppning fyrar
+visibilitychange/focus precis när vi vill kolla; intervallet täcker en app som står öppen länge. **Källa:**
+vite-plugin-pwa "Periodic SW Updates"-mönstret (onRegisteredSW + update()), verifierat mot installerad
+1.3.0 (`onRegisteredSW(swScriptUrl, registration)`). Ren/testbar logik (injicerbar doc/win/intervall),
+register-sw.ts förblir den tunna otestbara virtual:-seamen.
+
+---
+
 ## 2026-06-16 , T101 (#issue): ENGÅNGS-backfill av event-data för de 9 opollade avgjorda matcherna
 
 **Problem:** T100 source:ade score-/antals-stats ur facit (täcker 16/16), men de SPELAR-nivå-stats som

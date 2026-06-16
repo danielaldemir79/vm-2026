@@ -8,8 +8,10 @@
 // matchar vårt kontrakt. Inget annat bor här, så det otestade ytan är minimal.
 //
 // API-form verifierad mot vite-plugin-pwa-dokumentationen (registerSW med
-// onNeedRefresh/onOfflineReady, returnerar updateSW(reloadPage?)). Se
-// docs/decisions.md (T43).
+// onNeedRefresh/onOfflineReady/onRegisteredSW, returnerar updateSW(reloadPage?)). Se
+// docs/decisions.md (T43, T102).
+
+import { scheduleSwUpdateChecks } from './sw-update-scheduler';
 
 /**
  * Callbacks vi bryr oss om från vite-plugin-pwa:s registerSW.
@@ -39,6 +41,13 @@ type PwaRegisterModule = {
     immediate?: boolean;
     onNeedRefresh?: () => void;
     onOfflineReady?: () => void;
+    // onRegisteredSW (vite-plugin-pwa): ger oss den färdiga registreringen, så vi kan
+    // starta AKTIVA uppdaterings-kollar (T102) , annars upptäcks en ny SW aldrig på en
+    // frusen PWA-återöppning (iOS), och användaren fastnar på gammal version.
+    onRegisteredSW?: (
+      swScriptUrl: string,
+      registration: ServiceWorkerRegistration | undefined
+    ) => void;
   }) => (reloadPage?: boolean) => Promise<void>;
 };
 
@@ -99,6 +108,14 @@ export const registerAppSw = (
         immediate: true,
         onNeedRefresh: callbacks.onNeedRefresh,
         onOfflineReady: callbacks.onOfflineReady,
+        // AKTIVA uppdaterings-kollar (T102): poll + synlighet/fokus -> registration.update(),
+        // så en ny version upptäcks och tas i bruk (skipWaiting -> controllerchange -> reload
+        // ovan) inom ~en minut efter att appen öppnas, utan att användaren startar om något.
+        onRegisteredSW: (_swScriptUrl, registration) => {
+          if (registration) {
+            scheduleSwUpdateChecks(registration);
+          }
+        },
       });
     })
     .catch((error: unknown) => {
