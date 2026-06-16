@@ -91,6 +91,15 @@ export interface MatchCardProps {
   liveData?: LiveData | null;
   /** Nuet (epoch-ms), vidarebefordras till livekortets klocka (test-injicerbart). */
   now?: number;
+  /**
+   * Valfri DRILL-IN-affordans (T86, #178): en knapp som öppnar den rika matchvyn för matchen
+   * (tidslinje + statistik + laguppställning + "vad alla tippade"). En ren render-SLOT, så
+   * MatchCard förblir en presentations-komponent UTAN beroende till match-detalj-feature:n
+   * (lägsta koppling, samma form som `footer`): den som renderar kortet injicerar triggern.
+   * Default null = ingen drill-in (hero-kortet, enhetstester) , kortet ser ut precis som förr.
+   * Ligger på en egen rad efter live-/fotraden så den inte konkurrerar med lagnamns-knapparna.
+   */
+  detailAction?: ReactNode;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -193,6 +202,7 @@ export function MatchCard({
   favorite = false,
   liveData = null,
   now,
+  detailAction = null,
 }: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
@@ -446,6 +456,11 @@ export function MatchCard({
           now={now}
         />
       ) : null}
+
+      {/* DRILL-IN-affordansen (T86, #178): "Öppna matchsida" , öppnar den rika matchvyn.
+          Egen rad efter live-/metadata-blocket så den inte konkurrerar med lagnamns-knapparna.
+          Ren slot, så kortet är orört utan den (hero, tester). */}
+      {detailAction !== null ? <div className="flex">{detailAction}</div> : null}
 
       {/* Valfri fotrad (T24, #24): reaktions-raden injiceras här av dagens-vyn. En ren
           slot, så kortet är orört utan den (hero, tester). */}

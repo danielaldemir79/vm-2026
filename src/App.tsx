@@ -45,6 +45,7 @@ import { PredictionSection, PredictionsProvider } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
 import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
+import { MatchDetailProvider } from './features/match-detail';
 import { TotalLeaderboardSection } from './features/total-leaderboard';
 import { FavoriteTeamProvider, FavoriteTeamSection } from './features/favorite-team';
 import { AdminSection } from './features/admin';
@@ -182,9 +183,15 @@ function AppShell() {
             <TeamProfileProvider>
               <LeaderboardProvider>
                 <PredictionsProvider>
-                  {/* ===================== IDAG ===================== */}
-                  <TabPanel tabId="idag" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                    {/* IDAG, AVLASTAD (U2, north-star §4): fliken leder med EN sak , dagens
+                  {/* MatchDetailProvider (T86, #178): den rika matchvyns drill-in. Ligger HÄR,
+                      innanför Results + Leaderboard (matchvyn läser matcher/lag ur results-
+                      storen + reveal ur leaderboard-storen) och omsluter ALLA flik-paneler så
+                      en matchrad i Idag (nu) eller Tips-reveal (T92) kan öppna vyn. Overlayn
+                      renderas bara när ett match-id är öppet, så den vilar tills man drillar in. */}
+                  <MatchDetailProvider>
+                    {/* ===================== IDAG ===================== */}
+                    <TabPanel tabId="idag" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      {/* IDAG, AVLASTAD (U2, north-star §4): fliken leder med EN sak , dagens
                       live/nästa-match + matchlista. Den långa marknads-heron (wordmark +
                       paragraf + pills), install-knappen och favoritlags-väljaren är BORTA
                       härifrån: de var sekundära ytor som tryckte ner matcherna och gjorde
@@ -192,252 +199,255 @@ function AppShell() {
                       inställning), så Idag = nedräkning/live + matcher, inget annat.
                       En SLANK rad bär ändå appens namn (h1, tillgängligt namn + smoke-test)
                       som en lugn flik-titel, inte en hel landningssida. */}
-                    <div className="flex flex-col gap-8 sm:gap-10">
-                      <Fade>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-                            USA · Kanada · Mexiko · 2026
-                          </span>
-                          <Wordmark as="h1" className="text-3xl leading-none sm:text-4xl" />
-                        </div>
-                      </Fade>
+                      <div className="flex flex-col gap-8 sm:gap-10">
+                        <Fade>
+                          <div className="flex flex-col gap-1">
+                            <span className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                              USA · Kanada · Mexiko · 2026
+                            </span>
+                            <Wordmark as="h1" className="text-3xl leading-none sm:text-4xl" />
+                          </div>
+                        </Fade>
 
-                      {/* Daglig matchvy (T7) , Idag-flikens hjärta: dagens matcher +
+                        {/* Daglig matchvy (T7) , Idag-flikens hjärta: dagens matcher +
                         LIVE-matchen (LiveNowSection åker med) + nedräkning. SimulationFrame
                         runt daily bär sim-markeringen NÄR what-if-läget är PÅ (kontrollen bor
                         i Turnering, men daily speglar ett simulerat resultat live, så ramen
                         ska synas här med). ReactionsProvider + MatchCommentsProvider omsluter
                         bara dagens-vyn (de enda ytorna med reaktioner/match-trådar).
                         showFavoritePicker={false}: väljaren är en INSTÄLLNING och bor i Mer (U2). */}
-                      <SimulationFrame>
-                        <Slide direction="up">
-                          <ReactionsProvider>
-                            <MatchCommentsProvider>
-                              <DailyMatchesView showFavoritePicker={false} />
-                            </MatchCommentsProvider>
-                          </ReactionsProvider>
-                        </Slide>
-                      </SimulationFrame>
-                    </div>
-                  </TabPanel>
+                        <SimulationFrame>
+                          <Slide direction="up">
+                            <ReactionsProvider>
+                              <MatchCommentsProvider>
+                                <DailyMatchesView showFavoritePicker={false} />
+                              </MatchCommentsProvider>
+                            </ReactionsProvider>
+                          </Slide>
+                        </SimulationFrame>
+                      </div>
+                    </TabPanel>
 
-                  {/* ===================== TIPS ===================== */}
-                  <TabPanel tabId="tips" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                    <div className="flex flex-col gap-12">
-                      {/* Tips-motorn (T15): match-tips per rum. ScoreGuide (poäng-förklaringen)
+                    {/* ===================== TIPS ===================== */}
+                    <TabPanel tabId="tips" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      <div className="flex flex-col gap-12">
+                        {/* Tips-motorn (T15): match-tips per rum. ScoreGuide (poäng-förklaringen)
                         renderas inuti PredictionsView, så den följer Tips-fliken. */}
-                      <Slide direction="up">
-                        <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
-                      </Slide>
+                        <Slide direction="up">
+                          <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
+                        </Slide>
 
-                      {/* Gruppvinnar-tipsen (T16): tippa 1:an + 2:an i varje grupp. */}
-                      <Slide direction="up">
-                        <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
-                      </Slide>
+                        {/* Gruppvinnar-tipsen (T16): tippa 1:an + 2:an i varje grupp. */}
+                        <Slide direction="up">
+                          <GroupPredictionSection
+                            surface={(children) => <Panel>{children}</Panel>}
+                          />
+                        </Slide>
 
-                      {/* Bracket-/slutspels-tipsen (T16b, #59): VM-vinnaren + slot-vinnare. */}
-                      <Slide direction="up">
-                        <BracketPredictionSection
-                          surface={(children) => <Panel>{children}</Panel>}
-                        />
-                      </Slide>
+                        {/* Bracket-/slutspels-tipsen (T16b, #59): VM-vinnaren + slot-vinnare. */}
+                        <Slide direction="up">
+                          <BracketPredictionSection
+                            surface={(children) => <Panel>{children}</Panel>}
+                          />
+                        </Slide>
 
-                      {/* Tips-ligan (T14): skapa/gå med i ett rum, dela koden. Hör hemma i
+                        {/* Tips-ligan (T14): skapa/gå med i ett rum, dela koden. Hör hemma i
                         Tips , det är HÄR man organiserar vem man tippar mot. */}
-                      <Slide direction="up">
-                        <RoomSection surface={(children) => <Panel>{children}</Panel>} />
-                      </Slide>
-                    </div>
-                  </TabPanel>
+                        <Slide direction="up">
+                          <RoomSection surface={(children) => <Panel>{children}</Panel>} />
+                        </Slide>
+                      </div>
+                    </TabPanel>
 
-                  {/* ===================== TOPPLISTA ===================== */}
-                  <TabPanel tabId="topplista" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                    <div className="flex flex-col gap-12">
-                      {/* Per-rums-topplistan (T17): vem tippar bäst i DITT rum. ScoreGuide
+                    {/* ===================== TOPPLISTA ===================== */}
+                    <TabPanel tabId="topplista" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      <div className="flex flex-col gap-12">
+                        {/* Per-rums-topplistan (T17): vem tippar bäst i DITT rum. ScoreGuide
                         renderas inuti LeaderboardSummary, så den följer Topplista-fliken. */}
-                      <Slide direction="up">
-                        <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
-                      </Slide>
+                        <Slide direction="up">
+                          <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
+                        </Slide>
 
-                      {/* Den GLOBALA (cross-rum) topplistan (T82 del 3, #173): EN rankning av
+                        {/* Den GLOBALA (cross-rum) topplistan (T82 del 3, #173): EN rankning av
                         ALLA deltagare över ALLA rum. Visas även i demo/fixtures-läge. */}
-                      <Slide direction="up">
-                        <TotalLeaderboardSection
-                          surface={(children) => <Panel>{children}</Panel>}
-                        />
-                      </Slide>
-                    </div>
-                  </TabPanel>
+                        <Slide direction="up">
+                          <TotalLeaderboardSection
+                            surface={(children) => <Panel>{children}</Panel>}
+                          />
+                        </Slide>
+                      </div>
+                    </TabPanel>
 
-                  {/* ===================== TURNERING ===================== */}
-                  <TabPanel tabId="turnering" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                    {/* SimulationFrame runt HELA turnerings-zonen: tabeller + "vad krävs" +
+                    {/* ===================== TURNERING ===================== */}
+                    <TabPanel tabId="turnering" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      {/* SimulationFrame runt HELA turnerings-zonen: tabeller + "vad krävs" +
                       slutspelsträd + what-if-kontrollen + resultatinmatningen är alla
                       simulerings-PÅVERKADE, så ramen/badgen omsluter dem som EN zon (precis
                       som förr, fast nu i Turnering-fliken). Daily-ramen i Idag bär samma
                       markering där, eftersom sim-läget är globalt (en sanning i storen). */}
-                    <SimulationFrame>
-                      {/* Gruppspelstabellerna (T5): härledda ur den delade storen. */}
-                      <Slide direction="up">
-                        <GroupStageView />
-                      </Slide>
+                      <SimulationFrame>
+                        {/* Gruppspelstabellerna (T5): härledda ur den delade storen. */}
+                        <Slide direction="up">
+                          <GroupStageView />
+                        </Slide>
 
-                      {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
-                      <Slide direction="up">
-                        <ScenarioView />
-                      </Slide>
+                        {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
+                        <Slide direction="up">
+                          <ScenarioView />
+                        </Slide>
 
-                      {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
-                      <Slide direction="up">
-                        <BracketView />
-                      </Slide>
+                        {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
+                        <Slide direction="up">
+                          <BracketView />
+                        </Slide>
 
-                      {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
+                        {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
                         här i Turnering DIREKT ovanför resultatinmatningen (T32, #54). Sim-
                         läget handlar om RESULTAT, så kontrollen sitter vid inmatningen, och
                         ramen (ovan) omsluter alla påverkade vyer i fliken. */}
-                      <Slide direction="up">
-                        <SimulationBanner />
-                      </Slide>
+                        <Slide direction="up">
+                          <SimulationBanner />
+                        </Slide>
 
-                      {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): EN hemvist
+                        {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): EN hemvist
                         här i Turnering. I live visas den bara när what-if-läget är PÅ (lokal
                         "tänk om"-lek, skriver aldrig delat facit). Officiella resultat matas
                         in via AdminSection (Mer). I fixtures-läge alltid synlig. */}
-                      <Slide direction="up">
-                        <ResultEntryGate
-                          surface={(children) => <Panel>{children}</Panel>}
-                          renderCelebration={(celebration) => (
-                            <GoalCelebrationOverlay celebration={celebration} />
-                          )}
-                        />
-                      </Slide>
-                    </SimulationFrame>
-                  </TabPanel>
+                        <Slide direction="up">
+                          <ResultEntryGate
+                            surface={(children) => <Panel>{children}</Panel>}
+                            renderCelebration={(celebration) => (
+                              <GoalCelebrationOverlay celebration={celebration} />
+                            )}
+                          />
+                        </Slide>
+                      </SimulationFrame>
+                    </TabPanel>
 
-                  {/* ===================== MER ===================== */}
-                  <TabPanel tabId="mer" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                    <div className="flex flex-col gap-12">
-                      {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
+                    {/* ===================== MER ===================== */}
+                    <TabPanel tabId="mer" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      <div className="flex flex-col gap-12">
+                        {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
                         arrangören och gäller GLOBALT. Hör hemma i Mer (hjälp-/arrangörsytor). */}
-                      <Slide direction="up">
-                        <AdminSection surface={(children) => <Panel>{children}</Panel>} />
-                      </Slide>
+                        <Slide direction="up">
+                          <AdminSection surface={(children) => <Panel>{children}</Panel>} />
+                        </Slide>
 
-                      {/* FAVORITLAGS-VÄLJAREN (U2): flyttad hit från Idag , det är en
+                        {/* FAVORITLAGS-VÄLJAREN (U2): flyttad hit från Idag , det är en
                         INSTÄLLNING, inte dagens-innehåll. Avlastar Idag-fliken. */}
-                      <Slide direction="up">
-                        <FavoriteTeamSection surface={(children) => <Panel>{children}</Panel>} />
-                      </Slide>
+                        <Slide direction="up">
+                          <FavoriteTeamSection surface={(children) => <Panel>{children}</Panel>} />
+                        </Slide>
 
-                      {/* Den KOMPAKTA install-knappen (T63, #113): "Installera som app"-pill.
+                        {/* Den KOMPAKTA install-knappen (T63, #113): "Installera som app"-pill.
                         Flyttad hit från Idag (U2): install är en åtgärd som hör hemma i Mer,
                         inte före dagens matcher. GATAD bakom onboarding-touren (T39/#68, F1):
                         medan touren är öppen visas den inte; annars enligt plattform/event. */}
-                      {onboarding.open ? null : (
-                        <Slide direction="up">
-                          <Panel>
-                            <div className="flex flex-col gap-3">
-                              <header className="flex flex-col gap-1">
-                                <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-                                  Appen
-                                </p>
-                                <h2 className="font-display text-xl font-bold sm:text-2xl">
-                                  Installera som app
-                                </h2>
-                                <p className="text-sm text-fg-muted">
-                                  Lägg VM 2026 på hemskärmen, så öppnas den som en egen app, även
-                                  offline.
-                                </p>
-                              </header>
-                              <div className="flex">
-                                <InstallButton />
+                        {onboarding.open ? null : (
+                          <Slide direction="up">
+                            <Panel>
+                              <div className="flex flex-col gap-3">
+                                <header className="flex flex-col gap-1">
+                                  <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                                    Appen
+                                  </p>
+                                  <h2 className="font-display text-xl font-bold sm:text-2xl">
+                                    Installera som app
+                                  </h2>
+                                  <p className="text-sm text-fg-muted">
+                                    Lägg VM 2026 på hemskärmen, så öppnas den som en egen app, även
+                                    offline.
+                                  </p>
+                                </header>
+                                <div className="flex">
+                                  <InstallButton />
+                                </div>
                               </div>
-                            </div>
-                          </Panel>
-                        </Slide>
-                      )}
+                            </Panel>
+                          </Slide>
+                        )}
 
-                      {/* Footern (T44, #75): appens synliga adress + upphovs-kortet (signaturen)
+                        {/* Footern (T44, #75): appens synliga adress + upphovs-kortet (signaturen)
                         + versionsstämpel. Hör hemma i Mer (lugn samlingsplats). */}
-                      <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
-                        {/* Footerns ledtext + appens SYNLIGA adress (T44, #75): adressen ska gå
+                        <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
+                          {/* Footerns ledtext + appens SYNLIGA adress (T44, #75): adressen ska gå
                           att LÄSA och säga högt. vm-2026.pages.dev som synlig, klickbar länk-
                           text; href bär hela URL:en. Egen-flik + tabnabbing-skydd. */}
-                        <p>
-                          VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen
-                          med vänner,{' '}
-                          <a
-                            href="https://vm-2026.pages.dev"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Öppna appens adress vm-2026.pages.dev i en ny flik"
-                            className="rounded-sm font-medium text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
-                          >
-                            vm-2026.pages.dev
-                          </a>
-                          .
-                        </p>
+                          <p>
+                            VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela
+                            appen med vänner,{' '}
+                            <a
+                              href="https://vm-2026.pages.dev"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="Öppna appens adress vm-2026.pages.dev i en ny flik"
+                              className="rounded-sm font-medium text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                            >
+                              vm-2026.pages.dev
+                            </a>
+                            .
+                          </p>
 
-                        {/* UPPHOVS-KORTET (T38 signatur -> T44 runda 2, #75): footern lyfter
+                          {/* UPPHOVS-KORTET (T38 signatur -> T44 runda 2, #75): footern lyfter
                           Daniel. data-app-signature = stabil krok + testad semantik (T38/T39-
                           testerna vaktar "Daniel Aldemir" + länk-kontraktet). */}
-                        <div data-app-signature="" className="flex flex-col gap-3">
-                          <div className="flex items-center gap-2.5">
-                            <span aria-hidden="true" className="vm-signature-seal">
-                              DA
-                            </span>
-                            <span className="flex flex-col leading-tight">
-                              <span className="text-xs text-fg-muted">Byggd av</span>
-                              <a
-                                href="https://www.danielaldemir.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
-                                className="rounded-sm font-display text-base font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                          <div data-app-signature="" className="flex flex-col gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <span aria-hidden="true" className="vm-signature-seal">
+                                DA
+                              </span>
+                              <span className="flex flex-col leading-tight">
+                                <span className="text-xs text-fg-muted">Byggd av</span>
+                                <a
+                                  href="https://www.danielaldemir.com"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
+                                  className="rounded-sm font-display text-base font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                                >
+                                  Daniel Aldemir
+                                </a>
+                              </span>
+                            </div>
+
+                            {/* Titel-raden (T44, #75): promotar Daniel som utvecklaren. */}
+                            <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
+
+                            {/* HEMSIDE-CTA:n (T44 runda 2, #75): danielaldemir.com som en
+                            uppenbart klickbar pill (delade .vm-install-pill-formen). */}
+                            <a
+                              href="https://www.danielaldemir.com"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="Öppna danielaldemir.com i en ny flik"
+                              className="vm-install-pill self-start"
+                            >
+                              danielaldemir.com
+                              <svg
+                                aria-hidden="true"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="vm-install-pill-icon"
                               >
-                                Daniel Aldemir
-                              </a>
-                            </span>
+                                <path d="M15 3h6v6" />
+                                <path d="M10 14 21 3" />
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                              </svg>
+                            </a>
                           </div>
 
-                          {/* Titel-raden (T44, #75): promotar Daniel som utvecklaren. */}
-                          <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
-
-                          {/* HEMSIDE-CTA:n (T44 runda 2, #75): danielaldemir.com som en
-                            uppenbart klickbar pill (delade .vm-install-pill-formen). */}
-                          <a
-                            href="https://www.danielaldemir.com"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Öppna danielaldemir.com i en ny flik"
-                            className="vm-install-pill self-start"
-                          >
-                            danielaldemir.com
-                            <svg
-                              aria-hidden="true"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="vm-install-pill-icon"
-                            >
-                              <path d="M15 3h6v6" />
-                              <path d="M10 14 21 3" />
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                            </svg>
-                          </a>
-                        </div>
-
-                        {/* Version-stämpel (T43, #74): diskret bygg-identifierare. */}
-                        <VersionStamp />
-                      </footer>
-                    </div>
-                  </TabPanel>
+                          {/* Version-stämpel (T43, #74): diskret bygg-identifierare. */}
+                          <VersionStamp />
+                        </footer>
+                      </div>
+                    </TabPanel>
+                  </MatchDetailProvider>
                 </PredictionsProvider>
               </LeaderboardProvider>
             </TeamProfileProvider>

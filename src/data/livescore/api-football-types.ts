@@ -149,9 +149,22 @@ export interface RawLineupPlayer {
   grid: string | null;
 }
 
-/** lineup-svarets response[]-element: lag + formation + startelva + avbytare. */
+/**
+ * tränar-blocket i en lineup-post. id/photo finns men vi konsumerar bara `name`. Hela
+ * blocket kan saknas i ett svar, så det är valfritt och `name` kan vara null (gissa aldrig
+ * ett tränarnamn).
+ */
+export interface RawLineupCoach {
+  id?: number | null;
+  name?: string | null;
+  photo?: string | null;
+}
+
+/** lineup-svarets response[]-element: lag + ev. tränare + formation + startelva + avbytare. */
 export interface RawLineupResponse {
   team: RawTeamRef;
+  /** Tränaren (valfri i svaret; namnet bärs vidare till UI:t, övriga fält ignoreras). */
+  coach?: RawLineupCoach;
   formation: string;
   startXI: { player: RawLineupPlayer }[];
   substitutes: { player: RawLineupPlayer }[];

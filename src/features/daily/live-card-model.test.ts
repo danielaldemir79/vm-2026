@@ -27,7 +27,9 @@ function ev(overrides: Partial<LiveEvent> = {}): LiveEvent {
     detail: 'Normal Goal',
     teamApiId: HOME,
     teamName: 'England',
+    playerId: null,
     playerName: 'A. Player',
+    assistId: null,
     assistName: null,
     cardColor: null,
     ...overrides,
@@ -201,6 +203,7 @@ function lineup(teamApiId: number, formation: string): LiveLineup {
     formation,
     startXI: [{ apiPlayerId: 1, name: 'GK', number: 1, position: 'G', grid: '1:1' }],
     substitutes: [{ apiPlayerId: 2, name: 'Sub', number: 12, position: 'M', grid: null }],
+    coachName: null,
   };
 }
 

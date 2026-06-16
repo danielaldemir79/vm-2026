@@ -70,8 +70,16 @@ export interface LiveEvent {
   detail: string;
   teamApiId: number;
   teamName: string;
+  /**
+   * Spelarens API-id, null om API:t saknade det. STABIL nyckel för cross-match-aggregering
+   * (skytteliga, T87): namn kan stavas olika mellan svar, id:t är beständigt. Bärs vidare av
+   * parse-live ur event.player.id (kan vara null i råsvaret).
+   */
+  playerId: number | null;
   /** Spelarens namn, null om API:t saknade det. */
   playerName: string | null;
+  /** Assistens API-id, null när ingen assist (vanligt: assist {id:null,name:null}). */
+  assistId: number | null;
   /** Assistens namn, null när ingen assist (vanligt: assist {id:null,name:null}). */
   assistName: string | null;
   /** Kortfärg, satt bara för kind 'card' (annars null). */
@@ -110,6 +118,8 @@ export interface LiveLineup {
   formation: string;
   startXI: LiveLineupPlayer[];
   substitutes: LiveLineupPlayer[];
+  /** Tränarens namn (city/landslagsförbundskapten), null när API:t saknade det. */
+  coachName: string | null;
 }
 
 /**
