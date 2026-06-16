@@ -5,6 +5,54 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T85 (#177): Web-push FUNDAMENT (VAPID + prenumerationer + SW + sender)
+
+**Beslut (secret-uppdelning):** VAPID-nyckelparet genererat med `npx web-push generate-vapid-keys
+--json`. Den PUBLIKA nyckeln (publik per design) bor i en committad konstant
+(`src/features/push/vapid.ts`, `VAPID_PUBLIC_KEY`); den PRIVATA bor BARA i `app_config`
+(`vapid_private_key`, insertad via MCP `execute_sql`, ALDRIG i kod). `vapid_public_key` lagras
+också i app_config för komplett ess, men klienten använder den committade konstanten.
+**Varför:** samma mönster som `api_football_key` (T80). Publik-i-kod / privat-i-secret-store är
+den standardiserade web-push-uppdelningen. Källa: MDN "Push API" + web.dev "Web Push notifications"
+(VAPID-avsnittet). Secret-scan ren (privatnyckel-värdet finns i 0 spårade filer).
+
+**Beslut (web-push-lib i edge):** `push-sender` använder **`jsr:@negrel/webpush@0.5.0`** (Deno-native,
+Web Crypto), INTE `npm:web-push`. **Varför:** npm:web-push lutar sig mot `node:crypto` (ECDH/ECDSA)
+som inte är pålitligt i Supabases edge-runtime; @negrel/webpush är byggt på Web Crypto som finns i
+runtime. VERIFIERAT, inte antaget: den deployade funktionen anropades med en riktig anonym JWT och
+körde HELA boot-vägen (JWT -> VAPID-import -> ApplicationServer.new -> tom prenumerations-query ->
+`{sent:0}` 200) utan krasch , dvs libben + nyckel-importen FUNGERAR i edge-runtime. Endast den
+faktiska browser-leveransen är CI-omöjlig (manuell iPhone-verifiering).
+
+**Beslut (raw VAPID -> JWK):** app_config lagrar nycklarna i RAW base64url (som web-push ger dem),
+men @negrel/webpush.`importVapidKeys` tar JWK (ECDSA P-256). `rawVapidToJwkPair`
+(`src/features/push/vapid-jwk.ts`, speglad till `supabase/functions/_shared/push-vapid.ts`)
+konverterar: publik 65-byte okomprimerad punkt `0x04||X(32)||Y(32)` -> JWK `{kty:'EC',crv:'P-256',x,y}`,
+privat 32-byte `d` -> samma + `d`. **Bevisat mot Web Crypto (gissa-aldrig-prob):** den konverterade
+JWK:n importeras, signerar och verifierar (d hör ihop med x/y), och publik raw-export round-trippar
+till ursprungssträngen. Mirror-paritet vaktas av `push-vapid-mirror-parity.test.ts`. Källa: RFC 8292
+(VAPID) + W3C Push API + Web Crypto EC JWK.
+
+**Beslut (iOS-krav):** opt-in-ytan visar en lugn "lägg till på hemskärmen"-hint i stället för en
+aktivera-knapp när plattformen är iOS och appen INTE körs installerat (standalone). **Varför:**
+web-push fungerar på iOS BARA från 16.4+ OCH BARA när appen är installerad till hemskärmen (Apples
+krav). En knapp i Safari-fliken kunde aldrig fungera. iOS-gaten vinner FÖRST i state-maskinen
+(`resolvePushOptInState`), bevisat av ett ordnings-test. Källa: Apple "Web Push for Web Apps on iOS
+and iPadOS" (Safari 16.4 release notes / WWDC23) + web.dev.
+
+**Beslut (SW-handler):** appen behåller `generateSW` (workbox), och push-/notificationclick-
+hanterarna injiceras via `workbox.importScripts: ['custom-push-sw.js']` (public/custom-push-sw.js
+kopieras till dist-roten). INTE byte till injectManifest. **Verifierat:** `dist/sw.js` innehåller
+`importScripts("custom-push-sw.js")` och filen emittas + precachas. Parse-regeln finns dubbelt (SW
+kan inte importera src/), speglad från `sw-payload.ts` och vaktad av `sw-mirror-parity.test.ts`.
+
+**Beslut (RLS):** `push_subscriptions` (en rad per enhet, endpoint UNIQUE) , RLS på `auth.uid()`:
+en användare ser/skapar/raderar bara sina egna rader; ingen UPDATE-policy (en prenumeration ersätts,
+upsert on conflict träffar bara egen rad); service_role (sender) förbigår RLS för att kunna skicka.
+Samma mönster som predictions (T15). Sender-funktionen löser user ur JWT:n (aldrig ur bodyn) och
+filtrerar prenumerationerna på den lösta user_id:t (self-scope). CORS + OPTIONS tidigt (global-
+leaderboards 503 berodde delvis på saknad CORS , upprepas inte).
+
 ## 2026-06-16 , T102 (#210): Aktiv SW-uppdaterings-koll (PWA fastnar på gammal version)
 
 **Problem:** en testare startade om appen ~10 ggr utan att få nya versionen. Appen kör (sedan white-
