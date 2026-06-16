@@ -5,6 +5,47 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T96 (#193): Rum-kontext , RoomSection överst i Tips + persistent rum-pill i app-baren + globala topplistan dold
+
+**Beslut (RoomSection överst i Tips):** Hela RoomSection flyttades till TOPPEN av Tips-fliken (låg
+förr sist, efter match-/grupp-/bracket-tipsen). **Varför:** rum-valet är PRIMÄRT , man väljer rum
+först (vem tippar man mot) och rum-kontexten styr både tipsen OCH Topplistan, så att gömma rum-valet
+längst ner var bakvänt (Daniels live-feedback). Skapa rum / gå med via kod + T94:s komprimerade
+medlems-rutnät bor kvar i RoomSection, bara placeringen ändrades (återanvänd, bygg inte om).
+
+**Beslut (persistent rum-pill i app-baren, RoomPill):** Det aktiva rummet visas , och kan bytas ,
+via en liten pill i app-bar-headern (utanför flik-panelerna), så den syns på ALLA flikar
+(Idag/Tips/Topplista/Turnering/Mer), inte bara i RoomSection (Tips). **En sanning:** pillen är en
+tunn konsument av samma rums-store som RoomSection (`useRoomsStore`), så ett byte i pillen är samma
+`activeRoom` som ett byte i RoomSection , de rum-scopade vyerna (Tips + Topplista) följer med direkt.
+**Beslut (skapa/gå-med + nå pillen utan rum , Daniels tillägg under tasken):** Pillens meny bär OCKSÅ
+"Skapa rum" + "Gå med i rum" (`role=menuitem`), så man når rum-hanteringen från VILKEN flik som helst.
+Valen byter inte rum , de navigerar till RoomSection (överst i Tips) och scrollar + fokuserar RÄTT
+formulär (skapa vs gå med) via App-skalets `onOpenRooms` (DOM-delen bruten ut i `focusRoomForm`, testbar
+seam; dubbel rAF så Tips-panelen hunnit få layout efter flik-bytet; respekterar prefers-reduced-motion).
+**Varför pillen ändrades till alltid-meny:** kravet "nå skapa/gå-med från pillen" gör en stilla etikett
+otillräcklig, så pillen är nu en menyknapp i ALLA synliga lägen (formulären bor kvar i RoomSection , en
+sanning, pillen är bara genvägen dit).
+
+**Synlighets-grenar (slutligt):** rummen vilande (enabled=false) -> pillen är null (app-baren ser ut som
+förr). Aktiverade men INGET aktivt rum (ny användare) -> en "Rum"-CTA: menyknapp vars enda val är skapa/
+gå-med, så man kan gå med via pillen och routas till rätt sektion (visas bara när `onOpenRooms` finns,
+annars null , ingen död knapp). Exakt 1 rum -> menyknapp som visar rummets namn; menyn har inga rum-rader
+(inget att byta MELLAN) utan bara skapa/gå-med. 2+ rum -> menyknapp (`aria-haspopup=menu`) vars meny
+listar rummen (`role=menu` + `menuitemradio`, aktivt rum bär `aria-checked` + `aria-current`, byte på ett
+tap) FÖRE en separator + skapa/gå-med. **Varför en lättviktig meny, inte den delade Modal:** ett snabbt
+rum-byte ska vara ETT tap utan modal-ceremoni (KISS); menyn äger ändå full a11y (tangentbord vandrar
+ALLA rader rum + handlingar med wrap + Home/End, fokus-flytt till aktivt rum (annars första raden) vid
+öppning, Escape + klick-utanför stänger och returnerar fokus till knappen, reduced-motion-gated CSS).
+
+**Beslut (globala topplistan dold bakom flagga):** Den globala (cross-rum) TotalLeaderboardSection
+renderas inte längre ovillkorligt utan bakom `const GLOBAL_LEADERBOARD_ENABLED = false` (App.tsx).
+**Varför:** dess edge-funktion (global-leaderboard) BOOT-KRASCHAR (503, trasig sedan T90) i live-läge,
+och vi vill inte visa en trasig/fel-ruta för den globala topplistan. **Tänd igen:** flippa flaggan
+till `true` när edge-funktionen är fixad (eget spår) , inget annat behöver röras, render-grenen tänder
+sektionen oförändrad. Per-rums-topplistan (LeaderboardSection) + "vad alla tippade"-listan
+(RevealSection) är KVAR och opåverkade , bara den globala cross-rum-rankningen togs bort ur Topplista.
+
 ## 2026-06-16 , T94 (#187): Medlemslista , komprimera + linjerat rutnät (egen rad pinnad överst)
 
 **Beslut (linjerat rutnät i stället för flex-wrap):** Medlemslistan är nu ett CSS grid

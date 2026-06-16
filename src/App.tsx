@@ -21,7 +21,7 @@
 // resultat och ser tabeller/träd ändras). Frame:n är en ren wrapper som läser sim-
 // seamen, så den kan stå i två flikar utan dubblerad state (en sanning).
 
-import type { ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { Fade, Slide } from './motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
@@ -37,9 +37,11 @@ import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import {
   RoomSection,
+  RoomPill,
   RoomsProvider,
   ReactionsProvider,
   MatchCommentsProvider,
+  focusRoomForm,
   useRoomsStore,
 } from './features/rooms';
 import { OfficialResultsProvider } from './features/official-results';
@@ -64,6 +66,21 @@ import { VersionStamp } from './components/VersionStamp';
 
 /** Id-bas för flik-panelerna (TabBar:s aria-controls + TabPanel:s id pekar hit). */
 const TAB_PANEL_BASE = 'vm-tabpanel';
+
+/**
+ * GLOBALA (cross-rum) TOPPLISTAN TILLFÄLLIGT DÖLJD (T96, #193).
+ *
+ * TotalLeaderboardSection läser en edge-funktion (global-leaderboard) som
+ * BOOT-KRASCHAR (503, trasig sedan T90) i live-läge. Tills den är fixad (eget spår)
+ * döljer vi sektionen helt bakom denna flagga, i stället för att visa en trasig/fel-
+ * ruta för den globala topplistan. Per-rums-topplistan (LeaderboardSection) + "vad
+ * alla tippade"-listan (RevealSection) är KVAR och opåverkade , bara den globala
+ * cross-rum-rankningen tas bort ur Topplista-fliken.
+ *
+ * TÄND IGEN: när edge-funktionen är fixad, flippa denna till `true`. Inget annat
+ * behöver röras , render-grenen nedan tänder då TotalLeaderboardSection igen oförändrad.
+ */
+const GLOBAL_LEADERBOARD_ENABLED = false;
 
 /**
  * Ett innehållskort, delad yt-form för app-vyns sektioner. Nu en tunn wrapper runt
@@ -126,6 +143,27 @@ function AppShell() {
   // Aktiv flik <-> URL-hash (delbar länk, bakåt-knapp, djuplänk vid kall-laddning).
   const { activeTab, selectTab } = useTabRouting();
 
+  // GENVÄG TILL RUM-HANTERINGEN (T96, #193): rum-pillen i app-baren (RoomPill) kan
+  // skicka en hit "skapa rum" / "gå med i rum" från VILKEN flik som helst (även när man
+  // inte är med i något rum än). Vi byter till Tips (där RoomSection ligger överst) och
+  // scrollar + fokuserar RÄTT formulär via focusRoomForm. Tips-panelen är alltid monterad
+  // men `hidden` tills fliken är aktiv, så målet får layout först EFTER flik-bytets commit
+  // + paint , därför dubbel rAF innan vi scrollar/fokuserar (annars är formuläret ännu utan
+  // layout och scroll/focus blir no-op). Själva DOM-delen bor i focusRoomForm (testbar seam).
+  const openRooms = useCallback(
+    (target: 'create' | 'join') => {
+      selectTab('tips');
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => focusRoomForm(target))
+        );
+      } else {
+        focusRoomForm(target);
+      }
+    },
+    [selectTab]
+  );
+
   return (
     <>
       {/* min-h-dvh + overflow-x-clip = aldrig horisontell scroll på någon skärm.
@@ -157,10 +195,18 @@ function AppShell() {
             style={{ backgroundColor: 'color-mix(in srgb, var(--color-surface) 70%, transparent)' }}
           >
             <Wordmark className="text-xl sm:text-2xl" />
-            {/* Nät-status + inställningar (kugghjul) + tema-toggle. Status-chippet
-              döljs på de minsta skärmarna (sm:inline-flex) så headern aldrig
-              trängs; offline-läget syns ändå tydligt via offline-bannern nedan. */}
+            {/* RUM-PILLEN (T96, #193) + nät-status + inställningar (kugghjul) + tema-
+              toggle. Pillen ligger HÄR i app-bar-headern (utanför flik-panelerna), så
+              det AKTIVA rummet syns , och kan bytas , på ALLA flikar (Idag/Tips/
+              Topplista/Turnering/Mer), inte bara i RoomSection (Tips). Menyn bär också
+              skapa/gå-med-genvägar (onOpenRooms ovan: byter till Tips + scrollar/
+              fokuserar rätt formulär), så man når rum-hanteringen var man än står. Den
+              renderar null i fixtures-/lokalt läge (app-baren ser ut precis som förr då);
+              utan aktivt rum blir den en "Rum"-CTA (skapa/gå-med), eftersom onOpenRooms
+              alltid ges här. Status-chippet döljs på de minsta skärmarna (sm:inline-flex)
+              så headern aldrig trängs; offline-läget syns ändå via offline-bannern. */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <RoomPill onOpenRooms={openRooms} />
               <span className="hidden sm:inline-flex">
                 <SyncAwareOnlineStatus />
               </span>
@@ -248,6 +294,17 @@ function AppShell() {
                           tips-/rums-vyerna degraderar fliken lugnt, övriga flikar lever vidare. */}
                       <ErrorBoundary label="tips-fliken" resetKey={activeTab}>
                         <div className="flex flex-col gap-12">
+                          {/* RUM-VALET FÖRST (T96, #193): RoomSection flyttad till TOPPEN av Tips
+                          (låg förr sist, efter match-/grupp-/bracket-tipsen). Rum-valet är
+                          PRIMÄRT , man väljer rum FÖRST (vem tippar man mot), sen tippar man, och
+                          rum-kontexten styr både dessa tips OCH Topplistan. Skapa rum / gå med via
+                          kod + T94:s komprimerade medlems-rutnät bor kvar i RoomSection. Den
+                          persistenta rum-pillen i app-baren (RoomPill) speglar samma aktiva rum på
+                          alla flikar och låter en byta utan att scrolla hit. */}
+                          <Slide direction="up">
+                            <RoomSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
+
                           {/* Tips-motorn (T15): match-tips per rum. ScoreGuide (poäng-förklaringen)
                           renderas inuti PredictionsView, så den följer Tips-fliken. */}
                           <Slide direction="up">
@@ -266,12 +323,6 @@ function AppShell() {
                             <BracketPredictionSection
                               surface={(children) => <Panel>{children}</Panel>}
                             />
-                          </Slide>
-
-                          {/* Tips-ligan (T14): skapa/gå med i ett rum, dela koden. Hör hemma i
-                          Tips , det är HÄR man organiserar vem man tippar mot. */}
-                          <Slide direction="up">
-                            <RoomSection surface={(children) => <Panel>{children}</Panel>} />
                           </Slide>
 
                           {/* "Vad alla tippade" (T92 del D): FLYTTAD hit från Topplista-fliken
@@ -304,14 +355,20 @@ function AppShell() {
                         </Slide>
 
                         {/* Den GLOBALA (cross-rum) topplistan (T82 del 3, #173): EN rankning av
-                        ALLA deltagare över ALLA rum. Visas även i demo/fixtures-läge. */}
-                        <Slide direction="up">
-                          <ErrorBoundary label="den globala topplistan" resetKey={activeTab}>
-                            <TotalLeaderboardSection
-                              surface={(children) => <Panel>{children}</Panel>}
-                            />
-                          </ErrorBoundary>
-                        </Slide>
+                        ALLA deltagare över ALLA rum. TILLFÄLLIGT DÖLJD (T96, #193): edge-
+                        funktionen global-leaderboard 503:ar (trasig sedan T90), så vi renderar
+                        inte sektionen alls tills den är fixad (flagga GLOBAL_LEADERBOARD_ENABLED
+                        överst). Visar ingen trasig/fel-ruta , den globala raden är bara borta.
+                        Per-rums-topplistan ovan + reveal-listan i Tips är kvar. */}
+                        {GLOBAL_LEADERBOARD_ENABLED && (
+                          <Slide direction="up">
+                            <ErrorBoundary label="den globala topplistan" resetKey={activeTab}>
+                              <TotalLeaderboardSection
+                                surface={(children) => <Panel>{children}</Panel>}
+                              />
+                            </ErrorBoundary>
+                          </Slide>
+                        )}
                       </div>
                     </TabPanel>
 
