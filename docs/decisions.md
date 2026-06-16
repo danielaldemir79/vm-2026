@@ -5,6 +5,42 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T100 (#207): DATA-INTEGRITET , turneringsstatistikens mål-stats source:as ur officiellt facit, inte events
+
+**Problem (P0, förstörde förtroende):** "Flest mål per lag", "Mål per match" (total + snitt + snabbaste
+mål) i turneringsstatistiken härleddes ur `useCrossMatchEvents` (event-lagret, `match_live_data`), som
+BARA täcker de auto-pollade matcherna (7 av 16). Matcher utan event-rad var osynliga , den största
+matchen g-E-1 (7-1) saknade event-rad, så "Flest mål per lag" visade fel lag (Sverige 5, g-F-2) som etta
+i stället för 7-måls-laget (Tyskland), och "Mål per match" räknade 19/7 i stället för det sanna 46/16.
+
+**Beslut (KÄLLHÄNVISAT, gissa aldrig , verifierat mot prod 2026-06-16):** Alla SCORE-/ANTALS-stats som
+ska täcka HELA turneringen source:as nu ur den resolvade matchplanen (officiellt facit, `official_match_results`
+via ResultsProvider), exakt som clean sheets/skrällar redan gjorde. Ny ren aggregator
+`aggregateTeamScoreGoals` (tournament-stats-tables.ts, regel G3):
+- Ett lags `goals` = summan av lagets mål i slutresultaten (hemma home_goals, borta away_goals). Detta är
+  EXAKT samma goals-for som grupptabellens GM-kolumn (compute-standings `applyResult: goalsFor += scored`),
+  bara tournament-WIDE i stället för grupp-only , så siffran är konsekvent med vad användaren redan ser.
+  Scorelinen krediterar redan egenmål till det gynnade laget, så INGEN egenmåls-justering görs (scorelinen
+  ÄR sanningen , den gamla events-erans "självmål räknas inte på laget"-caveat togs bort, den motsade resultatet).
+- `totalGoals`/`matchesPlayed`/`goalAverage` ur facit (en 0-0 räknas som spelad match); `biggestMatch` =
+  färdig match med högst total scoreline (vid lika: lägst match-id). Ny "Flest mål i en match"-höjdpunkt
+  (Daniel efterfrågade den uttryckligen) visar den + de två lagen.
+- VERIFIERAT mot prod via Supabase MCP (kmzhyblzxangpxydufve): 16 matcher, total 46, snitt 2,875, största
+  g-E-1 7-1, goals-for-ranking ger 7 / swe 5 / usa 4 (korskontroll via schedule-join i DB). Källa:
+  MatchResult.homeGoals/awayGoals. Inline G3 + negativ-kontroll (mutera sort -> ranking-testerna rödnar,
+  verifierat).
+
+**Beslut (truth-in-labeling, återställer förtroende):** De stats som per natur BARA kan se event-täckta
+matcher (snabbaste mål, mål-per-15min-fördelning, kort-liga, bollinnehav/skott/fouls, OCH skytteligan/
+assist i ScorerTableView) får en lugn en-rads coverage-not "Baseras på N matcher med detaljerad spelardata",
+där N HÄRLEDS (`events.matches.length` / `matches.length`, en post per match med event-data), aldrig
+hårdkodad. Så förstår användaren varför en skytt/ett mål från en manuell-facit-match (t.ex. 7-1:an) inte
+listas. Ingen ändring av pollare eller edge-functions , ren frontend-aggregering + märkning.
+
+**Borttaget (ingen död kod):** `aggregateTeamGoals` + `TeamGoals`/`TeamGoalRow` (tournament-stats-events.ts)
+hade bara denna konsument , borttagna med sina tester (testerna för den nya facit-aggregatorn ligger i
+tournament-stats-tables.test.ts).
+
 ## 2026-06-16 , T96 (#193): Rum-kontext , RoomSection överst i Tips + persistent rum-pill i app-baren + globala topplistan dold
 
 **Beslut (RoomSection överst i Tips):** Hela RoomSection flyttades till TOPPEN av Tips-fliken (låg
@@ -213,7 +249,9 @@ tillgänglig fallback (role=alert, fokuseras, statisk = reduced-motion-ok). Käl
 Turnering-fliken (under skytteligan) bygger en rik uppsättning aggregat, allt härlett ur befintlig
 data, aldrig en gissad siffra:
 - EVENTS-härlett (near-live via `useCrossMatchEvents`, T87): kort-liga (spelare + lag), snabbaste
-  mål, mål-per-15min-fördelning, flest mål per lag, turneringens mål-total + målsnitt.
+  mål, mål-per-15min-fördelning. (OBS: "flest mål per lag" + "turneringens mål-total/målsnitt" var
+  ursprungligen events-härledda HÄR, men FLYTTADES till facit-källan i T100 (#207) , se T100-raden
+  överst. Events täcker bara en delmängd matcher, så en match utan event-rad blev osynlig.)
 - STATISTICS-härlett (near-live via nya `useCrossMatchStats`): mest bollinnehav, flest skott, mest
   fouls (null-medvetna lag-medel).
 - RESULTAT-härlett (den resolvade matchplanen ur ResultsProvider, dvs officiellt facit, slutgiltigt

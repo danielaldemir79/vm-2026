@@ -1,16 +1,19 @@
-// REN AGGREGERING för de TABELL-härledda turneringsstatistik-aggregaten (T88, #180): clean
-// sheets + skrällar (upsets). Ingen IO, inget React , rent in (den resolvade matchplanen +
-// en ranking-uppslagning) -> rent ut (rankade rader). Härleds ur den OFFICIELLA matchplanen
-// (FinishedMatch.result, vävt ur official_match_results via ResultsProvider , en sanning för
-// facit) + lagens FIFA-ranking, INTE ur live-events (de blir slutgiltiga vid FT).
+// REN AGGREGERING för de TABELL-härledda turneringsstatistik-aggregaten (T88, #180; T100, #207):
+// clean sheets + skrällar (upsets) + lag-mål/turnerings-mål ur officiellt facit. Ingen IO, inget
+// React , rent in (den resolvade matchplanen + en ranking-uppslagning) -> rent ut (rankade rader).
+// Härleds ur den OFFICIELLA matchplanen (FinishedMatch.result, vävt ur official_match_results via
+// ResultsProvider , en sanning för facit) + lagens FIFA-ranking, INTE ur live-events.
 //
-// VARFÖR result-baserat (inte event-baserat): clean sheets + skrällar handlar om det AVGJORDA
-// resultatet, inte om enskilda events. ResultsProvider väver redan in det officiella facit
-// near-live (Realtime på official_match_results + fokus/online), så en konsument som läser
-// matchplanen får dem färska vid FT, utan att vi bygger en egen läs-väg (DRY).
+// VARFÖR result-baserat (inte event-baserat): dessa stats handlar om det AVGJORDA resultatet, inte
+// om enskilda events. ResultsProvider väver redan in det officiella facit near-live (Realtime på
+// official_match_results + fokus/online), så en konsument som läser matchplanen får dem färska vid
+// FT, utan att vi bygger en egen läs-väg (DRY). KRITISKT (T100, #207): events-lagret (match_live_data)
+// täcker BARA en delmängd matcher (de auto-pollade), så en lag-mål-/mål-per-match-stat HÄRLEDD UR
+// EVENTS missar matcher utan event-rad (t.ex. en 7-1 utan auto-poll blir osynlig). Sådana score-/
+// antals-stats MÅSTE därför läsa officiellt facit (alla färdiga matcher), precis som clean sheets.
 //
 // =====================================================================================
-// DOMÄNREGLER (KÄLLHÄNVISADE , gissas aldrig; se docs/decisions.md 2026-06-16 T88):
+// DOMÄNREGLER (KÄLLHÄNVISADE , gissas aldrig; se docs/decisions.md 2026-06-16 T100 + T88):
 //
 //  C1. CLEAN SHEET: ett lag höll nollan i en match om MOTSTÅNDAREN gjorde 0 mål (i ordinarie
 //      tid + ev. förlängning; straffläggning räknas ALDRIG som "insläppta mål"). En 0-0 ger
@@ -25,6 +28,22 @@
 //      tabell som team-profiles.ts (fifaRanking), injicerad som uppslagning. Lägre tal = bättre
 //      lag (FIFA-ranking-konvention). VINNAREN avgörs av ordinarie+förlängning, vid lika av
 //      straffarna (MatchResult.penalties) , samma vinnar-härledning som slutspels-trädet.
+//
+//  G3. LAG-MÅL + TURNERINGS-MÅL UR FACIT (T100, #207, ERSÄTTER den tidigare events-härledda
+//      varianten): ett lags `goalsFor` = summan av lagets mål i SLUTRESULTATEN över alla färdiga
+//      matcher (hemmalag krediteras home_goals, bortalag away_goals). Detta är EXAKT samma
+//      goals-for som grupptabellen visar (compute-standings `applyResult: goalsFor += scored`),
+//      bara här tournament-WIDE (även slutspel) i stället för grupp-only , så "Flest mål per lag"
+//      matchar GM-kolumnen användaren redan ser (för ett lags gruppmatcher), utan en divergerande
+//      siffra. SLUTRESULTATET krediterar redan egenmål till det gynnade laget (egenmålet syns i
+//      ställningen), så vi gör INGEN egenmåls-justering här , scorelinen ÄR sanningen. Turneringens
+//      `totalGoals` = summan av alla mål i slutresultaten; `matchesPlayed` = antal färdiga matcher
+//      (en 0-0 räknas, den spelades); `goalAverage` = totalGoals / matchesPlayed (0 vid 0 matcher,
+//      ingen division med noll). `biggestMatch` = den färdiga matchen med högst total scoreline
+//      (home_goals + away_goals); vid lika total vinner lägst match-id (stabil ordning). KÄLLA:
+//      MatchResult.homeGoals/awayGoals (officiellt facit, official_match_results via ResultsProvider).
+//      Verifierat mot prod 2026-06-16: 16 matcher, total 46, snitt 2,875, största g-E-1 7-1, Tyskland
+//      (ger) toppar med 7 mål (events-varianten missade g-E-1 och visade fel lag som etta).
 // =====================================================================================
 
 import type { Match } from '../../domain/types';
@@ -54,6 +73,41 @@ export interface UpsetRow {
 
 /** Uppslagning lag-id -> FIFA-rankingtal (null för okänt lag). */
 export type RankLookup = (teamId: string) => number | null;
+
+/** En rad i lag-mål-tabellen (G3): ett lags gjorda mål ur slutresultaten. */
+export interface TeamScoreGoalRow {
+  /** Lagets id (gemen FIFA-kod, samma rymd som clean sheets/upsets). */
+  teamId: string;
+  /** Lagets gjorda mål summerat ur slutresultaten (samma som grupptabellens GM). */
+  goals: number;
+  /** Antal färdiga matcher laget hade ett id i (en 0-0 räknas, den spelades). */
+  matches: number;
+}
+
+/** Den färdiga match som hade flest mål totalt (G3, "Flest mål i en match"). */
+export interface BiggestMatch {
+  matchId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  homeGoals: number;
+  awayGoals: number;
+  /** Total scoreline (homeGoals + awayGoals), siffran matchen rankas på. */
+  total: number;
+}
+
+/** Lag-mål-aggregatet + turneringens mål-total/snitt + största matchen (G3, ur officiellt facit). */
+export interface TeamScoreGoals {
+  /** Lag rankade på flest gjorda mål (sedan färre matcher, sedan id). */
+  teams: TeamScoreGoalRow[];
+  /** ALLA mål i slutresultaten över färdiga matcher (turneringens måltotal). */
+  totalGoals: number;
+  /** Antal färdiga matcher (G3:s nämnare; en 0-0 räknas). */
+  matchesPlayed: number;
+  /** totalGoals / matchesPlayed, 0 vid 0 matcher (ingen division med noll). */
+  goalAverage: number;
+  /** Den färdiga matchen med högst total scoreline, null när inga matcher spelats. */
+  biggestMatch: BiggestMatch | null;
+}
 
 interface CleanSheetAcc {
   teamId: string;
@@ -162,4 +216,81 @@ export function aggregateUpsets(matches: readonly Match[], rankOf: RankLookup): 
 
   upsets.sort((a, b) => b.rankGap - a.rankGap || a.matchId.localeCompare(b.matchId, 'sv'));
   return upsets;
+}
+
+interface TeamScoreAcc {
+  teamId: string;
+  goals: number;
+  matches: number;
+}
+
+/**
+ * Aggregera lag-mål + turneringens mål-total/snitt + största matchen (G3) ur det OFFICIELLA
+ * facit (de färdiga matchernas slutresultat), INTE ur live-events. Det här är fixen i T100
+ * (#207): events-lagret täcker bara en delmängd matcher, så en match utan event-rad (t.ex. en
+ * 7-1 utan auto-poll) var osynlig för en events-härledd lag-mål-stat. Facit täcker ALLA färdiga
+ * matcher, så siffran blir den sanna och matchar grupptabellens GM-kolumn.
+ *
+ * Ett lags `goals` = summan av lagets mål i slutresultaten (hemma: home_goals, borta: away_goals);
+ * scorelinen krediterar redan egenmål till det gynnade laget, så ingen egenmåls-justering görs här
+ * (G3). En match utan kända lag (oseedad slutspelsmatch) hoppas för den lag-saknande sidan men
+ * räknas ändå i totalen (målen föll). Rankas på flest mål, sedan färre matcher, sedan id.
+ */
+export function aggregateTeamScoreGoals(matches: readonly Match[]): TeamScoreGoals {
+  const byTeam = new Map<string, TeamScoreAcc>();
+  let totalGoals = 0;
+  let matchesPlayed = 0;
+  let biggest: BiggestMatch | null = null;
+
+  const bump = (teamId: string | null, scored: number): void => {
+    if (teamId === null) {
+      return; // oseedad slutspelsmatch / saknat lag , gissa aldrig vems målen är
+    }
+    const acc = byTeam.get(teamId) ?? { teamId, goals: 0, matches: 0 };
+    acc.goals += scored;
+    acc.matches += 1;
+    byTeam.set(teamId, acc);
+  };
+
+  for (const m of finishedMatches(matches)) {
+    matchesPlayed += 1; // en färdig match räknas alltid (en 0-0 spelades ändå, G3)
+    const { homeGoals, awayGoals } = m.result;
+    totalGoals += homeGoals + awayGoals;
+    bump(m.homeTeamId, homeGoals);
+    bump(m.awayTeamId, awayGoals);
+
+    // Största matchen: högst total scoreline, vid lika lägst match-id (stabil ordning). Bara
+    // matcher med BÅDA lagen kända (annars kan vi inte visa "X mot Y"), och total > 0 (en 0-0 är
+    // ingen "stor" match att lyfta fram).
+    const total = homeGoals + awayGoals;
+    if (
+      total > 0 &&
+      m.homeTeamId !== null &&
+      m.awayTeamId !== null &&
+      (biggest === null ||
+        total > biggest.total ||
+        (total === biggest.total && m.id.localeCompare(biggest.matchId, 'sv') < 0))
+    ) {
+      biggest = {
+        matchId: m.id,
+        homeTeamId: m.homeTeamId,
+        awayTeamId: m.awayTeamId,
+        homeGoals,
+        awayGoals,
+        total,
+      };
+    }
+  }
+
+  const teams: TeamScoreGoalRow[] = [...byTeam.values()].map((a) => ({
+    teamId: a.teamId,
+    goals: a.goals,
+    matches: a.matches,
+  }));
+  teams.sort(
+    (a, b) => b.goals - a.goals || a.matches - b.matches || a.teamId.localeCompare(b.teamId, 'sv')
+  );
+
+  const goalAverage = matchesPlayed === 0 ? 0 : totalGoals / matchesPlayed;
+  return { teams, totalGoals, matchesPlayed, goalAverage, biggestMatch: biggest };
 }

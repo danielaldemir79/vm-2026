@@ -17,6 +17,20 @@ const MEDAL_CLASS: Record<number, string> = {
   3: 'vm-pool-medal vm-pool-medal--bronze',
 };
 
+/**
+ * En lugn, understruken coverage-notering (T100, #207): förklarar att ett event-/statistik-täckt
+ * kort bara ser en DELMÄNGD matcher (de med detaljerad spelardata), så en frånvarande skytt/mål
+ * inte väcker misstanke om fel. Husets typografi: liten, dämpad, en rad. Inte ett fel (ingen
+ * role=alert) , bara en ärlig fotnot.
+ */
+function CoverageNote({ text }: { text: string }) {
+  return (
+    <p data-tournament-stat-coverage="" className="text-xs italic text-fg-muted">
+      {text}
+    </p>
+  );
+}
+
 /** En generisk rad i ett stat-list-kort (en spelare/lag/match + ett nyckeltal). */
 export interface MetricListItem {
   /** Stabil React-nyckel. */
@@ -93,6 +107,12 @@ export interface MetricListCardProps {
    * orsak, t.ex. "visas med verkliga resultat" när what-if-läget döljer kortet (F2).
    */
   notReadyText?: string;
+  /**
+   * Lugn coverage-notering under listan (T100, #207, truth-in-labeling): för event-/statistik-
+   * täckta kort som bara ser en delmängd matcher, t.ex. "Baseras på 7 matcher med detaljerad
+   * spelardata." Null/utelämnad -> ingen not (facit-täckta kort behöver den inte).
+   */
+  coverageNote?: string | null;
   /** Id på den utfällda listans region (delas av expand-toggeln + sticky komprimera). */
   listId: string;
   /** Topp-N synliga i komprimerat läge. */
@@ -111,6 +131,7 @@ export function MetricListCard({
   ready,
   emptyText,
   notReadyText,
+  coverageNote,
   listId,
   collapsedVisibleCount,
 }: MetricListCardProps) {
@@ -127,6 +148,10 @@ export function MetricListCard({
         <h3 className="font-display text-base font-semibold">{title}</h3>
         <p className="text-xs text-fg-muted">{description}</p>
       </header>
+
+      {/* Coverage-not (T100): visas bara när kortet ÄR klart med rader (annars är notReady/empty-
+          texten redan förklaringen), så vi inte dubblar budskap eller visar den på en tom lista. */}
+      {ready && coverageNote && items.length > 0 ? <CoverageNote text={coverageNote} /> : null}
 
       {!ready ? (
         <p role="status" data-tournament-stat-notready="" className="py-2 text-sm text-fg-muted">
@@ -169,13 +194,31 @@ export interface HighlightStatRowProps {
   /** En liten under-rad (skytt + lag / mål-summering). */
   detail: string;
   ready: boolean;
+  /**
+   * Text när kortet INTE är klart (default "Laddar..."). För en icke-laddnings-orsak, t.ex. att
+   * what-if-läget döljer ett facit-höjdpunkts-kort (T100, samma anda som MetricListCard).
+   */
+  notReadyText?: string;
+  /**
+   * Lugn coverage-notering (T100, #207, truth-in-labeling): för ett EVENT-täckt höjdpunkts-kort
+   * (t.ex. snabbaste mål) som bara ser matcher med detaljerad spelardata. Null/utelämnad -> ingen
+   * not (facit-täckta höjdpunkter som "mål per match" / "flest mål i en match" behöver den inte).
+   */
+  coverageNote?: string | null;
 }
 
 /**
- * Ett KOMPAKT höjdpunkts-kort (ett enda nyckeltal stort + en under-rad). För snabbaste mål
- * och målsnitt, som inte är listor utan enskilda siffror.
+ * Ett KOMPAKT höjdpunkts-kort (ett enda nyckeltal stort + en under-rad). För snabbaste mål,
+ * målsnitt och största matchen, som inte är listor utan enskilda siffror.
  */
-export function HighlightStatRow({ label, value, detail, ready }: HighlightStatRowProps) {
+export function HighlightStatRow({
+  label,
+  value,
+  detail,
+  ready,
+  notReadyText,
+  coverageNote,
+}: HighlightStatRowProps) {
   return (
     <Surface
       as="div"
@@ -189,12 +232,15 @@ export function HighlightStatRow({ label, value, detail, ready }: HighlightStatR
       </p>
       {!ready ? (
         <p role="status" className="text-sm text-fg-muted">
-          Laddar...
+          {notReadyText ?? 'Laddar...'}
         </p>
       ) : (
         <>
           <p className="font-display text-2xl font-semibold tabular-nums">{value ?? ','}</p>
           <p className="truncate text-xs text-fg-muted">{detail}</p>
+          {/* Coverage-not bara när det FINNS ett värde att förbehålla (annars är "Inget mål än"
+              redan förklaringen), så vi inte visar en täcknings-not på ett tomt kort. */}
+          {coverageNote && value !== null ? <CoverageNote text={coverageNote} /> : null}
         </>
       )}
     </Surface>
@@ -204,6 +250,8 @@ export function HighlightStatRow({ label, value, detail, ready }: HighlightStatR
 export interface GoalTimingCardProps {
   timing: GoalTiming;
   ready: boolean;
+  /** Lugn coverage-not (T100): mål-tidningen ser bara de event-täckta matcherna. */
+  coverageNote?: string | null;
 }
 
 /**
@@ -211,7 +259,7 @@ export interface GoalTimingCardProps {
  * får en bredd proportionell mot sin andel av målen; siffran står ovanför. Rent dekorativ
  * grafik (aria-hidden på staplarna) + en uttömmande text-sammanfattning för skärmläsare.
  */
-export function GoalTimingCard({ timing, ready }: GoalTimingCardProps) {
+export function GoalTimingCard({ timing, ready, coverageNote }: GoalTimingCardProps) {
   const max = timing.buckets.reduce((m, b) => Math.max(m, b.count), 0);
   const total = timing.buckets.reduce((s, b) => s + b.count, 0);
   return (
@@ -227,6 +275,9 @@ export function GoalTimingCard({ timing, ready }: GoalTimingCardProps) {
         <h3 className="font-display text-base font-semibold">När faller målen?</h3>
         <p className="text-xs text-fg-muted">Alla mål fördelade på 15-minutersperioder.</p>
       </header>
+
+      {/* Coverage-not bara när det FINNS mål att fördela (annars är "inga mål än" förklaringen). */}
+      {ready && coverageNote && total > 0 ? <CoverageNote text={coverageNote} /> : null}
 
       {!ready ? (
         <p role="status" className="py-2 text-sm text-fg-muted">

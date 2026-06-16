@@ -239,6 +239,17 @@ export function ScorerTableView() {
   const scorerRows = useMemo(() => scorers.map(scorerToDisplay), [scorers]);
   const assistRows = useMemo(() => assisters.map(assistToDisplay), [assisters]);
 
+  // COVERAGE-NOTERING (T100, #207, truth-in-labeling): skytteligan ser bara matcher med detaljerad
+  // spelardata (match_live_data, en delmängd). Så en målskytt från en manuell-facit-match (t.ex.
+  // 7-1:an utan auto-poll) saknas , noteringen gör det ärligt. N härleds (matches.length, EN post
+  // per match med event-data), aldrig hårdkodad. Visas bara när det FINNS täckt data att förklara.
+  const coverageNote =
+    matches.length > 0
+      ? `Baseras på ${matches.length} ${
+          matches.length === 1 ? 'match' : 'matcher'
+        } med detaljerad spelardata.`
+      : null;
+
   return (
     <Surface aria-labelledby="scorer-heading" data-scorer-view="">
       <header className="flex flex-col gap-2">
@@ -271,6 +282,13 @@ export function ScorerTableView() {
               scorerCount={scorerRows.length}
               assistCount={assistRows.length}
             />
+            {/* Coverage-not (T100, #207): visas bara när det finns event-täckta matcher att
+                förklara , annars är den tomma-listan-raden redan budskapet. */}
+            {coverageNote ? (
+              <p data-scorer-coverage="" className="text-xs italic text-fg-muted">
+                {coverageNote}
+              </p>
+            ) : null}
             {tab === 'scorers' ? (
               <LeagueList rows={scorerRows} tab="scorers" listId={`${listId}-scorers`} />
             ) : (
