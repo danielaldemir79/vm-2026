@@ -26,6 +26,7 @@ import { Fade, Slide } from './motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
 import { Surface } from './components/Surface';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
@@ -104,7 +105,14 @@ export default function App() {
             (Personliga statistiken läser LeaderboardStore, inte denna.) Vilande utan
             effekt om inget lag är pinnat; helt oberoende av Supabase. */}
         <FavoriteTeamProvider>
-          <AppShell />
+          {/* ROT-SKYDDSNÄT (HOTFIX, white-screen): sista boundaryn. Skulle något oväntat
+              kasta UTANFÖR de finkorniga boundaryerna nedan, visar vi en lugn helsides-
+              fallback i stället för en blank sida. Per-flik- och per-sektion-boundaryerna
+              fångar normalt felet långt innan det når hit (isolerat), men roten garanterar
+              att appen ALDRIG mer kan bli helt blank. */}
+          <ErrorBoundary label="appen">
+            <AppShell />
+          </ErrorBoundary>
         </FavoriteTeamProvider>
       </OfficialResultsProvider>
     </RoomsProvider>
@@ -221,7 +229,12 @@ function AppShell() {
                           <Slide direction="up">
                             <ReactionsProvider>
                               <MatchCommentsProvider>
-                                <DailyMatchesView showFavoritePicker={false} />
+                                {/* Idag-flikens hjärta (live + matcher) i egen boundary:
+                                    ett fel i livekortet/dagslistan släcker aldrig hela
+                                    appen, bara den här ytan degraderar lugnt. */}
+                                <ErrorBoundary label="dagens matcher" resetKey={activeTab}>
+                                  <DailyMatchesView showFavoritePicker={false} />
+                                </ErrorBoundary>
                               </MatchCommentsProvider>
                             </ReactionsProvider>
                           </Slide>
@@ -231,50 +244,59 @@ function AppShell() {
 
                     {/* ===================== TIPS ===================== */}
                     <TabPanel tabId="tips" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                      <div className="flex flex-col gap-12">
-                        {/* Tips-motorn (T15): match-tips per rum. ScoreGuide (poäng-förklaringen)
-                        renderas inuti PredictionsView, så den följer Tips-fliken. */}
-                        <Slide direction="up">
-                          <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
-                        </Slide>
+                      {/* Hela Tips-panelens innehåll i en boundary (per-flik): ett fel i
+                          tips-/rums-vyerna degraderar fliken lugnt, övriga flikar lever vidare. */}
+                      <ErrorBoundary label="tips-fliken" resetKey={activeTab}>
+                        <div className="flex flex-col gap-12">
+                          {/* Tips-motorn (T15): match-tips per rum. ScoreGuide (poäng-förklaringen)
+                          renderas inuti PredictionsView, så den följer Tips-fliken. */}
+                          <Slide direction="up">
+                            <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
 
-                        {/* Gruppvinnar-tipsen (T16): tippa 1:an + 2:an i varje grupp. */}
-                        <Slide direction="up">
-                          <GroupPredictionSection
-                            surface={(children) => <Panel>{children}</Panel>}
-                          />
-                        </Slide>
+                          {/* Gruppvinnar-tipsen (T16): tippa 1:an + 2:an i varje grupp. */}
+                          <Slide direction="up">
+                            <GroupPredictionSection
+                              surface={(children) => <Panel>{children}</Panel>}
+                            />
+                          </Slide>
 
-                        {/* Bracket-/slutspels-tipsen (T16b, #59): VM-vinnaren + slot-vinnare. */}
-                        <Slide direction="up">
-                          <BracketPredictionSection
-                            surface={(children) => <Panel>{children}</Panel>}
-                          />
-                        </Slide>
+                          {/* Bracket-/slutspels-tipsen (T16b, #59): VM-vinnaren + slot-vinnare. */}
+                          <Slide direction="up">
+                            <BracketPredictionSection
+                              surface={(children) => <Panel>{children}</Panel>}
+                            />
+                          </Slide>
 
-                        {/* Tips-ligan (T14): skapa/gå med i ett rum, dela koden. Hör hemma i
-                        Tips , det är HÄR man organiserar vem man tippar mot. */}
-                        <Slide direction="up">
-                          <RoomSection surface={(children) => <Panel>{children}</Panel>} />
-                        </Slide>
-                      </div>
+                          {/* Tips-ligan (T14): skapa/gå med i ett rum, dela koden. Hör hemma i
+                          Tips , det är HÄR man organiserar vem man tippar mot. */}
+                          <Slide direction="up">
+                            <RoomSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
+                        </div>
+                      </ErrorBoundary>
                     </TabPanel>
 
                     {/* ===================== TOPPLISTA ===================== */}
                     <TabPanel tabId="topplista" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
                       <div className="flex flex-col gap-12">
                         {/* Per-rums-topplistan (T17): vem tippar bäst i DITT rum. ScoreGuide
-                        renderas inuti LeaderboardSummary, så den följer Topplista-fliken. */}
+                        renderas inuti LeaderboardSummary, så den följer Topplista-fliken.
+                        Egen boundary: en krasch i en topplista släcker inte den andra. */}
                         <Slide direction="up">
-                          <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
+                          <ErrorBoundary label="topplistan" resetKey={activeTab}>
+                            <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
+                          </ErrorBoundary>
                         </Slide>
 
                         {/* Den GLOBALA (cross-rum) topplistan (T82 del 3, #173): EN rankning av
                         ALLA deltagare över ALLA rum. Visas även i demo/fixtures-läge. */}
                         <Slide direction="up">
-                          <TotalLeaderboardSection
-                            surface={(children) => <Panel>{children}</Panel>}
-                          />
+                          <ErrorBoundary label="den globala topplistan" resetKey={activeTab}>
+                            <TotalLeaderboardSection
+                              surface={(children) => <Panel>{children}</Panel>}
+                            />
+                          </ErrorBoundary>
                         </Slide>
                       </div>
                     </TabPanel>
@@ -287,50 +309,59 @@ function AppShell() {
                       som förr, fast nu i Turnering-fliken). Daily-ramen i Idag bär samma
                       markering där, eftersom sim-läget är globalt (en sanning i storen). */}
                       <SimulationFrame>
-                        {/* Gruppspelstabellerna (T5): härledda ur den delade storen. */}
-                        <Slide direction="up">
-                          <GroupStageView />
-                        </Slide>
+                        {/* Hela turnerings-zonen (tabeller + scenarier + slutspelsträd +
+                            inmatning) i en boundary: en krasch i en härledd vy (t.ex.
+                            slutspelsträdet på en oväntad ställning) degraderar zonen lugnt i
+                            stället för att släcka hela appen. */}
+                        <ErrorBoundary label="turneringsvyn" resetKey={activeTab}>
+                          {/* Gruppspelstabellerna (T5): härledda ur den delade storen. */}
+                          <Slide direction="up">
+                            <GroupStageView />
+                          </Slide>
 
-                        {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
-                        <Slide direction="up">
-                          <ScenarioView />
-                        </Slide>
+                          {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
+                          <Slide direction="up">
+                            <ScenarioView />
+                          </Slide>
 
-                        {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
-                        <Slide direction="up">
-                          <BracketView />
-                        </Slide>
+                          {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
+                          <Slide direction="up">
+                            <BracketView />
+                          </Slide>
 
-                        {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
+                          {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
                         här i Turnering DIREKT ovanför resultatinmatningen (T32, #54). Sim-
                         läget handlar om RESULTAT, så kontrollen sitter vid inmatningen, och
                         ramen (ovan) omsluter alla påverkade vyer i fliken. */}
-                        <Slide direction="up">
-                          <SimulationBanner />
-                        </Slide>
+                          <Slide direction="up">
+                            <SimulationBanner />
+                          </Slide>
 
-                        {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): EN hemvist
+                          {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): EN hemvist
                         här i Turnering. I live visas den bara när what-if-läget är PÅ (lokal
                         "tänk om"-lek, skriver aldrig delat facit). Officiella resultat matas
                         in via AdminSection (Mer). I fixtures-läge alltid synlig. */}
-                        <Slide direction="up">
-                          <ResultEntryGate
-                            surface={(children) => <Panel>{children}</Panel>}
-                            renderCelebration={(celebration) => (
-                              <GoalCelebrationOverlay celebration={celebration} />
-                            )}
-                          />
-                        </Slide>
+                          <Slide direction="up">
+                            <ResultEntryGate
+                              surface={(children) => <Panel>{children}</Panel>}
+                              renderCelebration={(celebration) => (
+                                <GoalCelebrationOverlay celebration={celebration} />
+                              )}
+                            />
+                          </Slide>
+                        </ErrorBoundary>
                       </SimulationFrame>
 
                       {/* Skytteligan (T87, #179) , den första roliga turnerings-stat-delen.
                       UTANFÖR SimulationFrame: den härleds ur den VERKLIGA live-event-datan
                       (near-live via cross-match-hooken), inte ur det lokala what-if-läget, så
                       den ska aldrig bära sim-markeringen. I fixtures-läge renderas en demo-
-                      skytteliga ur committade events (ingen backend). */}
+                      skytteliga ur committade events (ingen backend). Egen boundary: en krasch
+                      här (t.ex. en oväntad live-data-form) får aldrig släcka hela appen. */}
                       <Slide direction="up">
-                        <ScorerTableView />
+                        <ErrorBoundary label="skytteligan" resetKey={activeTab}>
+                          <ScorerTableView />
+                        </ErrorBoundary>
                       </Slide>
 
                       {/* Turneringsstatistiken (T88, #180) , den rika "roliga VM-stats"-delen
@@ -339,134 +370,143 @@ function AppShell() {
                       event-/statistik-härledda korten kommer ur den VERKLIGA live-datan (egna
                       cross-match-hookar, oberoende av what-if-läget), och de resultat-härledda
                       korten (clean sheets/skrällar) gatas i vyn på att what-if-läget är AV, så
-                      de aldrig speglar sandlåde-resultat (se F2 + vyns simulating-grind). */}
+                      de aldrig speglar sandlåde-resultat (se F2 + vyns simulating-grind). Egen
+                      boundary, isolerad från skytteligan ovan. */}
                       <Slide direction="up">
-                        <TournamentStatsView />
+                        <ErrorBoundary label="turneringsstatistiken" resetKey={activeTab}>
+                          <TournamentStatsView />
+                        </ErrorBoundary>
                       </Slide>
                     </TabPanel>
 
                     {/* ===================== MER ===================== */}
                     <TabPanel tabId="mer" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                      <div className="flex flex-col gap-12">
-                        {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
+                      {/* Hela Mer-panelens innehåll i en boundary (per-flik): ett fel i en
+                          arrangörs-/inställnings-yta degraderar fliken lugnt utan att släcka appen. */}
+                      <ErrorBoundary label="Mer-fliken" resetKey={activeTab}>
+                        <div className="flex flex-col gap-12">
+                          {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
                         arrangören och gäller GLOBALT. Hör hemma i Mer (hjälp-/arrangörsytor). */}
-                        <Slide direction="up">
-                          <AdminSection surface={(children) => <Panel>{children}</Panel>} />
-                        </Slide>
+                          <Slide direction="up">
+                            <AdminSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
 
-                        {/* FAVORITLAGS-VÄLJAREN (U2): flyttad hit från Idag , det är en
+                          {/* FAVORITLAGS-VÄLJAREN (U2): flyttad hit från Idag , det är en
                         INSTÄLLNING, inte dagens-innehåll. Avlastar Idag-fliken. */}
-                        <Slide direction="up">
-                          <FavoriteTeamSection surface={(children) => <Panel>{children}</Panel>} />
-                        </Slide>
+                          <Slide direction="up">
+                            <FavoriteTeamSection
+                              surface={(children) => <Panel>{children}</Panel>}
+                            />
+                          </Slide>
 
-                        {/* Den KOMPAKTA install-knappen (T63, #113): "Installera som app"-pill.
+                          {/* Den KOMPAKTA install-knappen (T63, #113): "Installera som app"-pill.
                         Flyttad hit från Idag (U2): install är en åtgärd som hör hemma i Mer,
                         inte före dagens matcher. GATAD bakom onboarding-touren (T39/#68, F1):
                         medan touren är öppen visas den inte; annars enligt plattform/event. */}
-                        {onboarding.open ? null : (
-                          <Slide direction="up">
-                            <Panel>
-                              <div className="flex flex-col gap-3">
-                                <header className="flex flex-col gap-1">
-                                  <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-                                    Appen
-                                  </p>
-                                  <h2 className="font-display text-xl font-bold sm:text-2xl">
-                                    Installera som app
-                                  </h2>
-                                  <p className="text-sm text-fg-muted">
-                                    Lägg VM 2026 på hemskärmen, så öppnas den som en egen app, även
-                                    offline.
-                                  </p>
-                                </header>
-                                <div className="flex">
-                                  <InstallButton />
+                          {onboarding.open ? null : (
+                            <Slide direction="up">
+                              <Panel>
+                                <div className="flex flex-col gap-3">
+                                  <header className="flex flex-col gap-1">
+                                    <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                                      Appen
+                                    </p>
+                                    <h2 className="font-display text-xl font-bold sm:text-2xl">
+                                      Installera som app
+                                    </h2>
+                                    <p className="text-sm text-fg-muted">
+                                      Lägg VM 2026 på hemskärmen, så öppnas den som en egen app,
+                                      även offline.
+                                    </p>
+                                  </header>
+                                  <div className="flex">
+                                    <InstallButton />
+                                  </div>
                                 </div>
-                              </div>
-                            </Panel>
-                          </Slide>
-                        )}
+                              </Panel>
+                            </Slide>
+                          )}
 
-                        {/* Footern (T44, #75): appens synliga adress + upphovs-kortet (signaturen)
+                          {/* Footern (T44, #75): appens synliga adress + upphovs-kortet (signaturen)
                         + versionsstämpel. Hör hemma i Mer (lugn samlingsplats). */}
-                        <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
-                          {/* Footerns ledtext + appens SYNLIGA adress (T44, #75): adressen ska gå
+                          <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
+                            {/* Footerns ledtext + appens SYNLIGA adress (T44, #75): adressen ska gå
                           att LÄSA och säga högt. vm-2026.pages.dev som synlig, klickbar länk-
                           text; href bär hela URL:en. Egen-flik + tabnabbing-skydd. */}
-                          <p>
-                            VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela
-                            appen med vänner,{' '}
-                            <a
-                              href="https://vm-2026.pages.dev"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label="Öppna appens adress vm-2026.pages.dev i en ny flik"
-                              className="rounded-sm font-medium text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
-                            >
-                              vm-2026.pages.dev
-                            </a>
-                            .
-                          </p>
+                            <p>
+                              VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela
+                              appen med vänner,{' '}
+                              <a
+                                href="https://vm-2026.pages.dev"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Öppna appens adress vm-2026.pages.dev i en ny flik"
+                                className="rounded-sm font-medium text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                              >
+                                vm-2026.pages.dev
+                              </a>
+                              .
+                            </p>
 
-                          {/* UPPHOVS-KORTET (T38 signatur -> T44 runda 2, #75): footern lyfter
+                            {/* UPPHOVS-KORTET (T38 signatur -> T44 runda 2, #75): footern lyfter
                           Daniel. data-app-signature = stabil krok + testad semantik (T38/T39-
                           testerna vaktar "Daniel Aldemir" + länk-kontraktet). */}
-                          <div data-app-signature="" className="flex flex-col gap-3">
-                            <div className="flex items-center gap-2.5">
-                              <span aria-hidden="true" className="vm-signature-seal">
-                                DA
-                              </span>
-                              <span className="flex flex-col leading-tight">
-                                <span className="text-xs text-fg-muted">Byggd av</span>
-                                <a
-                                  href="https://www.danielaldemir.com"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
-                                  className="rounded-sm font-display text-base font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                            <div data-app-signature="" className="flex flex-col gap-3">
+                              <div className="flex items-center gap-2.5">
+                                <span aria-hidden="true" className="vm-signature-seal">
+                                  DA
+                                </span>
+                                <span className="flex flex-col leading-tight">
+                                  <span className="text-xs text-fg-muted">Byggd av</span>
+                                  <a
+                                    href="https://www.danielaldemir.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
+                                    className="rounded-sm font-display text-base font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                                  >
+                                    Daniel Aldemir
+                                  </a>
+                                </span>
+                              </div>
+
+                              {/* Titel-raden (T44, #75): promotar Daniel som utvecklaren. */}
+                              <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
+
+                              {/* HEMSIDE-CTA:n (T44 runda 2, #75): danielaldemir.com som en
+                            uppenbart klickbar pill (delade .vm-install-pill-formen). */}
+                              <a
+                                href="https://www.danielaldemir.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Öppna danielaldemir.com i en ny flik"
+                                className="vm-install-pill self-start"
+                              >
+                                danielaldemir.com
+                                <svg
+                                  aria-hidden="true"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="vm-install-pill-icon"
                                 >
-                                  Daniel Aldemir
-                                </a>
-                              </span>
+                                  <path d="M15 3h6v6" />
+                                  <path d="M10 14 21 3" />
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                </svg>
+                              </a>
                             </div>
 
-                            {/* Titel-raden (T44, #75): promotar Daniel som utvecklaren. */}
-                            <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
-
-                            {/* HEMSIDE-CTA:n (T44 runda 2, #75): danielaldemir.com som en
-                            uppenbart klickbar pill (delade .vm-install-pill-formen). */}
-                            <a
-                              href="https://www.danielaldemir.com"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label="Öppna danielaldemir.com i en ny flik"
-                              className="vm-install-pill self-start"
-                            >
-                              danielaldemir.com
-                              <svg
-                                aria-hidden="true"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="vm-install-pill-icon"
-                              >
-                                <path d="M15 3h6v6" />
-                                <path d="M10 14 21 3" />
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                              </svg>
-                            </a>
-                          </div>
-
-                          {/* Version-stämpel (T43, #74): diskret bygg-identifierare. */}
-                          <VersionStamp />
-                        </footer>
-                      </div>
+                            {/* Version-stämpel (T43, #74): diskret bygg-identifierare. */}
+                            <VersionStamp />
+                          </footer>
+                        </div>
+                      </ErrorBoundary>
                     </TabPanel>
                   </MatchDetailProvider>
                 </PredictionsProvider>

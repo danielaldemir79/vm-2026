@@ -94,7 +94,12 @@ describe('subscribeToTableChanges', () => {
       })
     );
 
-    expect(m.client.channel).toHaveBeenCalledWith('test-channel');
+    // Topic:en är channelName + ett unikt suffix (white-screen-fixen): varje
+    // prenumeration får ett eget topic så två konsumenter aldrig delar kanal-instans.
+    expect(m.client.channel).toHaveBeenCalledTimes(1);
+    expect((m.client.channel as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatch(
+      /^test-channel:\d+$/
+    );
     expect(m.listeners).toHaveLength(2);
     expect(m.listeners[0].config).toEqual({
       event: '*',
@@ -174,6 +179,69 @@ describe('subscribeToTableChanges', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('CHANNEL_ERROR');
     warn.mockRestore();
+  });
+
+  it('REGRESSION (white-screen): två prenumerationer på SAMMA channelName krockar INTE', () => {
+    // ROTORSAK (live white-screen mitt under VM): Supabase cachar kanaler per TOPIC, så
+    // `client.channel(name)` ger SAMMA instans för samma namn. T83 håller alla flik-paneler
+    // monterade -> ScorerTableView + TournamentStatsView prenumererade BÅDA på
+    // 'vm2026-tournament-stats' (via useCrossMatchEvents). Den andra fick den förstas redan
+    // subscribe():ade kanal och anropade `.on()` på den -> supabase-js KASTAR ("cannot add
+    // postgres_changes callbacks ... after subscribe()"), vilket utan error boundary släckte
+    // hela appen. Denna fake-klient speglar EXAKT det beteendet (topic-cache + throw-on-
+    // on-after-subscribe). Med fixen (unikt topic-suffix per prenumeration) får de två olika
+    // kanal-instanser och kan inte krocka.
+    const channelsByTopic = new Map<string, FakeChannel>();
+    class FakeChannel {
+      subscribed = false;
+      topic: string;
+      constructor(topic: string) {
+        this.topic = topic;
+      }
+      on(type: string) {
+        if (this.subscribed) {
+          throw new Error(
+            `cannot add \`${type}\` callbacks for realtime:${this.topic} after \`subscribe()\``
+          );
+        }
+        return this;
+      }
+      subscribe() {
+        this.subscribed = true;
+        return this;
+      }
+    }
+    const client = {
+      realtime: { setAuth: async () => {} },
+      channel: (topic: string) => {
+        const existing = channelsByTopic.get(topic);
+        if (existing) return existing; // Supabase återanvänder kanalen för samma topic
+        const ch = new FakeChannel(topic);
+        channelsByTopic.set(topic, ch);
+        return ch;
+      },
+      removeChannel: async () => 'ok',
+    } as unknown as VmSupabaseClient;
+
+    const tables = [{ table: 'match_live_data' }];
+    // Första prenumeranten (t.ex. ScorerTableView) , går bra.
+    subscribeToTableChanges({
+      client,
+      channelName: 'vm2026-tournament-stats',
+      tables,
+      onChange: vi.fn(),
+    });
+    // Andra prenumeranten (t.ex. TournamentStatsView), SAMMA channelName , får INTE krascha.
+    expect(() =>
+      subscribeToTableChanges({
+        client,
+        channelName: 'vm2026-tournament-stats',
+        tables,
+        onChange: vi.fn(),
+      })
+    ).not.toThrow();
+    // De två fick OLIKA topic-instanser (ingen delad, redan-subscribe():ad kanal).
+    expect(channelsByTopic.size).toBe(2);
   });
 
   it('TYSTAR en status som anländer EFTER rivning (T70: inget CLOSED-brus i teardown)', () => {
