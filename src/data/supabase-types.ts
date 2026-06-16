@@ -352,6 +352,43 @@ export type Database = {
           },
         ];
       };
+      // T85 (#177): web-push-prenumerationer (en rad per enhet). RLS: en användare
+      // ser/skapar/raderar BARA sina egna (user_id = auth.uid()); service_role
+      // (push-sender) förbigår RLS och läser alla. endpoint UNIQUE = idempotent
+      // upsert-ankare. Hand-tillagd för att spegla
+      // 20260616120000_t85_push_subscriptions.sql (samma "regenerera om schemat
+      // ändras"-kontrakt som övriga tabeller).
+      push_subscriptions: {
+        Row: {
+          auth_key: string;
+          created_at: string;
+          endpoint: string;
+          id: string;
+          p256dh: string;
+          user_agent: string | null;
+          user_id: string;
+        };
+        Insert: {
+          auth_key: string;
+          created_at?: string;
+          endpoint: string;
+          id?: string;
+          p256dh: string;
+          user_agent?: string | null;
+          // Default auth.uid() i DB:n, så klienten behöver inte skicka det.
+          user_id?: string;
+        };
+        Update: {
+          auth_key?: string;
+          created_at?: string;
+          endpoint?: string;
+          id?: string;
+          p256dh?: string;
+          user_agent?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       // T66 (#121): kommentarer i rummet (medlemmar skriver korta meddelanden).
       room_comments: {
         Row: {

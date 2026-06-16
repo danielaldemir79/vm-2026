@@ -52,6 +52,7 @@ import { LeaderboardProvider, LeaderboardSection, RevealSection } from './featur
 import { MatchDetailProvider } from './features/match-detail';
 import { TotalLeaderboardSection } from './features/total-leaderboard';
 import { FavoriteTeamProvider, FavoriteTeamSection } from './features/favorite-team';
+import { PushOptInSection } from './features/push';
 import { AdminSection } from './features/admin';
 import {
   InstallButton,
@@ -537,6 +538,14 @@ function AppShell() {
                             <FavoriteTeamSection
                               surface={(children) => <Panel>{children}</Panel>}
                             />
+                          </Slide>
+
+                          {/* MÅL-NOTISER opt-in (T85, #177): web-push-fundamentet. En
+                        INSTÄLLNING (slå på pling vid mål), bor i Mer bredvid favoritlag.
+                        Sektionen visar sig ärligt per läge (stöds ej / iOS-hint / nekad /
+                        aktivera / på + test). Samma Panel-yta som resten av Mer. */}
+                          <Slide direction="up">
+                            <PushOptInSection surface={(children) => <Panel>{children}</Panel>} />
                           </Slide>
 
                           {/* Den KOMPAKTA install-knappen (T63, #113): "Installera som app"-pill.
