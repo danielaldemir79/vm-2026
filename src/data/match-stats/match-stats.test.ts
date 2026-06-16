@@ -21,8 +21,14 @@ import {
   normalizeMatchStats,
   normalizeTeamStats,
 } from './match-stats';
-import { fixtureLiveEvents, fixtureLiveLineups, fixtureLiveStatistics } from '../livescore';
+import {
+  fixtureLiveEvents,
+  fixtureLiveLineups,
+  fixtureLiveStatistics,
+  parseEvents,
+} from '../livescore';
 import type { LiveEvent, LiveLineup, LiveTeamStatistics } from '../livescore';
+import type { RawApiResponse, RawEvent } from '../livescore/api-football-types';
 
 const HOME = 10; // England (de rika 2022-blobbarna)
 const AWAY = 22; // Iran
@@ -141,6 +147,33 @@ describe('extractCards', () => {
 
   it('tom -> inga kort', () => {
     expect(extractCards([])).toEqual([]);
+  });
+
+  // SKARV-test (F1) genom den RIKTIGA parsern, inte en bekväm fixtur: en andra-gult-utvisning
+  // anländer som detail "Yellow-Red Card" från API-Football. Vi kör den EXAKTA strängen via
+  // parseEvents -> extractCards och kräver att kortet räknas som RÖTT (utvisning), inte gult.
+  // De övriga testerna sätter cardColor direkt och hoppar därför över readCardColor-seam:en
+  // där buggen bodde , den här bevisar hela vägen råsträng -> 'red'.
+  it('räknar "Yellow-Red Card" (andra-gult-utvisning) som ETT rött kort via parseEvents-seam (F1)', () => {
+    const parsed = parseEvents({
+      get: 'fixtures/events',
+      results: 1,
+      errors: [],
+      response: [
+        {
+          time: { elapsed: 70, extra: null },
+          team: { id: HOME, name: 'England' },
+          player: { id: 7, name: 'Utvisad' },
+          assist: { id: null, name: null },
+          type: 'Card',
+          detail: 'Yellow-Red Card',
+          comments: null,
+        },
+      ],
+    } as unknown as RawApiResponse<RawEvent>);
+    const cards = extractCards(parsed);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ color: 'red', playerId: 7, teamApiId: HOME });
   });
 });
 

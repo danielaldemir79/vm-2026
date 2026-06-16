@@ -56,6 +56,56 @@ vid minskad rörelse, WCAG 2.3.3). Fixar alla långa listor på en gång.
 tunga sektionerna i HOTFIX-beslutet nedan, eftersom T92 rebasades ovanpå hotfixen.
 
 ---
+## 2026-06-16 , T99 (#200): avstängda spelare-sektion (härledd ur kort-datan, uppskattad)
+
+**Beslut:** En "Avstängda spelare"-sektion i Turnering-fliken som HÄRLEDS ur kort-datan vi redan
+har (T86 `extractCards` via T87 `useCrossMatchEvents`) + den källåkrade matchplanen. INGEN ny
+datakälla. Ren logik i `src/features/tournament-stats/suspensions.ts` (`deriveSuspensions`), vy i
+`SuspensionsView.tsx`, wired i Turnering-panelen i en `ErrorBoundary label="avstangda"`.
+
+**Domänreglerna (KÄLLHÄNVISADE , gissas ALDRIG; VM 2026:s disciplinregler skiljer sig från
+tidigare VM, så de är extra lätta att gissa fel). Korsverifierade mot TVÅ oberoende källor:**
+
+- **Rött kort -> avstängd nästa match (S1).** Källa: MLSSoccer.com, "2026 FIFA World Cup yellow
+  card and suspension rules" ("If a player receives a red card ... suspended for ... the following
+  contest"). S1 fångar även andra-gult-UTVISNINGEN: API-Football v3 sätter event-detail
+  **"Yellow-Red Card"** för en utvisning på andra gult, och `parse-live.readCardColor` klassar den
+  strängen som färg `'red'` (den måste testas FÖRE includes('yellow'), eftersom strängen bär både
+  "yellow" och "red"), så händelsen når S1-grenen som ett rött kort. KÄLLA för enum-värdet
+  "Yellow-Red Card": korsverifierad mot tre oberoende källor (api-football.com event-detail,
+  Sportmonks "YELLOWREDCARD", live-score-api "yellowred"). RÄTTAD 2026-06-16 (F1): readCardColor
+  klassade tidigare "Yellow-Red Card" som `'yellow'`, så en andra-gult-utvisning räknades som ett
+  vanligt gult och INGEN avstängning härleddes. Korrekt även för T88:s kort-liga (utvisning = rött,
+  inte två gula). Bevisat genom seam-test som matar den exakta API-strängen (parse-live.test.ts,
+  match-stats.test.ts, suspensions.test.ts).
+- **Två ackumulerade gula i SKILDA matcher -> avstängd nästa match (S2).** Källa: MLSSoccer +
+  Yahoo/Athlon, "World Cup 2026 Yellow Card Rules: When Do Cards Reset". Vi räknar max ETT
+  ackumulerings-gult per match (ett andra gult samma match är en utvisning, S1).
+- **Gul-nollställning i TVÅ steg (VM 2026:s NYHET, S3):** ackumulerade gula nollställs EFTER
+  gruppspelet OCH igen EFTER kvartsfinalerna ("Following the Group Stage, all yellow cards will be
+  reset, and then reset again after the quarterfinals"). En redan UTLÖST avstängning raderas INTE
+  av nollställningen (Yahoo: "The reset only removes single pending yellows, not completed
+  suspensions"). Fas-block i koden: gruppspel | {R32, R16, kvart} | {semi, brons, final}.
+- **Längd = UPPSKATTAD 1 match (S4).** Vi VET INTE disciplinnämndens exakta beslut (ett grovt rött
+  kan ge fler), så default 1 match och hela sektionen märks tydligt "uppskattning" i UI:t (Daniels
+  direktiv: håll enkelt + var tydlig att det är en uppskattning). Ingen gissning om längre straff.
+- **Från-match + auto-bort när avtjänad (S5).** Avstängningen utlöses i en match och gäller lagets
+  NÄSTA match (matchplanens kronologi). När den matchen är SPELAD (live/färdig/avspark passerad
+  relativt nu) är straffet avtjänat -> posten försvinner. Inget gissande , ren tidsordning ur planen.
+
+**Varför uppskattat och inte exakt:** vi har ingen feed för disciplinnämndens faktiska beslut. Att
+härleda ur korten ger en RIMLIG approximation utan ny datakälla, och vi är ärliga om osäkerheten i
+UI:t i stället för att låtsas vara facit. Kort som inte kan placeras i en lag-sekvens (fixtures
+`api-<id>` utan app-koppling, eller lag utanför VM-bryggan) HOPPAS , vi gissar aldrig en
+from-/nästa-match. Negativ-kontroll körd på S2-tröskeln (>=2 -> >=3 = rött), S3-nollställningen
+(gren bortkopplad = rött) och S5-auto-bort (gren bortkopplad = rött), 2026-06-16.
+
+**SKADOR , MEDVETET SKIPPAT (Daniels besked):** en skade-sektion kräver API-Footballs
+`injuries`/`sidelined`-endpoint = en NY låg-frekvent poll (additiv edge-fn + cron). Daniel föredrar
+rent framför komplett här, så det är UTELÄMNAT nu. En valfri FRAMTIDA uppföljning (additiv
+injuries-poll, RÖR EJ livescore-pollaren) , inte byggt, medvetet, för att hålla det rent.
+
+---
 
 ## 2026-06-16 , HOTFIX: white-screen live (Realtime kanal-namns-krock + saknad error boundary)
 

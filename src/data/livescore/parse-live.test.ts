@@ -185,6 +185,33 @@ describe('parseEvents: rika 2022-events (smutsig verklig data)', () => {
     expect(yellow?.cardColor).toBe('yellow');
   });
 
+  // DISKRIMINERANDE seam-test (F1): API-Football v3 sätter detail "Yellow-Red Card" för en
+  // andra-gult-UTVISNING. Den strängen bär BÅDE "yellow" och "red", så en includes('yellow')-
+  // FÖRST-ordning skulle klassa den som 'yellow' (buggen). Vi matar den EXAKTA API-strängen
+  // genom parseEvents->readCardColor och kräver 'red' (utvisning), inte 'yellow'. Tidigare
+  // tester använde bara de bekväma "Red Card"/"Yellow Card", aldrig den riktiga strängen.
+  it('klassar "Yellow-Red Card" (andra-gult-utvisning) som red, INTE yellow (F1)', () => {
+    const secondYellowSendOff = {
+      get: 'fixtures/events',
+      results: 1,
+      errors: [],
+      response: [
+        {
+          time: { elapsed: 75, extra: null },
+          team: { id: 1, name: 'X' },
+          player: { id: 1, name: 'A' },
+          assist: { id: null, name: null },
+          type: 'Card',
+          detail: 'Yellow-Red Card', // API-Footballs FAKTISKA sträng för andra gult
+          comments: null,
+        },
+      ],
+    } as unknown as RawApiResponse<RawEvent>;
+    const [e] = parseEvents(secondYellowSendOff);
+    expect(e.kind).toBe('card');
+    expect(e.cardColor).toBe('red');
+  });
+
   it('bär extra-minut för ett tilläggstid-event (45+1, 90+10, 90+13)', () => {
     const events = parseEvents(eventsResponse);
     const stoppage = events.find((e) => e.extra !== null);
