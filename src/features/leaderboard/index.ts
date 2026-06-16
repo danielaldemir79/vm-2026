@@ -6,6 +6,15 @@ export { LeaderboardProvider } from './LeaderboardProvider';
 export { LeaderboardSummary } from './LeaderboardSummary';
 export { LeaderboardView } from './LeaderboardView';
 export { RevealView, RevealMatchCard, type TeamNameLookup } from './RevealView';
+// T92 (del D): "vad alla tippade" som en paginerad, kompakt, drill-in-bar sektion i Tips-fliken.
+export { RevealSection } from './RevealSection';
+export {
+  buildRevealRows,
+  pageOfRevealRows,
+  type RevealRow,
+  type RevealPage,
+  type SelfRevealResult,
+} from './reveal-rows';
 export { TipsScoreSummary } from './TipsScoreSummary';
 export { PersonalStatsSection } from './PersonalStatsSection';
 export {

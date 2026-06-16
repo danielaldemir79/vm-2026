@@ -46,7 +46,7 @@ import { OfficialResultsProvider } from './features/official-results';
 import { PredictionSection, PredictionsProvider } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
-import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
+import { LeaderboardProvider, LeaderboardSection, RevealSection } from './features/leaderboard';
 import { MatchDetailProvider } from './features/match-detail';
 import { TotalLeaderboardSection } from './features/total-leaderboard';
 import { FavoriteTeamProvider, FavoriteTeamSection } from './features/favorite-team';
@@ -272,6 +272,20 @@ function AppShell() {
                           Tips , det är HÄR man organiserar vem man tippar mot. */}
                           <Slide direction="up">
                             <RoomSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
+
+                          {/* "Vad alla tippade" (T92 del D): FLYTTAD hit från Topplista-fliken
+                          (där den var inbakad i LeaderboardSection). Den hör tematiskt till tipsen
+                          ("vad alla tippade") och ligger SIST i Tips, ihopfälld default. Vid
+                          utfällning: en paginerad, kompakt matchlista (senaste först), tap på en
+                          rad -> rik matchvy (drill-in, T86, via MatchDetailProvider som omsluter
+                          alla flik-paneler). EN sektions-kollaps + EN paginering, aldrig två.
+                          Egen boundary (HOTFIX-mönstret): en krasch i den tunga reveal-listan
+                          degraderar isolerat och släcker aldrig hela Tips-fliken eller appen. */}
+                          <Slide direction="up">
+                            <ErrorBoundary label="vad alla tippade" resetKey={activeTab}>
+                              <RevealSection />
+                            </ErrorBoundary>
                           </Slide>
                         </div>
                       </ErrorBoundary>
