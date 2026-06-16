@@ -5,6 +5,58 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T92 (#185): Topplista-UX-städning (ordning, per-rums-tydlighet, global topp-10 + förändring, reveal-flytt, egen-rad, kollaps-scroll)
+
+**Beslut (Topplista-flikens ordning + per-rums-tydlighet, del A):** Topplista-fliken = per-rums-
+topplista ÖVERST -> global topplista DIREKT under. Per-rums-listans eyebrow visar nu det AKTIVA
+RUMMETS namn (`rooms.activeRoom.name`, EN sanning) i stället för den generiska "VM-poolen", så det
+är otvetydigt vilket rum listan gäller (Daniels feedback). Utan ett aktivt rum (eller tomt namn)
+faller eyebrow:n till "Ditt rum" , vi gissar aldrig ett rumsnamn.
+
+**Beslut (redundant sektions-kollaps borttagen, del B):** Per-rums-topplistan hade TVÅ kontroller
+(en sektions-`CollapsibleBody` "Fäll ihop" + list-"Visa alla N"). På en fokuserad flik ÄR listan
+flikens innehåll, så sektions-kollapsen var meningslös och förvirrande (två konkurrerande "fäll
+ihop"). Sektions-kollapsen är borttagen; bara list-komprimeringen (kompakt <-> alla, sticky följ-med)
+finns kvar.
+
+**Beslut (global topplista: topp-10 + din placering + din FÖRÄNDRING, del C):** Komprimerat default
+höjt från topp-5 till TOPP-10 + hjälten (din placering) + en rank-FÖRÄNDRINGS-indikator. **Data-
+beslut för "förändring" (källhänvisat, ingen rank-historik finns):** appen har varken DB-rank-
+snapshot eller en "senaste avgjorda omgång"-tabell, och att bygga server-side rank-historik för EN
+indikator vore för tungt (PRINCIPLES §0/§11). Vald renaste pragmatiska approach: **"sedan ditt
+senaste besök", per device, via localStorage** (`vm2026-total-rank-snapshot`, keyad på userId). Vi
+sparar den inloggades senast visade globala rank och jämför nästa besök => ▲/▼ delta, sen uppdaterar
+snapshoten. FÖRSTA besöket (ingen sparad rank) visar INGEN rörelse (gissar aldrig). Medveten
+avgränsning: per-device-scope (samma som tema/onboarding-flaggorna), dokumenterad, inte en låtsad
+cross-device-sanning. Rank (inte poäng) eftersom Daniel bad om rank-RÖRELSE (▲▼). Källa:
+`self-rank-snapshot.ts` (inline + här).
+
+**Beslut ("vad alla tippade" -> botten av Tips + drill-in, del D):** RevealView var inbakad i
+LeaderboardSection (renderades i Topplista) och var en vägg (allas tips per match inline). Den är
+FLYTTAD till en egen `RevealSection` SIST i Tips-fliken (där den tematiskt hör hemma), ihopfälld
+default. Utfälld = en PAGINERAD PLATT lista av KOMPAKTA matchrader (senaste spelade först, kickoff
+fallande), varje rad = lag + facit + ditt resultat. Tap på en rad -> DRILL-IN till den rika
+matchvyn (T86, via `MatchDetailTrigger`/`openMatch`), som visar allas tips. Resultat: EN sektions-
+kollaps + EN paginering + drill-in, aldrig två konkurrerande "fäll ihop" (north-star §2).
+
+**Beslut (egen rad markerad i ALLA listor, del E):** Användarens egna rad bär samma färg-oberoende
+"DU"-markering (`data-self` + DU-bricka, återanvänt mönster från topplistorna) i reveal-raderna.
+Konsekvent över per-rums-topplista, global topplista och avslöjande-listan.
+
+**Beslut (kollaps-scroll-fix i den DELADE komponenten, del F):** Klickar man "komprimera" långt ner
+i en utfälld lista kollapsade listan men SID-SCROLLEN stod kvar långt ner (desorienterande, Daniels
+bugg). Fix i den delade `collapsible-list` (`useCollapseScrollRestore` + wiring i `StickyFollowToggle`
+och per-rums-listans nedre toggle): vid komprimering skrollas sektionens ankare tillbaka i vy, med en
+mätt scroll-till-offset som KOMPENSERAR för app-barens höjd (`--vm-app-bar-height`, EN sanning, samma
+som sticky-baren) så rubriken inte hamnar under flik-raden. Smooth + reduced-motion-gatad (auto-hopp
+vid minskad rörelse, WCAG 2.3.3). Fixar alla långa listor på en gång.
+
+**Rebas-not (2026-06-16):** RevealSection i Tips wrappas dessutom i en egen `ErrorBoundary`
+(`label="vad alla tippade"`, resetKey=aktiv flik), samma white-screen-hotfix-mönster som de andra
+tunga sektionerna i HOTFIX-beslutet nedan, eftersom T92 rebasades ovanpå hotfixen.
+
+---
+
 ## 2026-06-16 , HOTFIX: white-screen live (Realtime kanal-namns-krock + saknad error boundary)
 
 **Symptom:** Den live-deployade appen (vm-2026.pages.dev) white-screenade för användare mitt under

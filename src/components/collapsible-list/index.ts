@@ -10,3 +10,6 @@ export { StickyFollowToggle } from './StickyFollowToggle';
 export type { StickyFollowToggleProps } from './StickyFollowToggle';
 export { useVirtualRows, computeRange, OVERSCAN } from './use-virtual-rows';
 export type { VirtualRows } from './use-virtual-rows';
+// T92 del F: delad kollaps-scroll-fix (skrolla sektionens ankare tillbaka i vy vid komprimering).
+export { useCollapseScrollRestore } from './use-collapse-scroll-restore';
+export type { CollapseScrollRestore } from './use-collapse-scroll-restore';

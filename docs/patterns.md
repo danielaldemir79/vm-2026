@@ -1313,6 +1313,40 @@ Rule-of-three uppfyllt (total + resultat + tips + per-rums), så mönstret bröt
 varianter, valda per lista efter dess tvång (virtualiserbar vs inmatnings-/glide-bunden), i stället för en
 parallell variant per vy. Källa: #173 T82 del 4, `src/components/collapsible-list/`.
 
+### skrolla-ankaret-tillbaka-i-vy-vid-komprimering-app-bar-kompenserat (React, VM 2026)
+
+**Problem (ägarens bugg, T92/#185):** klickar man "komprimera"/"visa färre" LÅNGT NER i en utfälld lista
+fälls listan ihop, men SID-SCROLLEN står kvar långt ner (där listan nyss tog slut) , man stirrar på
+tomrum/nästa sektion och tappar orienteringen.
+
+**Recept (`src/components/collapsible-list/use-collapse-scroll-restore.ts`, EN delad sanning):**
+1. **Hooken ger en `anchorRef` + en `scrollAnchorIntoView()`.** Sätt ankaret på TOPPEN av den
+   komprimerbara regionen (sektionen / följ-med-wrappern). Anropa `scrollAnchorIntoView()` EFTER att
+   listan komprimerats (via `requestAnimationFrame`, så mätningen sker mot det KOMPRIMERADE läget).
+2. **Mätt scroll-till-OFFSET, inte enbart `scrollIntoView()`.** `window.scrollTo({ top })` där
+   `top = scrollY + rect.top - appBarOffset`, klampat `>= 0`. KOMPENSERA för den sticky app-barens höjd
+   genom att läsa `--vm-app-bar-height` ur computed style (EN sanning, samma variabel som sticky-baren
+   `.vm-sticky-follow-bar` använder), annars hamnar rubriken UNDER flik-raden/headern (osynlig). Px och
+   rem (rem*16) hanteras; saknad/oparsebar variabel -> offset 0 (ankaret i absoluta toppen, ändå synligt).
+3. **Reduced-motion-GATAD (WCAG 2.3.3):** `behavior: 'smooth'` normalt, `'auto'` (direkt hopp) när
+   `matchMedia('(prefers-reduced-motion: reduce)').matches`. Gata på att matchMedia FINNS och returnerar
+   ett objekt (jsdom saknar den / kan ge undefined), annars no-op:a snällt, kasta aldrig.
+4. **Gata BARA på KOLLAPS, inte expandering.** I `StickyFollowToggle`: läs `expanded` FÖRE `onToggle()`,
+   skrolla bara om `willCollapse = expanded` (en expandering uppstår inget tomrum). Konsumenter med en
+   SEPARAT nedre toggle (per-rums-topplistan) anropar samma hook i sin egen kollaps-handler (den övre
+   sticky-toggeln sköts redan av StickyFollowToggle, så scrolla bara från den nedre , ingen dubbel-scroll).
+5. **Test (jsdom har ingen layout):** STUBBA ankarets `getBoundingClientRect`, `window.scrollY` och
+   `--vm-app-bar-height` och bevisa MATEMATIKEN (`top = scrollY + rect.top - appBarOffset`, klamp >= 0) +
+   beteende-valet (smooth vs auto). På komponentnivå: en KOLLAPS anropar `window.scrollTo`, en EXPANDERING
+   gör det INTE (negativ-kontroll). Den faktiska visuella scrollen verifieras i browsern (`.vmshots/`).
+
+**Varför:** fixen hör hemma i den DELADE collapsible-list-komponenten, så ALLA långa listor (per-rums-
+topplista, avslöjandet, framtida StickyFollowToggle-konsumenter) ärver den på en gång (EN sanning, ingen
+drift), i stället för en handgjord scroll-restore per vy. App-bar-kompensationen via `--vm-app-bar-height`
+återanvänder exakt den offset sticky-baren redan klistrar mot. Källa: T92 (#185, del F),
+`src/components/collapsible-list/use-collapse-scroll-restore.ts` + wiring i `StickyFollowToggle` +
+`LeaderboardView`.
+
 ### delad-modal-primitiv-agar-a11y-dialog-kontraktet-en-gang (React + motion, VM 2026)
 
 **Recept (EN primitiv som äger hela a11y-dialog-kontraktet, varje dialog behåller sin visuella identitet):**

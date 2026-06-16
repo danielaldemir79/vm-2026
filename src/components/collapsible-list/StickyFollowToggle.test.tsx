@@ -112,3 +112,60 @@ describe('StickyFollowToggle, F1-fix: bar + lista delar en containing block', ()
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });
+
+// T92 del F: kollaps-scroll-fixen. Klickar man komprimera (utfällt -> ihopfällt) ska sektionens
+// ankare skrollas tillbaka i vy (annars står sid-scrollen kvar långt ner). Vi gatar på TILLSTÅND:
+// bara en KOMPRIMERING skrollar, en EXPANDERING rör inte scrollen. jsdom har ingen layout, så vi
+// bevisar att window.scrollTo ANROPAS (resp. inte) , den faktiska visuella scrollen verifieras i
+// browsern. rAF körs synkront via en stub så vi kan asserta direkt.
+describe('StickyFollowToggle, kollaps-scroll-fix (del F)', () => {
+  function withScrollSpies() {
+    const scrollTo = vi.fn();
+    window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+    // Kör rAF-callbacken synkront, så vi kan asserta i samma tick.
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+    return { scrollTo };
+  }
+
+  it('KOMPRIMERING (utfällt -> klick) skrollar ankaret tillbaka i vy (scrollTo anropas)', () => {
+    const { scrollTo } = withScrollSpies();
+    const { container } = render(
+      <StickyFollowToggle
+        expanded
+        controls="lista-f"
+        onToggle={() => {}}
+        name="test"
+        labels={{ expand: 'Visa alla', collapse: 'Komprimera' }}
+      >
+        <ol />
+      </StickyFollowToggle>
+    );
+    fireEvent.click(container.querySelector('[data-test-toggle]') as HTMLButtonElement);
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    // Skrollar till en top-position (objekt-form), inte ett okontrollerat hopp.
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: expect.any(Number) }));
+    vi.unstubAllGlobals();
+  });
+
+  it('EXPANDERING (komprimerat -> klick) skrollar INTE (negativ-kontroll: bara kollaps skrollar)', () => {
+    const { scrollTo } = withScrollSpies();
+    const { container } = render(
+      <StickyFollowToggle
+        expanded={false}
+        hiddenCount={3}
+        controls="lista-g"
+        onToggle={() => {}}
+        name="test"
+        labels={{ expand: 'Visa alla', collapse: 'Komprimera' }}
+      >
+        <ol />
+      </StickyFollowToggle>
+    );
+    fireEvent.click(container.querySelector('[data-test-toggle]') as HTMLButtonElement);
+    expect(scrollTo).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
