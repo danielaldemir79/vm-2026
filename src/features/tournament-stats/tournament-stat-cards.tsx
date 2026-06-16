@@ -199,6 +199,12 @@ export interface HighlightStatRowProps {
    * what-if-läget döljer ett facit-höjdpunkts-kort (T100, samma anda som MetricListCard).
    */
   notReadyText?: string;
+  /**
+   * Lugn coverage-notering (T100, #207, truth-in-labeling): för ett EVENT-täckt höjdpunkts-kort
+   * (t.ex. snabbaste mål) som bara ser matcher med detaljerad spelardata. Null/utelämnad -> ingen
+   * not (facit-täckta höjdpunkter som "mål per match" / "flest mål i en match" behöver den inte).
+   */
+  coverageNote?: string | null;
 }
 
 /**
@@ -211,6 +217,7 @@ export function HighlightStatRow({
   detail,
   ready,
   notReadyText,
+  coverageNote,
 }: HighlightStatRowProps) {
   return (
     <Surface
@@ -231,6 +238,9 @@ export function HighlightStatRow({
         <>
           <p className="font-display text-2xl font-semibold tabular-nums">{value ?? ','}</p>
           <p className="truncate text-xs text-fg-muted">{detail}</p>
+          {/* Coverage-not bara när det FINNS ett värde att förbehålla (annars är "Inget mål än"
+              redan förklaringen), så vi inte visar en täcknings-not på ett tomt kort. */}
+          {coverageNote && value !== null ? <CoverageNote text={coverageNote} /> : null}
         </>
       )}
     </Surface>

@@ -387,4 +387,24 @@ describe('TournamentStatsView , coverage-notering på event-täckta kort (T100, 
     const { container } = render(<TournamentStatsView />);
     expect(container.querySelector('[data-tournament-stat-coverage]')).toBeNull();
   });
+
+  it('event-höjdpunkten "Snabbaste mål" bär coverage-not, men facit-höjdpunkten "Mål per match" gör det INTE', () => {
+    // Ett mål i event-datan -> "Snabbaste mål" har ett värde + ska bära coverage-noten (den ser
+    // bara den event-täckta delmängden). "Mål per match" räknas ur facit (alla matcher) -> ingen not.
+    mockEvents.mockReturnValue(
+      eventsReady([{ matchId: 'api-1', events: [goal({ minute: 4, playerName: 'Blixten' })] }])
+    );
+    mockStats.mockReturnValue(statsReady([]));
+    mockResults.mockReturnValue(
+      resultsStore({ matches: [finishedMatch('g-E-1', 'ger', 'cuw', 7, 1)] })
+    );
+    const { container } = render(<TournamentStatsView />);
+    const highlights = [...container.querySelectorAll('[data-tournament-highlight]')];
+    const fastest = highlights.find((h) => h.textContent?.includes('Snabbaste mål'));
+    const perMatch = highlights.find((h) => h.textContent?.includes('Mål per match'));
+    expect(fastest?.querySelector('[data-tournament-stat-coverage]')).toHaveTextContent(
+      'Baseras på 1 match med detaljerad spelardata.'
+    );
+    expect(perMatch?.querySelector('[data-tournament-stat-coverage]')).toBeNull();
+  });
 });

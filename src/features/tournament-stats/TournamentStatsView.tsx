@@ -207,6 +207,10 @@ export function TournamentStatsView() {
                 ? `${goalTiming.fastest.scorerName ?? 'Okänd skytt'} (${goalTiming.fastest.teamName})`
                 : 'Inget mål än'
             }
+            // Event-täckt höjdpunkt (T100): bär samma ärliga coverage-not som de andra
+            // event-korten, så den inte läses som hela turneringen bredvid det facit-täckta
+            // "Mål per match". "Mål per match"/"Flest mål i en match" är facit-täckta -> ingen not.
+            coverageNote={eventCoverageNote}
           />
           {/* Mål per match: ur OFFICIELLT facit (T100, #207), gatat på planReady (verkligt facit,
               inte what-if), så snittet räknar ALLA färdiga matcher , inte bara de event-pollade. */}
