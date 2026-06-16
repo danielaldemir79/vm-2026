@@ -256,4 +256,24 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     expect(screen.queryByText('Arena')).not.toBeInTheDocument();
     expect(container.querySelector('[data-venue-capacity]')).toBeNull();
   });
+
+  it('renderar drill-in-affordansen (detailAction-slot) BARA när den ges (T86, #178)', () => {
+    // Utan slot: ingen drill-in-affordans (hero-kortet, default).
+    const { container, rerender } = renderCard(
+      <MatchCard match={groupMatch()} teamsById={teamsById} />
+    );
+    expect(container.querySelector('[data-test-detail-action]')).toBeNull();
+
+    // Med slot: den injicerade affordansen renderas (kortet är agnostiskt om vad den är).
+    rerender(
+      <TeamProfileStub>
+        <MatchCard
+          match={groupMatch()}
+          teamsById={teamsById}
+          detailAction={<button data-test-detail-action="">Öppna matchsida</button>}
+        />
+      </TeamProfileStub>
+    );
+    expect(screen.getByRole('button', { name: 'Öppna matchsida' })).toBeInTheDocument();
+  });
 });

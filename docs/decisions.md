@@ -5,6 +5,46 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T86 (#178): rik live-matchvy , drill-in + delad match-stats-projektion
+
+**Beslut (drill-in = MODAL, inte route eller inline-expand):** Den rika matchvyn (tidslinje +
+statistik + laguppställning + "vad alla tippade") öppnas via DRILL-IN i en delad `<Modal>`
+(src/features/match-detail/), inte som inline-expand på livekortet och inte som en egen
+hash-route. **Varför:** north-star §2 säger att den TUNGA detaljen öppnas via drill-in (det
+eliminerar nästlade komprimera-knappar). En modal (inte en routad vy) är KISS i den router-lösa,
+hash-baserade flik-appen, och återanvänder den redan a11y-kompletta Modal-primitiven (fokus-fälla,
+Escape, portal, reduced-motion). Avvägning mot en delbar per-match-djuplänk: delning sker redan på
+app-nivå (vm-2026.pages.dev) och en per-match-URL var inget uttalat krav , KISS vägde över. Drill-
+in följer det etablerade mönstret `klickbar-entitet-oeppnar-en-delad-modal-overlay` (context +
+provider-renderar-en-gång + återanvändbar trigger), inkopplad från Idag-listans matchrader (T92
+kopplar in Tips-reveal-listans rader mot SAMMA openMatch-seam).
+
+**Beslut (EN delad match-stats-projektion, src/data/match-stats/):** En ny, MATCH-AGNOSTISK,
+team-/spelar-nyckad projektion (extractGoals/Cards/Subs/OtherEvents, normalizeTeamStats,
+extractLineup) ovanpå de redan-parsade live-typerna (parse-live.ts). **Varför:** T87 (skytteliga)
+aggregerar mål/assist per spelar-id över ALLA matcher, T88 (turneringsstatistik) aggregerar kort/
+innehav per lag-id över ALLA matcher , båda behöver team-/spelar-id bevarade, inte den sid-nyck(
+home/away)-form live-card-model.ts har (den tappar id:n och kräver ett homeApiId, rätt för EN
+match-vy men oanvändbart cross-match). Vi parsar ALDRIG om de råa svaren här (parse-live äger RÅ ->
+normaliserad, en sanning); projektionen tar bara den normaliserade formen ett steg till. För att
+bära skytt-/assist-id + tränare genom skarven utökades `LiveEvent` (playerId/assistId) och
+`LiveLineup` (coachName) additivt i parse-live (null-säkert, gissar aldrig ett id/namn).
+
+**Egenmåls-regel (KÄLLHÄNVISAD + flaggad osäkerhet, gissa aldrig):** `extractGoals` FLAGGAR egenmål
+via detail "Own Goal" (verifierbart, samma källa som live-card-model redan matchar) och straff via
+detail "Penalty". Den VERIFIERBARA, provider-oberoende regeln "ett egenmål är aldrig SKYTTENS mål"
+uttrycks genom att T87 filtrerar `isOwnGoal === false` innan den räknar en spelares tally. Vi tolkar
+INTE om vilket lag `teamApiId` pekar på för ett egenmål (om det är det gjorda-emot-laget eller det
+gynnade laget): de två stora fotbolls-API:erna är OENIGA om den konventionen (API-Football vs
+football-data.org / Sportmonks), och API-Footballs egen v3-doc svarar 403 mot automatiska hämtningar
+så den gick inte att bekräfta, och de committade fixtures innehåller inget egenmål att probe:a mot.
+**Beslut:** behåll `teamApiId` EXAKT som API:t attribuerar eventet (ingen omtolkning), tills regeln
+kan källverifieras mot ett riktigt egenmåls-svar live (eller mot den nåbara doc:en). T88:s ev. "mål
+för/emot per lag"-aggregering måste vänta in den verifieringen innan den litar på egenmålets team-
+fält. Negativ-kontroll bevisar att test:et som låser team-bevarandet rödnar om någon inför en flip.
+
+---
+
 ## 2026-06-16 , T91 (#184): live-score auto-uppdatering , poll + fokus/online-skyddsnät ovanpå Realtime
 
 **Rotorsak (fastställd, inte gissad):** en pågående match uppdaterades inte i appen förrän en

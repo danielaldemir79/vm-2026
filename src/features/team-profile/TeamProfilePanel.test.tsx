@@ -8,6 +8,7 @@ import { TeamProfileProvider } from './TeamProfileProvider';
 import { useTeamProfile } from './team-profile-context';
 import { GroupStageView } from '../groups/GroupStageView';
 import { DailyMatchesView } from '../daily/DailyMatchesView';
+import { MatchDetailProvider } from '../match-detail';
 import type { Group, Match, Team } from '../../domain/types';
 
 // Profil-modalen + navigeringen testas END-TO-END mot fixtures-datan (den verifierade
@@ -35,7 +36,11 @@ const simStub = {
 function renderWithProviders(children: ReactNode) {
   return render(
     <ResultsProvider env={fixturesEnv()}>
-      <TeamProfileProvider>{children}</TeamProfileProvider>
+      <TeamProfileProvider>
+        {/* MatchDetailProvider (T86, #178): den dagliga vyns matchkort bär nu en drill-in-
+            trigger som kräver provideren. Den riktiga appen wrappar Idag i den; testet med. */}
+        <MatchDetailProvider>{children}</MatchDetailProvider>
+      </TeamProfileProvider>
     </ResultsProvider>
   );
 }

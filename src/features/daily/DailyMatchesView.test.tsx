@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { TeamProfileProvider } from '../team-profile';
+import { MatchDetailProvider } from '../match-detail';
 import { DailyMatchesView } from './DailyMatchesView';
 import type { DataSource } from '../../data';
 import type { LiveDataResult } from './use-live-data';
@@ -40,7 +41,12 @@ function fixturesEnv(): ImportMetaEnv {
 function renderView(env: ImportMetaEnv, children: ReactNode, dataSource?: DataSource) {
   return render(
     <ResultsProvider env={env} dataSource={dataSource}>
-      <TeamProfileProvider>{children}</TeamProfileProvider>
+      <TeamProfileProvider>
+        {/* MatchDetailProvider (T86, #178): listans matchkort bär nu en drill-in-trigger
+            (MatchDetailTrigger), som fail-loud:ar utan provider. Den riktiga appen wrappar
+            alltid Idag-fliken i provideren, så dessa render-tester gör likadant. */}
+        <MatchDetailProvider>{children}</MatchDetailProvider>
+      </TeamProfileProvider>
     </ResultsProvider>
   );
 }

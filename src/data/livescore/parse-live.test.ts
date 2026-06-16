@@ -165,6 +165,20 @@ describe('parseEvents: rika 2022-events (smutsig verklig data)', () => {
     expect(card?.assistName).toBeNull();
   });
 
+  it('bär spelar- + assist-id (stabil nyckel för skytteligan T87)', () => {
+    // Första målet i samplen: J. Bellingham (id 129718) med assist L. Shaw (id 891).
+    const events = parseEvents(eventsResponse);
+    const firstGoal = events.find((e) => e.kind === 'goal');
+    expect(firstGoal?.playerId).toBe(129718);
+    expect(firstGoal?.assistId).toBe(891);
+  });
+
+  it('sätter assistId till null när assist saknas (assist {id:null,name:null})', () => {
+    const events = parseEvents(eventsResponse);
+    const card = events.find((e) => e.kind === 'card');
+    expect(card?.assistId).toBeNull();
+  });
+
   it('läser kortfärg ur detail (Yellow Card -> yellow)', () => {
     const events = parseEvents(eventsResponse);
     const yellow = events.find((e) => e.kind === 'card' && e.detail === 'Yellow Card');
@@ -283,6 +297,30 @@ describe('parseLineups: laguppställningar', () => {
   it('sätter grid till null för avbytare (grid saknas)', () => {
     const lineups = parseLineups(lineupsResponse);
     expect(lineups[0].substitutes[0].grid).toBeNull();
+  });
+
+  it('bär tränarens namn ur coach-blocket (England: G. Southgate)', () => {
+    const lineups = parseLineups(lineupsResponse);
+    expect(lineups[0].coachName).toBe('G. Southgate');
+  });
+
+  it('tål en lineup-post UTAN coach-block -> coachName null (gissa aldrig)', () => {
+    // En post där hela coach-blocket saknas (API kan utelämna det) ska ge null, inte krasch.
+    const payload = {
+      get: 'fixtures/lineups',
+      results: 1,
+      response: [
+        {
+          team: { id: 99, name: 'Utan tränare' },
+          formation: '4-4-2',
+          startXI: [{ player: { id: 1, name: 'A', number: 1, pos: 'G', grid: '1:1' } }],
+          substitutes: [],
+        },
+      ],
+      errors: {},
+    };
+    const lineups = parseLineups(payload);
+    expect(lineups[0].coachName).toBeNull();
   });
 });
 

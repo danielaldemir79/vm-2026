@@ -28,6 +28,7 @@ import { MatchCard } from './MatchCard';
 import { LiveNowSection } from './LiveNowSection';
 import { selectLiveFeed } from './live-feed';
 import { MatchReactions, MatchComments } from '../rooms';
+import { MatchDetailTrigger } from '../match-detail';
 import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favorite-team';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
@@ -508,6 +509,36 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
                       match={match}
                       teamsById={teamsById}
                       liveData={liveByMatchId.get(match.id) ?? null}
+                      detailAction={
+                        // DRILL-IN (T86, #178): tryck på matchen -> rik matchvy (tidslinje +
+                        // statistik + laguppställning + vad alla tippade). En tydlig egen
+                        // affordans per matchrad (Daniels "tap på en match"); reveal-listornas
+                        // drill-in i Tips görs i T92. aria-label namnger matchen för skärmläsare.
+                        <MatchDetailTrigger
+                          matchId={match.id}
+                          ariaLabel={`Öppna matchsida för ${teamDisplayName(
+                            match.homeTeamId,
+                            teamsById
+                          )} mot ${teamDisplayName(match.awayTeamId, teamsById)}`}
+                          className="vm-install-pill self-start text-xs"
+                        >
+                          Öppna matchsida
+                          <svg
+                            aria-hidden="true"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="vm-install-pill-icon"
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                        </MatchDetailTrigger>
+                      }
                       footer={
                         <>
                           <MatchReactions matchId={match.id} />

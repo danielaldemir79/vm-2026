@@ -214,7 +214,11 @@ function toEvent(e: RawEvent): LiveEvent {
     detail: e.detail,
     teamApiId: e.team.id,
     teamName: e.team.name,
+    // Spelar-/assist-id bärs vidare (stabil nyckel för skytteligan, T87). Råsvaret kan ha
+    // id null (t.ex. en assist som saknas), då blir det null , gissa aldrig ett id.
+    playerId: e.player?.id ?? null,
     playerName: cleanName(e.player?.name ?? null),
+    assistId: e.assist?.id ?? null,
     assistName: cleanName(e.assist?.name ?? null),
     cardColor: readCardColor(kind, e.detail),
   };
@@ -287,6 +291,9 @@ export function parseLineups(payload: RawApiResponse<RawLineupResponse>): LiveLi
       formation: l.formation,
       startXI: l.startXI.map(toLineupPlayer),
       substitutes: l.substitutes.map(toLineupPlayer),
+      // Tränarens namn bärs vidare när API:t har det; saknas coach-blocket eller namnet
+      // blir det null (gissa aldrig ett tränarnamn). cleanName trimmar/kollapsar smuts.
+      coachName: cleanName(l.coach?.name ?? null),
     };
   });
 }

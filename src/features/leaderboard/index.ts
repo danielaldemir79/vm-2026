@@ -5,7 +5,7 @@ export { LeaderboardSection } from './LeaderboardSection';
 export { LeaderboardProvider } from './LeaderboardProvider';
 export { LeaderboardSummary } from './LeaderboardSummary';
 export { LeaderboardView } from './LeaderboardView';
-export { RevealView } from './RevealView';
+export { RevealView, RevealMatchCard, type TeamNameLookup } from './RevealView';
 export { TipsScoreSummary } from './TipsScoreSummary';
 export { PersonalStatsSection } from './PersonalStatsSection';
 export {
