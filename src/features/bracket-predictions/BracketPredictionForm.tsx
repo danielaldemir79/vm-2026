@@ -435,7 +435,7 @@ export function BracketPredictionForm({
                 <button
                   type="submit"
                   data-bracket-prediction-save=""
-                  className="h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
+                  className="h-11 rounded-pill bg-accent px-6 font-display text-sm font-semibold text-accent-fg shadow-[var(--vm-shadow-button)] transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
                 >
                   {current ? 'Ändra tips' : 'Spara tips'}
                 </button>
@@ -595,7 +595,7 @@ export function BracketPredictionForm({
               <button
                 type="submit"
                 data-bracket-prediction-save=""
-                className="h-10 rounded-pill bg-accent px-5 font-display text-[0.8125rem] font-semibold text-accent-fg shadow-sm transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
+                className="h-10 rounded-pill bg-accent px-5 font-display text-[0.8125rem] font-semibold text-accent-fg shadow-[var(--vm-shadow-button)] transition-[transform,box-shadow,filter] duration-150 outline-none hover:brightness-105 hover:shadow-[var(--vm-shadow-raised)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px active:brightness-95"
               >
                 {current ? 'Ändra tips' : 'Spara tips'}
               </button>
