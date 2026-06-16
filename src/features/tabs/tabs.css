@@ -19,7 +19,7 @@
    gräns (App.tsx + section-nav använde sm:). En sanning för var "mobil" slutar. */
 
 /* Höjden på den FASTA mobil-flikraden (utan safe-area). EN sanning som både
-   innehålls-luften (.vm-tab-content) OCH svävande element ovanför raden (toaster,
+   innehålls-luften ([data-tab-content]) OCH svävande element ovanför raden (toaster,
    "ny version"-prompten, F3) mäter mot, så de aldrig kan krocka med flik-raden.
    ~3.25rem flik-höjd + 1px topp-kant, avrundat till en lugn 4rem.
 
@@ -180,9 +180,13 @@
 }
 
 /* Innehålls-luft så den fasta mobil-raden aldrig skymmer sidans sista innehåll.
-   Sätts på en wrapper appen ger (data-tab-content); höjd-raden + safe-area. */
-.vm-tab-content {
-  padding-bottom: calc(var(--vm-tab-bar-height) + 0.25rem + env(safe-area-inset-bottom, 0px));
+   Sätts på den wrapper appen ger , den bär attributet `data-tab-content` (App.tsx
+   <main>), så selektorn MÅSTE matcha attributet (en tidigare `.vm-tab-content`-klass
+   var aldrig satt på elementet => regeln var död och sista kortet kröp in under flik-
+   raden på alla flikar). Klarering = flik-radens höjd + en bekväm luft + safe-area, så
+   det sista kortet alltid har tydligt avstånd till den fasta raden (inte bara nuddar). */
+[data-tab-content] {
+  padding-bottom: calc(var(--vm-tab-bar-height) + 1.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* SVÄVANDE BOTTEN-ELEMENT OVANFÖR FLIK-RADEN (F3): toaster / "ny version"-prompten
@@ -271,7 +275,7 @@
   }
 
   /* Ingen fast botten-rad => ingen extra botten-luft behövs på desktop. */
-  .vm-tab-content {
+  [data-tab-content] {
     padding-bottom: 0;
   }
 }
