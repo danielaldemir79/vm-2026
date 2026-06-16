@@ -59,6 +59,18 @@
   color: color-mix(in srgb, var(--color-accent) 70%, var(--color-fg));
 }
 
+/* "RUM"-kickern: en liten versal etikett FÖRE rum-namnet, så ett rum som heter "VM 2026"
+   inte läses som appens namn. Dämpad accent-ton, kompakt, krymper aldrig (namnet får
+   ellipsis-utrymmet). En ETIKETT, inte en del av namnet. */
+.vm-room-pill-kicker {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-accent) 78%, var(--color-fg));
+}
+
 /* Menyknappen: en riktig knapp med hover-lyft + fokus-ring (pillen är alltid en
    menyknapp när den syns , aktivt rum, 1 rum eller CTA-läget). */
 .vm-room-pill-trigger {
@@ -93,22 +105,24 @@
   }
 }
 
-/* Wrappern bär den absolut-placerade menyn (stacking-kontext + ankarpunkt). */
+/* Wrappern håller knappen (och bär data-room-pill-kroken). Menyn PORTALERAS till body
+   (se RoomPill.tsx fil-huvudet) så den aldrig fångas av app-bar-headerns backdrop-filter-
+   stacking-kontext, därför behöver wrappern inte längre vara menyns ankarpunkt. */
 .vm-room-pill-wrap {
   position: relative;
 }
 
-/* MENYN: en liten popover-yta under pillen. surface-raised (samma opaka yta som
-   appens övriga popovers/pickers) + en mjuk höjd, så den läser som ett svävande
-   lager. Höger-justerad mot pillen (app-baren ligger till höger på desktop) men
-   klampad så den aldrig sticker ut ur viewporten på smal skärm. z-40: under
-   modaler/onboarding (z-50) men över sid-innehåll + flik-raden (z-30). */
+/* MENYN: en liten popover-yta under pillen, PORTALERAD till body och placerad med JS
+   (position: fixed + left/top via inline-style, viewport-klampad i RoomPill.tsx , samma
+   mönster som ReactionAuthorsPopover). Fixed + portal = menyn ligger i rot-stacking-
+   kontexten, ALDRIG bakom sid-innehåll (iOS Safari backdrop-filter-buggen). surface-raised
+   (samma opaka yta som appens övriga popovers/pickers) + en mjuk höjd. z-40: under
+   modaler/onboarding (z-50) men över sid-innehåll + flik-raden (z-30). min-width är ett
+   FAST mått (inte 100% , menyn är nu barn till body, inte pillen, så 100% vore viewporten). */
 .vm-room-pill-menu {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
+  position: fixed;
   z-index: 40;
-  min-width: max(11rem, 100%);
+  min-width: 11rem;
   max-width: min(16rem, calc(100vw - 1.5rem));
   display: flex;
   flex-direction: column;
