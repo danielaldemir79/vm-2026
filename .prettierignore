@@ -21,6 +21,12 @@ src/domain/bracket/annexe-c-source.txt
 # en formaterings-churn vore brus på ett artefakt ingen redigerar för hand.
 supabase/functions/_shared/global-leaderboard-core.ts
 
+# Mål-push-mirror:n är GENERERAD (esbuild-bundle av src-grafen,
+# scripts/generate-goal-push-core.ts, T89). Prettier får inte röra den: den
+# regenereras ur src och vaktas av goal-push-core-mirror-parity.test.ts; en
+# formaterings-churn vore brus på ett artefakt ingen redigerar för hand.
+supabase/functions/_shared/goal-push-core.ts
+
 # Livescore-feature: de fångade API-Football-svaren är test-guld, committade
 # OFÖRÄNDRADE I FORM (exakt som API:t levererade dem, en rad per svar). Prettier
 # får inte röra dem: parsern (parse-live.ts) bevisas mot den FAKTISKA käll-formen,

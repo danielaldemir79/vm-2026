@@ -18,6 +18,13 @@ function api(overrides: Partial<PushApi> = {}): PushApi {
     activate: vi.fn().mockResolvedValue(undefined),
     deactivate: vi.fn().mockResolvedValue(undefined),
     sendTest: vi.fn().mockResolvedValue(undefined),
+    preferences: {
+      notifyEnabled: true,
+      quietHoursEnabled: false,
+      scope: 'all',
+      favoriteTeamId: null,
+    },
+    setPreference: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -96,6 +103,60 @@ describe('PushOptInSection', () => {
       />
     );
     expect(screen.getByText(/test-notis skickad/i)).toBeInTheDocument();
+  });
+
+  it('subscribed: nattläge-toggeln speglar preferensen och kallar setPreference vid byte', () => {
+    const a = api({
+      state: 'subscribed',
+      preferences: {
+        notifyEnabled: true,
+        quietHoursEnabled: false,
+        scope: 'all',
+        favoriteTeamId: null,
+      },
+    });
+    render(<PushOptInSection surface={surface} api={a} />);
+    const toggle = screen.getByRole('checkbox', { name: /tyst på natten/i });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(a.setPreference).toHaveBeenCalledWith({ quietHoursEnabled: true });
+  });
+
+  it('subscribed: nattläge-toggeln visar PÅ när preferensen är på', () => {
+    const a = api({
+      state: 'subscribed',
+      preferences: {
+        notifyEnabled: true,
+        quietHoursEnabled: true,
+        scope: 'all',
+        favoriteTeamId: null,
+      },
+    });
+    render(<PushOptInSection surface={surface} api={a} />);
+    expect(screen.getByRole('checkbox', { name: /tyst på natten/i })).toBeChecked();
+  });
+
+  it('subscribed: scope-radio "alla matcher" är vald som default och kallar setPreference', () => {
+    const a = api({ state: 'subscribed' });
+    render(<PushOptInSection surface={surface} api={a} favoriteTeamId="swe" />);
+    const all = screen.getByRole('radio', { name: /alla matcher/i });
+    expect(all).toBeChecked();
+    const fav = screen.getByRole('radio', { name: /bara mitt favoritlag/i });
+    fireEvent.click(fav);
+    expect(a.setPreference).toHaveBeenCalledWith({ scope: 'favorite', favoriteTeamId: 'swe' });
+  });
+
+  it('subscribed: favoritlags-scopet är DISABLAT när inget favoritlag valts (gissa aldrig ett lag)', () => {
+    const a = api({ state: 'subscribed' });
+    render(<PushOptInSection surface={surface} api={a} favoriteTeamId={null} />);
+    const fav = screen.getByRole('radio', { name: /välj ett favoritlag först/i });
+    expect(fav).toBeDisabled();
+  });
+
+  it('subscribable: inga preferens-kontroller (de hör till på-läget)', () => {
+    render(<PushOptInSection surface={surface} api={api({ state: 'subscribable' })} />);
+    expect(screen.queryByRole('checkbox', { name: /tyst på natten/i })).toBeNull();
+    expect(screen.queryByRole('radio')).toBeNull();
   });
 
   it('använder inga em-dash i den svenska copyn (voice-regel)', () => {

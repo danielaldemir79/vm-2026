@@ -5,6 +5,63 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T89 (#182): Mål-push-notiser ("MÅL! Spanien 2-1")
+
+**Beslut (arkitektur , pollaren rörs ej, SPEC §13.3 out-of-scope):** mål-detekteringen körs SERVER-
+side men UTANFÖR pollaren. En AFTER UPDATE-trigger på `match_live_data` (`t89_goal_push_trigger`)
+POST:ar OLD + NEW till en NY edge-funktion `goal-push-dispatcher` via `net.http_post` (pg_net) ,
+EXAKT samma mekanism som livescore-poller-cronen (cron.job 2). Ingen rad i pollarens kod ändras.
+Triggern gatas på `new.events is distinct from old.events` så en ren klock-/ställnings-poll (var 30:e
+sek) inte väcker dispatchern i onödan.
+
+**Beslut (EN sanning för mål-härledning, SPEC §13.3 HARD):** dispatchern parsar events med EXAKT
+samma delade util som skytteligan (T87): `parseEvents` -> `extractGoals` (data/match-stats). Ingen
+parallell mål-parse. Logiken (parse + mål-diff + preferenser) bor som rena, enhetstestade moduler i
+`src/features/push/{goal-detection,push-preferences}.ts` + `edge-entry.ts`, och GENERERAS till
+`supabase/functions/_shared/goal-push-core.ts` med esbuild (`npm run gen:goal-push-core`), samma recept
+som global-leaderboard-core (T90). Paritet (committad mirror == src) vaktas av
+`goal-push-core-mirror-parity.test.ts` (negativ-kontroll: en muterad mirror-gren rödnar, verifierat).
+
+**Beslut (scoring-sida ur ställnings-DELTAT, INTE event-laget , egenmåls-SÄKERT):** vilken sida som
+gjorde målet härleds ur `home_goals`/`away_goals`-deltat OLD->NEW (sidan som ÖKADE), inte ur mål-
+eventets `teamApiId`. **Varför (gissa aldrig):** API-Footballs `goals.home/away` är det auktoritativa,
+redan korrekt krediterade resultatet (egenmål inräknat åt det GYNNADE laget), medan ett egenmåls event-
+lag pekar på det KONCEDERANDE laget , en team-konvention som är OVERIFIERBAR (de stora fotbolls-API:erna
+är oeniga, API-Footballs egen doc nås inte; samma slutsats som match-stats-headern + T86/T87). Att läsa
+sidan ur deltat sidsteppar den overifierade konventionen helt. Det FIRADE lagets NAMN: för ett vanligt
+mål = eventets `teamName` (direkt); för ett egenmål = MOTSTÅNDARENS namn (hämtas ur ett annat lags event
+i samma match), aldrig egenmåls-skyttens lag. Notisen orienteras scoring-team-först ("Spanien 2-1" =
+Spanien gjorde mål, leder/står 2-1). KÄLLA: parse-live.ts facit-regel (`goals` = auktoritativt) +
+match-stats `isOwnGoalDetail`-doc (team-konventionen tolkas aldrig om).
+
+**Beslut (idempotens , HARD, ingen dubbel-/historik-notis):** en `notified_goals`-tabell (PK
+`(match_id, goal_signature)`). Dispatchern INSERTar en rad per mål med `on conflict do nothing` FÖRE
+sändning; rörde insert 0 rader är målet redan notifierat (re-levererad webhook / redeploy / re-poll som
+skrev om events-blobben) -> hoppa TYST. `goal_signature` (goal-detection.ts) är STABIL över re-poll
+(minut + tillägg + lag-id + skytt-id + skytt-namn + straff/egenmåls-flagga), INTE event-index (som
+skiftar när blobben skrivs om). Verifierat live (execute_sql): andra inserten med samma signatur
+returnerar 0 rader. RLS: ingen policy => default-deny (service-role-only, som poll_log).
+
+**Beslut (nattläge/quiet hours, Daniels "stäng av på nätterna"):** per-användare-toggle, default AV
+(notiser dygnet runt tills den slås på). Tyst i fönstret 23:00-08:00 EUROPE/STOCKHOLM (start inklusiv,
+slut exklusiv), utvärderat i den testade rena `isQuietHoursStockholm` (Intl, DST-säkert), SAMMA tidszon
+som pollarens `swedishDay`. KÄLLA: Daniels direktiv (memory vm2026-next-build-plan) + SPEC §13.3.
+
+**Beslut (preferenser server-side + fail-closed/open):** master på/av (default PÅ), nattläge (default
+AV), match-scope 'all'|'favorite' (default 'all') + favorite_team_id (FIFA-kod), som kolumner på
+`push_subscriptions` (RLS self-scope ärvs, UPDATE-policyn från T85 täcker dem). Dispatchern läser varje
+opt-in:ad enhets preferens och hoppar sändningar som inte matchar. Master + natt är fail-CLOSED (de
+uttryckliga av-knapparna); scope är fail-OPEN (en halvkonfigurerad 'favorite' utan valt lag släpper
+igenom hellre än tyst sväljer allt). Favoritlaget speglas från klient-localStorage (FavoriteTeamProvider)
+till preferens-raden när användaren väljer 'favorite' i Mer.
+
+**Beslut (dispatcher-säkerhet , skickar till ANDRAS enheter):** `verify_jwt=false` + DELAD HEMLIGHET
+(`x-goal-dispatch-secret`-header, värdet i `app_config.goal_dispatch_secret`, aldrig i kod). En anon-JWT
+(som pollar-cronen) skulle göra funktionen anropbar av vem som helst , oacceptabelt här. Triggern läser
+hemligheten server-side och sätter headern; ett anrop utan exakt rätt hemlighet -> 401 (verifierat live).
+Mottagarna gatas dessutom av varje rads EGNA opt-in/preferenser (en rad finns bara om enheten själv
+prenumererat). Detta är det dokumenterade verify_jwt=false-undantaget (custom auth), inte en öppen funktion.
+
 ## 2026-06-16 , T84 (#176): Live-uppdaterad (preliminär) topplista under matcher
 
 **Beslut (en seam, ingen parallell poäng-motor, HARD DRY):** den live-uppdaterade topplistan är
