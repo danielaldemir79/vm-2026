@@ -54,9 +54,14 @@ export interface StickyFollowToggleProps {
 }
 
 /**
- * En ExpandToggle i en bar som klistrar (sticky, top-16) i UTFÄLLT läge och, eftersom den långa
+ * En ExpandToggle i en bar som klistrar (sticky) i UTFÄLLT läge och, eftersom den långa
  * listan ligger i SAMMA wrapper (`children`), följer med ner i listan , komprimera nås från alla
  * scroll-lägen. Inline i komprimerat läge.
+ *
+ * TOP-OFFSET: `top-16` (64px) är MOBIL-offseten (klistrar under den top-sticky headern; flik-raden
+ * är `fixed bottom-0` där och räknas inte). På DESKTOP (>=640px) är app-baren header + flik-rad,
+ * så .vm-sticky-follow-bar flyttar offseten till app-barens fulla höjd (--vm-app-bar-height) via en
+ * media-query i collapsible-list.css, annars skulle baren tuckas under flik-raden (F1/T83).
  */
 export function StickyFollowToggle({
   expanded,
@@ -77,6 +82,9 @@ export function StickyFollowToggle({
         {...{ [`data-${name}-toggle-bar`]: '' }}
         data-sticky={expanded ? 'true' : undefined}
         className={
+          // top-16 = MOBIL-offset (under headern). Desktop-offseten (under hela app-baren)
+          // sätts av .vm-sticky-follow-bar:s media-query (--vm-app-bar-height), se collapsible-
+          // list.css + JSDoc ovan (F1/T83), så baren aldrig tuckas under desktop-flik-raden.
           expanded ? 'vm-sticky-follow-bar sticky top-16 z-20 -mx-1 flex px-1 py-2' : 'flex'
         }
       >

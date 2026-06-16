@@ -9,8 +9,9 @@
  * RESPONSIV PLACERING (ren CSS, ingen JS-resize-gissning, samma princip som T79):
  *   - MOBIL (< 640px): en flik-rad FAST längst ner (sport-app-mönster, tummen når
  *     den). safe-area-inset så den inte hamnar under iPhone-hemknappsindikatorn.
- *   - DESKTOP (>= 640px): en horisontell rad i flödet, sticky direkt under app-
- *     headern (top-0-headern är z-10), så den alltid är nåbar vid scroll.
+ *   - DESKTOP (>= 640px): en horisontell rad i flödet, sticky med top = header-höjden
+ *     så den pinnar DIREKT UNDER den sticky top-0-headern (z-30), aldrig ovanpå den, och
+ *     är alltid nåbar vid scroll. (--vm-header-height bär offseten, en sanning.)
  * Vilken layout som gäller styrs HELT av media-queries, så ingen dubbel-rendering
  * och inget JS behövs (en enda DOM-nod, två lägen). */
 
@@ -20,9 +21,27 @@
 /* Höjden på den FASTA mobil-flikraden (utan safe-area). EN sanning som både
    innehålls-luften (.vm-tab-content) OCH svävande element ovanför raden (toaster,
    "ny version"-prompten, F3) mäter mot, så de aldrig kan krocka med flik-raden.
-   ~3.25rem flik-höjd + 1px topp-kant, avrundat till en lugn 4rem. */
+   ~3.25rem flik-höjd + 1px topp-kant, avrundat till en lugn 4rem.
+
+   --vm-header-height = app-headerns (data-app-header) höjd. Headern är `sticky top-0`
+   på ALLA brytpunkter, så på desktop måste den sticky flik-raden pinna UNDER headern,
+   inte ovanpå den (annars glider de över varandra vid scroll, F1/T83). EN sanning som
+   både flik-radens desktop-`top` OCH den sticky "följ-med"-baren (StickyFollowToggle)
+   mäter mot, så header-offseten aldrig driftar isär (jfr --vm-tab-bar-height ovan).
+   4rem = headerns py-3 (0.75rem * 2) + wordmark-raden, matchar uppmätt 64px. */
 :root {
   --vm-tab-bar-height: 4rem;
+  --vm-header-height: 4rem;
+  /* DESKTOP-flik-radens höjd (>=640px), där raden sitter i flödet (inte fast längst
+     ner). Härledd ur .vm-tab:s desktop-luft: 2 * 0.875rem padding + ~1.25rem etikett-
+     rad + 1px botten-kant ≈ 3.25rem (uppmätt 52.67px @16px root). Egen token, INTE
+     --vm-tab-bar-height (den beskriver den FASTA mobil-radens 4rem), så de två kan
+     skilja sig utan att drifta. */
+  --vm-tab-bar-height-desktop: 3.25rem;
+  /* Den SAMMANHÅLLNA desktop-app-barens fulla höjd = header + flik-rad. EN sanning
+     som svävande sticky-element under app-baren (StickyFollowToggle:s "följ-med"-bar)
+     mäter sin top-offset mot, så de tuckas UNDER hela app-baren, inte under flik-raden. */
+  --vm-app-bar-height: calc(var(--vm-header-height) + var(--vm-tab-bar-height-desktop));
 }
 
 /* --- MOBIL (default): fast flik-rad längst ner --- */
@@ -191,7 +210,12 @@
 @media (min-width: 640px) {
   .vm-tab-bar {
     position: sticky;
-    top: 0; /* Headern är inte sticky-staplad ovanför här (se nedan); raden tar toppen. */
+    /* Headern (data-app-header) ÄR sticky top-0 på alla brytpunkter, så den pinnar
+       0..header-höjd vid scroll. Flik-raden måste därför pinna UNDER headern (top =
+       header-höjd), annars glider de två sticky-banden över varandra vid scroll och
+       de frostade fonderna lägger sig på varandra till en grötig strimla (F1/T83).
+       Token-driven så offseten = headerns höjd, en sanning. */
+    top: var(--vm-header-height);
     bottom: auto;
     border-top: none;
     border-bottom: 1px solid var(--color-border);

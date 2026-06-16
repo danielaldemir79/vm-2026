@@ -94,3 +94,18 @@
   backdrop-filter: blur(6px);
   box-shadow: 0 6px 12px -8px color-mix(in srgb, var(--color-fg) 22%, transparent);
 }
+
+/* TOP-OFFSET PER BRYTPUNKT (F1/T83): baren ska klistra DIREKT under den sticky app-baren,
+ * och app-baren har OLIKA höjd i de två lägena:
+ *   - MOBIL (<640px): bara headern är top-sticky (flik-raden är `fixed bottom-0`), så
+ *     offseten = header-höjden. Konsumenten sätter den via Tailwind `top-16` (64px = 4rem).
+ *   - DESKTOP (>=640px): app-baren är header + flik-rad (~117px), båda top-sticky. Med bara
+ *     `top-16` skulle "följ-med"-baren klistra MITT I flik-raden (tuckas under den). Här
+ *     flyttar vi den till app-barens FULLA höjd (--vm-app-bar-height, en sanning), så baren
+ *     pinnar precis under hela app-baren. !important slår Tailwinds `top-16`-utility (samma
+ *     specificitet, men källordningen är inte garanterad mellan utility- och komponent-CSS). */
+@media (min-width: 640px) {
+  .vm-sticky-follow-bar {
+    top: var(--vm-app-bar-height) !important;
+  }
+}
