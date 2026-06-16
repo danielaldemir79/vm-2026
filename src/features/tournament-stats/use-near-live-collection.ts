@@ -58,7 +58,9 @@ const EMPTY: readonly unknown[] = [];
  * online/visibility). Gatat bakom live-läge.
  *
  * @param load        loadern som hämtar raderna (env-gatad, fixtures-först), t.ex. getLiveEvents.
- * @param channelName unik Realtime-kanal-namnrymd (så två collections inte krockar).
+ * @param channelName Realtime-kanal-namnrymd (PREFIX). Behöver inte vara globalt unik:
+ *                    seamen lägger på ett unikt suffix per prenumeration, så två
+ *                    konsumenter med samma prefix ändå får skilda kanaler (white-screen-fix).
  * @param env         import.meta.env (injiceras för test, default = riktiga).
  * @param liveReady   injicerbar live-flagga (default LIVE_READY), så live-grenen kan testas
  *                    utan att flippa den globala konstanten (samma mönster som use-live-data).

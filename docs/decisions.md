@@ -5,6 +5,39 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , HOTFIX: white-screen live (Realtime kanal-namns-krock + saknad error boundary)
+
+**Symptom:** Den live-deployade appen (vm-2026.pages.dev) white-screenade för användare mitt under
+VM, headern syntes <1 s, sedan blev hela sidan blank. Bygget var intakt (HTTP 200), så ett
+runtime-fel. Verifierat i browsern: `#root` hade 0 barn (helt avmonterat träd), konsolen visade
+`Error: cannot add 'postgres_changes' callbacks for realtime:vm2026-tournament-stats after subscribe()`.
+
+**Rotorsak (verifierad, gissad aldrig):** Supabase Realtime cachar kanaler per TOPIC ,
+`client.channel(name)` returnerar SAMMA kanal-instans för samma namn. T83 håller ALLA flik-paneler
+monterade samtidigt, så de två alltid-monterade Turnering-vyerna `ScorerTableView` (T87) och
+`TournamentStatsView` (T88) anropade BÅDA `useCrossMatchEvents()`, som prenumererade på samma
+channelName `'vm2026-tournament-stats'`. Den andra prenumeranten fick tillbaka den förstas redan
+`subscribe()`:ade kanal och anropade `.on('postgres_changes', ...)` på den, vilket supabase-js
+förbjuder , felet kastades synkront i effekten. Eftersom appen INTE hade någon error boundary
+avmonterade ett enda sådant fel HELA React-trädet -> blank sida. Live-only: i fixtures-läge öppnas
+ingen kanal, så alla fixtures-tester + isolerade render-harness passerade (skarven testades aldrig).
+
+**Fix 1 (rotorsak):** `subscribeToTableChanges` (den enda Realtime-seamen) ger nu VARJE
+prenumeration ett unikt topic-suffix (`${channelName}:${++counter}`), så två konsumenter aldrig kan
+dela kanal-instans oavsett channelName. channelName är nu en läsbar namnrymds-PREFIX, inte ett delat
+lås. Regression: faithful Supabase-fake (topic-cache + throw-on-`.on()`-after-`subscribe()`) , två
+prenumerationer på samma namn kastar INTE längre; negativ-kontroll verifierad (revert -> RÖTT).
+
+**Fix 2 (strukturell, ovillkorlig):** Ny `ErrorBoundary` (klass-komponent, `getDerivedStateFromError`
++ `componentDidCatch` som `console.error`:ar fel + komponent-stack, fail-loud). Wrappar varje
+flik-panels innehåll (resetKey=aktiv flik), de tunga sektionerna var för sig (skytteliga,
+turneringsstatistik, dagens matcher, topplistor, turnerings-zonen) OCH app-roten som sista
+skyddsnät. En sektions-krasch kan ALDRIG mer blanka hela appen , den degraderar isolerat med en
+tillgänglig fallback (role=alert, fokuseras, statisk = reduced-motion-ok). Källa: hotfix-direktiv
+2026-06-16; browser-verifierad rotorsak.
+
+---
+
 ## 2026-06-16 , T88 (#180): turneringsstatistik (rik uppsättning härledda VM-stats, near-live)
 
 **Beslut (vilka stats + varifrån de härleds, EN sanning per siffra):** Turneringsstatistiken i
