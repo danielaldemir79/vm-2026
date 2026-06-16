@@ -21,7 +21,7 @@
 // resultat och ser tabeller/träd ändras). Frame:n är en ren wrapper som läser sim-
 // seamen, så den kan stå i två flikar utan dubblerad state (en sanning).
 
-import type { ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { Fade, Slide } from './motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
@@ -142,6 +142,42 @@ function AppShell() {
   // Aktiv flik <-> URL-hash (delbar länk, bakåt-knapp, djuplänk vid kall-laddning).
   const { activeTab, selectTab } = useTabRouting();
 
+  // GENVÄG TILL RUM-HANTERINGEN (T96, #193): rum-pillen i app-baren (RoomPill) kan
+  // skicka en hit "skapa rum" / "gå med i rum" från VILKEN flik som helst. Vi byter till
+  // Tips (där RoomSection ligger överst) och scrollar + fokuserar RÄTT formulär (skapa
+  // vs gå med). Tips-panelen är alltid monterad men `hidden` tills fliken är aktiv, så
+  // målet får layout först EFTER flik-bytets commit + paint , därför dubbel rAF innan vi
+  // scrollar/fokuserar (annars är formuläret ännu utan layout och scroll/focus blir
+  // no-op). data-rooms-create-form / data-rooms-join-form = RoomPanels stabila krokar.
+  const openRooms = useCallback(
+    (target: 'create' | 'join') => {
+      selectTab('tips');
+      const focusForm = () => {
+        if (typeof document === 'undefined') {
+          return;
+        }
+        const selector =
+          target === 'create' ? '[data-rooms-create-form]' : '[data-rooms-join-form]';
+        const form = document.querySelector<HTMLElement>(selector);
+        if (form === null) {
+          return;
+        }
+        const reduceMotion =
+          typeof window !== 'undefined' &&
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+        form.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+        // Fokusera första fältet, så tangentbord/skärmläsare landar direkt i formuläret.
+        form.querySelector<HTMLElement>('input')?.focus({ preventScroll: true });
+      };
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(focusForm));
+      } else {
+        focusForm();
+      }
+    },
+    [selectTab]
+  );
+
   return (
     <>
       {/* min-h-dvh + overflow-x-clip = aldrig horisontell scroll på någon skärm.
@@ -176,12 +212,15 @@ function AppShell() {
             {/* RUM-PILLEN (T96, #193) + nät-status + inställningar (kugghjul) + tema-
               toggle. Pillen ligger HÄR i app-bar-headern (utanför flik-panelerna), så
               det AKTIVA rummet syns , och kan bytas , på ALLA flikar (Idag/Tips/
-              Topplista/Turnering/Mer), inte bara i RoomSection (Tips). Den renderar
-              null i fixtures-/lokalt läge + utan aktivt rum, så app-baren ser ut precis
-              som förr då. Status-chippet döljs på de minsta skärmarna (sm:inline-flex)
-              så headern aldrig trängs; offline-läget syns ändå via offline-bannern. */}
+              Topplista/Turnering/Mer), inte bara i RoomSection (Tips). Menyn bär också
+              skapa/gå-med-genvägar (onOpenRooms ovan: byter till Tips + scrollar/
+              fokuserar rätt formulär), så man når rum-hanteringen var man än står. Den
+              renderar null i fixtures-/lokalt läge + utan aktivt rum, så app-baren ser ut
+              precis som förr då. Status-chippet döljs på de minsta skärmarna
+              (sm:inline-flex) så headern aldrig trängs; offline-läget syns ändå via
+              offline-bannern. */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <RoomPill />
+              <RoomPill onOpenRooms={openRooms} />
               <span className="hidden sm:inline-flex">
                 <SyncAwareOnlineStatus />
               </span>

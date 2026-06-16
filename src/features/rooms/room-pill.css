@@ -176,6 +176,38 @@
   white-space: nowrap;
 }
 
+/* Avdelaren mellan rum-raderna och skapa/gå-med-handlingarna: en lugn hårlinje med
+   lite luft, så de två zonerna (byt rum vs hantera rum) läses isär utan en tung kant. */
+.vm-room-pill-sep {
+  height: 1px;
+  margin: 0.25rem 0.125rem;
+  background-color: var(--color-border);
+}
+
+/* Skapa/gå-med-raderna: samma list-rad-form som rum-raderna men med en glyf-kolumn i
+   stället för bock-kolumnen, så texten ligger i linje med rum-namnen ovanför. Tonen är
+   dämpad (fg-muted) , det är sekundära handlingar bredvid det primära rum-bytet. */
+.vm-room-pill-action {
+  color: var(--color-fg-muted);
+  font-weight: 600;
+}
+
+.vm-room-pill-action:hover,
+.vm-room-pill-action:focus-visible {
+  color: var(--color-fg);
+}
+
+/* Glyf-kolumnen (+ / ↳): samma bredd som bock-kolumnen så skapa/gå-med-texten linjerar
+   med rum-namnen. Accent-tonad dekor (aria-hidden), bärs inte av text-kontrast. */
+.vm-room-pill-action-glyph {
+  flex-shrink: 0;
+  width: 0.9rem;
+  text-align: center;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--color-accent);
+}
+
 /* Bock-markören: en fast liten kolumn så raderna ligger i linje med/utan bock. Den
    aktiva radens bock är accent-tonad (AA mot tinten ej kritiskt , glyf är dekor, men
    den hålls läsbar). */
