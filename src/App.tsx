@@ -25,6 +25,7 @@ import type { ReactNode } from 'react';
 import { Fade, Slide } from './motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
+import { Surface } from './components/Surface';
 import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
@@ -45,7 +46,7 @@ import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
 import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
 import { TotalLeaderboardSection } from './features/total-leaderboard';
-import { FavoriteTeamProvider } from './features/favorite-team';
+import { FavoriteTeamProvider, FavoriteTeamSection } from './features/favorite-team';
 import { AdminSection } from './features/admin';
 import {
   InstallButton,
@@ -61,13 +62,14 @@ import { VersionStamp } from './components/VersionStamp';
 /** Id-bas för flik-panelerna (TabBar:s aria-controls + TabPanel:s id pekar hit). */
 const TAB_PANEL_BASE = 'vm-tabpanel';
 
-/** Ett innehållskort på en yt-token, delad yt-form för app-vyns sektioner. */
+/**
+ * Ett innehållskort, delad yt-form för app-vyns sektioner. Nu en tunn wrapper runt
+ * den ENA delade Surface-primitiven (D3/D4): alla `surface={...}`-render-props i
+ * appen funnlas hit, så hela appen bär EXAKT samma kort-stil (radie/kant/fond/skugga/
+ * luft). Tidigare var kort-idiomet handkopierat här, nu en sanning i Surface.
+ */
 function Panel({ children }: { children: ReactNode }) {
-  return (
-    <section className="rounded-card border border-border bg-surface p-5 shadow-[var(--vm-shadow-card)] sm:p-7">
-      {children}
-    </section>
-  );
+  return <Surface>{children}</Surface>;
 }
 
 /**
@@ -130,12 +132,15 @@ function AppShell() {
           }}
         />
 
-        {/* Header: wordmark + tema-toggle. Frostat glas-band (tema-troget via
-          color-mix mot --color-surface), sticky så toggle alltid är nåbar.
-          data-app-header = den STABILA kroken sticky-offsetterna (top-16) mäter mot. */}
+        {/* APP-BAR (D5/D8): header + flik-rad läses som EN sammanhållen, frostad
+          app-bar på desktop. Headern bär INGEN egen botten-kant på desktop
+          (sm:border-b-0); flik-radens egen kant fortsätter bandet, så de två
+          banden inte ser ut som två lösa lister utan en enhetlig topp-app-bar. På
+          mobil (där flik-raden ligger längst ner) behåller headern sin kant som
+          förr. data-app-header = den STABILA kroken sticky-offsetterna mäter mot. */}
         <header
           data-app-header=""
-          className="sticky top-0 z-30 border-b border-border backdrop-blur-md"
+          className="sticky top-0 z-30 border-b border-border backdrop-blur-md sm:border-b-0"
         >
           <div
             className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-8"
@@ -156,9 +161,9 @@ function AppShell() {
         </header>
 
         {/* FLIK-RADEN: tillgänglig tablist. På desktop (>= sm) en top-rad direkt under
-          headern; på mobil en fast rad längst ner (sport-app-mönster), se tabs.css.
-          Funktionell + tillgänglig struktur här; design-frontend lägger premium-finishen
-          (ikoner, aktiv-indikator, mikro-animation) ovanpå via .vm-tab*-hakarna. */}
+          headern (del av app-baren); på mobil en fast rad längst ner (sport-app-
+          mönster), se tabs.css. Ikoner + glidande aktiv-indikator + mjuk motion
+          ligger nu på via .vm-tab*-hakarna (D1/D2). */}
         <TabBar activeTab={activeTab} onSelect={selectTab} panelIdBase={TAB_PANEL_BASE} />
 
         {/* data-tab-content bär botten-luft så den FASTA mobil-flikraden aldrig skymmer
@@ -179,53 +184,36 @@ function AppShell() {
                 <PredictionsProvider>
                   {/* ===================== IDAG ===================== */}
                   <TabPanel tabId="idag" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                    <div className="flex flex-col gap-12">
-                      {/* Hero. Wordmark som h1 (bär appens tillgängliga namn, håller smoke-testet). */}
+                    {/* IDAG, AVLASTAD (U2, north-star §4): fliken leder med EN sak , dagens
+                      live/nästa-match + matchlista. Den långa marknads-heron (wordmark +
+                      paragraf + pills), install-knappen och favoritlags-väljaren är BORTA
+                      härifrån: de var sekundära ytor som tryckte ner matcherna och gjorde
+                      Idag till en vägg. Install + favoritlag bor nu i Mer (de är install/
+                      inställning), så Idag = nedräkning/live + matcher, inget annat.
+                      En SLANK rad bär ändå appens namn (h1, tillgängligt namn + smoke-test)
+                      som en lugn flik-titel, inte en hel landningssida. */}
+                    <div className="flex flex-col gap-8 sm:gap-10">
                       <Fade>
-                        <section className="flex flex-col items-start gap-5 py-6 sm:py-10">
-                          <span className="rounded-pill border border-border bg-surface px-3 py-1 text-xs font-medium text-fg-muted">
-                            USA · Kanada · Mexiko · sommaren 2026
+                        <div className="flex flex-col gap-1">
+                          <span className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                            USA · Kanada · Mexiko · 2026
                           </span>
-                          <Wordmark as="h1" className="text-5xl leading-none sm:text-7xl" />
-                          <p className="max-w-xl text-balance text-lg text-fg-muted sm:text-xl">
-                            Följ mästerskapet tillsammans. Matcher, tabeller och ett slutspelsträd
-                            som lever, plus tips-ligan med kompisarna. Allt i en app du delar med en
-                            länk.
-                          </p>
-                          <div className="flex flex-wrap gap-3">
-                            <span className="rounded-pill bg-accent px-5 py-2.5 font-display text-sm font-semibold text-accent-fg shadow-md">
-                              48 lag · 12 grupper
-                            </span>
-                            <span className="rounded-pill border border-border px-5 py-2.5 font-display text-sm font-semibold">
-                              Installeras som app
-                            </span>
-                          </div>
-                        </section>
+                          <Wordmark as="h1" className="text-3xl leading-none sm:text-4xl" />
+                        </div>
                       </Fade>
-
-                      {/* Den KOMPAKTA install-knappen (T63, #113): diskret "Installera som
-                        app"-pill. GATAD bakom onboarding-touren (T39/#68, F1): medan touren
-                        är öppen visas den inte; annars enligt plattform/event. Hör hemma i
-                        Idag (hemmet), första ytan en delningslänk-besökare ser. */}
-                      {onboarding.open ? null : (
-                        <Slide direction="up">
-                          <div className="flex">
-                            <InstallButton />
-                          </div>
-                        </Slide>
-                      )}
 
                       {/* Daglig matchvy (T7) , Idag-flikens hjärta: dagens matcher +
                         LIVE-matchen (LiveNowSection åker med) + nedräkning. SimulationFrame
                         runt daily bär sim-markeringen NÄR what-if-läget är PÅ (kontrollen bor
                         i Turnering, men daily speglar ett simulerat resultat live, så ramen
                         ska synas här med). ReactionsProvider + MatchCommentsProvider omsluter
-                        bara dagens-vyn (de enda ytorna med reaktioner/match-trådar). */}
+                        bara dagens-vyn (de enda ytorna med reaktioner/match-trådar).
+                        showFavoritePicker={false}: väljaren är en INSTÄLLNING och bor i Mer (U2). */}
                       <SimulationFrame>
                         <Slide direction="up">
                           <ReactionsProvider>
                             <MatchCommentsProvider>
-                              <DailyMatchesView />
+                              <DailyMatchesView showFavoritePicker={false} />
                             </MatchCommentsProvider>
                           </ReactionsProvider>
                         </Slide>
@@ -335,6 +323,40 @@ function AppShell() {
                       <Slide direction="up">
                         <AdminSection surface={(children) => <Panel>{children}</Panel>} />
                       </Slide>
+
+                      {/* FAVORITLAGS-VÄLJAREN (U2): flyttad hit från Idag , det är en
+                        INSTÄLLNING, inte dagens-innehåll. Avlastar Idag-fliken. */}
+                      <Slide direction="up">
+                        <FavoriteTeamSection surface={(children) => <Panel>{children}</Panel>} />
+                      </Slide>
+
+                      {/* Den KOMPAKTA install-knappen (T63, #113): "Installera som app"-pill.
+                        Flyttad hit från Idag (U2): install är en åtgärd som hör hemma i Mer,
+                        inte före dagens matcher. GATAD bakom onboarding-touren (T39/#68, F1):
+                        medan touren är öppen visas den inte; annars enligt plattform/event. */}
+                      {onboarding.open ? null : (
+                        <Slide direction="up">
+                          <Panel>
+                            <div className="flex flex-col gap-3">
+                              <header className="flex flex-col gap-1">
+                                <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                                  Appen
+                                </p>
+                                <h2 className="font-display text-xl font-bold sm:text-2xl">
+                                  Installera som app
+                                </h2>
+                                <p className="text-sm text-fg-muted">
+                                  Lägg VM 2026 på hemskärmen, så öppnas den som en egen app, även
+                                  offline.
+                                </p>
+                              </header>
+                              <div className="flex">
+                                <InstallButton />
+                              </div>
+                            </div>
+                          </Panel>
+                        </Slide>
+                      )}
 
                       {/* Footern (T44, #75): appens synliga adress + upphovs-kortet (signaturen)
                         + versionsstämpel. Hör hemma i Mer (lugn samlingsplats). */}

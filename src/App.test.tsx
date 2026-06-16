@@ -238,6 +238,55 @@ describe('App-skalet, flik-navigering (T83)', () => {
   });
 });
 
+// DESIGN-POLISHEN (design-frontend, T83): U2 (avlastad Idag) + U2-relocations + F3.
+// Vaktar att Idag-fliken inte återfår sin marknads-vägg, att favoritlags-väljaren +
+// install bor i Mer, och att den svävande "ny version"-prompten lyfts ovanför flik-
+// raden (F3) i stället för att lägga sig över den.
+describe('App-skalet, Idag avlastad (U2) + Mer-relocations + toast-placering (F3)', () => {
+  it('U2: Idag-panelen har INTE längre marknads-heron (paragraf + 48 lag-pills)', async () => {
+    renderApp();
+    await waitForAppSettled();
+
+    const idagPanel = document.querySelector('[data-tab-panel="idag"]');
+    expect(idagPanel).not.toBeNull();
+    // Den långa marknads-paragrafen ("plus tips-ligan med kompisarna ... delar med en
+    // länk") låg i Idag-heron och tryckte ner matcherna. Den ska vara borta från Idag.
+    expect(idagPanel?.textContent).not.toContain('tips-ligan med kompisarna');
+    // Marknads-pillsen ("48 lag · 12 grupper" / "Installeras som app") är också borta.
+    expect(idagPanel?.textContent).not.toContain('48 lag · 12 grupper');
+    // h1:an (appens namn) finns ändå kvar som en lugn flik-titel (tillgängligt namn).
+    expect(screen.getByRole('heading', { level: 1, name: 'VM 2026' })).toBeInTheDocument();
+  });
+
+  it('U2: favoritlags-väljaren bor i Mer-panelen, inte i Idag-panelen', async () => {
+    renderApp();
+    await waitForAppSettled();
+
+    const idagPanel = document.querySelector('[data-tab-panel="idag"]');
+    const merPanel = document.querySelector('[data-tab-panel="mer"]');
+    // Väljaren (data-favorite-team-control) ska INTE finnas i Idag (avlastat) ...
+    expect(idagPanel?.querySelector('[data-favorite-team-control]')).toBeNull();
+    // ... men FINNAS i Mer (inställningar), via favoritlags-sektionen.
+    expect(merPanel?.querySelector('[data-favorite-team-section]')).not.toBeNull();
+    expect(merPanel?.querySelector('[data-favorite-team-control]')).not.toBeNull();
+  });
+
+  it('F3: "ny version"-prompten bär vm-above-tab-bar så den aldrig krockar med flik-raden', async () => {
+    // Tvinga fram prompten genom att injicera ett needRefresh-tillstånd. Vi importerar
+    // UpdatePrompt direkt och ger den ett pinnat api (samma testväg som dess egna tester).
+    const { UpdatePrompt } = await import('./features/app-settings');
+    const { container } = render(
+      <UpdatePrompt
+        api={{ needRefresh: true, offlineReady: false, updateApp: () => {}, dismiss: () => {} }}
+      />
+    );
+    const prompt = container.querySelector('[data-update-prompt]');
+    expect(prompt).not.toBeNull();
+    // Klassen som lyfter prompten ovanför den fasta mobil-flikraden (F3).
+    expect(prompt?.className).toContain('vm-above-tab-bar');
+  });
+});
+
 // Den kompakta install-knappen (T63, #113) gatas bakom onboarding-touren (T39/#68, F1):
 // touren är en z-50 helskärms-overlay vid första besöket och ligger ÖVER ytan, så knappen
 // skulle se ut att "inte göra något". Medan touren är öppen ska install-knappen alltså

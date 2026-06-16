@@ -170,7 +170,19 @@ function NextKickoffPillar({
   );
 }
 
-export function DailyMatchesView() {
+export interface DailyMatchesViewProps {
+  /**
+   * Visa favoritlags-väljaren i matchvyns header. Default true (bevarar tidigare
+   * beteende, t.ex. i fixtures-/standalone-render). Idag-fliken sätter false (U2):
+   * väljaren är en INSTÄLLNING och flyttas till Mer, så Idag avlastas och leder med
+   * matcherna. Den DISKRETA lyftningen av favoritlagets matcher i listan/hero:n
+   * påverkas INTE av detta (den läser favoritlags-storen, inte väljaren), så ett valt
+   * favoritlag lyfts som förr även när väljaren bor i en annan flik.
+   */
+  showFavoritePicker?: boolean;
+}
+
+export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesViewProps = {}) {
   const {
     status,
     mode,
@@ -259,8 +271,10 @@ export function DailyMatchesView() {
 
         {/* FAVORITLAGS-VÄLJAREN (T23, #23): pinna ett lag så dess matcher lyfts diskret i
             listan. Visas först när lagen laddats (annars en tom väljare). Egen liten yta
-            under rubriken, lågmäld; design-frontend finputsar utseendet. */}
-        {teams.length > 0 ? (
+            under rubriken, lågmäld. U2: Idag-fliken döljer väljaren (showFavoritePicker=
+            false) och visar den i stället i Mer, eftersom det är en INSTÄLLNING , så Idag
+            inte blir en vägg. Den diskreta match-lyftningen påverkas inte (läser storen). */}
+        {showFavoritePicker && teams.length > 0 ? (
           <div className="mt-1 max-w-md rounded-card border border-border bg-surface p-4 shadow-[var(--vm-shadow-card)]">
             <FavoriteTeamPicker teams={teams} />
           </div>

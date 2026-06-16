@@ -139,6 +139,12 @@ test.describe('VM 2026 , kritiska flöden (fixtures)', () => {
     // detectStandalone); här bevisar vi den synliga, klickbara guide-fallbacken.
     await openApp(page);
 
+    // U2 (design-frontend, #175): install-knappen flyttades från Idag till Mer , den är
+    // en åtgärd/inställning, inte dagens-innehåll, så Idag avlastas. Den ärliga guide-
+    // fallbacken finns alltså i Mer-fliken nu. (Den ALLTID nåbara install-vägen via
+    // kugghjuls-portalen finns kvar oberoende; här bevisar vi flik-ytans fallback.)
+    await gotoTab(page, 'Mer');
+
     const installButton = page.locator('[data-get-started-open="install"]');
     await expect(installButton).toBeVisible();
     await expect(installButton).toHaveAttribute('aria-label', /Installera som app/);
