@@ -254,7 +254,11 @@ function AppShell() {
                       inställning), så Idag = nedräkning/live + matcher, inget annat.
                       En SLANK rad bär ändå appens namn (h1, tillgängligt namn + smoke-test)
                       som en lugn flik-titel, inte en hel landningssida. */}
-                      <div className="flex flex-col gap-8 sm:gap-10">
+                      {/* SAMMA TOPP-NIVÅ-RYTM SOM ÖVRIGA FLIKAR (gap-12 = 48px): Idag bar förr en
+                      egen, tätare rytm (gap-8 sm:gap-10) utan principiellt skäl. Nu vilar flik-
+                      titeln -> dagens-hjärta på exakt samma luft som kort-mot-kort i Tips/
+                      Topplista/Turnering/Mer, så HELA appen andas på EN skala (north-star §4). */}
+                      <div className="flex flex-col gap-12">
                         <Fade>
                           <div className="flex flex-col gap-1">
                             <span className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
@@ -374,68 +378,77 @@ function AppShell() {
 
                     {/* ===================== TURNERING ===================== */}
                     <TabPanel tabId="turnering" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
-                      {/* SimulationFrame runt HELA turnerings-zonen: tabeller + "vad krävs" +
+                      {/* SAMMA TOPP-NIVÅ-RYTM SOM ÖVRIGA FLIKAR (gap-12): Turnering saknade förr
+                      en delad flex-gap-behållare, så avståndet mellan sim-zonen (SimulationFrame)
+                      och stat-sektionerna (skytteliga/turneringsstatistik/avstängda) , och mellan
+                      stat-sektionerna inbördes , blev noll (bara det `Slide`-wrapparna råkade ge).
+                      Tips/Topplista/Mer omsluter sina toppsektioner i `flex flex-col gap-12`; nu gör
+                      Turnering det med, så ALLA flikar har EXAKT samma luft mellan sina kort. */}
+                      <div className="flex flex-col gap-12">
+                        {/* SimulationFrame runt HELA turnerings-zonen: tabeller + "vad krävs" +
                       slutspelsträd + what-if-kontrollen + resultatinmatningen är alla
                       simulerings-PÅVERKADE, så ramen/badgen omsluter dem som EN zon (precis
                       som förr, fast nu i Turnering-fliken). Daily-ramen i Idag bär samma
-                      markering där, eftersom sim-läget är globalt (en sanning i storen). */}
-                      <SimulationFrame>
-                        {/* Hela turnerings-zonen (tabeller + scenarier + slutspelsträd +
+                      markering där, eftersom sim-läget är globalt (en sanning i storen). Den är
+                      ETT toppsektions-block här (samma gap-12-rytm mot stat-sektionerna under),
+                      medan dess EGNA delvyer behåller sin tätare inre rytm (SimulationFrame). */}
+                        <SimulationFrame>
+                          {/* Hela turnerings-zonen (tabeller + scenarier + slutspelsträd +
                             inmatning) i en boundary: en krasch i en härledd vy (t.ex.
                             slutspelsträdet på en oväntad ställning) degraderar zonen lugnt i
                             stället för att släcka hela appen. */}
-                        <ErrorBoundary label="turneringsvyn" resetKey={activeTab}>
-                          {/* Gruppspelstabellerna (T5): härledda ur den delade storen. */}
-                          <Slide direction="up">
-                            <GroupStageView />
-                          </Slide>
+                          <ErrorBoundary label="turneringsvyn" resetKey={activeTab}>
+                            {/* Gruppspelstabellerna (T5): härledda ur den delade storen. */}
+                            <Slide direction="up">
+                              <GroupStageView />
+                            </Slide>
 
-                          {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
-                          <Slide direction="up">
-                            <ScenarioView />
-                          </Slide>
+                            {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
+                            <Slide direction="up">
+                              <ScenarioView />
+                            </Slide>
 
-                          {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
-                          <Slide direction="up">
-                            <BracketView />
-                          </Slide>
+                            {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
+                            <Slide direction="up">
+                              <BracketView />
+                            </Slide>
 
-                          {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
+                            {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
                         här i Turnering DIREKT ovanför resultatinmatningen (T32, #54). Sim-
                         läget handlar om RESULTAT, så kontrollen sitter vid inmatningen, och
                         ramen (ovan) omsluter alla påverkade vyer i fliken. */}
-                          <Slide direction="up">
-                            <SimulationBanner />
-                          </Slide>
+                            <Slide direction="up">
+                              <SimulationBanner />
+                            </Slide>
 
-                          {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): EN hemvist
+                            {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): EN hemvist
                         här i Turnering. I live visas den bara när what-if-läget är PÅ (lokal
                         "tänk om"-lek, skriver aldrig delat facit). Officiella resultat matas
                         in via AdminSection (Mer). I fixtures-läge alltid synlig. */}
-                          <Slide direction="up">
-                            <ResultEntryGate
-                              surface={(children) => <Panel>{children}</Panel>}
-                              renderCelebration={(celebration) => (
-                                <GoalCelebrationOverlay celebration={celebration} />
-                              )}
-                            />
-                          </Slide>
-                        </ErrorBoundary>
-                      </SimulationFrame>
+                            <Slide direction="up">
+                              <ResultEntryGate
+                                surface={(children) => <Panel>{children}</Panel>}
+                                renderCelebration={(celebration) => (
+                                  <GoalCelebrationOverlay celebration={celebration} />
+                                )}
+                              />
+                            </Slide>
+                          </ErrorBoundary>
+                        </SimulationFrame>
 
-                      {/* Skytteligan (T87, #179) , den första roliga turnerings-stat-delen.
+                        {/* Skytteligan (T87, #179) , den första roliga turnerings-stat-delen.
                       UTANFÖR SimulationFrame: den härleds ur den VERKLIGA live-event-datan
                       (near-live via cross-match-hooken), inte ur det lokala what-if-läget, så
                       den ska aldrig bära sim-markeringen. I fixtures-läge renderas en demo-
                       skytteliga ur committade events (ingen backend). Egen boundary: en krasch
                       här (t.ex. en oväntad live-data-form) får aldrig släcka hela appen. */}
-                      <Slide direction="up">
-                        <ErrorBoundary label="skytteligan" resetKey={activeTab}>
-                          <ScorerTableView />
-                        </ErrorBoundary>
-                      </Slide>
+                        <Slide direction="up">
+                          <ErrorBoundary label="skytteligan" resetKey={activeTab}>
+                            <ScorerTableView />
+                          </ErrorBoundary>
+                        </Slide>
 
-                      {/* Turneringsstatistiken (T88, #180) , den rika "roliga VM-stats"-delen
+                        {/* Turneringsstatistiken (T88, #180) , den rika "roliga VM-stats"-delen
                       (kort-liga, mål-fördelning, lag-mål, lag-medel, clean sheets, skrällar).
                       UTANFÖR SimulationFrame, samma val som skytteligan (T87): de
                       event-/statistik-härledda korten kommer ur den VERKLIGA live-datan (egna
@@ -443,23 +456,24 @@ function AppShell() {
                       korten (clean sheets/skrällar) gatas i vyn på att what-if-läget är AV, så
                       de aldrig speglar sandlåde-resultat (se F2 + vyns simulating-grind). Egen
                       boundary, isolerad från skytteligan ovan. */}
-                      <Slide direction="up">
-                        <ErrorBoundary label="turneringsstatistiken" resetKey={activeTab}>
-                          <TournamentStatsView />
-                        </ErrorBoundary>
-                      </Slide>
+                        <Slide direction="up">
+                          <ErrorBoundary label="turneringsstatistiken" resetKey={activeTab}>
+                            <TournamentStatsView />
+                          </ErrorBoundary>
+                        </Slide>
 
-                      {/* Avstängda spelare (T99, #200) , härledd ur kort-datan (rött / 2 gula),
+                        {/* Avstängda spelare (T99, #200) , härledd ur kort-datan (rött / 2 gula),
                       uppskattad längd, auto-bort när avtjänad. UTANFÖR SimulationFrame (samma val
                       som skytteligan/turneringsstatistiken: härleds ur den VERKLIGA live-event-
                       datan via cross-match-hooken, inte what-if-läget). Egen boundary, isolerad
                       från statistiken ovan: en krasch här får aldrig släcka hela appen (hotfix-
                       mönstret). Skador byggs INTE (ny datakälla, medvetet skippat, se decisions). */}
-                      <Slide direction="up">
-                        <ErrorBoundary label="avstangda" resetKey={activeTab}>
-                          <SuspensionsView />
-                        </ErrorBoundary>
-                      </Slide>
+                        <Slide direction="up">
+                          <ErrorBoundary label="avstangda" resetKey={activeTab}>
+                            <SuspensionsView />
+                          </ErrorBoundary>
+                        </Slide>
+                      </div>
                     </TabPanel>
 
                     {/* ===================== MER ===================== */}

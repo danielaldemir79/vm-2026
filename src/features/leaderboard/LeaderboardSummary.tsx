@@ -40,7 +40,7 @@ function SelfScorePanel() {
       data-leaderboard-self-summary=""
       data-rank={summary.rank}
       data-points={summary.points}
-      className="vm-board-self-summary flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-card px-4 py-3"
+      className="vm-board-self-summary flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 rounded-card px-4 py-3.5"
     >
       <p className="m-0 font-display text-sm font-semibold">Dina poäng</p>
       <p className="m-0 flex items-baseline gap-3">
@@ -75,7 +75,10 @@ export function LeaderboardSummary() {
     return null;
   }
   return (
-    <div data-leaderboard-summary="" className="mt-4 flex flex-col gap-3">
+    // gap-4 (inte gap-3): samma lugna intra-panel-rytm som TipsScoreSummary och resten av
+    // appen, så "Dina poäng"-panelen och "Så funkar poängen"-knappen får luft mellan sig
+    // (Daniels feedback: panelen kändes hoptryckt , "lite luft mellan linjerna").
+    <div data-leaderboard-summary="" className="mt-4 flex flex-col gap-4">
       <SelfScorePanel />
       <div data-leaderboard-score-guide="">
         <ScoreGuide surface="topplista" />

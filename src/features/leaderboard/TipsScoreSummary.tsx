@@ -76,7 +76,7 @@ export function TipsScoreSummary() {
       {/* SKYLTFÖNSTRET: en liten eyebrow + "Dina poäng" till vänster, totalen + placeringen
           till höger , så ögat landar på "så här ligger JAG till" på en sekund. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-1">
           {/* EYEBROW: guld-TEXT-tonen (--color-warning, AA-säker per tema, ALDRIG rå
               --vm-gold som faller under AA som text på ljus yta). Dekorativ guld-glow
               lever i CSS-fonden; här bär texten läsbarhet -> warning-tonen. */}
