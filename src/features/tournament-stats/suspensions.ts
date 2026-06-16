@@ -22,9 +22,10 @@
 //   - Yahoo/Athlon, "World Cup 2026 Yellow Card Rules: When Do Cards Reset"
 //
 //  S1. RÖTT KORT (utvisning) -> avstängd NÄSTA match. "If a player receives a red card ... they're
-//      suspended for ... the following contest." Ett rött kort i parse-live täcker BÅDE ett
-//      direkt rött OCH en utvisning för andra gult i SAMMA match (båda blir ett 'red'-event på
-//      spelaren), så denna gren fångar även "två gula i en match"-utvisningen. KÄLLA: MLSSoccer.
+//      suspended for ... the following contest." Denna gren fångar BÅDE ett direkt rött OCH en
+//      utvisning på andra gult i SAMMA match, eftersom parse-live.readCardColor klassar API-
+//      Footballs detail "Yellow-Red Card" (= andra-gult-utvisning) som färg 'red' (verifierat
+//      där + i parse-live.test.ts; det var F1 att den tidigare blev 'yellow'). KÄLLA: MLSSoccer.
 //
 //  S2. TVÅ ACKUMULERADE GULA (i SKILDA matcher) -> avstängd nästa match. "Players can ... be
 //      suspended after accumulating two yellow cards across separate matches." Vi räknar därför
@@ -253,9 +254,10 @@ export function deriveSuspensions(
         }
         const acc = ensurePlayer(byPlayer, card);
         if (card.color === 'red') {
-          // S1: rött kort -> avstängd nästa match. (Täcker även andra-gult-utvisningen: den blir
-          // ett 'red'-event på spelaren i parse-live.) Nollställ pending gula , en ny "ren tavla"
-          // efter avtjänat (vi modellerar inte staplade gula ovanpå ett rött).
+          // S1: rött kort -> avstängd nästa match. (Täcker även andra-gult-utvisningen: parse-
+          // live.readCardColor klassar detail "Yellow-Red Card" som 'red', så den når DENNA gren.)
+          // Nollställ pending gula , en ny "ren tavla" efter avtjänat (vi modellerar inte staplade
+          // gula ovanpå ett rött).
           acc.pendingYellows = 0;
           pushPostIfServable(posts, acc, seq, i, 'red-card', nowMs);
         } else if (!yellowThisMatch.has(acc.playerId)) {

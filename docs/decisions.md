@@ -68,7 +68,16 @@ tidigare VM, så de är extra lätta att gissa fel). Korsverifierade mot TVÅ ob
 
 - **Rött kort -> avstängd nästa match (S1).** Källa: MLSSoccer.com, "2026 FIFA World Cup yellow
   card and suspension rules" ("If a player receives a red card ... suspended for ... the following
-  contest"). Ett rött event täcker även andra-gult-utvisningen (blir ett 'red'-event på spelaren).
+  contest"). S1 fångar även andra-gult-UTVISNINGEN: API-Football v3 sätter event-detail
+  **"Yellow-Red Card"** för en utvisning på andra gult, och `parse-live.readCardColor` klassar den
+  strängen som färg `'red'` (den måste testas FÖRE includes('yellow'), eftersom strängen bär både
+  "yellow" och "red"), så händelsen når S1-grenen som ett rött kort. KÄLLA för enum-värdet
+  "Yellow-Red Card": korsverifierad mot tre oberoende källor (api-football.com event-detail,
+  Sportmonks "YELLOWREDCARD", live-score-api "yellowred"). RÄTTAD 2026-06-16 (F1): readCardColor
+  klassade tidigare "Yellow-Red Card" som `'yellow'`, så en andra-gult-utvisning räknades som ett
+  vanligt gult och INGEN avstängning härleddes. Korrekt även för T88:s kort-liga (utvisning = rött,
+  inte två gula). Bevisat genom seam-test som matar den exakta API-strängen (parse-live.test.ts,
+  match-stats.test.ts, suspensions.test.ts).
 - **Två ackumulerade gula i SKILDA matcher -> avstängd nästa match (S2).** Källa: MLSSoccer +
   Yahoo/Athlon, "World Cup 2026 Yellow Card Rules: When Do Cards Reset". Vi räknar max ETT
   ackumulerings-gult per match (ett andra gult samma match är en utvisning, S1).

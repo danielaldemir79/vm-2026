@@ -8,7 +8,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { deriveSuspensions } from './suspensions';
+import { parseEvents } from '../../data/livescore';
 import type { LiveMatchEvents, LiveEvent } from '../../data/livescore';
+import type { RawApiResponse, RawEvent } from '../../data/livescore/api-football-types';
 import type { Match } from '../../domain/types';
 
 // --- Bygg-hjälpare ----------------------------------------------------------------------
@@ -108,6 +110,70 @@ describe('S1, rött kort', () => {
   it('rött kort i lagets SISTA match -> ingen post (ingen kommande match att avtjäna i)', () => {
     const out = deriveSuspensions([evt('g-A-3', [card('red')])], PLAN_3, NOW_BEFORE_ALL);
     expect(out).toHaveLength(0);
+  });
+});
+
+// --- S1 via andra-gult-UTVISNING ("Yellow-Red Card", F1) --------------------------------
+// Den verkliga API-strängen för en utvisning på andra gult parsas till ett 'red'-event
+// (parse-live.readCardColor), så S1-grenen fångar den. Vi kör den EXAKTA strängen genom
+// parseEvents, så hela kedjan råsträng -> 'red' -> EN avstängning bevisas (inte en bekväm
+// fixtur). Detta var F1: före fixen klassades "Yellow-Red Card" som 'yellow' -> ingen post.
+
+/** Parsa ETT "Yellow-Red Card"-event (andra-gult-utvisning) som parse-live skulle ge det. */
+function secondYellowSendOff(minute: number): LiveEvent {
+  const [parsed] = parseEvents({
+    get: 'fixtures/events',
+    results: 1,
+    errors: [],
+    response: [
+      {
+        time: { elapsed: minute, extra: null },
+        team: { id: BRA, name: 'Brasilien' },
+        player: { id: 100, name: 'Försvararen' },
+        assist: { id: null, name: null },
+        type: 'Card',
+        detail: 'Yellow-Red Card', // API-Footballs FAKTISKA sträng för andra gult
+        comments: null,
+      },
+    ],
+  } as unknown as RawApiResponse<RawEvent>);
+  return parsed;
+}
+
+describe('S1 via andra-gult-utvisning (Yellow-Red Card, F1)', () => {
+  it('"Yellow-Red Card" i match 1 -> EN avstängning (red-card) som gäller match 2', () => {
+    const out = deriveSuspensions(
+      [evt('g-A-1', [secondYellowSendOff(75)])],
+      PLAN_3,
+      NOW_BEFORE_ALL
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      playerId: 100,
+      teamId: 'bra',
+      reason: 'red-card',
+      fromMatchId: 'g-A-1',
+      servesMatchId: 'g-A-2',
+    });
+  });
+
+  it('första gult (match 1) + andra-gult-utvisning (match 2) -> EXAKT EN avstängning, första gult ej dubbelräknat', () => {
+    // Spelaren får ett rent gult i match 1 (pending = 1), sedan en utvisning på andra gult i
+    // match 2. Utvisningen är ett 'red'-event (S1) som gäller match 3 , INTE ett andra
+    // ackumulerings-gult som skulle paras ihop med match 1:s gula till en EGEN S2-avstängning.
+    // Före F1-fixen klassades "Yellow-Red Card" som 'yellow' -> match 1+2 hade blivit ett par
+    // (fel from-match) ELLER (med yellowThisMatch-dedupen) ingen post alls. Nu: exakt 1 röd-post.
+    const out = deriveSuspensions(
+      [evt('g-A-1', [card('yellow')]), evt('g-A-2', [secondYellowSendOff(75)])],
+      PLAN_3,
+      NOW_BEFORE_ALL
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      reason: 'red-card', // utvisningen, inte 'two-yellows'
+      fromMatchId: 'g-A-2', // utlöstes i match 2 (utvisningen), inte match 1
+      servesMatchId: 'g-A-3', // gäller lagets nästa match
+    });
   });
 });
 
