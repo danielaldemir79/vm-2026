@@ -4,6 +4,10 @@
 
 export { ScorerTableView } from './ScorerTableView';
 export { TournamentStatsView } from './TournamentStatsView';
+export { SuspensionsView } from './SuspensionsView';
+
+// Den rena avstängnings-härledningen (T99) , delbar om en annan vy vill räkna samma.
+export { deriveSuspensions, type SuspensionPost, type SuspensionReason } from './suspensions';
 
 // De ÅTERANVÄNDBARA cross-match-hookarna: hämtar events/statistik för ALLA matcher (smalt
 // SELECT) och håller dem near-live via den DELADE T91-spine:n (useNearLiveCollection).

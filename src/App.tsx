@@ -32,7 +32,7 @@ import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryGate, ResultsProvider } from './features/results';
 import { ScenarioView } from './features/scenarios';
-import { ScorerTableView, TournamentStatsView } from './features/tournament-stats';
+import { ScorerTableView, SuspensionsView, TournamentStatsView } from './features/tournament-stats';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import {
@@ -389,6 +389,18 @@ function AppShell() {
                       <Slide direction="up">
                         <ErrorBoundary label="turneringsstatistiken" resetKey={activeTab}>
                           <TournamentStatsView />
+                        </ErrorBoundary>
+                      </Slide>
+
+                      {/* Avstängda spelare (T99, #200) , härledd ur kort-datan (rött / 2 gula),
+                      uppskattad längd, auto-bort när avtjänad. UTANFÖR SimulationFrame (samma val
+                      som skytteligan/turneringsstatistiken: härleds ur den VERKLIGA live-event-
+                      datan via cross-match-hooken, inte what-if-läget). Egen boundary, isolerad
+                      från statistiken ovan: en krasch här får aldrig släcka hela appen (hotfix-
+                      mönstret). Skador byggs INTE (ny datakälla, medvetet skippat, se decisions). */}
+                      <Slide direction="up">
+                        <ErrorBoundary label="avstangda" resetKey={activeTab}>
+                          <SuspensionsView />
                         </ErrorBoundary>
                       </Slide>
                     </TabPanel>
