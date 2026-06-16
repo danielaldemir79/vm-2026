@@ -201,10 +201,10 @@ function AppShell() {
               Topplista/Turnering/Mer), inte bara i RoomSection (Tips). Menyn bär också
               skapa/gå-med-genvägar (onOpenRooms ovan: byter till Tips + scrollar/
               fokuserar rätt formulär), så man når rum-hanteringen var man än står. Den
-              renderar null i fixtures-/lokalt läge + utan aktivt rum, så app-baren ser ut
-              precis som förr då. Status-chippet döljs på de minsta skärmarna
-              (sm:inline-flex) så headern aldrig trängs; offline-läget syns ändå via
-              offline-bannern. */}
+              renderar null i fixtures-/lokalt läge (app-baren ser ut precis som förr då);
+              utan aktivt rum blir den en "Rum"-CTA (skapa/gå-med), eftersom onOpenRooms
+              alltid ges här. Status-chippet döljs på de minsta skärmarna (sm:inline-flex)
+              så headern aldrig trängs; offline-läget syns ändå via offline-bannern. */}
             <div className="flex items-center gap-2 sm:gap-3">
               <RoomPill onOpenRooms={openRooms} />
               <span className="hidden sm:inline-flex">

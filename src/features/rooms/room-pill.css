@@ -23,8 +23,9 @@
    som den svepande reduced-motion-grinden i index.css nollar.
    ========================================================================== */
 
-/* Grund-pillen (delad form för den stilla etiketten + den bytbara knappen): en lugn
-   accent-tonad pill, kompakt så den får plats i app-baren bredvid kugghjul + tema. */
+/* Grund-pillen (delad form för menyknappen i alla synliga lägen , aktivt rum, 1 rum,
+   CTA): en lugn accent-tonad pill, kompakt så den får plats i app-baren bredvid kugghjul
+   + tema. */
 .vm-room-pill {
   display: inline-flex;
   align-items: center;
