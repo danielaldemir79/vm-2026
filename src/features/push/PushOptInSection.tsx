@@ -20,6 +20,7 @@
 import type { ReactNode } from 'react';
 import { usePush } from './use-push';
 import type { PushApi } from './use-push';
+import { useFavoriteTeam } from '../favorite-team/favorite-team-context';
 
 export interface PushOptInSectionProps {
   /** Yt-formen från call-sitet (App ger Panel), så sektionen matchar Mer. */
@@ -29,6 +30,11 @@ export interface PushOptInSectionProps {
    * tester kan injicera ett känt läge utan att mocka hela browser-/Supabase-stacken.
    */
   api?: PushApi;
+  /**
+   * Injicerbart favoritlags-id (för test). I appen utelämnas det och favoritlags-contexten
+   * läses; valet styr scope='favorite'-radens lag.
+   */
+  favoriteTeamId?: string | null;
 }
 
 /** Gemensam header (rubrik-kapitäl + titel + förklaring), en sanning för sektionen. */
@@ -55,11 +61,15 @@ function InfoRow({ children, attr }: { children: ReactNode; attr: string }) {
   );
 }
 
-export function PushOptInSection({ surface, api }: PushOptInSectionProps) {
+export function PushOptInSection({ surface, api, favoriteTeamId }: PushOptInSectionProps) {
   // Hooken körs ALLTID (regel: inga villkorade hooks). Den injicerade api:n vinner sedan
   // (test/Storybook). Hook-anropet är biverkningsfritt vid mount, så detta är säkert.
   const live = usePush();
-  const { state, busy, error, info, activate, deactivate, sendTest } = api ?? live;
+  const { state, busy, error, info, activate, deactivate, sendTest, preferences, setPreference } =
+    api ?? live;
+  // Favoritlaget (för scope='favorite'-raden). Injicerbart för test, annars contexten.
+  const contextFavorite = useFavoriteTeam().favoriteTeamId;
+  const favorite = favoriteTeamId !== undefined ? favoriteTeamId : contextFavorite;
 
   return surface(
     <section data-push-optin-section="" className="flex flex-col gap-4">
@@ -102,10 +112,47 @@ export function PushOptInSection({ surface, api }: PushOptInSectionProps) {
       ) : null}
 
       {state === 'subscribed' ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <p data-push-info="on" className="text-sm font-medium text-fg">
             Mål-notiser är på för den här enheten.
           </p>
+
+          {/* Inställningar: nattläge + match-scope. Sparas direkt (optimistiskt) via setPreference. */}
+          <div className="flex flex-col gap-3 rounded-card border border-border bg-surface/60 p-3">
+            <ToggleRow
+              attr="quiet-hours"
+              label="Tyst på natten"
+              hint="Inga notiser mellan 23 och 08 (svensk tid)."
+              checked={preferences.quietHoursEnabled}
+              disabled={busy}
+              onChange={(checked) => void setPreference({ quietHoursEnabled: checked })}
+            />
+
+            <fieldset className="flex flex-col gap-2" data-push-scope="">
+              <legend className="text-sm font-medium text-fg">Vilka matcher</legend>
+              <ScopeRadio
+                value="all"
+                label="Alla matcher"
+                current={preferences.scope}
+                disabled={busy}
+                onSelect={() => void setPreference({ scope: 'all' })}
+              />
+              <ScopeRadio
+                value="favorite"
+                label={
+                  favorite
+                    ? 'Bara mitt favoritlag'
+                    : 'Bara mitt favoritlag (välj ett favoritlag först)'
+                }
+                current={preferences.scope}
+                disabled={busy || !favorite}
+                onSelect={() =>
+                  void setPreference({ scope: 'favorite', favoriteTeamId: favorite ?? null })
+                }
+              />
+            </fieldset>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -146,6 +193,74 @@ export function PushOptInSection({ surface, api }: PushOptInSectionProps) {
         ) : null}
       </div>
     </section>
+  );
+}
+
+/**
+ * En på/av-rad (label + hint + en checkbox-styrd switch). Semantisk checkbox (tillgänglig,
+ * tangentbordsstyrd), stylad som en switch. attr ger en stabil test/DOM-krok.
+ */
+function ToggleRow({
+  attr,
+  label,
+  hint,
+  checked,
+  disabled,
+  onChange,
+}: {
+  attr: string;
+  label: string;
+  hint: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-3">
+      <span className="flex flex-col gap-0.5">
+        <span className="text-sm font-medium text-fg">{label}</span>
+        <span className="text-xs text-fg-muted">{hint}</span>
+      </span>
+      <input
+        type="checkbox"
+        data-push-toggle={attr}
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+      />
+    </label>
+  );
+}
+
+/** En scope-radioknapp (alla matcher / favoritlag). Radio = ömsesidigt uteslutande val. */
+function ScopeRadio({
+  value,
+  label,
+  current,
+  disabled,
+  onSelect,
+}: {
+  value: 'all' | 'favorite';
+  label: string;
+  current: 'all' | 'favorite';
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2">
+      <input
+        type="radio"
+        name="push-scope"
+        data-push-scope-option={value}
+        value={value}
+        checked={current === value}
+        disabled={disabled}
+        onChange={onSelect}
+        className="h-4 w-4 accent-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+      />
+      <span className="text-sm text-fg">{label}</span>
+    </label>
   );
 }
 

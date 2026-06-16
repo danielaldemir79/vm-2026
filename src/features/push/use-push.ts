@@ -21,6 +21,13 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from './push-client';
+import type { PushPreferences } from './push-preferences';
+import {
+  DEFAULT_PUSH_PREFERENCES,
+  readPushPreferences,
+  updatePushPreferences,
+  type PreferenceUpdate,
+} from './push-preferences-client';
 
 export interface PushApi {
   /** Det aktuella opt-in-läget (avgör vad PushOptInSection renderar). */
@@ -37,6 +44,10 @@ export interface PushApi {
   deactivate: () => Promise<void>;
   /** Skicka en test-notis till mina egna enheter (end-to-end-beviset). */
   sendTest: () => Promise<void>;
+  /** Användarens notis-preferenser (master/natt/scope), default tills laddade. */
+  preferences: PushPreferences;
+  /** Uppdatera en eller flera preferenser (optimistiskt + persistat). */
+  setPreference: (update: PreferenceUpdate) => Promise<void>;
 }
 
 /**
@@ -58,6 +69,7 @@ export function usePush(env: ImportMetaEnv = import.meta.env): PushApi {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<PushPreferences>(DEFAULT_PUSH_PREFERENCES);
 
   // Läs om enheten redan har en aktiv prenumeration (vid mount). Påverkar bara läget,
   // inga skrivningar. Avbrytbar (cancelled) så en sen upplösning inte rör en avmonterad
@@ -85,6 +97,28 @@ export function usePush(env: ImportMetaEnv = import.meta.env): PushApi {
   // stabil referens så de tre åtgärds-callbacksen kan ha den i sina deps utan att
   // återskapas varje render (annars react-hooks/exhaustive-deps-varning).
   const client = useCallback((): VmSupabaseClient => getSupabaseClient(env), [env]);
+
+  // Läs användarens preferenser NÄR enheten är prenumererad (raden finns då). Avbrytbar.
+  // Innan dess visar UI:t default (master på, natt av, scope alla) , men preferens-kontrollerna
+  // renderas ändå bara i 'subscribed'-läget, så defaulten syns inte felaktigt.
+  useEffect(() => {
+    let cancelled = false;
+    if (!liveConfigured || !isSubscribed) {
+      return;
+    }
+    void readPushPreferences(client())
+      .then((prefs) => {
+        if (!cancelled) {
+          setPreferences(prefs);
+        }
+      })
+      .catch(() => {
+        // En läs-miss ska inte krascha sektionen; behåll default (UI:t fungerar ändå).
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveConfigured, isSubscribed, client]);
 
   // Opt-in-läget. Utan live-konfiguration kan vi inte lagra -> 'unsupported' (ärligt).
   // isSupported i kontexten gatas DESSUTOM av browser-API:erna; vi AND:ar in
@@ -146,5 +180,39 @@ export function usePush(env: ImportMetaEnv = import.meta.env): PushApi {
     });
   }, [run, client]);
 
-  return { state, busy, error, info, activate, deactivate, sendTest };
+  // Uppdatera en preferens OPTIMISTISKT (UI svarar direkt) + persistera. Vid fel: visa felet
+  // OCH läs tillbaka det faktiska värdet, så UI:t aldrig ljuger om vad som sparades.
+  const setPreference = useCallback(
+    async (update: PreferenceUpdate): Promise<void> => {
+      const previous = preferences;
+      setPreferences((prev) => ({
+        notifyEnabled: update.notifyEnabled ?? prev.notifyEnabled,
+        quietHoursEnabled: update.quietHoursEnabled ?? prev.quietHoursEnabled,
+        scope: update.scope ?? prev.scope,
+        favoriteTeamId:
+          update.favoriteTeamId !== undefined ? update.favoriteTeamId : prev.favoriteTeamId,
+      }));
+      setError(null);
+      try {
+        await updatePushPreferences(client(), update);
+      } catch (err: unknown) {
+        // Rulla tillbaka det optimistiska värdet och visa felet ärligt.
+        setPreferences(previous);
+        setError(err instanceof Error ? err.message : 'Kunde inte spara notis-inställningen.');
+      }
+    },
+    [client, preferences]
+  );
+
+  return {
+    state,
+    busy,
+    error,
+    info,
+    activate,
+    deactivate,
+    sendTest,
+    preferences,
+    setPreference,
+  };
 }

@@ -358,13 +358,19 @@ export type Database = {
       // upsert-ankare. Hand-tillagd för att spegla
       // 20260616120000_t85_push_subscriptions.sql (samma "regenerera om schemat
       // ändras"-kontrakt som övriga tabeller).
+      // T89 (#182): + preferens-kolumner (notify_enabled / quiet_hours_enabled /
+      // match_scope / favorite_team_id) ur 20260616160100_t89_push_preferences.sql.
       push_subscriptions: {
         Row: {
           auth_key: string;
           created_at: string;
           endpoint: string;
+          favorite_team_id: string | null;
           id: string;
+          match_scope: string;
+          notify_enabled: boolean;
           p256dh: string;
+          quiet_hours_enabled: boolean;
           user_agent: string | null;
           user_id: string;
         };
@@ -372,8 +378,15 @@ export type Database = {
           auth_key: string;
           created_at?: string;
           endpoint: string;
+          favorite_team_id?: string | null;
           id?: string;
+          // Default 'all' i DB:n.
+          match_scope?: string;
+          // Default true i DB:n (notiser på när enheten prenumererar).
+          notify_enabled?: boolean;
           p256dh: string;
+          // Default false i DB:n (nattläge av).
+          quiet_hours_enabled?: boolean;
           user_agent?: string | null;
           // Default auth.uid() i DB:n, så klienten behöver inte skicka det.
           user_id?: string;
@@ -382,8 +395,12 @@ export type Database = {
           auth_key?: string;
           created_at?: string;
           endpoint?: string;
+          favorite_team_id?: string | null;
           id?: string;
+          match_scope?: string;
+          notify_enabled?: boolean;
           p256dh?: string;
+          quiet_hours_enabled?: boolean;
           user_agent?: string | null;
           user_id?: string;
         };
