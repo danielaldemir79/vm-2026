@@ -5,6 +5,7 @@ node_modules
 package-lock.json
 *.png
 *.ico
+supabase/.temp/
 
 # Markdown-dokumentation formateras inte av Prettier: docs och HANDOFF ägs av
 # inception/dirigenten och ska inte få formaterings-churn från kod-grinden.
