@@ -1,0 +1,9 @@
+#!/bin/sh
+# Diakritik-vakt: commit-msg-hook.
+# Tunn shim -> Node gör jobbet (läser UTF-8 rätt oberoende av skal, se _scan.mjs).
+# git skickar sökvägen till commit-meddelande-filen som $1.
+#
+# Körs via Git for Windows medföljande sh på Windows, och systemets sh på macOS/Linux.
+# Aktiveras av core.hooksPath=.githooks (sätts av npm-scriptet "prepare", se package.json).
+
+exec node "$(dirname "$0")/_scan.mjs" commit-msg "$1"

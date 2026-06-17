@@ -5,6 +5,40 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-17 , Diakritik-vakt: git-hook som blockerar ASCII-substitut i svensk text
+
+**Beslut:** En git-hook (`.githooks/` + `src/lib/diakritik-vakt.mjs`) blockerar commits där
+svensk text smugit in med ASCII-substitut för å/ä/ö ("pa", "fran", "nar", "slutlaaget"). All <!-- diakritik-vakt:exempel -->
+scan-logik bor i EN modul som både hookarna och Vitest-testet importerar (en sanning), så
+testet bevisar exakt det körningen kör. Aktiveras automatiskt via `npm install` (`prepare` ->
+`git config core.hooksPath .githooks`); `npm run hooks:install` sätter om det explicit.
+**Varför:** ASCII-substitut i commit-meddelanden (och ibland kommentarer/SQL-strängar) har varit
+repots vanligaste återkommande kvalitetsmiss, roten är att PowerShell strippar UTF-8 i
+commit-meddelanden inline på Windows + manuella slarv. Manuell disciplin räckte inte; en
+mekanisk grind är enda hållbara fixen.
+
+**Beslut:** Bindestreck (`-`) räknas som ord-gräns-tecken i scannern (`GRANS = [\p{L}\p{N}_-]`),
+så ett denylist-ord klämt mellan bindestreck (`-pa-`, `-nar-`) aldrig matchar.
+**Varför:** Repots docs och kod-kommentarer refererar pervasivt till kebab-case-identifierare
+(lärdoms-id och mönster-namn, t.ex. `delad-rums-data-med-rls-pa-auth-uid`,
+`aa-kontrast-pastad-pa-genererad-farg`) som bär svensk-lika segment mellan bindestreck. Dessa
+är stabila kors-referens-nycklar, inte prosa. Utan bindestrecks-gränsen gav de falsklarm, vilket
+hade blockerat alla commits i repot. Äkta prosa-substitut ("rootMargin pa mobil-bandet", ordet <!-- diakritik-vakt:exempel -->
+omgivet av mellanslag) fångas ändå. Bekräftat genom att köra scannern mot hela trädet:
+0 falska positiver.
+
+**Beslut:** Scannade filtyper = `.md`, `.ts`, `.tsx`, `.mjs`, `.sql`, `.js`.
+**Varför:** Det är där svensk prosa bor. `.sql` med flit (migrationerna har svenska kommentarer
+OCH `comment on`-strängar som persisteras live i DB:n, en känd fälla), `.tsx` för React-UI-text,
+`.js` för service-worker-/config-filer med svensk prosa. Denylistan är kurerad SMAL: bara
+starkt indikativa svenska ord utan diakrit, ordgräns-matchade. Tvetydiga ord ("for", "are",
+"har", "andra", "laget", "sa", "ga", "manga") är medvetet uteslutna så legitim engelsk kod,
+fotbolls-/lånord och korrekt svenska aldrig ger falsklarm. Modulen + dess test undantas från
+scan (de citerar substituten avsiktligt). Override: markören `diakritik-vakt:exempel` på en rad
+(synligt + spårbart), eller `git commit --no-verify` som engångskringgång.
+
+---
+
 ## 2026-06-17 , Global topplista LIVE: CORS + OPTIONS för browser-anropade edge functions, 503:an var en stale deploy
 
 **Problem:** den globala (cross-rum) topplistan (server-side scoring via edge-funktionen
@@ -1447,28 +1481,28 @@ portal-baserad helskärms-dialog (fixed inset-0 z-50); hamburgare-menyn är ett 
 nedfälld panel i bandets flöde (knuffar innehåll, överlappar inte), så Modal hade varit fel form. A11y-
 semantiken (Escape/fokus-in-och-retur/fokus-fälla) följer ändå samma kontrakt.
 
-**Beslut (C4, Copilot-runda-1): scroll-spy observerar ALLA band, inte bara det forsta.**
+**Beslut (C4, Copilot-runda-1): scroll-spy observerar ALLA band, inte bara det första.**
 `useSectionSpy` anropade `querySelectorAll('[data-section-nav]')` men implementationen hade en
 bugg: mock i testet fyrade `emitResize` oavsett om bandet faktiskt observerades, vilket dolde
-att bara forsta bandet observerades. Fixt: observern byggs om med `querySelectorAll` och ett
-tvabands-harness-test verifierar att hogjdandring i mobil-bandet (panel oppnas) triggar om-
-byggnad av observern med ny rootMargin. Negativ-kontroll bekraftad: querySelector-revert
-(bara ett band) rodnar bada C4-testerna. Utan fixen: stale rootMargin pa mobil-bandet vid
-panel-oppning, scroll-spy uppfattar knappt att aktiv sektion byts.
+att bara första bandet observerades. Fixt: observern byggs om med `querySelectorAll` och ett
+tvåbands-harness-test verifierar att höjdändring i mobil-bandet (panel öppnas) triggar om-
+byggnad av observern med ny rootMargin. Negativ-kontroll bekräftad: querySelector-revert
+(bara ett band) rödnar båda C4-testerna. Utan fixen: stale rootMargin på mobil-bandet vid
+panel-öppning, scroll-spy uppfattar knappt att aktiv sektion byts.
 
-**Beslut (C5, Copilot-runda-1): CSS-var-cleanup ar VILLKORAD pa att inga band kvar i DOM.**
-Bada banden skriver samma `--vm-section-nav-offset` via `useStickyBandOffset`. Vid unmount
+**Beslut (C5, Copilot-runda-1): CSS-var-cleanup är VILLKORAD på att inga band kvar i DOM.**
+Båda banden skriver samma `--vm-section-nav-offset` via `useStickyBandOffset`. Vid unmount
 av ett band (t.ex. ResizeObserver-recompute) rensades variablerna alltid - vilket nollade
-offseten medan det andra bandet levde. Fix: rensa bara nar `document.querySelectorAll
+offseten medan det andra bandet levde. Fix: rensa bara när `document.querySelectorAll
 ('[data-section-nav]').length === 0` (inget band kvar). Negativ-kontroll: alltid-rensa-revert
-rodnar testet som verifierar att variablerna behalles efter ett bands unmount.
+rödnar testet som verifierar att variablerna behålles efter ett bands unmount.
 
-**Beslut (C6, Copilot-runda-2): aria-controls villkorad pa att panelen ar monterad.**
-Hamburgare-knappen bar `aria-controls` som pekade pa panelens id. Panelen renderas bara nar
-menyn ar oppen (open === true); i stangt lage ar IDREF:en ogiltig (pekar pa ett omonterat
+**Beslut (C6, Copilot-runda-2): aria-controls villkorad på att panelen är monterad.**
+Hamburgare-knappen bar `aria-controls` som pekade på panelens id. Panelen renderas bara när
+menyn är öppen (open === true); i stängt läge är IDREF:en ogiltig (pekar på ett omonterat
 element). Fix: `aria-controls={open ? panelId : undefined}`. `aria-expanded` (alltid
-satt) och `aria-haspopup` barer knappens tillstand oforandrat. Kontrakt-testet skarptes:
-aria-controls ska SAKNAS i stangt lage och peka pa panelens id i oppet lage.
+satt) och `aria-haspopup` bärer knappens tillstånd oförändrat. Kontrakt-testet skärptes:
+aria-controls ska SAKNAS i stängt läge och peka på panelens id i öppet läge.
 
 ---
 
@@ -1531,11 +1565,11 @@ mäter den faktiska renderade positionen mot viewporten och är korrekt för sti
 Alltid använda `getBoundingClientRect` vid mätning av sticky-band som ska offseta scroll-mål.
 
 **Beslut (C5, Copilot-runda-3): CSS-variabler rensas vid providerns unmount.**
-`--vm-section-nav-offset` och `--vm-section-nav-header-top` skrivs pa `<html>` av `SectionNavProvider`.
-Om providern unmountas (t.ex. via React.StrictMode dubbelmount eller framtida dynamisk routing) maste
+`--vm-section-nav-offset` och `--vm-section-nav-header-top` skrivs på `<html>` av `SectionNavProvider`.
+Om providern unmountas (t.ex. via React.StrictMode dubbelmount eller framtida dynamisk routing) måste
 CSS-variablerna rensas (sättas till '' via `document.documentElement.style.removeProperty`) i cleanup-
 funktionen av den useEffect som skriver dem, annars lever de stale-värdena kvar och skjuter
-scroll-margin-top fel pa sektionerna. Rensningen bevisad negativt: utan den failar ett test som kontrollerar
+scroll-margin-top fel på sektionerna. Rensningen bevisad negativt: utan den failar ett test som kontrollerar
 att variablerna är tomma efter unmount.
 
 ---

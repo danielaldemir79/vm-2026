@@ -15,6 +15,10 @@ playwright-report/
 test-results/
 .playwright/
 
+# Vitest junit-rapport (auktoritativ test-räkning på Windows, körs ad hoc vid
+# verifiering, ska aldrig checkas in)
+test-results*.xml
+
 # Design-frontends visuella verifierings-skärmdumpar (scratch, körs vid handoff, ej i CI)
 .vmshots/
 

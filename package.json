@@ -14,6 +14,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "prepare": "node .githooks/install.mjs",
+    "hooks:install": "node .githooks/install.mjs --strict",
     "gen:third-place-table": "vite-node scripts/generate-third-place-table.ts",
     "gen:matches": "vite-node scripts/generate-matches.ts",
     "gen:team-profiles": "vite-node scripts/generate-team-profiles.ts",

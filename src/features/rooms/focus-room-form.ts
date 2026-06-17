@@ -1,7 +1,7 @@
 // Genväg-fokus till RoomSection-formulären (T96, #193).
 //
 // RoomPill-menyns "Skapa rum" / "Gå med i rum" navigerar till RoomSection (överst i
-// Tips) och ska landa anvandaren PÅ rätt formulär. Tab-bytet (selectTab('tips')) bor i
+// Tips) och ska landa användaren PÅ rätt formulär. Tab-bytet (selectTab('tips')) bor i
 // App-skalet (det äger flik-routern); DEN HÄR funktionen är den rena DOM-delen: hitta
 // rätt formulär, scrolla in det och fokusera dess första fält. Bruten ut hit så seamen
 // går att testa isolerat (jsdom) i stället för att gömmas i en App-callback , just det
