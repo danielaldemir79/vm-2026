@@ -10,7 +10,7 @@
 // är svensk tid. Hela raden är synlig informationstext (inte status/alert): den ska
 // läsas tillsammans med formuläret, inte annonseras som en händelse.
 //
-// VISUELL DESIGN (design-frontend, T35): STRUKTUREN här hålls ren (hänglås-glyf +
+// VISUELL DESIGN (designen, T35): STRUKTUREN här hålls ren (hänglås-glyf +
 // "Låses <tid>" + relativ närhet), stabil data-hake (data-deadline-notice) +
 // data-deadline-iso för finputs/test. Färg/ton lämnas till design-lagret ovanpå,
 // här bär texten läsbarhet (fg/fg-muted, inte rå dekor-färg som text, lessons).
@@ -50,7 +50,7 @@ export function DeadlineNotice({
       className="m-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.75rem] leading-snug text-fg-muted"
     >
       {/* Hänglås-glyf (samma signatur som låst-etiketten, men "kommer att låsas"):
-          ren dekoration, aria-hidden, texten bär betydelsen. TON (design-frontend,
+          ren dekoration, aria-hidden, texten bär betydelsen. TON (designen,
           T35): glyfen bär samma dämpade fg-muted-ton som raden, INTE warning-amber.
           En vänlig UPPLYSNING ("bra att veta när det låses"), inte en VARNING, ska
           läsas som en lugn rad. Warning-amber drog ögat som ett larm; fg-muted gör

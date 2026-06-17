@@ -1,5 +1,5 @@
 /* =============================================================================
-   RUMS-UI:ts PREMIUM-VISUELLA LAGER (design-frontend, T14 / issue #14).
+   RUMS-UI:ts PREMIUM-VISUELLA LAGER (designen, T14 / issue #14).
    =============================================================================
 
    DELNINGS-ÖGONBLICKET: "skapa ett rum, skicka koden till kompisarna" ska kännas
@@ -188,7 +188,7 @@
 }
 
 /* -----------------------------------------------------------------------------
-   7. KOPIERA-MINA-TIPS-KONTROLLEN (T52, #91). [design-frontend premium-finish]
+   7. KOPIERA-MINA-TIPS-KONTROLLEN (T52, #91). [designen premium-finish]
 
    Kontrollen är en EGEN underzon längst ner i biljett-kroppen ("Kopiera dina tips
    hit"). Den avgränsas med en hårfin guld topp-list (samma kvällsljus-detalj som
@@ -312,7 +312,7 @@
 }
 
 /* -----------------------------------------------------------------------------
-   8. KOMMENTARER (T66, #121). [design-frontend premium-finish]
+   8. KOMMENTARER (T66, #121). [designen premium-finish]
 
    Snack-ytan där rummets medlemmar pratar match LIVE (Daniels klass använder den
    flitigt under matcherna). Premium-finishen lägger en CHATT-känsla ovanpå senior-
@@ -417,7 +417,7 @@
 }
 
 /* -----------------------------------------------------------------------------
-   9. EMOJI-REAKTIONER på matchkorten (T24, #24). [design-frontend premium-finish]
+   9. EMOJI-REAKTIONER på matchkorten (T24, #24). [designen premium-finish]
 
    Det LÄTTASTE sociala lagret: en snabb känsla på en match (mål, het, skratt ...),
    en reaktion per medlem. Reaktions-raden bor i FOTEN på matchkorten i dagens-vyn
@@ -509,7 +509,7 @@
 
 /* "VEM REAGERADE"-POPOVERN (T74, #157): senior-devs Tailwind ger redan position (fixed
    + viewport-klampade left/top via JS), surface-raised, border, radie, skugga och z-index.
-   design-frontend FINPUTSAR utseendet (pil mot ankaret, diskret in-känsla gatad av
+   designen FINPUTSAR utseendet (pil mot ankaret, diskret in-känsla gatad av
    reduced-motion, max-höjd + lugn scroll vid många namn) UTAN att röra positionerings-
    logiken (JS) eller a11y-hakarna (role=tooltip + aria-describedby). Texten (namn + tid)
    bär betydelsen och håller AA på surface-raised (samma yta som pickern, redan mätt i T24).
@@ -611,7 +611,7 @@
 }
 
 /* -----------------------------------------------------------------------------
-   10. PER-MATCH KOMMENTARER på matchkorten (T77, #161). [design-frontend premium-finish]
+   10. PER-MATCH KOMMENTARER på matchkorten (T77, #161). [designen premium-finish]
 
    Den HOPFÄLLDA affordansen + den UTFÄLLDA tråden UNDER matchkortet i dagens-vyn.
    Daniel är MÅN om att kortet inte blir rörigt, så finishen vilar på två lugna idéer:

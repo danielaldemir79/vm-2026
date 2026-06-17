@@ -1,5 +1,5 @@
 // Kontrast-mätning för T24-reaktionsraden (emoji-reaktioner på matchkorten),
-// canvas-komposit VÄRSTA fall. Engångs-verktyg (körs av design-frontend vid handoff,
+// canvas-komposit VÄRSTA fall. Engångs-verktyg (körs av designen vid handoff,
 // inte i CI): beräknar WCAG-kontrastförhållanden med KORREKT alfa-komposit (en token
 // vid given alfa blandad över sin BASYTA), så ton-på-text-fällan fångas i siffran,
 // inte gissas. Samma metod som T15/T16/T17/T38/T58-visuellt (decisions.md). Token-

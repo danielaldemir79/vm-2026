@@ -1,6 +1,6 @@
 // Den tillgängliga flik-raden (T83, #175): en WAI-ARIA tablist.
 //
-// ANSVAR (funktionell + tillgänglig struktur; design-frontend lägger premium-
+// ANSVAR (funktionell + tillgänglig struktur; designen lägger premium-
 // finishen ovanpå, samma arbetsdelning som tidigare tasks): rendera de fem flikarna
 // som en riktig tablist med korrekt roll-semantik, tangentbords-navigering och
 // fokus-hantering. Den VISUELLA placeringen (flik-rad längst ner på mobil, top-/
@@ -80,7 +80,7 @@ export function TabBar({ activeTab, onSelect, panelIdBase }: TabBarProps) {
 
   return (
     <nav
-      // data-tab-bar = stabil krok för design-frontends premium-styling (placering,
+      // data-tab-bar = stabil krok för designens premium-styling (placering,
       // ikoner, indikator-linje) + tester. Den semantiska tablisten ligger inuti.
       data-tab-bar=""
       className="vm-tab-bar"

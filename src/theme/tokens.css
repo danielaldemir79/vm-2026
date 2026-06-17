@@ -1,5 +1,5 @@
 /* =============================================================================
-   DESIGN-TOKENS, SLUTGILTIGA VÄRDEN (authorade av design-frontend-agenten, T2).
+   DESIGN-TOKENS, SLUTGILTIGA VÄRDEN (authorade av designern, T2).
    =============================================================================
 
    ÄGARSKAP (oförändrat sedan senior-devs kontrakt):
@@ -347,7 +347,7 @@ body {
    KONTRAST-VAKT (acceptanskriterium 2, WCAG AA): `--vm-day-hue` är BARA ett tal
    (en hue-grad), aldrig en text-/yt-/kant-färg. Dagstonen får bara väva in i
    DEKORATIVA ytor (gradienter, glow), aldrig i något som bär läsbarhet, så den
-   kan per konstruktion inte sänka text-kontrasten. Design-frontend bygger den
+   kan per konstruktion inte sänka text-kontrasten. Designen bygger den
    slutgiltiga dekoren ur hue:n (hsl()/color-mix) HÄR i CSS-lagret. En default
    sätts så dekoren har en giltig hue även innan en dag valts.
 
@@ -1593,7 +1593,7 @@ body {
      bricka med mörk ink, den färg-oberoende solid-bricka-formen (T9/T11/T15/T16/T17).
 
    KONTRAST-VAKT (lessons aa-kontrast-...-varsta-fall + guld-på-tint-fällan, som
-   står 2 ggr i design-frontend-lessons): ALL läsbar text (rubrik, eyebrow, intro,
+   står 2 ggr i design-lärdomarna): ALL läsbar text (rubrik, eyebrow, intro,
    sektions-rubriker, regel-etiketter) står på den OPAKA surface/surface-raised-
    fonden, ALDRIG på guld/grön-glow:en. POÄNG-TALEN står som mörk ink på en SOLID
    guld-yta (--vm-coupon-ink på --vm-gold), aldrig som ljus guld-text på en tint,
@@ -1697,7 +1697,7 @@ body {
    ink (samma färg-oberoende solid-bricka-form som .vm-coupon-mine/.vm-reveal-actual,
    AA-proven: --vm-coupon-ink på --vm-gold = 10.90:1 mörkt / 5.03:1 ljust). Detta
    ERSÄTTER det gamla guld-tint + fg-text-utseendet som föll i exakt den gold-on-tint-
-   fälla design-frontend-lessons flaggat 2 ggr. tabular-nums (i markup) håller talen
+   fälla som design-lärdomarna flaggat 2 ggr. tabular-nums (i markup) håller talen
    stadiga. Mjuk inre högdager ger brickan samma präglade känsla som medaljerna. */
 .vm-score-points {
   display: inline-flex;

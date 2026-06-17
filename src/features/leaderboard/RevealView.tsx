@@ -1,5 +1,5 @@
 // TIPS-AVSLÖJANDE-VYN (T17, #17). FUNKTIONELLT + a11y-lager (senior-dev) + PREMIUM-
-// FINISH (design-frontend), ett lager.
+// FINISH (designen), ett lager.
 //
 // IDENTITET ("FACIT-ÖGONBLICKET"): per avgjord match avslöjas allas tips jämte facit
 // + poäng. Designen gör det till ett facit-ögonblick , vem prickade rätt, vem bommade,
@@ -36,7 +36,7 @@
 // + varför som förut. Diskriminanten gör att poäng-fälten strukturellt bara finns på den
 // färdiga grenen.
 //
-// PÅGÅR-FINISHEN (design-frontend, ovanpå data-attribut-hakarna): pågår-kortet bär
+// PÅGÅR-FINISHEN (designen, ovanpå data-attribut-hakarna): pågår-kortet bär
 // appens PITCH-GRÖNA accent-identitet (.vm-reveal-card--live) i stället för facit-
 // kortets kvällsljus-guld, så de två kort-typerna skiljs på en blink. "Pågår"-markören
 // är en levande accent-pill med en pulsande prick (.vm-reveal-pending + .vm-pending-dot,
@@ -178,7 +178,7 @@ function FinishedMatchCard({
                   {formatScore(pick.predicted)}
                 </span>
                 {/* VARFÖR + poäng (T46): orsaken bredvid poängen, "Exakt resultat +3".
-                    data-reveal-reason = stabil krok för design-frontend + test. */}
+                    data-reveal-reason = stabil krok för designen + test. */}
                 <span
                   data-reveal-reason=""
                   className={`shrink-0 text-right font-medium tabular-nums ${
@@ -207,7 +207,7 @@ function FinishedMatchCard({
 /**
  * En LÅST men PÅGÅENDE match (T55, #96): allas tips synliga, men INGET facit och INGA
  * poäng (ärligt "Pågår"). Ingen utfalls-markör/VARFÖR-etikett, det finns inget facit att
- * döma mot än. Vi visar bara vem som gissade vad. design-frontend polerar finishen ovanpå
+ * döma mot än. Vi visar bara vem som gissade vad. Designen polerar finishen ovanpå
  * data-reveal-status="live" + data-reveal-live-pick.
  */
 function PendingMatchCard({

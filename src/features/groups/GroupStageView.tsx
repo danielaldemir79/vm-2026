@@ -6,7 +6,7 @@
 // T6 räknar om dem). Resultat-INMATNINGEN är T6, inte här, vyn visar den härledda
 // tabellen.
 //
-// VISUELL DESIGN (design-frontend-agentens lager): "arena i kvällsljus"-premium.
+// VISUELL DESIGN (design-lagret): "arena i kvällsljus"-premium.
 // Varje grupp blir ett kort med en stark bokstavs-badge i kort-headern, mjuk
 // elevation och ett responsivt rutnät (1 kol mobil -> 2 -> 3 -> 4 ultrawide).
 // Korten glider in med en stagger (rörelse-primitiverna, reducerad rörelse

@@ -19,7 +19,7 @@ test-results/
 # verifiering, ska aldrig checkas in)
 test-results*.xml
 
-# Design-frontends visuella verifierings-skärmdumpar (scratch, körs vid handoff, ej i CI)
+# Visuella verifierings-skärmdumpar (scratch, körs vid handoff, ej i CI)
 .vmshots/
 
 # Supabase CLI lokal scratch (länkat projekt-id m.m., skapas av CLI:t, ska aldrig checkas in)

@@ -1,7 +1,7 @@
 // Lag-emblem (PRESENTATIONS-komponent, ren): en liten rund "flagg-disc" med
 // lagets FIFA-landskod, för visuell igenkänning i matchkortet.
 //
-// DESIGN (design-frontend, T7): ett matchkort utan lag-identitet blir en rad
+// DESIGN (designen, T7): ett matchkort utan lag-identitet blir en rad
 // text. Riktiga flaggbilder för 48 nationer vore ett nät-/asset-beroende som
 // hotar LCP/CLS (en sanning: SPEC §7 + PRINCIPLES §12, Core Web Vitals), och
 // emoji-flaggor renderas inte på Windows. I stället genererar vi en stabil,

@@ -1,5 +1,5 @@
 // Kontrast-mätning för T54 kom-igång-dialogen (design-polering), canvas-komposit
-// VÄRSTA fall. Engångs-verktyg (körs av design-frontend vid handoff, inte i CI):
+// VÄRSTA fall. Engångs-verktyg (körs av designen vid handoff, inte i CI):
 // beräknar WCAG-kontrastförhållanden med KORREKT alfa-komposit (en token vid given
 // alfa blandad över sin BASYTA), så token-på-tint-fällan fångas i siffran, inte gissas.
 // Samma metod som T15/T16/T17/T38/T58-visuellt (decisions.md). Token-värdena nedan är

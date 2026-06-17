@@ -1,5 +1,5 @@
 // Kontrast-mätning för T58-summeringspanelen (poäng-summeringen överst i tips-vyn),
-// canvas-komposit VÄRSTA fall. Engångs-verktyg (körs av design-frontend vid handoff,
+// canvas-komposit VÄRSTA fall. Engångs-verktyg (körs av designen vid handoff,
 // inte i CI): beräknar WCAG-kontrastförhållanden med KORREKT alfa-komposit (en token
 // vid given alfa blandad över sin BASYTA), så glow-på-text-fällan fångas i siffran,
 // inte gissas. Samma metod som T15/T16/T16b/T17/T38-visuellt (decisions.md). Token-

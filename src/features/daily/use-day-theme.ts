@@ -5,15 +5,15 @@
 // härled dags-temat (memoiserat), och returnera ett STABILT seam som vyn lägger
 // på sin dekor-yta:
 //   - en CSS-variabel `--vm-day-hue` (heltals-grad, eller utelämnad i default-
-//     läget) som design-frontend väver in i gradienter/glow ovanpå T2:s tokens,
+//     läget) som designen väver in i gradienter/glow ovanpå T2:s tokens,
 //   - data-attribut (`data-day-theme`, `data-day-theme-source`) som STABIL hake
 //     för premium-styling och för test/felsökning.
 //
 // VARFÖR en hook och inte styling här: senior-dev äger NÄR/HUR temat HÄRLEDS
-// (deterministiskt, testbart, kontrast-säkert), design-frontend äger HUR det SER
+// (deterministiskt, testbart, kontrast-säkert), designen äger HUR det SER
 // UT. Hooken ger en ren seam mellan lagren (samma uppdelning som målfirande-
 // kroken, patterns.md). Mjuka ÖVERGÅNGAR vid dag-byte sköts av en CSS-transition
-// på dekor-ytan (sätts av design-frontend i CSS), som den befintliga
+// på dekor-ytan (sätts av designen i CSS), som den befintliga
 // reduced-motion-grinden (index.css) nollar, så acceptanskriterium 3 (mjuka
 // övergångar, respekterar reduced-motion) hålls utan en egen JS-grind.
 

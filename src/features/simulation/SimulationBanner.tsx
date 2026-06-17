@@ -8,7 +8,7 @@
 //
 // MARKERING: i sim-läge får komponenten role="status" + ett synligt "Simulering
 // pågår"-meddelande, OCH den sätter ett data-attribut (data-simulation-active)
-// som design-frontend hänger en premium-banner/badge på (banner uppe, dämpad
+// som designen hänger en premium-banner/badge på (banner uppe, dämpad
 // bakgrundston etc.). Funktionellt fungerar markeringen utan styling.
 //
 // VARFÖR i en EGEN komponent (inte i någon vy): what-if-läget påverkar ALLA
@@ -46,7 +46,7 @@ export function SimulationBanner() {
   const { simulating, enterSimulation, exitSimulation, resetSimulation } = useResultsStore();
 
   return (
-    // data-simulation-active speglar läget för design-frontends styling OCH för
+    // data-simulation-active speglar läget för designens styling OCH för
     // tester (stabil hake). aria-live via role="status" på meddelandet nedan, så
     // en skärmläsare hör när läget slås på/av utan att flytta fokus.
     //

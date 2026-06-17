@@ -8,10 +8,10 @@
 // resultat. Den hanterar även icke-happy-path (loading/error/tom) precis som
 // gruppspelsvyn (fail loud, role="status"/"alert").
 //
-// VISUELL DESIGN (design-frontend-agentens lager, ovanpå): premium-styling +
+// VISUELL DESIGN (design-lagret, ovanpå): premium-styling +
 // den faktiska målfirande-ANIMATIONEN. Vyn exponerar en tydlig SEAM för den: ett
 // aria-hidden firande-slot som renderar `children` med det aktiva firande-
-// tillståndet. Design-frontend fyller den med konfetti/mål-pop (bygger på T2:s
+// tillståndet. Designen fyller den med konfetti/mål-pop (bygger på T2:s
 // motion-primitiver, reducerad rörelse respekteras redan i kroken). Funktionellt
 // fungerar inmatningen helt utan firandet, det är ren glädje-yta.
 
@@ -35,10 +35,10 @@ function indexTeams(teams: readonly Team[]): Map<string, Team> {
 
 export interface ResultEntryViewProps {
   /**
-   * Render-prop för det VISUELLA målfirande-lagret (design-frontends ansvar).
+   * Render-prop för det VISUELLA målfirande-lagret (designens ansvar).
    * Får det aktiva firande-tillståndet (eller null) och renderar sin animation.
    * Default: inget visuellt lager (funktionellt komplett ändå), så vyn fungerar
-   * fristående och design-frontend kopplar in sin premium-animation utan att röra
+   * fristående och designen kopplar in sin premium-animation utan att röra
    * inmatnings-logiken.
    */
   renderCelebration?: (celebration: GoalCelebration | null) => ReactNode;
@@ -239,7 +239,7 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
                   formatDayHeading (DRY, EN sanning för dag-rubriken). h3 under vyns
                   h2, så rubrik-hierarkin är korrekt för skärmläsare.
 
-                  VISUELL FINISH (design-frontend, T28/#42): en elegant AVDELARE som
+                  VISUELL FINISH (designen, T28/#42): en elegant AVDELARE som
                   ger tydlig hierarki utan att stjäla fokus från korten. "Arena i
                   kvällsljus"-tonen bärs av tre lager: en liten accent-"tändsticka"
                   (en kort lodrät list som glöder grönt), datumet i display-fonten,
@@ -353,7 +353,7 @@ export function ResultEntryView({ renderCelebration }: ResultEntryViewProps) {
       ) : null}
 
       {/* Målfirande-SEAM: aria-hidden (ren visuell glädje, dubblerar ingen info).
-          Design-frontend renderar sitt premium-lager via renderCelebration; utan
+          Designen renderar sitt premium-lager via renderCelebration; utan
           den är vyn funktionellt komplett (firandet är valfri yta). */}
       {renderCelebration ? (
         <div aria-hidden="true" data-celebration-slot="">

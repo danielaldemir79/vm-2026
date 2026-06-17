@@ -1,6 +1,6 @@
 // "Kom igång"-dialogen (PRESENTATION + a11y, T54/#93).
 //
-// FOKUS (senior-devs funktionella + a11y-lager, polerat av design-frontend): en
+// FOKUS (senior-devs funktionella + a11y-lager, polerat av designen): en
 // VÄLKOMNANDE, glasklar yta som svarar på Daniels feedback. En vän, ofta icke-teknisk,
 // ska direkt FÖRSTÅ att hen kan (a) använda appen direkt i webbläsaren ELLER (b) lägga
 // den på hemskärmen som en app, med rätt steg för sin enhet. De två vägarna läses på en

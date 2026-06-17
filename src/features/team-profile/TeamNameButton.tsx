@@ -5,7 +5,7 @@
 // för skärmläsare och ett tydligt aria-label ("Visa lagprofil för X"). Den bär bara
 // beteendet (öppna profilen via context) + en stabil semantik/data-attribut-seam;
 // den VISUELLA finishen (hover-affordans, understruken-på-hover m.m.) lämnas till
-// design-frontend via klass-haken + data-attributet.
+// designen via klass-haken + data-attributet.
 //
 // VARFÖR en knapp och inte en länk: profilen är en modal/overlay i samma vy (ingen
 // router, ingen URL-navigering, se decisions.md T10), så semantiskt är detta en

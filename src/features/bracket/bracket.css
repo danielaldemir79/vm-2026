@@ -1,5 +1,5 @@
 /* =============================================================================
-   SLUTSPELSTRÄDETS PREMIUM-VISUELLA LAGER (design-frontend, T9 / issue #9).
+   SLUTSPELSTRÄDETS PREMIUM-VISUELLA LAGER (designen, T9 / issue #9).
    =============================================================================
 
    "Arena i kvällsljus", men för trädet: sextondel -> final som ett vackert träd
@@ -291,7 +291,7 @@
 }
 
 /* =============================================================================
-   6. SIMULERINGS-TRÄDET UR TIPSEN (T51, #88). [design-frontend, ovanpå senior-devs
+   6. SIMULERINGS-TRÄDET UR TIPSEN (T51, #88). [designen, ovanpå senior-devs
    seam: data-tips-slot-resolution, data-tips-bracket-*]
    =============================================================================
 
@@ -491,7 +491,7 @@
 
 /* =============================================================================
    7. DET LEVANDE TRÄDET UNDER GRUPPSPELET, PRELIMINÄRA LAG (T56, #100).
-   [design-frontend, ovanpå senior-devs seam: data-bracket-preliminary,
+   [designen, ovanpå senior-devs seam: data-bracket-preliminary,
    data-slot-resolution='preliminary', data-slot-preliminary]
    =============================================================================
 

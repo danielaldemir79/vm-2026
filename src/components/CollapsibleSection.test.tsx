@@ -75,7 +75,7 @@ describe('CollapsibleSection', () => {
     const section = screen.getByRole('region', { name: 'Gruppspelet' });
     expect(within(section).getByText('Beskrivning av sektionen.')).toBeInTheDocument();
     expect(within(section).getByTestId('content')).toBeInTheDocument();
-    // Default = komprimerat: data-haken speglar läget för design-frontend + tester.
+    // Default = komprimerat: data-haken speglar läget för designen + tester.
     expect(section.querySelector('[data-collapsible-body]')).toHaveAttribute(
       'data-collapsed',
       'true'

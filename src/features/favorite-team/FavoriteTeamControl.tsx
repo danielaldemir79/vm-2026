@@ -1,5 +1,5 @@
 // FAVORITLAGS-VÄLJAREN (T23, #23). FUNKTIONELL + a11y-korrekt presentations-komponent
-// (senior-dev-lager); PREMIUM-FINISH (design-frontend) ovanpå data-attribut-seamen.
+// (senior-dev-lager); PREMIUM-FINISH (designen) ovanpå data-attribut-seamen.
 //
 // VARFÖR ett <select> (inte 48 radio-knappar): 48 lag är en lång lista där ett
 // inbyggt <select> ger inhemsk tangentbords-/skärmläsar-/mobil-hjul-navigering utan

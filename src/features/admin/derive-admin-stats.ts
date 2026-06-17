@@ -64,7 +64,7 @@ export interface AdminStatsOverview {
    * rum räknas EN gång (det är "hur många människor använder appen", inte rum-poster).
    */
   totalTipsters: number;
-  /** Per-rum-överblicken (sorterad: nyaste/störst först är design-frontends val). */
+  /** Per-rum-överblicken (sorterad: nyaste/störst först är designens val). */
   rooms: AdminRoomOverview[];
   /** Global "vem tippar bäst" (alla (rum, medlem)-poster, högsta poäng först). */
   topTipsters: GlobalTipsterEntry[];

@@ -8,12 +8,12 @@
 //
 // FUNKTIONELLT + a11y FÖRST: semantiska landmärken (section + rubrik per runda),
 // varje slot som en list-rad med läsbar etikett (gruppvinnare/möjliga lag/lag),
-// och stabila DATA-ATTRIBUT som design-frontend bygger premium-trädet ovanpå
+// och stabila DATA-ATTRIBUT som designen bygger premium-trädet ovanpå
 // (data-bracket-round, data-bracket-slot, data-slot-resolution, data-winner).
 // Den horisontella kolumn-layouten TÅL mobil (overflow-x-auto, en runda i taget),
-// och animationen som "drar fram vinnaren" ägs av design-frontend via dessa hakar.
+// och animationen som "drar fram vinnaren" ägs av designen via dessa hakar.
 //
-// VISUELL DESIGN (design-frontend-lagret, ovanpå): premium-bracket med kopplings-
+// VISUELL DESIGN (design-lagret, ovanpå): premium-bracket med kopplings-
 // linjer, vinnar-animation och dags-tema. Strukturen är gjord lätt att styla:
 // stabila roller + data-attribut, inga inbakade statusfärger (T7-pin).
 
@@ -96,7 +96,7 @@ function slotText(slot: BracketSlotState, teamsById: ReadonlyMap<string, Team>):
  *   - data-bracket-slot: hakar varje slot.
  *   - data-slot-resolution: resolved | possible | tbd (design kan tonsätta).
  *   - data-winner: satt på den slot vars lag vann matchen (vinnar-framhävning +
- *     animations-target för design-frontend), så "drag fram vinnaren" är en ren
+ *     animations-target för designen), så "drag fram vinnaren" är en ren
  *     CSS/animations-fråga ovanpå denna hake.
  * Möjliga lag (under gruppspelet) visas som ett diskret antal ("4 möjliga"), så
  * raden inte blir textig men ändå kommunicerar att platsen inte är låst.
@@ -144,7 +144,7 @@ export function SlotRow({
           // Under lagnamnet: dess NUVARANDE position ("1:a grupp E") + att det är
           // preliminärt, så ett preliminärt lag aldrig läses som facit. aria-label
           // ger skärmläsaren hela sanningen i en mening (data-slot-resolution +
-          // detta gör att design-frontend kan tonsätta utan att röra semantiken).
+          // detta gör att designen kan tonsätta utan att röra semantiken).
           <span
             data-slot-preliminary=""
             className="vm-bracket-slot-prelim min-w-0 truncate text-[0.625rem] font-medium uppercase tracking-wide text-fg-muted"

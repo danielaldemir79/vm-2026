@@ -22,7 +22,7 @@
 // synliga texten är svensk tid. Steg-etiketten är en vanlig text-span. Hela raden
 // är synlig (inte sr-only): det är information Daniel uttryckligen vill se i listan.
 //
-// VISUELL FINISH (design-frontend, T28/#42): tiden får en liten accent-färgad
+// VISUELL FINISH (designen, T28/#42): tiden får en liten accent-färgad
 // klock-ikon (skumbar "tiden först"-affordans, samma tänk som daily-matchkortet)
 // och steg-etiketten blir ett CHIP som ekar TV-badge-/steg-pillen från daily
 // (samma rounded-pill-recept, delat designspråk, inte duplicerad komponent). Ingen
@@ -40,7 +40,7 @@ export interface MatchContextRowProps {
 /**
  * En kompakt metadata-rad: avsparkstid (svensk) + grupp/steg-etikett. Stabil
  * semantik + data-attribut (`data-match-context`, `data-result-time`,
- * `data-result-stage`) så design-frontend kan finputsa utseendet utan att röra
+ * `data-result-stage`) så designen kan finputsa utseendet utan att röra
  * strukturen (samma seam-princip som resten av resultatinmatningen).
  */
 export function MatchContextRow({ match }: MatchContextRowProps) {

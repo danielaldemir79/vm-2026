@@ -16,7 +16,7 @@
 // LAG-IDENTITET: formulärets value är lagets CODE (TeamCode), brandas vid UI-gränsen
 // (teamCode()) innan store.saveBracketPrediction, så API:t garanterat får en code.
 //
-// VISUELL DESIGN (design-frontend, T16b): "VÄGEN TILL BUCKLAN". Rubriken bär pool-
+// VISUELL DESIGN (designen, T16b): "VÄGEN TILL BUCKLAN". Rubriken bär pool-
 // identiteten (guld-eyebrow + motiverande öppen-räknare). CHAMPION är HJÄLTE-momentet
 // (egen guld-pokal-hero, variant="champion"). Slot-tipsen är en rund-grupperad kupong-
 // grid där varje runda får en rubrik-marker vars intensitet BYGGER mot finalen (samma

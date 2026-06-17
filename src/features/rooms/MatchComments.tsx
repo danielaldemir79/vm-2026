@@ -10,7 +10,7 @@
 // trådning, ingen redigering (samma MVP-anda som RoomComments/T66).
 //
 // SEMANTIK + DATA-HAKAR äger detta lager (data-match-comments-*, role/aria, etiketter);
-// design-frontend lägger premium-finishen ovanpå UTAN att röra logiken (samma seam-
+// designen lägger premium-finishen ovanpå UTAN att röra logiken (samma seam-
 // princip som MatchReactions/RoomComments). Renderar INGET om kommentar-lagret är
 // inaktivt (inget aktivt rum / live ej konfigurerat), så ett matchkort i lokalt läge är
 // orört, precis som reaktions-raden.
@@ -33,7 +33,7 @@ import { threadForMatch } from './match-comments-aggregate';
 import { avatarHueFromId, initialsFromName } from './member-avatar';
 
 // Fält-stil i SAMMA premium-formspråk som RoomComments-fältet (.vm-comment-input,
-// FIELD_BASE där). En sanning för formkänslan; design-frontend finputsar ovanpå.
+// FIELD_BASE där). En sanning för formkänslan; designen finputsar ovanpå.
 const FIELD_BASE =
   'vm-comment-input mt-0 w-full rounded-card border border-border px-3.5 py-3 text-fg ' +
   'transition-[border-color,box-shadow] duration-150 outline-none placeholder:text-fg-muted/70 ' +

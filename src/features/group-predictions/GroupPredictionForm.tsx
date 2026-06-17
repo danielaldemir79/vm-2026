@@ -5,7 +5,7 @@
 // OLIKA lag, och båda måste väljas. Efter gruppens första match är formuläret LÅST
 // (server-RLS är det riktiga låset; här härleds det bara för visning).
 //
-// VISUELL DESIGN (design-frontend, T16): det här är "tippa hela gruppspelet"-momentet,
+// VISUELL DESIGN (designen, T16): det här är "tippa hela gruppspelet"-momentet,
 // VM-kupongen man fyller i med kompisarna. EGEN identitet: en PODIUM-KUPONG. Samma
 // TIPS-KUPONG-familj som T15 (samma `.vm-coupon-card`-fond, guld-signatur, DRY), men
 // med en pallplats-metafor: 1:a = GULD-medalj, 2:a = SILVER-medalj. Varje plats-rad

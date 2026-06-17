@@ -7,7 +7,7 @@
 // BYTER. MVP-ytan är matchkorten i dagens-vyn (där snacket händer, decisions.md T24).
 //
 // SEMANTIK + DATA-HAKAR äger detta lager (data-reactions-*, role/aria, etiketter);
-// design-frontend lägger premium-finishen ovanpå UTAN att röra logiken (samma
+// designen lägger premium-finishen ovanpå UTAN att röra logiken (samma
 // seam-princip som RoomComments). Renderar INGET om reaktions-lagret är inaktivt
 // (inget aktivt rum / live ej konfigurerat), så ett matchkort i lokalt läge är orört.
 //
@@ -203,7 +203,7 @@ export function MatchReactions({ matchId }: MatchReactionsProps) {
       className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-3"
     >
       {/* Befintliga reaktioner som brickor (emoji + antal). MIN bär aria-pressed +
-          data-mine (design-frontend tonar den), så markeringen är färg-oberoende. Varje
+          data-mine (designen tonar den), så markeringen är färg-oberoende. Varje
           bricka är OCKSÅ trigger för "vem reagerade"-popovern (långtryck/hover/focus). */}
       {summary.tallies.map((t) => (
         <ReactionTallyButton

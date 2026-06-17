@@ -5,7 +5,7 @@
 // Datan kommer från de SERVER-GATADE RPC:erna (is_app_admin), så även om vyn på något
 // sätt nåddes av en icke-admin skulle den få tom data (servern är det riktiga skyddet).
 //
-// PREMIUM-FINISH (design-frontend, T45-visuellt): arrangörens KONTROLLPANEL. Funktion
+// PREMIUM-FINISH (designen, T45-visuellt): arrangörens KONTROLLPANEL. Funktion
 // före fluff (det är ett verktyg bara Daniel ser), men den hör tydligt hemma i appens
 // premium-familj , inte en grå admin-tabell. Tre lager bär känslan:
 //   1. ÖVERSIKTS-KORTEN (Rum/Tippare totalt): stat-kort med grön arena-glow + talet som

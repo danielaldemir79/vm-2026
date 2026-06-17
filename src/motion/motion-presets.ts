@@ -2,7 +2,7 @@
 //
 // ÄGARSKAP: STRUKTUREN (vilka presets finns, hur primitiverna konsumerar dem)
 // ägs av motorn (T2). Den exakta easing-/timing-PERSONLIGHETEN (hur "snärtig"
-// eller "mjuk" rörelsen känns) finjusteras av design-frontend-agenten, den får
+// eller "mjuk" rörelsen känns) finjusteras av designern, den får
 // byta värdena här utan att röra primitiv-komponenterna.
 //
 // SPEC §7: mjuka animationer, levande men inte stökigt.

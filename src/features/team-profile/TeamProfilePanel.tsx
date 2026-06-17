@@ -5,7 +5,7 @@
 // (matcher) i turneringen. Den läser den delade results-storen (en sanning för
 // lag/grupper/matcher) och härleder profilen via deriveTeamProfile (ren). All
 // data + härledning är frikopplad; vyn renderar bara, med stabil semantik +
-// data-attribut så design-frontend kan ge premium-finish utan att röra logiken.
+// data-attribut så designen kan ge premium-finish utan att röra logiken.
 //
 // A11y-dialog-kontraktet (role="dialog" + aria-modal, aria-labelledby, Escape, klick
 // på bakgrunden, fokus in/ut, fokus-fälla, motion-gating, portal) ägs nu av den delade

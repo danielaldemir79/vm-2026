@@ -3,7 +3,7 @@
 // React, inga sido-effekter), så hela regeln kan enhetstestas fristående.
 //
 // VAD det styr (och VAD det ALDRIG styr): dags-temat ger EN dekorativ accent-hue
-// (0-359) som design-frontend väver in i DEKORATIVA ytor (hero-gradienter, glow,
+// (0-359) som designen väver in i DEKORATIVA ytor (hero-gradienter, glow,
 // accent-detaljer) ovanpå T2:s token-system. Det rör ALDRIG text-, yt- eller
 // kant-tokens som bär läsbarhet. Det är den medvetna KONTRAST-VAKTEN i kod: en
 // hue som bara lever i dekor kan aldrig sänka text-kontrasten under WCAG AA,
@@ -39,7 +39,7 @@ import { hueFromCode } from './team-hue';
  *
  * `hue` är null bara i default-läget (vilodag). I 'teams'- och 'date'-läget är
  * den ett heltal i [0, 360). Inga andra fält behövs av det funktionella lagret:
- * design-frontend bygger gradienter/glow ur denna enda hue + sina egna tokens.
+ * designen bygger gradienter/glow ur denna enda hue + sina egna tokens.
  */
 export interface DayTheme {
   /** Dekorativ accent-hue (0-359), eller null i default-läget (vilodag). */

@@ -1,5 +1,5 @@
 // POÄNG-SUMMERING + KÄLL-DETALJ ÖVERST I TIPS-VYN (T58, #99). FUNKTIONELLT + a11y-lager
-// (senior-dev); PREMIUM-FINISH (design-frontend) ovanpå data-attribut-seamen, ett lager.
+// (senior-dev); PREMIUM-FINISH (designen) ovanpå data-attribut-seamen, ett lager.
 //
 // VARFÖR (Daniels live-feedback 2026-06-12): under "Tippa matcherna" syntes inga poäng
 // och ingen summering, fast matcher avgjorts. Denna panel ger, ÖVERST i tips-sektionen:
@@ -18,7 +18,7 @@
 // renderar panelen inget, hellre tyst än en gissad/fel rad (samma fail-safe som
 // LeaderboardSummary, T46). Käll-detaljen visas bara när vi har en känd egen total.
 //
-// DESIGN ("skyltfönstret", design-frontend): panelen är Daniels skyltfönster, så den
+// DESIGN ("skyltfönstret", designen): panelen är Daniels skyltfönster, så den
 // lyfts till en STOLT liten hero-panel i appens "arena i kvällsljus"-språk (SPEC §7).
 // Totalen bärs av en SOLID guld-bricka med mörk ink (den färg-oberoende, AA-säkra
 // solid-bricka-formen som .vm-coupon-mine/.vm-reveal-actual använder), placeringen av
