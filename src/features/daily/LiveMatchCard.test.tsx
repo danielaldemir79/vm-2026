@@ -394,8 +394,7 @@ describe('LiveMatchCard, status-styrd klocka (vattenpaus-säker)', () => {
 });
 
 describe('LiveMatchCard, a11y: artig live-region annonserar mål/slut', () => {
-  const announceOf = () =>
-    screen.getByRole('region').querySelector('[data-live-announce]');
+  const announceOf = () => screen.getByRole('region').querySelector('[data-live-announce]');
 
   it('speglar ställningen i en aria-live="polite"-region medan matchen är live', () => {
     renderCard({ status: 'live', homeGoals: 1, awayGoals: 0 });
@@ -432,7 +431,10 @@ describe('LiveMatchCard, a11y: artig live-region annonserar mål/slut', () => {
   });
 
   it('annonserar SLUTRESULTAT när matchen är slut', () => {
-    renderCard({ status: 'finished', frozen: true, homeGoals: 2, awayGoals: 1 }, SYNC_MS + min(120));
+    renderCard(
+      { status: 'finished', frozen: true, homeGoals: 2, awayGoals: 1 },
+      SYNC_MS + min(120)
+    );
     expect(announceOf()?.textContent).toMatch(/Slutresultat: Nederländerna 2-1 Japan/);
   });
 
