@@ -74,7 +74,23 @@ function selectAll(db, table, columns, orderCols) {
   );
 }
 
-Deno.serve(async () => {
+// CORS: appen anropar funktionen via supabase-js functions.invoke (POST) FRÅN WEBBLÄSAREN
+// (vm-2026.pages.dev), så svaret MÅSTE bära CORS-headers + preflight (OPTIONS) måste besvaras,
+// annars blockerar webbläsaren läsningen (curl bryr sig inte, därav att 200 syntes i curl men
+// inte i appen). Samma mönster som push-sender/goal-push-dispatcher. '*' är ok: svaret bär bara
+// redan publika visningsnamn + härledda poäng, ingen cookie-auth (token i Authorization-headern).
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  // CORS preflight: svara TIDIGT, före all annan logik.
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -196,14 +212,14 @@ Deno.serve(async () => {
     const leaderboard = buildGlobalLeaderboard(rooms, officialResults, EMBEDDED_STATIC_PLAN);
 
     return new Response(JSON.stringify({ leaderboard, participants: leaderboard.length }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
   } catch (err) {
     // FAIL-LOUD: svara 500 med ett begripligt fel (aldrig en tyst tom/fel topplista).
     const message = err instanceof Error ? err.message : String(err);
     return new Response(JSON.stringify({ error: `[VM2026] global-leaderboard: ${message}` }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
   }
 });

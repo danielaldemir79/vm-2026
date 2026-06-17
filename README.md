@@ -69,7 +69,9 @@ Plus en uppsättning informationsskärmar runt båda.
 - **Livescore direkt på kortet.** Under pågående matcher berikas varje matchkort med en live-panel:
   en mjukt tickande matchklocka (status-styrd och paus-säker, visar "Paus" under uppehåll, "45+"
   eller "90+" vid tavlans gräns, "Slut" när matchen är klar, aldrig en påhittad tid), live-ställning,
-  målskyttar med assist, gula och röda kort samt byten. Allt direkt synligt utan att klicka.
+  målskyttar med assist, gula och röda kort samt byten. Allt direkt synligt utan att klicka. När
+  ställningen ändras annonseras den för skärmläsare via en artig aria-live-region, så att ett nytt
+  mål läses upp utan att flytta fokus.
 - **"Visa mer" (utfällbar statistik och laguppställning).** En tydlig expandera-knapp fäller ut
   full matchstatistik (bollinnehav, skott, hörnor, offside och fler nyckeltal som jämförelse-staplar)
   samt laguppställning och formationer för varje lag, bakom ett ärligt löfte: knappen visas bara
@@ -119,6 +121,10 @@ Plus en uppsättning informationsskärmar runt båda.
   vinner VM (20 poäng), för bonuspoäng.
 - **Resultattavla (Topplista-fliken).** Vem som tippar bäst, med en sammanfattning överst
   (totala poäng och placering) och poängen per match under.
+- **Global topplista (alla rum).** Utöver din egen miniliga finns en samlad topplista över alla
+  som spelar, i alla rum, så du ser var du ligger i hela fältet och inte bara i din egen krets.
+  Bara säkra, publika fält visas (namn och poäng, aldrig någons tips eller privata data), och den
+  räknas fram på serversidan över hela tävlingen.
 - **Tips-avslöjande.** När avsparks-deadlinen låser ser alla vad var och en har tippat.
 - **Märken.** Bedrifter (streaks, "förutspådde skrällen", "perfekt omgång" med flera).
 - **Reaktioner.** En kurerad uppsättning emoji på matcher, en reaktion per person och match, och
@@ -282,7 +288,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Formatkontroll | `npm run format:check` |
 
-- **2921 passerande tester** över 276 testfiler (Vitest) på en färsk klon, med 56 tester som
+- **2926 passerande tester** över 276 testfiler (Vitest) på en färsk klon, med 56 tester som
   hoppas över med flit (live-Supabase RLS-integrationstesterna, som bara körs när Supabase-env
   är konfigurerat, se nedan). Verifierat genom att köra `npm test`.
 - **Säkerhet bevisad, inte antagen.** Row Level Security-modellen (bara admin kan skriva
