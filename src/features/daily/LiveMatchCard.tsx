@@ -113,6 +113,17 @@ export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: Live
   const stateWord = finished ? 'Slutresultat' : live ? 'Live' : clock.label;
   const regionLabel = `${stateWord}: ${homeName} ${homeGoals}-${awayGoals} ${awayName}, ${clock.label}`;
 
+  // A11Y: en ARTIG live-region annonserar STÄLLNINGEN när den ändras (ett mål faller) eller
+  // när matchen tar slut, så en skärmläsar-användare HÖR mål utan att navigera kortet. Den
+  // section-aria-label ovan är bara ett statiskt tillgängligt NAMN , en ändring där annonseras
+  // inte. Annonsen EXKLUDERAR medvetet den tickande klockan (minuten ändras var 60:e sekund och
+  // får inte spamma uppläsningar); ställnings-raden ändras bara på mål / slutsignal. Tom sträng
+  // när matchen varken är live eller slut (inget pågående skeende att annonsera då).
+  const liveAnnouncement =
+    live || finished
+      ? `${finished ? 'Slutresultat' : 'Ställning'}: ${homeName} ${homeGoals}-${awayGoals} ${awayName}`
+      : '';
+
   // Det finns något att fälla ut bara om vi faktiskt har statistik, laguppställning ELLER
   // byten (bytena flyttades hit, längst ned i "Visa mer", under laguppställningen).
   const hasDetail =
@@ -126,6 +137,14 @@ export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: Live
       aria-label={regionLabel}
       className="vm-live-card mt-1 flex flex-col gap-3 rounded-card border p-3.5"
     >
+      {/* ARTIG live-region (sr-only, ingen visuell yta): annonserar ställningen vid mål /
+          slutsignal. aria-atomic så HELA raden läses som en enhet (inte bara den ändrade
+          siffran). Ligger alltid i DOM:en när kortet renderas, så efterföljande text-
+          ändringar (mål) faktiskt annonseras av skärmläsaren. */}
+      <p data-live-announce="" aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveAnnouncement}
+      </p>
+
       {/* RAD 1: klock-/status-chip + (live) en diskret pulsande LIVE-indikator. */}
       <div className="flex items-center justify-between gap-2">
         <span

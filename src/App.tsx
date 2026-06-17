@@ -88,19 +88,19 @@ const TURNERING_SECTIONS: readonly SectionNavItem[] = [
 ];
 
 /**
- * GLOBALA (cross-rum) TOPPLISTAN TILLFÄLLIGT DÖLJD (T96, #193).
+ * GLOBALA (cross-rum) TOPPLISTAN AKTIV (T96 dolde den, 2026-06-17 åter tänd).
  *
- * TotalLeaderboardSection läser en edge-funktion (global-leaderboard) som
- * BOOT-KRASCHAR (503, trasig sedan T90) i live-läge. Tills den är fixad (eget spår)
- * döljer vi sektionen helt bakom denna flagga, i stället för att visa en trasig/fel-
- * ruta för den globala topplistan. Per-rums-topplistan (LeaderboardSection) + "vad
- * alla tippade"-listan (RevealSection) är KVAR och opåverkade , bara den globala
- * cross-rum-rankningen tas bort ur Topplista-fliken.
+ * TotalLeaderboardSection läser edge-funktionen (global-leaderboard). Den BOOT-KRASCHADE
+ * (503) en period: den DEPLOYADE artefakten (v1) var stale/korrupt , KÄLLAN var hel hela
+ * tiden (boot:ar rent lokalt i Deno). En ren omdeploy av nuvarande källa löste det
+ * (funktionen svarar nu 200 med BARA säkra fält: visningsnamn, poäng, rank, exakt-träffar).
+ * Därför är flaggan true. Per-rums-topplistan + "vad alla tippade"-listan var KVAR och
+ * opåverkade hela tiden.
  *
- * TÄND IGEN: när edge-funktionen är fixad, flippa denna till `true`. Inget annat
- * behöver röras , render-grenen nedan tänder då TotalLeaderboardSection igen oförändrad.
+ * SLÄCK IGEN (om funktionen någonsin krånglar): flippa denna till `false` , render-grenen
+ * nedan döljer då TotalLeaderboardSection helt, inget annat behöver röras.
  */
-const GLOBAL_LEADERBOARD_ENABLED = false;
+const GLOBAL_LEADERBOARD_ENABLED = true;
 
 /**
  * Ett innehållskort, delad yt-form för app-vyns sektioner. Nu en tunn wrapper runt
