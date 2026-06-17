@@ -9,6 +9,124 @@ bygget. Tomt nu, det är normalt i ett nytt projekt.
 
 ## Mönster
 
+### flik-app-shell-med-hash-routning-utan-router-dependency (VM 2026)
+
+**Problem:** en SPA som vuxit till en lång sida ska bli en flik-app (vy-växling) med delbar URL,
+bakåt-knapp och djuplänk , men ett router-paket är överkill för EN navigerings-axel (PRINCIPLES §11).
+
+**Recept (`src/features/tabs/`, T83):**
+1. **EN katalog** (`tab-config.ts`) = en sanning per flik: id (typad union), etikett, URL-slug, ordning.
+   Flik-raden, routningen OCH App.tsx läser samma lista, så en ny/ändrad flik ändras på ETT ställe.
+2. **Ren hash<->flik-mappning** (`tab-routing.ts`, ingen window/React): `tabFromHash` (fail-safe till
+   default för tom/okänd hash) + `hashForTab`. Testbar fristående med round-trip + okänd-slug-fall.
+3. **Hook med window/history-IO** (`use-tab-routing.ts`): lat initial-läsning ur `location.hash`
+   (djuplänk vid kall-laddning), `history.pushState` per flik-byte (bakåt-knapp = en post per byte),
+   lyssna på BÅDE `popstate` (bakåt) och `hashchange` (manuell länk), normalisera tom hash till
+   kanonisk form med `replaceState` (ingen extra post). **Hash, inte path**, för statiskt hostade
+   SPA:er (Cloudflare/GitHub Pages): en path-rutt ger 404 vid direkt-laddning, hash serveras alltid.
+4. **Tillgänglig tablist** (`TabBar.tsx`): role tablist/tab, aria-selected + aria-current + aria-controls,
+   ROVING TABINDEX (bara aktiv flik tabbar, övriga -1), piltangenter/Home/End som flyttar+aktiverar+
+   flyttar fokus. focus-visible-ring + reduced-motion i CSS. Responsiv placering (mobil-botten/desktop-
+   top) via REN CSS-media-query (ingen JS-resize-gissning).
+5. **Alla paneler MONTERADE, inaktiv = `hidden`** (`TabPanel.tsx`, role tabpanel + aria-labelledby):
+   bevarar vy-state (formulär/sök/utfällt) över flik-byte (unmount skulle tappa det), delar providers +
+   live-data, och `hidden` (display:none) tar bort den dolda panelen ur layout OCH a11y-trädet (ren
+   scroll per flik, skärmläsaren ser bara aktiv flik). Pris: `getByRole` ser inte roller i en `hidden`
+   panel , navigera till fliken i test före roll-assertioner (bevisar också vy-växlingen end-to-end).
+
+**Varför:** state + hash/history räcker exakt för delbar länk + bakåt + djuplänk, utan en router-
+dependency, och en katalog + ren mappning + tillgänglig tablist ger en testbar, drift-säker grund som
+senare flik-features placeras i. Källa: T83 (`src/features/tabs/*`, decisions.md 2026-06-15).
+
+### sticky-foljer-sidscroll-kraver-gemensam-containing-block (VM 2026)
+
+**Problem:** en `position: sticky`-kontroll (t.ex. en "komprimera"-bar som ska följa med ner i en lång
+lista) "glider ur vy" i stället för att klistra , den verkar inte följa sidans scroll.
+
+**Root cause:** en sticky-yta klistrar/följer bara med inom sin egen CONTAINING BLOCK = föräldra-
+elementets innehållsbox (CSS Positioned Layout L3 §6.2). Ligger den sticky baren och den långa listan
+som SKILDA SYSKON, är barens containing block bara dess egen lilla wrapper (noll extra höjd) , den har
+ingen sträcka att följa längs och skrollar ur vy direkt. (Förväxla inte med en faktisk nästlad overflow-
+scroll; här är det containing-block-relationen, inte en inre scroll-container.)
+
+**Fix:** lägg den sticky baren OCH innehållet den ska följa längs i SAMMA förälder (skicka listan som
+`children`, rendera den efter baren i samma wrapper). Då sträcker sig containing block:en över hela
+listans höjd och `sticky top-N` klistrar baren under headern hela vägen ner.
+
+**Bevisa (jsdom har ingen layout):** (1) enhetstest på den STRUKTURELLA invarianten , bar och lista har
+samma `parentElement` , med en negativ-kontroll som rödnar om listan åter blir ett syskon; (2) en
+browser-probe (Playwright) som mäter barens `getBoundingClientRect().top` före/efter `window.scrollBy`
+och bekräftar att den stannar nära toppen (under headern), inte glider bort. Källa: T83, F1
+(`src/components/collapsible-list/StickyFollowToggle.tsx` + `.test.tsx`, decisions.md 2026-06-15).
+
+### hand-rullad-fast-höjd-virtualisering-utan-dependency (VM 2026)
+
+**Problem:** en lista kan bli LÅNG (240+ rader, t.ex. den totala topplistan över alla rum), och att
+rendera alla på en gång ger en DOM-vägg (långsam, hög minnesåtgång). Ett virtualiserings-PAKET
+(`@tanstack/react-virtual` m.fl.) löser det men är ett nytt beroende för något som är en liten,
+väl förstådd beräkning (PRINCIPLES §11: lägg inte till ett paket för det triviala).
+
+**Recept (`src/components/collapsible-list/use-virtual-rows.ts`):** (flyttad hit från total-
+leaderboard i #173 T82 del 4 när den blev en DELAD husprimitiv, se collapsible-list-mönstret nedan.)
+1. Anta FAST radhöjd (`rowHeight`, matchad mot CSS). Totalhöjd = `count * rowHeight`.
+2. Mät den scrollande containerns höjd (ResizeObserver, fallback window-resize för jsdom/test).
+3. Vid en scroll-position: `startIndex = floor(scrollTop / rowHeight) - OVERSCAN`,
+   `endIndex = startIndex + ceil(viewportH / rowHeight) + OVERSCAN*2`, klampat i `[0, count]`.
+4. Rendera BARA spannet `[startIndex, endIndex)` absolut-positionerat på `startIndex * rowHeight`,
+   inuti en spacer-div med full höjd (scrollbaren stämmer mot hela listan).
+5. Bryt ut den RENA spann-matematiken (`computeRange`) så den testas utan DOM (tom lista, kortare än
+   viewporten, skrollad till botten, overscan-klamp, rowHeight 0). Hooken (DOM-delen) testas i
+   komponenten (mät att DOM:en bär en DELMÄNGD, inte hela listan).
+
+**A11y (viktigt):** virtualiseringen får INTE ljuga om listans storlek för en skärmläsare. Sätt
+`role="list"` på containern och `aria-setsize={total}` + `aria-posinset={absolutIndex+1}` på VARJE
+synlig rad (giltig list-ARIA), så AT vet att listan har N rader även när bara en delmängd är monterad.
+ANVÄND INTE `aria-rowcount`/`aria-rowindex`, de är grid/table-attribut, inte giltiga på en `role="list"`.
+
+**"Hoppa till"-genväg:** en knapp/sök som skrollar containern till `index * rowHeight` (en bit ner i
+viewporten, inte exakt i kanten, så raden känns "hittad"). `scrollTo({behavior:'smooth'})` respekterar
+OS:ets reduced-motion automatiskt (ingen Framer-anim att gata). Element utanför fönstret som ALLTID
+ska synas (egen rad i topp-3, en hjälte) renderas UTANFÖR det virtualiserade spannet, så de aldrig kan
+saknas ur DOM:en även om de skrollats förbi.
+
+**Varför:** fast-höjd-windowing är ~50 rader ren kod med en testbar kärna, inget paket behövs. Resultatet:
+240+ rader scrollar mjukt med ~20 rader i DOM:en (verifierat i browsern: 241 deltagare -> 21 monterade),
+och AT får hela listans storlek via aria-setsize.
+
+### sparsam-deterministisk-social-generering-med-tysthets-default (VM 2026)
+
+**Recept (generera "levande" social-data , reaktioner/kommentarer , från botar/agenter utan att spamma
+och utan att gissa data källan inte bär):**
+
+1. **Härled en KATEGORI ur källans EGNA form, gissa inte fält som saknas.** Klassa utfallet (här en
+   matchs "mood") ENBART ur det källan faktiskt bär (här `PoolFacit.matches[i].actual = Scoreline`), och
+   härled MEDVETET INTE kategorier som kräver data du inte har (här "skräll"/odds, "sen vinst"/minut).
+   Kategorin är EN sanning som alla generatorer läser (DRY). Testa prioritets-ordningen med DISKRIMINERANDE
+   fixturer (ett värde där fel ordning ger ett ANNAT svar) + operator-mutation som rödnar.
+2. **Reaktioner är primärt + billigt, kommentarer en sällsynt krydda.** Gata reaktioner på en MÅTTLIG
+   benägenhet, men SKALA NER kommentar-chansen hårt (här `commentChance * COMMENT_SCALE`), så kommentarer
+   blir få. Allt val (emoji, fras) ur KURERADE pooler som speglar en DB-CHECK / en enda sanning (här
+   `REACTION_EMOJIS`), aldrig en egen sträng som kan nekas live.
+3. **TYSTHETS-DEFAULT som beteende, inte som efterhandstanke.** Faller inte sannolikheten -> generera
+   INGET (var tyst). BEVISA sparsamheten kvantitativt (andel kommenterade enheter låg) OCH tysthets-
+   defaulten (lågbenägen aktör i ett "tråkigt" fall = 0), med en NEGATIV-KONTROLL (samma fall med hög
+   benägenhet ger > 0, annars vaktade testet inget).
+4. **Variation, inte mekaniska mallar.** Flera fras-varianter per (kategori, ton), valda deterministiskt,
+   så samma aktör inte upprepar identisk text och olika aktörer säger olika saker om samma händelse.
+5. **Determinism via separata seed-rymder per beteende.** Ge varje generator (tips/reaktion/kommentar/svar)
+   en EGEN seed-konstant XOR:ad med ett stabilt index, så beteendena inte korrelerar inom samma aktör men
+   ändå är reproducerbara (samma input -> samma output, dry-run == live).
+6. **Saknar schemat en koppling , approximera ärligt och dokumentera det.** Saknas en svars-/tråd-FK
+   (här room_comments utan parent_id) , approximera "svar" som en följd-rad i samma grupp (match-tråd) som
+   REDAN har en annan aktörs inlägg (giltig befintlig konversation), korsa aldrig grupper, och skriv ut
+   i decisions.md att det inte är en hård länk.
+
+**Varför:** social "atmosfär" från botar blir lätt antingen spam (för många, för mekaniska) eller falsk
+(hittar på utfall källan inte bär). Genom att härleda en kategori bara ur källans form, hålla kommentarer
+sällsynta med en bevisad tysthets-default, variera ur kurerade pooler, och approximera saknade kopplingar
+ärligt, blir resultatet diskret och naturligt , och varje "är det här sparsamt/sant?" är testbart, inte
+en gissning. Källa: T82 del 2 (`src/data/bots/match-mood.ts` + `react.ts` + `comment.ts` + `comment-pools.ts`).
+
 ### rå-api-kuvert-i-jsonb-projiceras-genom-kall-parsern-med-per-blob-isolering (VM 2026)
 
 **Recept (en DB-rad med RÅA externa svar i jsonb -> klient-modell, utan att gissa formen och utan att
@@ -97,6 +215,42 @@ nästa mirror-funktion:
   och bekräfta RÖTT (gjort: mirror MAX->SUM / window-bound borttagen -> testet rödnar).
 Källa: pollare-v3 (`v3-mirror-parity.test.ts`, `live-window.ts` + `per-match-poll-plan.ts` + mirror i
 `_shared/livescore-core.ts`, decisions.md 2026-06-15).
+
+### genererad-edge-mirror-via-esbuild-bundle-nar-grafen-ar-stor-och-ren (VM 2026)
+
+**Recept (en edge-funktion behöver en STOR, ren domän-graf , för stor att hand-spegla utan drift):**
+
+När logiken edge-funktionen behöver är LITEN (några rena funktioner) räcker den hand-skrivna,
+synk-märkta mirror:n ovan. Men när grafen är STOR (T90: hela scoring-/facit-grafen ,
+`derivePoolFacit` + `compute-standings` + `derive-bracket` + FIFA-tiebreak + `buildTotalLeaderboard`,
+~3400 rader + den källåkrade statiska planen), är en hand-mirror en orimlig drift-yta. GENERERA den
+i stället:
+
+1. **Gör en TUNN, REN bundle-entrypoint i src** (`src/data/global-leaderboard/edge-entry.ts`) som
+   re-exporterar exakt den publika ytan edge-funktionen kallar + ev. inbäddad källåkrad data
+   (`EMBEDDED_STATIC_PLAN`). Använd DEEP imports (inte feature-barrels) , barrels re-exporterar
+   React-komponenter + CSS som annars bundlas in (verifiera med en trial-bundle: 0 React/CSS/node:).
+2. **GENERERA mirror:n med esbuild** (`scripts/generate-<core>.ts`, npm `gen:`-script via vite-node):
+   `build({ entryPoints:[entry], bundle:true, format:'esm', platform:'neutral', write:false })` ->
+   skriv `_shared/<core>.ts` med en `// GENERERAD , REDIGERA INTE`-banner + `@ts-nocheck`. Bundlingen
+   inlinear HELA grafen automatiskt , ingen rad skrivs för hand, alltså ingen hand-drift-yta.
+3. **Lägg den genererade filen i `.prettierignore`** (esbuild-output matchar inte prettier; det är ett
+   artefakt ingen redigerar). Paritet, inte formatering, är grinden.
+4. **VERIFIERA paritet behavioralt** (samma recept som hand-mirror:n, steg 3): ett node-env-test som
+   esbuild-BUNDLAR (a) den COMMITTADE mirror-filen och (b) src-entrypointen FÄRSKT, laddar båda via
+   `data:`-URL, och kör samma diskriminerande in->ut mot BÅDA + ett FÄRSK-vs-committad-fall (fångar en
+   glömd `npm run gen:`). Negativ-kontroll: mutera en konstant i den committade filen -> testet rödnar.
+5. **Edge-funktionen förblir TUNN** (`@ts-nocheck`, bara IO: läs DB sidindelat + gruppera + anropa den
+   bundlade rena funktionen + projicera till en SÄKER utåt-form). Inga domänregler i funktionen.
+
+**Varför:** en stor, ren, källhänvisad domän-graf får inte reimplementeras (SQL) eller hand-speglas
+(drift). En esbuild-bundle ur src ger "EN sanning" gratis , edge-funktionen kör bokstavligen samma
+kompilerade TS som klienten , och paritetstestet (committad bundle == färsk src-bundle) gör en glömd
+regenerering till ett CI-fel i stället för en prod-bugg. Skiljer sig från hand-mirror-receptet bara i
+HUR mirror:n produceras (genererad vs handskriven); välj generering när grafen är för stor att spegla
+för hand. Källa: T90 (#183) (`src/data/global-leaderboard/`, `scripts/generate-global-leaderboard-core.ts`,
+`supabase/functions/_shared/global-leaderboard-core.ts` + `global-leaderboard/index.ts`,
+`global-leaderboard-mirror-parity.test.ts`, decisions.md 2026-06-15 T90).
 
 ### server-harledd-dag-via-before-trigger-for-en-per-omgang-PK (Supabase, VM 2026)
 
@@ -1108,6 +1262,91 @@ kontroll med rätt a11y. Design-frontend stylar via de stabila `data-${name}-tog
 hakarna. Källa: T68 (#129), `src/components/CollapsibleSection.tsx` + wiring i groups/scenarios/bracket/
 group-predictions/bracket-predictions/admin/leaderboard.
 
+### sticky-kontroll-rad-som-foljer-med-i-en-lang-lista-plus-borja-komprimerad (React, VM 2026)
+
+**Problem (ägarens feedback, #173):** en lång RAD-lista (topplista, resultat, tips) ska (a) börja
+KOMPRIMERAD med några rader synliga, och (b) ha en komprimera-kontroll som FÖLJER MED i listan, så man
+kan fälla in/söka/hoppa från VILKEN scroll-position som helst utan att skrolla tillbaka till toppen.
+(Skiljer sig från höjd-klipp-mönstret ovan: det är för RESPONSIVA grid/träd, detta för platta rad-listor
+med en sann "N rader synliga"-preview.)
+
+**Två varianter, EN husplats (`src/components/collapsible-list/`), valda per lista:**
+
+1. **Virtualiserat scroll-fönster med en INRE sticky kontroll-rad** (`CollapsibleList` + `CollapsibleScrollList`),
+   för listor som kan bli MYCKET långa och vars rader är fristående (ingen osparad inmatning, ingen
+   layout-glide). `CollapsibleList` orkestrerar: komprimerat default = en preview (render-prop, de N
+   översta raderna, t.ex. en pall) + en "Visa alla M"-`ExpandToggle`; utfällt = `CollapsibleScrollList`,
+   ett `max-height`-begränsat `overflow-y-auto`-fönster med en `position: sticky; top:0`-kontroll-rad
+   INUTI fönstret. Den raden bär en KOMPRIMERA-knapp (alltid nåbar) + ett valfritt `controls`-slot
+   (sök/hoppa-till-mig). Vid satt `rowHeight` VIRTUALISERAS raderna (delad `use-virtual-rows`, bara
+   synliga + overscan i DOM:en); utan `rowHeight` renderas alla rader (kort lista). Den sticky raden har
+   en OPAK fond + skugga (`.vm-collapsible-controls`) så raderna under aldrig lyser igenom (ingen jitter).
+   Fokus-återföring vid komprimering: när den sticky kontrollen avmonteras förs fokus till "Visa alla M".
+   *Konsument:* den globala topplistan (`TotalLeaderboardList`/`TotalLeaderboardView`), 241 deltagare.
+
+2. **Sticky FÖLJ-MED-toggle över en lista som INTE kan virtualiseras** (`StickyFollowToggle`), för listor
+   där rader MÅSTE förbli mountade: dag-grupperade resultat/tips (osparad inmatning bevaras via `hidden`
+   på `<li>`, inte unmount) och den motion-animerade per-rums-topplistan (layout-glidet kräver mountade
+   rader). I stället för ett scroll-fönster wrappar den den befintliga `ExpandToggle` i en bar som blir
+   `position: sticky; top-16` (under sajt-headern, opak `.vm-sticky-follow-bar`-fond) ENBART i UTFÄLLT
+   läge, så komprimera följer med ner i listan; i komprimerat läge är den en vanlig inline-kontroll. Det
+   befintliga fönstret/inmatningen/sorteringen rörs INTE, bara kontrollens klister-position per läge.
+   *Konsumenter:* resultat-listan + tips-listan (3-dygns/dagens-fönster, oförändrat) + per-rums-topplistan
+   (börjar komprimerad topp-N över en tröskel, glidet bevarat).
+
+**A11y:** list-ARIA (`role="list"` + `aria-setsize`/`aria-posinset` per rad, INTE grid-attribut) bär hela
+storleken även när bara en delmängd renderas; komprimera/expandera bär `aria-expanded`/`aria-controls`;
+den sticky raden är bara en container (kontrollerna i den är vanliga fokuserbara knappar/fält, inget
+fokus-fångande). Kontrast MÄTT i webbläsaren på renderad yta (inte hex), båda teman: komprimera-knapp
+15.2/17.9, sök-fält 12.7/17.9, resultat-bar-knapp 9.8/13.4 (alla >> 4.5); de sticky radernas/barernas
+fond är OPAK och bär ingen egen text.
+
+**Test (per byggsten + per konsument):** byggstenen , komprimerat visar N, utfäll visar alla, sticky
+komprimera bor INUTI scroll-fönstret/baren och nås oavsett scroll, list-ARIA korrekt, fokus-återgång.
+Varje konsument , att den börjar komprimerad + fäller ut + behåller sina särdrag (egen rad markerad,
+inmatning bevarad, glidet kvar). jsdom saknar layout, så STRUKTUREN (sticky-klass + top-offset per läge)
+bevisas i test, den faktiska visuella stickyn i webbläsaren (`.vmshots/`). Negativ-kontroll på de nya
+beteende-testerna (mutera bort slicen/stickyn -> rött).
+
+**Varför:** ägaren gillade total-topplistans sticky kontroll-rad och ville ha den på alla långa listor.
+Rule-of-three uppfyllt (total + resultat + tips + per-rums), så mönstret bröts ut till EN husplats med två
+varianter, valda per lista efter dess tvång (virtualiserbar vs inmatnings-/glide-bunden), i stället för en
+parallell variant per vy. Källa: #173 T82 del 4, `src/components/collapsible-list/`.
+
+### skrolla-ankaret-tillbaka-i-vy-vid-komprimering-app-bar-kompenserat (React, VM 2026)
+
+**Problem (ägarens bugg, T92/#185):** klickar man "komprimera"/"visa färre" LÅNGT NER i en utfälld lista
+fälls listan ihop, men SID-SCROLLEN står kvar långt ner (där listan nyss tog slut) , man stirrar på
+tomrum/nästa sektion och tappar orienteringen.
+
+**Recept (`src/components/collapsible-list/use-collapse-scroll-restore.ts`, EN delad sanning):**
+1. **Hooken ger en `anchorRef` + en `scrollAnchorIntoView()`.** Sätt ankaret på TOPPEN av den
+   komprimerbara regionen (sektionen / följ-med-wrappern). Anropa `scrollAnchorIntoView()` EFTER att
+   listan komprimerats (via `requestAnimationFrame`, så mätningen sker mot det KOMPRIMERADE läget).
+2. **Mätt scroll-till-OFFSET, inte enbart `scrollIntoView()`.** `window.scrollTo({ top })` där
+   `top = scrollY + rect.top - appBarOffset`, klampat `>= 0`. KOMPENSERA för den sticky app-barens höjd
+   genom att läsa `--vm-app-bar-height` ur computed style (EN sanning, samma variabel som sticky-baren
+   `.vm-sticky-follow-bar` använder), annars hamnar rubriken UNDER flik-raden/headern (osynlig). Px och
+   rem (rem*16) hanteras; saknad/oparsebar variabel -> offset 0 (ankaret i absoluta toppen, ändå synligt).
+3. **Reduced-motion-GATAD (WCAG 2.3.3):** `behavior: 'smooth'` normalt, `'auto'` (direkt hopp) när
+   `matchMedia('(prefers-reduced-motion: reduce)').matches`. Gata på att matchMedia FINNS och returnerar
+   ett objekt (jsdom saknar den / kan ge undefined), annars no-op:a snällt, kasta aldrig.
+4. **Gata BARA på KOLLAPS, inte expandering.** I `StickyFollowToggle`: läs `expanded` FÖRE `onToggle()`,
+   skrolla bara om `willCollapse = expanded` (en expandering uppstår inget tomrum). Konsumenter med en
+   SEPARAT nedre toggle (per-rums-topplistan) anropar samma hook i sin egen kollaps-handler (den övre
+   sticky-toggeln sköts redan av StickyFollowToggle, så scrolla bara från den nedre , ingen dubbel-scroll).
+5. **Test (jsdom har ingen layout):** STUBBA ankarets `getBoundingClientRect`, `window.scrollY` och
+   `--vm-app-bar-height` och bevisa MATEMATIKEN (`top = scrollY + rect.top - appBarOffset`, klamp >= 0) +
+   beteende-valet (smooth vs auto). På komponentnivå: en KOLLAPS anropar `window.scrollTo`, en EXPANDERING
+   gör det INTE (negativ-kontroll). Den faktiska visuella scrollen verifieras i browsern (`.vmshots/`).
+
+**Varför:** fixen hör hemma i den DELADE collapsible-list-komponenten, så ALLA långa listor (per-rums-
+topplista, avslöjandet, framtida StickyFollowToggle-konsumenter) ärver den på en gång (EN sanning, ingen
+drift), i stället för en handgjord scroll-restore per vy. App-bar-kompensationen via `--vm-app-bar-height`
+återanvänder exakt den offset sticky-baren redan klistrar mot. Källa: T92 (#185, del F),
+`src/components/collapsible-list/use-collapse-scroll-restore.ts` + wiring i `StickyFollowToggle` +
+`LeaderboardView`.
+
 ### delad-modal-primitiv-agar-a11y-dialog-kontraktet-en-gang (React + motion, VM 2026)
 
 **Recept (EN primitiv som äger hela a11y-dialog-kontraktet, varje dialog behåller sin visuella identitet):**
@@ -1169,3 +1408,34 @@ Styling-slottarna + `children` bevarar varje dialogs distinkta visuella identite
 inline a11y-dialog ÄR nu `<Modal>`. Källa: T33 (#56), `src/components/Modal.tsx` (+ `Modal.test.tsx`),
 migrerade dialoger: `TeamProfilePanel` (T10), `OnboardingDialog` (T13), `SettingsControl` (T32),
 `ScoreGuide` (T34), `GetStartedDialog`/`GetStartedControl` (T54).
+
+### ren-planerare-plus-tunn-exekverare-med-dry-run-och-fore-efter-skydd (VM 2026)
+
+**Recept (ett skript som SKRIVER mot den delade DB:n , seeding, bulk-migrering, städning , utan att kunna
+röra riktig data av misstag):**
+
+1. **Dela i en REN PLANERARE och en TUNN EXEKVERARE.** Planeraren (`buildSeedPlan`, ingen I/O) tar
+   en ÖGONBLICKSBILD av DB-läget (read-only: vilka rum/rader finns) + indata och returnerar en PLAN
+   (vad som SKULLE skapas/ändras). Exekveraren gör bara I/O:t mot planen. ALL logik värd att testa
+   (antal, scopning, uteslutning av skyddad data, idempotens) bor i planeraren och enhetstestas mot
+   fixtures; exekveraren hålls dum. Källa: T82 (`src/data/bots/seed-plan.ts` + `scripts/seed-bots.ts`).
+2. **Dry-run är DEFAULT, skrivning kräver en explicit flagga.** Skriptet skriver INGET om man bara kör
+   det , det rapporterar planen (antal + stickprov). `--live`/`--teardown` krävs för att verkställa. Så
+   man kan aldrig RÅKA skriva. Dry-run kan dessutom planera mot en SYNTETISK snapshot om env saknas, så
+   planens FORM syns utan att röra DB:n alls.
+3. **Secrets ur ENV, fail loud om de saknas i skriv-läge.** service_role-nyckel + URL läses ur
+   `process.env` (aldrig committat), och `requireEnv` kastar med begriplig text om de saknas i
+   `--live`/`--teardown`. Inga secrets i koden (PRINCIPLES §7).
+4. **Uteslut skyddad data i PLANERAREN, inte bara i exekveraren.** Rader/rum som ALDRIG får röras (här
+   Rhodos-rummet) utesluts strukturellt i den rena planen (matchas på NAMN, aldrig på en gissad position),
+   och bevisas i testet (inget medlemskap/tips/nytt rum pekar någonsin dit). Så skyddet är testbart och
+   inte beroende av att exekveraren "kommer ihåg" det.
+5. **FÖRE/EFTER-skydd i skriv-läget.** Räkna RIKTIG (icke-bot/icke-mål) data FÖRE och EFTER körningen och
+   AVBRYT (kasta) om den ändrats. En bugg som mot förmodan rör riktig data fail-loud:ar i stället för att
+   tyst skada den. Idempotens dessutom på rad-nivå (upsert/onConflict + ett UNIQUE idempotens-ankare, här
+   `bot_accounts.persona_key`), så en omkörning aldrig dubblar.
+
+**Varför:** ett skript som skriver mot en DB med RIKTIGA användare är den farligaste kod-klassen i projektet.
+Genom att lägga all beslutslogik i en ren, testad planerare och hålla exekveraren tunn blir "vad händer?"
+bevisbart före en enda rad skrivs, och dry-run-default + env-gating + skyddad-data-uteslutning +
+före/efter-räkning gör att en oavsiktlig eller buggig körning inte kan skada riktig data tyst.

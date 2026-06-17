@@ -24,7 +24,6 @@ import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { teamDisplayName } from '../daily/match-display';
 import { groupByRound, type BracketSlotState } from './derive-bracket';
 import { useBracketData } from './use-bracket-data';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 // Premium-trädets visuella lager (kopplings-affordans, vinnar-framhävning,
 // avancerings-animation, scroll-edges). Stylas ENBART via seamens data-attribut
 // + klass-hakar nedan, så senior-devs semantik + alla tester står kvar.
@@ -270,14 +269,12 @@ export function BracketView() {
   const { status, bracket, teams, mode, error } = useBracketData();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
   const rounds = useMemo(() => (bracket ? groupByRound(bracket) : []), [bracket]);
-  // Anmäl sektionen till chip-navet (T78, #165) medan vyn är monterad.
-  useRegisterSection(SECTIONS.bracket);
 
   return (
     <section aria-labelledby="slutspel-rubrik" className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="slutspel-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+          <h2 id="slutspel-rubrik" className="font-display text-xl font-semibold sm:text-2xl">
             Slutspelsträdet
           </h2>
           {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}

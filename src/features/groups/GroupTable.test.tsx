@@ -119,6 +119,59 @@ describe('GroupTable, tillgänglig tabell-semantik', () => {
   });
 });
 
+describe('GroupTable, responsiv kolumn-täthet (T103: P får aldrig klippas på mobil)', () => {
+  // Den KOMPAKTA mobil-uppsättningen ska alltid vara synlig (ingen `hidden`-klass),
+  // de breda stöd-kolumnerna fälls bort på smala skärmar via media-query-klasser.
+  // Vi kan inte mäta layout i jsdom (inga media-queries tillämpas), men vi kan
+  // verifiera KONTRAKTET: rätt kolumner bär rätt synlighets-klasser, så P (poäng)
+  // och de avgörande talen aldrig kan skrollas ur vy på en 360px-telefon.
+  function headerByLabel(label: string): HTMLElement {
+    const th = screen.getAllByRole('columnheader').find((el) => el.textContent?.trim() === label);
+    if (th === undefined) throw new Error(`Hittade ingen kolumn-header "${label}"`);
+    return th;
+  }
+
+  it('håller den kompakta uppsättningen (#, Lag, S, MS, P) alltid synlig', () => {
+    renderTable();
+    // Inga responsiva `hidden`-klasser på de alltid-synliga kolumnerna: de ryms på 360px.
+    for (const label of ['S', 'MS', 'P']) {
+      expect(headerByLabel(label).className).not.toMatch(/\bhidden\b/);
+    }
+  });
+
+  it('döljer P-kolumnen ALDRIG (viktigaste talet), oavsett brytpunkt', () => {
+    renderTable();
+    const p = headerByLabel('P');
+    // P bär varken `hidden` eller en breakpoint-gate: den är alltid i layouten.
+    expect(p.className).not.toMatch(/hidden|sm:table-cell|md:table-cell/);
+    // Och den är fortfarande den betonade (fet) kolumnen.
+    expect(p.className).toMatch(/font-semibold/);
+  });
+
+  it('fäller bort utfalls-kolumnerna (V/O/F) under sm och stöd-kolumnerna (GM/IM) under md', () => {
+    renderTable();
+    for (const label of ['V', 'O', 'F']) {
+      expect(headerByLabel(label).className).toMatch(/hidden sm:table-cell/);
+    }
+    for (const label of ['GM', 'IM']) {
+      expect(headerByLabel(label).className).toMatch(/hidden md:table-cell/);
+    }
+  });
+
+  it('låter header och datacell följas åt (samma synlighets-klass per kolumn)', () => {
+    renderTable();
+    // V är en sm-kolumn: både dess <th> OCH varje <td> i kolumnen ska bära samma gate,
+    // annars pekar rubriken på fel cell vid en brytpunkt. Vi tar Mexiko-raden som prov.
+    const mexRow = screen.getByRole('rowheader', { name: /Mexiko/ }).closest('tr');
+    expect(mexRow).not.toBeNull();
+    const cells = within(mexRow as HTMLElement).getAllByRole('cell');
+    // cell[0]=#, sedan S V O F GM IM MS P. V är index 2 (S=1, V=2).
+    const vCell = cells[2];
+    expect(vCell).toHaveTextContent('2'); // Mexiko: won=2
+    expect(vCell.className).toMatch(/hidden sm:table-cell/);
+  });
+});
+
 describe('GroupTable, kvalificeringszon (markeras tillgängligt, inte med färg)', () => {
   it('markerar etta och tvåa som kvalificerade via data-attribut + dold text', () => {
     renderTable();

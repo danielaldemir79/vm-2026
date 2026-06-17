@@ -107,7 +107,7 @@ function outcomeMarkFor(pointType: MatchPointType, actualOutcome: Outcome): Outc
 }
 
 /** Lagnamn-uppslag (Team.id -> namn). Returnerar en stabil fallback, ingen krasch. */
-type TeamNameLookup = (teamId: string | null) => string;
+export type TeamNameLookup = (teamId: string | null) => string;
 
 /**
  * En FÄRDIG match: facit-talet (hjälten) + allas tips + poäng + VARFÖR-etikett. Oförändrat
@@ -271,8 +271,21 @@ function PendingMatchCard({
   );
 }
 
-/** Rendera ett avslöjande, dispatchat på status (pågår vs färdig). Uttömmande union. */
-function RevealMatchCard({ match, nameOf }: { match: RevealedMatch; nameOf: TeamNameLookup }) {
+/**
+ * Rendera ETT avslöjande (en match), dispatchat på status (pågår vs färdig). Uttömmande
+ * union. EXPORTERAD (T86, #178) så den rika matchvyns drill-in kan rendera EXAKT detta
+ * "vad alla tippade"-kort SCOPAT till en enskild match, utan att duplicera facit-/pågår-
+ * markup:en (en sanning för reveal-kortet, delas av topplistans lista och matchvyns drill-
+ * in). `nameOf` injiceras så kallaren äger lagnamn-uppslaget (matchvyn slår upp ur sin egen
+ * lag-lista, RevealView ur storens).
+ */
+export function RevealMatchCard({
+  match,
+  nameOf,
+}: {
+  match: RevealedMatch;
+  nameOf: TeamNameLookup;
+}) {
   return match.status === 'finished' ? (
     <FinishedMatchCard match={match} nameOf={nameOf} />
   ) : (

@@ -28,11 +28,11 @@ import { MatchCard } from './MatchCard';
 import { LiveNowSection } from './LiveNowSection';
 import { selectLiveFeed } from './live-feed';
 import { MatchReactions, MatchComments } from '../rooms';
+import { MatchDetailTrigger } from '../match-detail';
 import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favorite-team';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
 import { stageLabel, teamDisplayName } from './match-display';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 
 /**
  * Etiketten ovanför hero:ns framträdande match: "Dagens match" BARA när matchen
@@ -171,7 +171,19 @@ function NextKickoffPillar({
   );
 }
 
-export function DailyMatchesView() {
+export interface DailyMatchesViewProps {
+  /**
+   * Visa favoritlags-väljaren i matchvyns header. Default true (bevarar tidigare
+   * beteende, t.ex. i fixtures-/standalone-render). Idag-fliken sätter false (U2):
+   * väljaren är en INSTÄLLNING och flyttas till Mer, så Idag avlastas och leder med
+   * matcherna. Den DISKRETA lyftningen av favoritlagets matcher i listan/hero:n
+   * påverkas INTE av detta (den läser favoritlags-storen, inte väljaren), så ett valt
+   * favoritlag lyfts som förr även när väljaren bor i en annan flik.
+   */
+  showFavoritePicker?: boolean;
+}
+
+export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesViewProps = {}) {
   const {
     status,
     mode,
@@ -188,9 +200,6 @@ export function DailyMatchesView() {
     goNext,
   } = useDailyMatches();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
-  // Anmäl sektionen till det sticky chip-navet (T78, #165) medan vyn är monterad.
-  // Tracker-vyn renderar alltid, så "Idag"-chipet finns alltid.
-  useRegisterSection(SECTIONS.daily);
   // Dagens svenska kalenderdag (dag-medvetet: flyttar sig över midnatt/PWA-väckning,
   // se use-today-key). Driver hero-etiketten "Dagens match" vs matchens datum (#54).
   const { todayKey } = useTodayKey();
@@ -252,7 +261,7 @@ export function DailyMatchesView() {
           Matcher
         </p>
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="dagens-matcher-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+          <h2 id="dagens-matcher-rubrik" className="font-display text-xl font-semibold sm:text-2xl">
             Dagens matcher
           </h2>
           {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}
@@ -263,8 +272,10 @@ export function DailyMatchesView() {
 
         {/* FAVORITLAGS-VÄLJAREN (T23, #23): pinna ett lag så dess matcher lyfts diskret i
             listan. Visas först när lagen laddats (annars en tom väljare). Egen liten yta
-            under rubriken, lågmäld; design-frontend finputsar utseendet. */}
-        {teams.length > 0 ? (
+            under rubriken, lågmäld. U2: Idag-fliken döljer väljaren (showFavoritePicker=
+            false) och visar den i stället i Mer, eftersom det är en INSTÄLLNING , så Idag
+            inte blir en vägg. Den diskreta match-lyftningen påverkas inte (läser storen). */}
+        {showFavoritePicker && teams.length > 0 ? (
           <div className="mt-1 max-w-md rounded-card border border-border bg-surface p-4 shadow-[var(--vm-shadow-card)]">
             <FavoriteTeamPicker teams={teams} />
           </div>
@@ -498,6 +509,36 @@ export function DailyMatchesView() {
                       match={match}
                       teamsById={teamsById}
                       liveData={liveByMatchId.get(match.id) ?? null}
+                      detailAction={
+                        // DRILL-IN (T86, #178): tryck på matchen -> rik matchvy (tidslinje +
+                        // statistik + laguppställning + vad alla tippade). En tydlig egen
+                        // affordans per matchrad (Daniels "tap på en match"); reveal-listornas
+                        // drill-in i Tips görs i T92. aria-label namnger matchen för skärmläsare.
+                        <MatchDetailTrigger
+                          matchId={match.id}
+                          ariaLabel={`Öppna matchsida för ${teamDisplayName(
+                            match.homeTeamId,
+                            teamsById
+                          )} mot ${teamDisplayName(match.awayTeamId, teamsById)}`}
+                          className="vm-install-pill self-start text-xs"
+                        >
+                          Öppna matchsida
+                          <svg
+                            aria-hidden="true"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="vm-install-pill-icon"
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                        </MatchDetailTrigger>
+                      }
                       footer={
                         <>
                           <MatchReactions matchId={match.id} />

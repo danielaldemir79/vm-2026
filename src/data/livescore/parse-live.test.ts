@@ -165,10 +165,51 @@ describe('parseEvents: rika 2022-events (smutsig verklig data)', () => {
     expect(card?.assistName).toBeNull();
   });
 
+  it('bär spelar- + assist-id (stabil nyckel för skytteligan T87)', () => {
+    // Första målet i samplen: J. Bellingham (id 129718) med assist L. Shaw (id 891).
+    const events = parseEvents(eventsResponse);
+    const firstGoal = events.find((e) => e.kind === 'goal');
+    expect(firstGoal?.playerId).toBe(129718);
+    expect(firstGoal?.assistId).toBe(891);
+  });
+
+  it('sätter assistId till null när assist saknas (assist {id:null,name:null})', () => {
+    const events = parseEvents(eventsResponse);
+    const card = events.find((e) => e.kind === 'card');
+    expect(card?.assistId).toBeNull();
+  });
+
   it('läser kortfärg ur detail (Yellow Card -> yellow)', () => {
     const events = parseEvents(eventsResponse);
     const yellow = events.find((e) => e.kind === 'card' && e.detail === 'Yellow Card');
     expect(yellow?.cardColor).toBe('yellow');
+  });
+
+  // DISKRIMINERANDE seam-test (F1): API-Football v3 sätter detail "Yellow-Red Card" för en
+  // andra-gult-UTVISNING. Den strängen bär BÅDE "yellow" och "red", så en includes('yellow')-
+  // FÖRST-ordning skulle klassa den som 'yellow' (buggen). Vi matar den EXAKTA API-strängen
+  // genom parseEvents->readCardColor och kräver 'red' (utvisning), inte 'yellow'. Tidigare
+  // tester använde bara de bekväma "Red Card"/"Yellow Card", aldrig den riktiga strängen.
+  it('klassar "Yellow-Red Card" (andra-gult-utvisning) som red, INTE yellow (F1)', () => {
+    const secondYellowSendOff = {
+      get: 'fixtures/events',
+      results: 1,
+      errors: [],
+      response: [
+        {
+          time: { elapsed: 75, extra: null },
+          team: { id: 1, name: 'X' },
+          player: { id: 1, name: 'A' },
+          assist: { id: null, name: null },
+          type: 'Card',
+          detail: 'Yellow-Red Card', // API-Footballs FAKTISKA sträng för andra gult
+          comments: null,
+        },
+      ],
+    } as unknown as RawApiResponse<RawEvent>;
+    const [e] = parseEvents(secondYellowSendOff);
+    expect(e.kind).toBe('card');
+    expect(e.cardColor).toBe('red');
   });
 
   it('bär extra-minut för ett tilläggstid-event (45+1, 90+10, 90+13)', () => {
@@ -283,6 +324,30 @@ describe('parseLineups: laguppställningar', () => {
   it('sätter grid till null för avbytare (grid saknas)', () => {
     const lineups = parseLineups(lineupsResponse);
     expect(lineups[0].substitutes[0].grid).toBeNull();
+  });
+
+  it('bär tränarens namn ur coach-blocket (England: G. Southgate)', () => {
+    const lineups = parseLineups(lineupsResponse);
+    expect(lineups[0].coachName).toBe('G. Southgate');
+  });
+
+  it('tål en lineup-post UTAN coach-block -> coachName null (gissa aldrig)', () => {
+    // En post där hela coach-blocket saknas (API kan utelämna det) ska ge null, inte krasch.
+    const payload = {
+      get: 'fixtures/lineups',
+      results: 1,
+      response: [
+        {
+          team: { id: 99, name: 'Utan tränare' },
+          formation: '4-4-2',
+          startXI: [{ player: { id: 1, name: 'A', number: 1, pos: 'G', grid: '1:1' } }],
+          substitutes: [],
+        },
+      ],
+      errors: {},
+    };
+    const lineups = parseLineups(payload);
+    expect(lineups[0].coachName).toBeNull();
   });
 });
 

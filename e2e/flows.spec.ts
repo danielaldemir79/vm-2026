@@ -9,17 +9,24 @@
 // känslig.
 
 import { test, expect } from '@playwright/test';
-import { openApp, SECTION_HEADINGS, THEME_ATTRIBUTE } from './helpers';
+import { openApp, gotoTab, IDAG_HEADINGS, TURNERING_HEADINGS, THEME_ATTRIBUTE } from './helpers';
 
 test.describe('VM 2026 , kritiska flöden (fixtures)', () => {
-  test('appen laddar och alla huvudsektioner renderas', async ({ page }) => {
+  test('appen laddar och huvudsektionerna renderas i rätt flik (T83)', async ({ page }) => {
     await openApp(page);
 
-    // Hero-rubriken (h1) bär appens namn.
+    // Hero-rubriken (h1) bär appens namn (Idag-fliken är default).
     await expect(page.getByRole('heading', { level: 1, name: 'VM 2026' })).toBeVisible();
 
-    // De fyra live-tracker-sektionerna finns alla på sidan (en skroll-sida, ingen router).
-    for (const heading of SECTION_HEADINGS) {
+    // FLIK-IA (T83): "Dagens matcher" finns i Idag-fliken (default).
+    for (const heading of IDAG_HEADINGS) {
+      await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    }
+
+    // Turnerings-sektionerna (gruppspel/"vad krävs"/slutspelsträd) finns i Turnering-fliken
+    // , byt flik och bevisa att de renderas där (= vy-växlingen kopplar in rätt vyer).
+    await gotoTab(page, 'Turnering');
+    for (const heading of TURNERING_HEADINGS) {
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     }
   });
@@ -28,6 +35,8 @@ test.describe('VM 2026 , kritiska flöden (fixtures)', () => {
     page,
   }) => {
     await openApp(page);
+    // Gruppspels-sektionen bor i Turnering-fliken (T83).
+    await gotoTab(page, 'Turnering');
 
     // Gruppspels-sektionen bär den delade komprimerings-kontrollen (data-groups-toggle).
     // Den ÖVRE toggeln (position 'top') styr utfällningen via aria-expanded.
@@ -68,20 +77,25 @@ test.describe('VM 2026 , kritiska flöden (fixtures)', () => {
 
   test('what-if-simulering: starta och avbryt återgår till neutralt läge', async ({ page }) => {
     await openApp(page);
+    // What-if-kontrollen (SimulationBanner) bor i Turnering-fliken (T83), vid tabeller/träd.
+    await gotoTab(page, 'Turnering');
 
-    const frame = page.locator('[data-simulation-frame]');
+    // Turnering-flikens sim-ram (det finns en frame per simulerad flik; ta Turnering-flikens
+    // panel-scope så vi mäter rätt). Scopa till den aktiva Turnering-panelen.
+    const turnering = page.locator('[data-tab-panel="turnering"]');
+    const frame = turnering.locator('[data-simulation-frame]');
     await expect(frame).toHaveAttribute('data-simulation-active', 'false');
 
     // Starta simuleringen.
-    await page.locator('[data-simulation-enter]').click();
+    await turnering.locator('[data-simulation-enter]').click();
     await expect(frame).toHaveAttribute('data-simulation-active', 'true');
     // Sim-ramen visar "Simuleringsläge"-badgen så ingen förväxlar labbet med riktig data.
-    await expect(page.getByText('Simuleringsläge')).toBeVisible();
+    await expect(turnering.getByText('Simuleringsläge')).toBeVisible();
 
     // Avbryt (Avsluta simulering) , tillbaka till neutralt läge.
-    await page.locator('[data-simulation-exit]').click();
+    await turnering.locator('[data-simulation-exit]').click();
     await expect(frame).toHaveAttribute('data-simulation-active', 'false');
-    await expect(page.locator('[data-simulation-enter]')).toBeVisible();
+    await expect(turnering.locator('[data-simulation-enter]')).toBeVisible();
   });
 
   test('lagprofil-modal: ett lagnamn öppnar profilen och Escape stänger den', async ({ page }) => {
@@ -124,6 +138,12 @@ test.describe('VM 2026 , kritiska flöden (fixtures)', () => {
     // GATINGEN: i standalone (app-läge) döljs den HELT (testas i enhetstesterna mot
     // detectStandalone); här bevisar vi den synliga, klickbara guide-fallbacken.
     await openApp(page);
+
+    // U2 (design-frontend, #175): install-knappen flyttades från Idag till Mer , den är
+    // en åtgärd/inställning, inte dagens-innehåll, så Idag avlastas. Den ärliga guide-
+    // fallbacken finns alltså i Mer-fliken nu. (Den ALLTID nåbara install-vägen via
+    // kugghjuls-portalen finns kvar oberoende; här bevisar vi flik-ytans fallback.)
+    await gotoTab(page, 'Mer');
 
     const installButton = page.locator('[data-get-started-open="install"]');
     await expect(installButton).toBeVisible();

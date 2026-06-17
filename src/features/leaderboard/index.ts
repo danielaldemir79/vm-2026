@@ -5,7 +5,16 @@ export { LeaderboardSection } from './LeaderboardSection';
 export { LeaderboardProvider } from './LeaderboardProvider';
 export { LeaderboardSummary } from './LeaderboardSummary';
 export { LeaderboardView } from './LeaderboardView';
-export { RevealView } from './RevealView';
+export { RevealView, RevealMatchCard, type TeamNameLookup } from './RevealView';
+// T92 (del D): "vad alla tippade" som en paginerad, kompakt, drill-in-bar sektion i Tips-fliken.
+export { RevealSection } from './RevealSection';
+export {
+  buildRevealRows,
+  pageOfRevealRows,
+  type RevealRow,
+  type RevealPage,
+  type SelfRevealResult,
+} from './reveal-rows';
 export { TipsScoreSummary } from './TipsScoreSummary';
 export { PersonalStatsSection } from './PersonalStatsSection';
 export {
@@ -31,6 +40,10 @@ export {
   type GroupFacit,
   type BracketFacit,
 } from './derive-facit';
+
+// T84 (#176): PRELIMINÄR (live) resultat-overlay + dess "pågår nu?"-predikat. REN, ingen
+// skriv-väg, konvergerar mot facit. Delas av per-rums-topplistan + den totala (demo-derivationen).
+export { applyLiveResults, hasLivePreliminaryMatch } from './apply-live-results';
 export {
   buildMatchReveal,
   type RevealedMatch,

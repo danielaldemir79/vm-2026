@@ -1,0 +1,315 @@
+/* Flik-radens layout + baseline-utseende (T83, #175).
+ *
+ * FUNKTIONELL + tillgänglig baseline; design-frontend lägger premium-finishen
+ * (ikoner, aktiv-indikator, mikro-animation) ovanpå via de stabila .vm-tab*-hakarna
+ * + data-attributen (samma arbetsdelning som tidigare tasks). Här bor bara det som
+ * gör raden ANVÄNDBAR och RESPONSIV: var den sitter, hur den klarar tangentbord
+ * (fokus-ring), och att den inte skymmer innehåll.
+ *
+ * RESPONSIV PLACERING (ren CSS, ingen JS-resize-gissning, samma princip som T79):
+ *   - MOBIL (< 640px): en flik-rad FAST längst ner (sport-app-mönster, tummen når
+ *     den). safe-area-inset så den inte hamnar under iPhone-hemknappsindikatorn.
+ *   - DESKTOP (>= 640px): en horisontell rad i flödet, sticky med top = header-höjden
+ *     så den pinnar DIREKT UNDER den sticky top-0-headern (z-30), aldrig ovanpå den, och
+ *     är alltid nåbar vid scroll. (--vm-header-height bär offseten, en sanning.)
+ * Vilken layout som gäller styrs HELT av media-queries, så ingen dubbel-rendering
+ * och inget JS behövs (en enda DOM-nod, två lägen). */
+
+/* Bredd-brytpunkten matchar Tailwinds `sm` (640px), appens etablerade mobil/desktop-
+   gräns (App.tsx + section-nav använde sm:). En sanning för var "mobil" slutar. */
+
+/* Höjden på den FASTA mobil-flikraden (utan safe-area). EN sanning som både
+   innehålls-luften ([data-tab-content]) OCH svävande element ovanför raden (toaster,
+   "ny version"-prompten, F3) mäter mot, så de aldrig kan krocka med flik-raden.
+   ~3.25rem flik-höjd + 1px topp-kant, avrundat till en lugn 4rem.
+
+   --vm-header-height = app-headerns (data-app-header) höjd. Headern är `sticky top-0`
+   på ALLA brytpunkter, så på desktop måste den sticky flik-raden pinna UNDER headern,
+   inte ovanpå den (annars glider de över varandra vid scroll, F1/T83). EN sanning som
+   både flik-radens desktop-`top` OCH den sticky "följ-med"-baren (StickyFollowToggle)
+   mäter mot, så header-offseten aldrig driftar isär (jfr --vm-tab-bar-height ovan).
+   4rem = headerns py-3 (0.75rem * 2) + wordmark-raden, matchar uppmätt 64px. */
+:root {
+  --vm-tab-bar-height: 4rem;
+  --vm-header-height: 4rem;
+  /* DESKTOP-flik-radens höjd (>=640px), där raden sitter i flödet (inte fast längst
+     ner). Härledd ur .vm-tab:s desktop-luft: 2 * 0.875rem padding + ~1.25rem etikett-
+     rad + 1px botten-kant ≈ 3.25rem (uppmätt 52.67px @16px root). Egen token, INTE
+     --vm-tab-bar-height (den beskriver den FASTA mobil-radens 4rem), så de två kan
+     skilja sig utan att drifta. */
+  --vm-tab-bar-height-desktop: 3.25rem;
+  /* Den SAMMANHÅLLNA desktop-app-barens fulla höjd = header + flik-rad. EN sanning
+     som svävande sticky-element under app-baren (StickyFollowToggle:s "följ-med"-bar)
+     mäter sin top-offset mot, så de tuckas UNDER hela app-baren, inte under flik-raden. */
+  --vm-app-bar-height: calc(var(--vm-header-height) + var(--vm-tab-bar-height-desktop));
+}
+
+/* --- MOBIL (default): fast flik-rad längst ner --- */
+.vm-tab-bar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  /* z-30: i nivå med app-headern, ÖVER sid-innehåll OCH över svävande toaster/
+     prompter (z-20), så en toast aldrig kan lägga sig ÖVER och dölja flik-raden
+     (F3). Under modaler/onboarding (z-50). */
+  z-index: 30;
+  border-top: 1px solid var(--color-border);
+  /* Opak, lätt frostad fond så innehåll som scrollar under raden inte lyser igenom
+     (samma anti-genomlysnings-recept som app-headern). */
+  background-color: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(10px);
+  /* Respektera mobilens safe-area (iPhone home-indikator), annars klipps raden. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.vm-tab-list {
+  display: flex;
+  margin-inline: auto;
+  max-width: 72rem; /* max-w-6xl, samma som appens main-container. */
+}
+
+.vm-tab {
+  position: relative; /* Bär den absolut-placerade aktiv-indikatorn (D2). */
+  flex: 1 1 0; /* Fem lika breda flikar på mobil. */
+  display: inline-flex;
+  flex-direction: column; /* Ikon ÖVER etikett (sport-app-stack på mobil). */
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.375rem;
+  min-height: 3.25rem; /* >= 44px touch-mål (WCAG 2.5.5 / mobil-ergonomi). */
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-fg-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Flik-ikonen (D1): ärver färg via currentColor (muted -> fg/accent på aktiv),
+   storlek via em så den följer flik-fontens skala. Konsekvent glyf-storlek. */
+.vm-tab-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+.vm-tab-label {
+  line-height: 1;
+}
+
+/* AKTIV FLIK (D2): tydlig markering på FLERA samtidiga sätt (inte bara färg, så
+   den bär även för en färgblind användare):
+   1. ikon + etikett i ACCENT-färgen (currentColor=accent -> ikonens fyllning tänds),
+   2. en VIKT-bump på etiketten (600 -> 700),
+   3. en glidande accent-indikator (.vm-tab-indicator nedan),
+   4. en svag arena-glow bakom ikonen (radial, låg alfa, ren dekor). */
+.vm-tab[data-active='true'] {
+  color: var(--color-accent);
+}
+
+.vm-tab[data-active='true'] .vm-tab-label {
+  font-weight: 700;
+  color: var(--color-fg);
+}
+
+/* Svag arena-glow bakom den aktiva ikonen (wow-detalj, sparsam). Ren dekor via
+   en radial bakom ikon-raden; låg alfa så den lyfter utan att skrika. */
+.vm-tab[data-active='true'] .vm-tab-icon {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--color-accent) 45%, transparent));
+}
+
+/* AKTIV-INDIKATORN (D2): en accent-stav. På mobil-raden sitter den som en kort,
+   rundad topp-stav (ovanför ikonen); på desktop blir den en underlinje (se nedan).
+   Mjuk in-toning gatas på reduced-motion. */
+.vm-tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.75rem;
+  height: 3px;
+  border-radius: 0 0 var(--radius-pill) var(--radius-pill);
+  background: var(--color-accent);
+  box-shadow: 0 1px 8px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+/* Synlig tangentbords-fokus (WCAG 2.4.7), samma accent-ring-recept som appens övriga
+   kontroller. focus-visible => musklick ger ingen ring, tangentbord gör det. En
+   rundad inre ring runt hela flik-träffytan (matchar touch-målet). */
+.vm-tab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+  outline-offset: -3px;
+  border-radius: var(--radius-md);
+}
+
+/* Hover på en INAKTIV flik: lyft texten mot fg (en lugn affordans, ingen färgklick). */
+@media (hover: hover) {
+  .vm-tab:not([data-active='true']):hover {
+    color: var(--color-fg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-tab {
+    transition: color 0.18s ease;
+  }
+  .vm-tab-icon {
+    transition:
+      filter 0.18s ease,
+      transform 0.18s ease;
+  }
+  /* Indikatorn tonar + växer in mjukt när fliken blir aktiv (wow, men sparsamt). */
+  .vm-tab-indicator {
+    animation: vm-tab-indicator-in 0.22s ease both;
+  }
+}
+
+@keyframes vm-tab-indicator-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scaleX(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scaleX(1);
+  }
+}
+
+/* Innehålls-luft så den fasta mobil-raden aldrig skymmer sidans sista innehåll.
+   Sätts på den wrapper appen ger , den bär attributet `data-tab-content` (App.tsx
+   <main>), så selektorn MÅSTE matcha attributet (en tidigare `.vm-tab-content`-klass
+   var aldrig satt på elementet => regeln var död och sista kortet kröp in under flik-
+   raden på alla flikar). Klarering = flik-radens höjd + en bekväm luft + safe-area, så
+   det sista kortet alltid har tydligt avstånd till den fasta raden (inte bara nuddar). */
+[data-tab-content] {
+  padding-bottom: calc(var(--vm-tab-bar-height) + 1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* SVÄVANDE BOTTEN-ELEMENT OVANFÖR FLIK-RADEN (F3): toaster / "ny version"-prompten
+   ligger `fixed bottom-0`. På MOBIL skulle de annars lägga sig RAKT ÖVER den fasta
+   flik-raden och dölja navigationen. Den här klassen lyfter dem ovanför raden
+   (flik-höjd + safe-area + en liten luft), så de aldrig krockar. På DESKTOP (där
+   flik-raden flyttat upp till toppen, se nedan) nollas lyftet och elementet sitter
+   vid botten-kanten som vanligt. EN sanning för "rätt ovanför flik-raden". */
+.vm-above-tab-bar {
+  bottom: calc(var(--vm-tab-bar-height) + 0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  /* Desktop: flik-raden sitter i toppen, inte i botten => inget botten-lyft behövs. */
+  .vm-above-tab-bar {
+    bottom: 0;
+  }
+}
+
+/* --- DESKTOP (>= 640px): horisontell app-bar-rad, sticky under headern (D5/D8) ---
+   På desktop blir flik-raden en sammanhållen del av app-baren direkt under header-
+   bandet: samma frostade fond, en horisontell rad där ikon + etikett sitter SIDA
+   vid sida (inte staplade), och aktiv-markören blir en glidande UNDERLINJE. Så
+   navigationen läser som en proffsig app-bar, inte en bred mobil-rad. */
+@media (min-width: 640px) {
+  .vm-tab-bar {
+    position: sticky;
+    /* Headern (data-app-header) ÄR sticky top-0 på alla brytpunkter, så den pinnar
+       0..header-höjd vid scroll. Flik-raden måste därför pinna UNDER headern (top =
+       header-höjd), annars glider de två sticky-banden över varandra vid scroll och
+       de frostade fonderna lägger sig på varandra till en grötig strimla (F1/T83).
+       Token-driven så offseten = headerns höjd, en sanning. */
+    top: var(--vm-header-height);
+    bottom: auto;
+    border-top: none;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 0;
+    /* Samma frostade fond som app-headern (color-mix mot surface), så header +
+       flik-rad läses som EN sammanhållen app-bar på desktop (D8). */
+    background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);
+  }
+
+  .vm-tab-list {
+    justify-content: flex-start;
+    gap: 0.125rem;
+    padding-inline: 1.25rem;
+  }
+
+  .vm-tab {
+    flex: 0 0 auto; /* Innehållsbred på desktop (inte tvingat lika breda). */
+    flex-direction: row; /* Ikon BREDVID etikett på desktop. */
+    gap: 0.5rem;
+    padding: 0.875rem 1.125rem;
+    font-size: 0.875rem;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+
+  .vm-tab-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  /* Inaktiv flik på desktop: en mjuk yt-ton på hover (app-bar-känsla). */
+  @media (hover: hover) {
+    .vm-tab:not([data-active='true']):hover {
+      background: color-mix(in srgb, var(--color-fg) 5%, transparent);
+    }
+  }
+
+  /* Desktop: aktiv-indikatorn blir en UNDERLINJE som spänner hela flik-bredden
+     (botten-kant), i stället för den korta topp-staven. */
+  .vm-tab-indicator {
+    top: auto;
+    bottom: -1px; /* Ligger på app-barens botten-kant. */
+    left: 0;
+    width: 100%;
+    height: 2.5px;
+    transform: none;
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .vm-tab-indicator {
+      animation: vm-tab-underline-in 0.22s ease both;
+    }
+  }
+
+  /* Ingen fast botten-rad => ingen extra botten-luft behövs på desktop. */
+  [data-tab-content] {
+    padding-bottom: 0;
+  }
+}
+
+@keyframes vm-tab-underline-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+/* MJUK FLIK-ÖVERGÅNG (north-star §4): när en flik blir aktiv tonar + lyfter dess
+   panel-innehåll mjukt IN. En inaktiv panel är `hidden` (display:none); när den
+   blir aktiv går display till block och animationen spelar EN gång , så varje flik-
+   byte får en lugn, syftesfull övergång utan att avmontera (state bevaras). Helt
+   dekorativt: `hidden` styr fortfarande synlighet + a11y-trädet, så övergången kan
+   aldrig påverka vad en skärmläsare ser. Gatad på reduced-motion (då ingen rörelse). */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-tab-panel[data-active='true'] {
+    animation: vm-tab-panel-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes vm-tab-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

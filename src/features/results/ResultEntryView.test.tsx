@@ -12,6 +12,36 @@ function fixturesEnv(): ImportMetaEnv {
   return {} as ImportMetaEnv;
 }
 
+// Antal SYNLIGA matchformulär via en STABIL markör (`form[data-match-id]` vars
+// innersta <li> inte är `hidden`), i stället för screen.getAllByRole('group').
+//
+// Varför (samma prestanda-patologi som T90 fixade i App.test.tsx, se decisions.md):
+// getAllByRole('group') tvingar Testing Library att, för VARJE kandidat i hela
+// trädet, både matcha rollen OCH avgöra synlighet via dom-accessibility-apis
+// isInaccessible -> jsdom getComputedStyle, vars kostnad växer med DOM-storleken.
+// Den här vyn renderar ALLA 104 matchformulär (out-of-window dolda med `hidden`,
+// inte bortfiltrerade, C2), så trädet är stort, och varje sådan query i en
+// waitFor-loop betalar kostnaden om och om igen -> testet sväller (~31 s under full
+// parallell svit-last, sårbart mot 20 s-blockets timeout). Markör-uppslaget är ett
+// O(n) querySelectorAll + en hidden-koll per nod (ingen a11y-namnberäkning), så det
+// är billigt och deterministiskt.
+//
+// EKVIVALENT, inte svagare: "synlig" definieras EXAKT som produktionskoden gör (se
+// ResultEntryView.tsx: "getAllByRole('group') räknar bara de synliga"), nämligen ett
+// kort vars innersta <li> inte är `hidden`. Markören (`data-match-id` på <form>) är
+// 1:1 med fieldset:en (role=group), så antalet är detsamma. closest('li') (inte en
+// `li:not([hidden]) form`-selektor) krävs för att den nya dag-grupp-nivån (T28) annars
+// skulle räkna ett dolt kort-<li> som synligt bara för att dess dag-<li> är synligt.
+function visibleFormCount(): number {
+  let count = 0;
+  document.querySelectorAll('form[data-match-id]').forEach((form) => {
+    if (!(form as HTMLElement).closest('li')?.hasAttribute('hidden')) {
+      count += 1;
+    }
+  });
+  return count;
+}
+
 describe('ResultEntryView, rendering + a11y', () => {
   it('renderar i ett etiketterat section-landmark', async () => {
     render(
@@ -35,7 +65,7 @@ describe('ResultEntryView, rendering + a11y', () => {
     );
     await waitFor(() => {
       // Fixtures har gruppmatcher med kända lag; minst ett formulär ska finnas.
-      expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+      expect(visibleFormCount()).toBeGreaterThan(0);
     });
     expect(screen.queryByText(/Okänt lag/)).not.toBeInTheDocument();
   });
@@ -116,7 +146,7 @@ describe('ResultEntryView + GroupStageView, inmatning uppdaterar tabellen (en sa
     // Vänta in seedningen: grupp A-tabellen + inmatnings-formulären finns.
     await waitFor(() => {
       expect(screen.getByRole('table', { name: /Grupp A/i })).toBeInTheDocument();
-      expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+      expect(visibleFormCount()).toBeGreaterThan(0);
     });
 
     // Hitta inmatnings-formuläret för g-A-1 (Mexiko mot Sydafrika, gruppens första
@@ -179,7 +209,7 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     // Seedningen är async; vänta in att formulären finns. (Fake timers påverkar
     // inte microtask-flushen som waitFor driver, men advance:a för säkerhets skull.)
     await waitFor(() => {
-      expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+      expect(visibleFormCount()).toBeGreaterThan(0);
     });
     return utils;
   }
@@ -196,7 +226,7 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
 
   it('visar bara matcher inom fönstret som default (inte hela listan), med en expandera-knapp', async () => {
     await renderView();
-    const windowedCount = screen.getAllByRole('group').length;
+    const windowedCount = visibleFormCount();
     // Fönstret döljer matcher -> knappen finns och säger hur många som är dolda.
     const toggle = topToggle();
     expect(toggle).toHaveAccessibleName(/Visa alla matcher \(\d+ dold/i);
@@ -211,7 +241,7 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     // Fäll ut -> fler formulär än i fönstret, knappen blir "Visa färre".
     fireEvent.click(toggle);
     await waitFor(() => {
-      expect(screen.getAllByRole('group').length).toBeGreaterThan(windowedCount);
+      expect(visibleFormCount()).toBeGreaterThan(windowedCount);
     });
     const collapse = topToggle();
     expect(collapse).toHaveAccessibleName(/Visa färre/i);
@@ -221,20 +251,54 @@ describe('ResultEntryView, 3-dagars fönster + expandera (#39)', { timeout: 2000
     // Fäll ihop igen -> tillbaka till fönster-antalet.
     fireEvent.click(collapse);
     await waitFor(() => {
-      expect(screen.getAllByRole('group').length).toBe(windowedCount);
+      expect(visibleFormCount()).toBe(windowedCount);
     });
     expect(topToggle()).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('utfälld lista visar fler matcher än fönstret (ingen match går förlorad)', async () => {
     await renderView();
-    const windowedCount = screen.getAllByRole('group').length;
+    const windowedCount = visibleFormCount();
     fireEvent.click(topToggle());
     await waitFor(() => {
       // Hela fixtures-listan (104 matcher, alla med kända lag i gruppspelet) är
       // strikt fler än fönstrets delmängd.
-      expect(screen.getAllByRole('group').length).toBeGreaterThan(windowedCount);
+      expect(visibleFormCount()).toBeGreaterThan(windowedCount);
     });
+  });
+
+  // #173 T82 del 4 (ägarens feedback "den där raden som följer med i listorna"): när
+  // resultat-listan (104 matcher) är UTFÄLLD ska den övre komprimera-kontrollen bli STICKY
+  // (följer med ner i listan), så KOMPRIMERA är ett tryck bort oavsett scroll-position. I
+  // KOMPRIMERAT läge (kort 3-dygnsfönster) är den en vanlig inline-kontroll (inget att följa
+  // med i). jsdom saknar layout, så vi bevisar STRUKTUREN (sticky-klassen + top-offset togglas
+  // per läge), inte den faktiska visuella stickyn (verifieras i webbläsaren, se .vmshots).
+  it('den övre komprimera-kontrollen blir STICKY (följer med) i UTFÄLLT läge, inline i komprimerat', async () => {
+    await renderView();
+    const bar = (): HTMLElement | null => document.querySelector('[data-results-toggle-bar]');
+
+    // KOMPRIMERAT: inte sticky (ingen lång lista att följa med i).
+    expect(bar()).not.toBeNull();
+    expect(bar()!.className).not.toContain('sticky');
+    expect(bar()!.hasAttribute('data-sticky')).toBe(false);
+
+    // Fäll ut -> baren blir sticky och pinnas under sajt-headern (top-16), så komprimera
+    // alltid är nåbar oavsett hur djupt man skrollat.
+    fireEvent.click(topToggle());
+    await waitFor(() => {
+      expect(bar()!.getAttribute('data-sticky')).toBe('true');
+    });
+    expect(bar()!.className).toContain('sticky');
+    expect(bar()!.className).toContain('top-16');
+    // Komprimera-kontrollen (ExpandToggle) bor INUTI den sticky baren, så den följer med.
+    expect(bar()!.querySelector('button[data-results-toggle-position="top"]')).not.toBeNull();
+
+    // Fäll ihop igen -> tillbaka till en vanlig inline-kontroll (ingen sticky).
+    fireEvent.click(topToggle());
+    await waitFor(() => {
+      expect(bar()!.hasAttribute('data-sticky')).toBe(false);
+    });
+    expect(bar()!.className).not.toContain('sticky');
   });
 
   // Copilot R1, C2: ett kort UTANFÖR fönstret renderas (dolt med `hidden`), inte
@@ -317,7 +381,7 @@ describe('ResultEntryView, fönstret följer dagens datum (C1)', () => {
       </ResultsProvider>
     );
     await waitFor(() => {
-      expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+      expect(visibleFormCount()).toBeGreaterThan(0);
     });
     const ids = new Set<string>();
     // Ett kort är SYNLIGT när dess EGNA (innersta) <li> inte är hidden. Vi måste
@@ -376,7 +440,7 @@ describe(
         </ResultsProvider>
       );
       await waitFor(() => {
-        expect(screen.getAllByRole('group').length).toBeGreaterThan(0);
+        expect(visibleFormCount()).toBeGreaterThan(0);
       });
       return utils;
     }

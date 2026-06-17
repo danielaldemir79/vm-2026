@@ -24,7 +24,9 @@ function goalEvent(over: Partial<LiveEvent> = {}): LiveEvent {
     detail: 'Normal Goal',
     teamApiId: HOME,
     teamName: 'Netherlands',
+    playerId: null,
     playerName: 'Memphis',
+    assistId: null,
     assistName: 'Gakpo',
     cardColor: null,
     ...over,
@@ -49,6 +51,7 @@ function lineupBlock(teamApiId: number, formation: string): LiveLineup {
     formation,
     startXI: [{ apiPlayerId: 1, name: 'Keeper', number: 1, position: 'G', grid: '1:1' }],
     substitutes: [{ apiPlayerId: 2, name: 'Avbytare', number: 12, position: 'M', grid: null }],
+    coachName: null,
   };
 }
 

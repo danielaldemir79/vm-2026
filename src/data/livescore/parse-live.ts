@@ -163,12 +163,32 @@ function normalizeEventKind(rawType: string): LiveEventKind {
   }
 }
 
-/** Läs ut kortfärg ur detail ("Yellow Card"/"Red Card"), null när det inte är ett kort. */
+/**
+ * Läs ut kortfärg ur detail ("Yellow Card"/"Red Card"/"Yellow-Red Card"), null när det inte
+ * är ett kort.
+ *
+ * KÄLLHÄNVISAD enum-regel (gissas ALDRIG): API-Football v3 sätter detail "Yellow-Red Card"
+ * för en UTVISNING på andra gult (två gula i samma match), INTE ett vanligt gult. En sådan
+ * spelare lämnar planen och är avstängd nästa match , det är funktionellt ett RÖTT kort.
+ * Korsverifierat mot tre oberoende källor (api-football.com event-detail "Yellow-Red Card",
+ * Sportmonks "YELLOWREDCARD", live-score-api "yellowred"). Se docs/decisions.md 2026-06-16.
+ *
+ * ORDNINGEN ÄR LASTBÄRANDE: "Yellow-Red Card" innehåller BÅDE "yellow" och "red", så den
+ * måste testas FÖRE den vanliga includes('yellow')-grenen , annars klassas en utvisning
+ * felaktigt som 'yellow' (det var F1: en andra-gult-utvisning fångades aldrig som rött, så
+ * avstängningen härleddes inte). Korrekt för ALLA konsumenter: T99-avstängningen ser ett
+ * 'red'-event, och T88:s kort-liga räknar utvisningen som rött (inte två gula).
+ */
 function readCardColor(kind: LiveEventKind, detail: string): CardColor | null {
   if (kind !== 'card') {
     return null;
   }
   const d = detail.toLowerCase();
+  // Andra-gult-utvisningen ("Yellow-Red Card") FÖRST , den bär både "yellow" och "red" och
+  // ÄR en utvisning (rött), inte ett vanligt gult. Matcha även sammanslagna varianter.
+  if (d.includes('yellow-red') || d.includes('yellowred')) {
+    return 'red';
+  }
   if (d.includes('yellow')) {
     return 'yellow';
   }
@@ -214,7 +234,11 @@ function toEvent(e: RawEvent): LiveEvent {
     detail: e.detail,
     teamApiId: e.team.id,
     teamName: e.team.name,
+    // Spelar-/assist-id bärs vidare (stabil nyckel för skytteligan, T87). Råsvaret kan ha
+    // id null (t.ex. en assist som saknas), då blir det null , gissa aldrig ett id.
+    playerId: e.player?.id ?? null,
     playerName: cleanName(e.player?.name ?? null),
+    assistId: e.assist?.id ?? null,
     assistName: cleanName(e.assist?.name ?? null),
     cardColor: readCardColor(kind, e.detail),
   };
@@ -287,6 +311,9 @@ export function parseLineups(payload: RawApiResponse<RawLineupResponse>): LiveLi
       formation: l.formation,
       startXI: l.startXI.map(toLineupPlayer),
       substitutes: l.substitutes.map(toLineupPlayer),
+      // Tränarens namn bärs vidare när API:t har det; saknas coach-blocket eller namnet
+      // blir det null (gissa aldrig ett tränarnamn). cleanName trimmar/kollapsar smuts.
+      coachName: cleanName(l.coach?.name ?? null),
     };
   });
 }

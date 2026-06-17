@@ -5,6 +5,1140 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-16 , T89 (#182): Mål-push-notiser ("MÅL! Spanien 2-1")
+
+**Beslut (arkitektur , pollaren rörs ej, SPEC §13.3 out-of-scope):** mål-detekteringen körs SERVER-
+side men UTANFÖR pollaren. En AFTER UPDATE-trigger på `match_live_data` (`t89_goal_push_trigger`)
+POST:ar OLD + NEW till en NY edge-funktion `goal-push-dispatcher` via `net.http_post` (pg_net) ,
+EXAKT samma mekanism som livescore-poller-cronen (cron.job 2). Ingen rad i pollarens kod ändras.
+Triggern gatas på `new.events is distinct from old.events` så en ren klock-/ställnings-poll (var 30:e
+sek) inte väcker dispatchern i onödan.
+
+**Beslut (EN sanning för mål-härledning, SPEC §13.3 HARD):** dispatchern parsar events med EXAKT
+samma delade util som skytteligan (T87): `parseEvents` -> `extractGoals` (data/match-stats). Ingen
+parallell mål-parse. Logiken (parse + mål-diff + preferenser) bor som rena, enhetstestade moduler i
+`src/features/push/{goal-detection,push-preferences}.ts` + `edge-entry.ts`, och GENERERAS till
+`supabase/functions/_shared/goal-push-core.ts` med esbuild (`npm run gen:goal-push-core`), samma recept
+som global-leaderboard-core (T90). Paritet (committad mirror == src) vaktas av
+`goal-push-core-mirror-parity.test.ts` (negativ-kontroll: en muterad mirror-gren rödnar, verifierat).
+
+**Beslut (scoring-sida ur ställnings-DELTAT, INTE event-laget , egenmåls-SÄKERT):** vilken sida som
+gjorde målet härleds ur `home_goals`/`away_goals`-deltat OLD->NEW (sidan som ÖKADE), inte ur mål-
+eventets `teamApiId`. **Varför (gissa aldrig):** API-Footballs `goals.home/away` är det auktoritativa,
+redan korrekt krediterade resultatet (egenmål inräknat åt det GYNNADE laget), medan ett egenmåls event-
+lag pekar på det KONCEDERANDE laget , en team-konvention som är OVERIFIERBAR (de stora fotbolls-API:erna
+är oeniga, API-Footballs egen doc nås inte; samma slutsats som match-stats-headern + T86/T87). Att läsa
+sidan ur deltat sidsteppar den overifierade konventionen helt. Det FIRADE lagets NAMN: för ett vanligt
+mål = eventets `teamName` (direkt); för ett egenmål = MOTSTÅNDARENS namn (hämtas ur ett annat lags event
+i samma match), aldrig egenmåls-skyttens lag. Notisen orienteras scoring-team-först ("Spanien 2-1" =
+Spanien gjorde mål, leder/står 2-1). KÄLLA: parse-live.ts facit-regel (`goals` = auktoritativt) +
+match-stats `isOwnGoalDetail`-doc (team-konventionen tolkas aldrig om).
+
+**Beslut (idempotens , HARD, ingen dubbel-/historik-notis):** en `notified_goals`-tabell (PK
+`(match_id, goal_signature)`). Dispatchern INSERTar en rad per mål med `on conflict do nothing` FÖRE
+sändning; rörde insert 0 rader är målet redan notifierat (re-levererad webhook / redeploy / re-poll som
+skrev om events-blobben) -> hoppa TYST. `goal_signature` (goal-detection.ts) är STABIL över re-poll
+(minut + tillägg + lag-id + skytt-id + skytt-namn + straff/egenmåls-flagga), INTE event-index (som
+skiftar när blobben skrivs om). Verifierat live (execute_sql): andra inserten med samma signatur
+returnerar 0 rader. RLS: ingen policy => default-deny (service-role-only, som poll_log).
+
+**Beslut (nattläge/quiet hours, Daniels "stäng av på nätterna"):** per-användare-toggle, default AV
+(notiser dygnet runt tills den slås på). Tyst i fönstret 23:00-08:00 EUROPE/STOCKHOLM (start inklusiv,
+slut exklusiv), utvärderat i den testade rena `isQuietHoursStockholm` (Intl, DST-säkert), SAMMA tidszon
+som pollarens `swedishDay`. KÄLLA: Daniels direktiv (memory vm2026-next-build-plan) + SPEC §13.3.
+
+**Beslut (preferenser server-side + fail-closed/open):** master på/av (default PÅ), nattläge (default
+AV), match-scope 'all'|'favorite' (default 'all') + favorite_team_id (FIFA-kod), som kolumner på
+`push_subscriptions` (RLS self-scope ärvs, UPDATE-policyn från T85 täcker dem). Dispatchern läser varje
+opt-in:ad enhets preferens och hoppar sändningar som inte matchar. Master + natt är fail-CLOSED (de
+uttryckliga av-knapparna); scope är fail-OPEN (en halvkonfigurerad 'favorite' utan valt lag släpper
+igenom hellre än tyst sväljer allt). Favoritlaget speglas från klient-localStorage (FavoriteTeamProvider)
+till preferens-raden när användaren väljer 'favorite' i Mer.
+
+**Beslut (dispatcher-säkerhet , skickar till ANDRAS enheter):** `verify_jwt=false` + DELAD HEMLIGHET
+(`x-goal-dispatch-secret`-header, värdet i `app_config.goal_dispatch_secret`, aldrig i kod). En anon-JWT
+(som pollar-cronen) skulle göra funktionen anropbar av vem som helst , oacceptabelt här. Triggern läser
+hemligheten server-side och sätter headern; ett anrop utan exakt rätt hemlighet -> 401 (verifierat live).
+Mottagarna gatas dessutom av varje rads EGNA opt-in/preferenser (en rad finns bara om enheten själv
+prenumererat). Detta är det dokumenterade verify_jwt=false-undantaget (custom auth), inte en öppen funktion.
+
+## 2026-06-16 , T84 (#176): Live-uppdaterad (preliminär) topplista under matcher
+
+**Beslut (en seam, ingen parallell poäng-motor, HARD DRY):** den live-uppdaterade topplistan är
+INTE en ny poäng-väg. Hela poäng-pipelinen är `Match[] -> derivePoolFacit -> buildLeaderboard`, och
+det ENDA som skiljer officiell från preliminär är vilken `Match[]` man matar in. En NY ren funktion
+`applyLiveResults(officialMatches, liveByMatchId)` (`src/features/leaderboard/apply-live-results.ts`)
+lägger den löpande live-ställningen (`match_live_data.home_goals/away_goals`, via `useLiveData`) ovanpå
+de officiella matcherna BARA för matcher som pågår just nu, och matar den preliminära listan genom
+SAMMA derivePoolFacit/buildLeaderboard. Poäng-modellen är alltså helt orörd (T84-direktivet: scoring
+låst). Overlayn återanvänder `applyMatchResult` (T6:s validerade state-transition, samma som det
+officiella `applyRoomResults`-vävandet), så preliminära listan är formad EXAKT som den officiella.
+
+**DATA-INTEGRITET (HARD, T84-direktivet):** live-lagret är PRELIMINÄRT och skriver ALDRIG det
+officiella facit (`official_match_results`, T42-källan). `applyLiveResults` är en REN funktion (data
+in -> ny data ut), tar ingen Supabase-klient, har ingen skriv-väg och muterar aldrig sina indata.
+Bevisat med test (overlayn returnerar nya objekt, indata oförändrade) + negativ-kontroll (mutera bort
+overwrite-vakten -> testet rödnar). Reveal, käll-uppdelning, märken och personlig statistik läser
+ALLTID det officiella facit (de är retrospektiva), aldrig live-lagret , bara topplistans placeringar
++ "live"-indikatorn är preliminära.
+
+**KONVERGENS-GARANTIN (acceptanskriterium):** overlayn lägger BARA på live-ställningen för en match
+vars OFFICIELLA status INTE redan är `finished`. Så snart admin matat in det officiella resultatet är
+matchen `finished` och overlayn hoppar den (officiellt vinner alltid), så preliminär == officiell
+BITVIS , konvergens by construction, inte en extra avstämning. Bevisat i både provider- och
+demo-total-testerna (live 2-1 == officiellt inmatad 2-1 ger identisk lista, indikatorn släcks).
+
+**ÄRLIG GRÄNS (dokumenterad, gissas inte):** en pågående OAVGJORD slutspelsmatch (t.ex. live 1-1)
+faller TYST ur overlayn. En slutspelsmatch kan inte bli ett giltigt `finished`-resultat utan en
+straff-vinnare (FIFA Article 14, `validate-result.ts` `knockout-tie-needs-penalties`), och vi gissar
+ALDRIG en vinnare , `applyMatchResult` avvisar då inmatningen och overlayn isolerar matchen
+(fail-safe, samma hållning som `applyRoomResults` mot en trasig rad). Följd: en oavgjord live-slutspels-
+match rör inga preliminära poäng förrän ställningen blir oavgjord-skild eller det officiella facit
+landar. Gruppspel (alla gruppmatcher, där oavgjort står sig) påverkas inte , draws är giltiga där, så
+hela gruppspelet rör sig live som tänkt. Avgjorda live-slutspelsmatcher (icke-lika) får sin preliminära
+ställning som vanligt.
+
+**INDIKATOR (ärligt märkt, samma anda som T56:s preliminära slutspelsträd):** "Live, preliminära
+placeringar medan matcher pågår" (med pulsande `vm-live-dot`, reduced-motion-säker) visas ENDAST när
+minst en match faktiskt pågår (`hasLivePreliminaryMatch`, samma reachbarhets-villkor som overlayn).
+Ingen match pågår -> ingen indikator, topplistan är det officiella läget exakt som förr.
+
+**RÖRELSE (återanvänd, inget nytt):** rad-glidet är den BEFINTLIGA `motion.li layout='position'` +
+rank-pulsen i `LeaderboardView` (gatad på `useReducedMotion`), helt oförändrad , de preliminära
+poängen byter bara `leaderboard`-datan, så raderna glider till nya platser med samma animation.
+
+**EN SANNING för "pågår nu" (rule-of-three):** predikatet `'live' || 'paused'` bodde på TVÅ ställen
+(daily/live-feed + LiveMatchCard) och lyftes till `isMatchInProgress` i `data/livescore/live-types.ts`
+(T84 är tredje konsumenten), så LIVE-indikatorn, "LIVE NU"-blocket och den preliminära topplistan
+aldrig kan dra isär om vad som räknas som pågående (en match i halvtidsvila behandlas likadant överallt).
+
+**SCOPE för den TOTALA (globala) listan:** live-overlayn wirades in i den totala komponentens
+KLIENT-derivation (demo-vägen: `applyLiveResults` -> facit -> `buildTotalLeaderboard`), så demon rör
+sig live OCH den live-medvetna derivationen är på plats. I LIVE-läge byggs den globala listan
+SERVER-SIDE (edge-funktionen `loadGlobalLeaderboard`, T90), så den preliminära overlayn hör hemma DÄR
+(pollaren/edge-funktionen) , out of scope per direktiv (rör inte pollaren, un-hide:a inte global). Den
+globala flaggan (`GLOBAL_LEADERBOARD_ENABLED=false`) lämnas av.
+
+---
+
+## 2026-06-16 , T85 (#177): Web-push FUNDAMENT (VAPID + prenumerationer + SW + sender)
+
+**Beslut (secret-uppdelning):** VAPID-nyckelparet genererat med `npx web-push generate-vapid-keys
+--json`. Den PUBLIKA nyckeln (publik per design) bor i en committad konstant
+(`src/features/push/vapid.ts`, `VAPID_PUBLIC_KEY`); den PRIVATA bor BARA i `app_config`
+(`vapid_private_key`, insertad via MCP `execute_sql`, ALDRIG i kod). `vapid_public_key` lagras
+också i app_config för komplett ess, men klienten använder den committade konstanten.
+**Varför:** samma mönster som `api_football_key` (T80). Publik-i-kod / privat-i-secret-store är
+den standardiserade web-push-uppdelningen. Källa: MDN "Push API" + web.dev "Web Push notifications"
+(VAPID-avsnittet). Secret-scan ren (privatnyckel-värdet finns i 0 spårade filer).
+
+**Beslut (web-push-lib i edge):** `push-sender` använder **`jsr:@negrel/webpush@0.5.0`** (Deno-native,
+Web Crypto), INTE `npm:web-push`. **Varför:** npm:web-push lutar sig mot `node:crypto` (ECDH/ECDSA)
+som inte är pålitligt i Supabases edge-runtime; @negrel/webpush är byggt på Web Crypto som finns i
+runtime. VERIFIERAT, inte antaget: den deployade funktionen anropades med en riktig anonym JWT och
+körde HELA boot-vägen (JWT -> VAPID-import -> ApplicationServer.new -> tom prenumerations-query ->
+`{sent:0}` 200) utan krasch , dvs libben + nyckel-importen FUNGERAR i edge-runtime. Endast den
+faktiska browser-leveransen är CI-omöjlig (manuell iPhone-verifiering).
+
+**Beslut (raw VAPID -> JWK):** app_config lagrar nycklarna i RAW base64url (som web-push ger dem),
+men @negrel/webpush.`importVapidKeys` tar JWK (ECDSA P-256). `rawVapidToJwkPair`
+(`src/features/push/vapid-jwk.ts`, speglad till `supabase/functions/_shared/push-vapid.ts`)
+konverterar: publik 65-byte okomprimerad punkt `0x04||X(32)||Y(32)` -> JWK `{kty:'EC',crv:'P-256',x,y}`,
+privat 32-byte `d` -> samma + `d`. **Bevisat mot Web Crypto (gissa-aldrig-prob):** den konverterade
+JWK:n importeras, signerar och verifierar (d hör ihop med x/y), och publik raw-export round-trippar
+till ursprungssträngen. Mirror-paritet vaktas av `push-vapid-mirror-parity.test.ts`. Källa: RFC 8292
+(VAPID) + W3C Push API + Web Crypto EC JWK.
+
+**Beslut (iOS-krav):** opt-in-ytan visar en lugn "lägg till på hemskärmen"-hint i stället för en
+aktivera-knapp när plattformen är iOS och appen INTE körs installerat (standalone). **Varför:**
+web-push fungerar på iOS BARA från 16.4+ OCH BARA när appen är installerad till hemskärmen (Apples
+krav). En knapp i Safari-fliken kunde aldrig fungera. iOS-gaten vinner FÖRST i state-maskinen
+(`resolvePushOptInState`), bevisat av ett ordnings-test. Källa: Apple "Web Push for Web Apps on iOS
+and iPadOS" (Safari 16.4 release notes / WWDC23) + web.dev.
+
+**Beslut (SW-handler):** appen behåller `generateSW` (workbox), och push-/notificationclick-
+hanterarna injiceras via `workbox.importScripts: ['custom-push-sw.js']` (public/custom-push-sw.js
+kopieras till dist-roten). INTE byte till injectManifest. **Verifierat:** `dist/sw.js` innehåller
+`importScripts("custom-push-sw.js")` och filen emittas + precachas. Parse-regeln finns dubbelt (SW
+kan inte importera src/), speglad från `sw-payload.ts` och vaktad av `sw-mirror-parity.test.ts`.
+
+**Beslut (RLS):** `push_subscriptions` (en rad per enhet, endpoint UNIQUE) , RLS på `auth.uid()`:
+en användare ser/skapar/uppdaterar/raderar bara sina egna rader (4 policies: select/insert/update/
+delete, alla `user_id = auth.uid()`); service_role (sender) förbigår RLS för att kunna skicka.
+UPDATE-policyn KRÄVS: klientens upsert (on conflict endpoint) kör en UPDATE-gren när enheten redan
+är prenumererad, och Postgres släpper den grenen bara om en UPDATE-policy finns , även för egen rad
+(en insert-check räcker inte). Detta är exakt varför predictions (T15) , vars upsert vi speglar ,
+HAR en egen UPDATE-policy; en tidig version här utelämnade den och blockerades av RLS (granskar-fynd). Sender-funktionen löser user ur JWT:n (aldrig ur bodyn) och
+filtrerar prenumerationerna på den lösta user_id:t (self-scope). CORS + OPTIONS tidigt (global-
+leaderboards 503 berodde delvis på saknad CORS , upprepas inte).
+
+## 2026-06-16 , T102 (#210): Aktiv SW-uppdaterings-koll (PWA fastnar på gammal version)
+
+**Problem:** en testare startade om appen ~10 ggr utan att få nya versionen. Appen kör (sedan white-
+screen-hotfixen) `registerType: 'autoUpdate'` (skipWaiting + clientsClaim + `controllerchange` ->
+auto-reload i register-sw.ts) , INTE längre 'prompt' som den ursprungliga T43-raden beskrev (T43 är
+alltså supersedad på den punkten). Den kedjan tar i bruk en ny SW automatiskt, MEN bara efter att
+webbläsaren UPPTÄCKT en ny sw.js. Webbläsaren hämtar sw.js vid navigering + ~var 24:e timme. En
+installerad PWA som öppnas igen från hemskärmen återupptas ofta FRUSEN (iOS) utan en färsk navigering,
+så uppdaterings-kollen körs aldrig och användaren fastnar på gammal version.
+
+**Beslut:** kolla AKTIVT efter en ny SW via `registration.update()` , direkt + på ett 60s-intervall +
+när appen blir synlig/fokuserad igen (`sw-update-scheduler.ts`, wirad via `registerSW`s `onRegisteredSW`-
+callback i register-sw.ts). Hittar update() en ny sw.js går den befintliga kedjan igång (skipWaiting ->
+controllerchange -> reload), så nya versionen tas i bruk inom ~en minut efter att appen öppnas, utan
+handgrepp. **Varför poll + synlighet/fokus, inte bara intervall:** en frusen PWA-återöppning fyrar
+visibilitychange/focus precis när vi vill kolla; intervallet täcker en app som står öppen länge. **Källa:**
+vite-plugin-pwa "Periodic SW Updates"-mönstret (onRegisteredSW + update()), verifierat mot installerad
+1.3.0 (`onRegisteredSW(swScriptUrl, registration)`). Ren/testbar logik (injicerbar doc/win/intervall),
+register-sw.ts förblir den tunna otestbara virtual:-seamen.
+
+---
+
+## 2026-06-16 , T101 (#issue): ENGÅNGS-backfill av event-data för de 9 opollade avgjorda matcherna
+
+**Problem:** T100 source:ade score-/antals-stats ur facit (täcker 16/16), men de SPELAR-nivå-stats som
+PER NATUR bara kan läsa `match_live_data.events` , skytteliga, assist, kort-liga, snabbaste mål, mål-per-
+15min-fördelning , täckte bara 7 av 16 matcher (de auto-pollade). De 9 första gruppmatcherna (g-A-1..g-E-1,
+inkl. 7-1:an g-E-1) avgjordes innan pollarens per-match-fönster var igång, så deras events/statistics/lineups
+hämtades aldrig och facit matades in för hand. Pollaren kan inte backfilla dem (den pollar bara matcher i
+sitt live-fönster; robust-facit-vägen täcker bara redan MAPPADE matcher i ett 4h-bak-fönster). Coverage-noten
+("Baseras på N matcher", T100) stod därför på 7.
+
+**Beslut (engångs edge function `livescore-backfill`, REN ADDITIV):** En ny Deno-funktion hämtar EN gång
+de rika blobbarna (events/statistics/lineups) för avgjorda matcher som saknar event-data och skriver dem
+till `match_live_data` i EXAKT pollarens form (`shapeFrozenBlobs` ur den DELADE `_shared/livescore-core.ts`,
+samma kuvert-lindning konsument-läs-lagret parsar). RÖR ALDRIG `official_match_results` och anropar ALDRIG
+`apply_auto_facit` , de manuella facit-raderna är korrekta + admin-låsta (Daniels HARD-krav). Säsongen
+HÄRLEDS ur API:t (`/fixtures?id=1489375` -> `league.season`), gissas/hårdkodas aldrig. Auto-mappning via
+samma `resolveFixtureToMatch` som pollaren (entydig träff resolvas, tvetydig/okänd hoppas). Dry-run är
+DEFAULT (tom kropp = ingen skrivning); `{dryRun:false}` skriver. Idempotent (upsert på match_id,
+fixture_map-insert sväljer 23505), fail-loud (500) på äkta fel. Anropen bokförs mot `poll_log` (budget-ärligt).
+
+**KÄLLHÄNVISAD regel (gissas aldrig) , mål-event-räkningen i decision-gaten:** funktionens `goalEventCount`
+(paritets-kollen mot facit-totalen) räknar ett event som mål om dess `type` normaliseras till 'goal'
+(`rawType.toLowerCase() === 'goal'`), EXAKT som `normalizeEventKind` (parse-live.ts:151) + `extractGoals`
+(match-stats.ts:59-61) , en sanning, ingen parallell regel. Ett MISSAT straff är INTE ett mål-event i
+API-Football v3 (det är ett "Var"/"Missed Penalty"-event), så det faller bort redan på type-filtret (samma
+regel som match-stats.ts:33-40 redan källhänvisar). Egenmål ÄR ett 'goal'-event och räknas mot ställningen
+(skytteligan filtrerar bort dem ur SKYTT-tallyn, inte ur måltotalen), så `goalEventCount` ska = home+away
+för en korrekt match. Den paritets-kollen är decision-gaten: skriv bara om alla 9 är resolvade, finished,
+apiScore == officialScore OCH goalEventCount == måltotalen; annars stopp + rapportera (fixa aldrig en
+avvikelse , facit är låst).
+
+## 2026-06-16 , T100 (#207): DATA-INTEGRITET , turneringsstatistikens mål-stats source:as ur officiellt facit, inte events
+
+**Problem (P0, förstörde förtroende):** "Flest mål per lag", "Mål per match" (total + snitt + snabbaste
+mål) i turneringsstatistiken härleddes ur `useCrossMatchEvents` (event-lagret, `match_live_data`), som
+BARA täcker de auto-pollade matcherna (7 av 16). Matcher utan event-rad var osynliga , den största
+matchen g-E-1 (7-1) saknade event-rad, så "Flest mål per lag" visade fel lag (Sverige 5, g-F-2) som etta
+i stället för 7-måls-laget (Tyskland), och "Mål per match" räknade 19/7 i stället för det sanna 46/16.
+
+**Beslut (KÄLLHÄNVISAT, gissa aldrig , verifierat mot prod 2026-06-16):** Alla SCORE-/ANTALS-stats som
+ska täcka HELA turneringen source:as nu ur den resolvade matchplanen (officiellt facit, `official_match_results`
+via ResultsProvider), exakt som clean sheets/skrällar redan gjorde. Ny ren aggregator
+`aggregateTeamScoreGoals` (tournament-stats-tables.ts, regel G3):
+- Ett lags `goals` = summan av lagets mål i slutresultaten (hemma home_goals, borta away_goals). Detta är
+  EXAKT samma goals-for som grupptabellens GM-kolumn (compute-standings `applyResult: goalsFor += scored`),
+  bara tournament-WIDE i stället för grupp-only , så siffran är konsekvent med vad användaren redan ser.
+  Scorelinen krediterar redan egenmål till det gynnade laget, så INGEN egenmåls-justering görs (scorelinen
+  ÄR sanningen , den gamla events-erans "självmål räknas inte på laget"-caveat togs bort, den motsade resultatet).
+- `totalGoals`/`matchesPlayed`/`goalAverage` ur facit (en 0-0 räknas som spelad match); `biggestMatch` =
+  färdig match med högst total scoreline (vid lika: lägst match-id). Ny "Flest mål i en match"-höjdpunkt
+  (Daniel efterfrågade den uttryckligen) visar den + de två lagen.
+- VERIFIERAT mot prod via Supabase MCP (kmzhyblzxangpxydufve): 16 matcher, total 46, snitt 2,875, största
+  g-E-1 7-1, goals-for-ranking ger 7 / swe 5 / usa 4 (korskontroll via schedule-join i DB). Källa:
+  MatchResult.homeGoals/awayGoals. Inline G3 + negativ-kontroll (mutera sort -> ranking-testerna rödnar,
+  verifierat).
+
+**Beslut (truth-in-labeling, återställer förtroende):** De stats som per natur BARA kan se event-täckta
+matcher (snabbaste mål, mål-per-15min-fördelning, kort-liga, bollinnehav/skott/fouls, OCH skytteligan/
+assist i ScorerTableView) får en lugn en-rads coverage-not "Baseras på N matcher med detaljerad spelardata",
+där N HÄRLEDS (`events.matches.length` / `matches.length`, en post per match med event-data), aldrig
+hårdkodad. Så förstår användaren varför en skytt/ett mål från en manuell-facit-match (t.ex. 7-1:an) inte
+listas. Ingen ändring av pollare eller edge-functions , ren frontend-aggregering + märkning.
+
+**Borttaget (ingen död kod):** `aggregateTeamGoals` + `TeamGoals`/`TeamGoalRow` (tournament-stats-events.ts)
+hade bara denna konsument , borttagna med sina tester (testerna för den nya facit-aggregatorn ligger i
+tournament-stats-tables.test.ts).
+
+## 2026-06-16 , T96 (#193): Rum-kontext , RoomSection överst i Tips + persistent rum-pill i app-baren + globala topplistan dold
+
+**Beslut (RoomSection överst i Tips):** Hela RoomSection flyttades till TOPPEN av Tips-fliken (låg
+förr sist, efter match-/grupp-/bracket-tipsen). **Varför:** rum-valet är PRIMÄRT , man väljer rum
+först (vem tippar man mot) och rum-kontexten styr både tipsen OCH Topplistan, så att gömma rum-valet
+längst ner var bakvänt (Daniels live-feedback). Skapa rum / gå med via kod + T94:s komprimerade
+medlems-rutnät bor kvar i RoomSection, bara placeringen ändrades (återanvänd, bygg inte om).
+
+**Beslut (persistent rum-pill i app-baren, RoomPill):** Det aktiva rummet visas , och kan bytas ,
+via en liten pill i app-bar-headern (utanför flik-panelerna), så den syns på ALLA flikar
+(Idag/Tips/Topplista/Turnering/Mer), inte bara i RoomSection (Tips). **En sanning:** pillen är en
+tunn konsument av samma rums-store som RoomSection (`useRoomsStore`), så ett byte i pillen är samma
+`activeRoom` som ett byte i RoomSection , de rum-scopade vyerna (Tips + Topplista) följer med direkt.
+**Beslut (skapa/gå-med + nå pillen utan rum , Daniels tillägg under tasken):** Pillens meny bär OCKSÅ
+"Skapa rum" + "Gå med i rum" (`role=menuitem`), så man når rum-hanteringen från VILKEN flik som helst.
+Valen byter inte rum , de navigerar till RoomSection (överst i Tips) och scrollar + fokuserar RÄTT
+formulär (skapa vs gå med) via App-skalets `onOpenRooms` (DOM-delen bruten ut i `focusRoomForm`, testbar
+seam; dubbel rAF så Tips-panelen hunnit få layout efter flik-bytet; respekterar prefers-reduced-motion).
+**Varför pillen ändrades till alltid-meny:** kravet "nå skapa/gå-med från pillen" gör en stilla etikett
+otillräcklig, så pillen är nu en menyknapp i ALLA synliga lägen (formulären bor kvar i RoomSection , en
+sanning, pillen är bara genvägen dit).
+
+**Synlighets-grenar (slutligt):** rummen vilande (enabled=false) -> pillen är null (app-baren ser ut som
+förr). Aktiverade men INGET aktivt rum (ny användare) -> en "Rum"-CTA: menyknapp vars enda val är skapa/
+gå-med, så man kan gå med via pillen och routas till rätt sektion (visas bara när `onOpenRooms` finns,
+annars null , ingen död knapp). Exakt 1 rum -> menyknapp som visar rummets namn; menyn har inga rum-rader
+(inget att byta MELLAN) utan bara skapa/gå-med. 2+ rum -> menyknapp (`aria-haspopup=menu`) vars meny
+listar rummen (`role=menu` + `menuitemradio`, aktivt rum bär `aria-checked` + `aria-current`, byte på ett
+tap) FÖRE en separator + skapa/gå-med. **Varför en lättviktig meny, inte den delade Modal:** ett snabbt
+rum-byte ska vara ETT tap utan modal-ceremoni (KISS); menyn äger ändå full a11y (tangentbord vandrar
+ALLA rader rum + handlingar med wrap + Home/End, fokus-flytt till aktivt rum (annars första raden) vid
+öppning, Escape + klick-utanför stänger och returnerar fokus till knappen, reduced-motion-gated CSS).
+
+**Beslut (globala topplistan dold bakom flagga):** Den globala (cross-rum) TotalLeaderboardSection
+renderas inte längre ovillkorligt utan bakom `const GLOBAL_LEADERBOARD_ENABLED = false` (App.tsx).
+**Varför:** dess edge-funktion (global-leaderboard) BOOT-KRASCHAR (503, trasig sedan T90) i live-läge,
+och vi vill inte visa en trasig/fel-ruta för den globala topplistan. **Tänd igen:** flippa flaggan
+till `true` när edge-funktionen är fixad (eget spår) , inget annat behöver röras, render-grenen tänder
+sektionen oförändrad. Per-rums-topplistan (LeaderboardSection) + "vad alla tippade"-listan
+(RevealSection) är KVAR och opåverkade , bara den globala cross-rum-rankningen togs bort ur Topplista.
+
+## 2026-06-16 , T94 (#187): Medlemslista , komprimera + linjerat rutnät (egen rad pinnad överst)
+
+**Beslut (linjerat rutnät i stället för flex-wrap):** Medlemslistan är nu ett CSS grid
+(`.vm-rooms-member-grid` i rooms.css) med **fast responsivt kolumnantal** (2 kol mobil ->
+3 vid >=640px -> 4 vid >=1024px) och `grid-template-columns: repeat(N, minmax(0, 1fr))`, så alla
+chips blir exakt lika breda och raderna ligger i linje. Det gamla `flex-wrap`:et gav olika breda
+chips som radbröt raggat (Daniels skärmdump 2026-06-16). **Varför `minmax(0, 1fr)` och inte `1fr`:**
+`1fr` = `minmax(auto, 1fr)`, och `auto`-miniminet är cellens min-content, så ett långt namn vägrar
+krympa och spränger sin kolumn (då hjälper inte `truncate` på chip:en). `minmax(0, ...)` låter
+cellen krympa under sitt innehåll så ellipsis (`truncate`) faktiskt slår in. Brytpunkterna matchar
+Tailwinds sm/lg, samma skala som resten av appen.
+
+**Beslut (komprimering via CollapsibleBody, inte CollapsibleList):** Rutnätet komprimeras med den
+delade **CollapsibleBody** (höjd-klipp + gradient-fade + EN expandera-kontroll), samma primitiv som
+appens övriga grid-sektioner (GroupStage/Bracket/Admin). **Varför inte CollapsibleList:s render-
+subset:** rutnätet är responsivt (2/3/4 kol per skärmbredd) och en render-subset kan inte veta
+brytpunkten vid render-tid , exakt motivet CollapsibleBody dokumenterades för i T68. Höjd-klipp +
+egen rad pinnad överst ger den ärliga "ett par medlemmar synliga"-teasern oavsett bredd. Komprimerar
+bara vid 4+ medlemmar (`COLLAPSE_THRESHOLD = 3`); 1-3 ryms utan vägg och visas direkt.
+
+**Beslut (egen rad pinnad överst + "DU"-markering återanvänd):** Den egna raden sorteras FÖRST
+(stabil sort i MemberGrid, presentationslager , rör inte rums-/medlems-datalogiken) och bär den
+BEFINTLIGA "DU"-markeringen (MemberChip `data-self` + "(du)" + accent-kant i rooms.css, north-star
+§5). `selfUserId` kan vara null (anonym auth inte etablerad) , då matchar ingen rad och inget pinnas
+(vi gissar aldrig vem användaren är).
+
+## 2026-06-16 , T92 (#185): Topplista-UX-städning (ordning, per-rums-tydlighet, global topp-10 + förändring, reveal-flytt, egen-rad, kollaps-scroll)
+
+**Beslut (Topplista-flikens ordning + per-rums-tydlighet, del A):** Topplista-fliken = per-rums-
+topplista ÖVERST -> global topplista DIREKT under. Per-rums-listans eyebrow visar nu det AKTIVA
+RUMMETS namn (`rooms.activeRoom.name`, EN sanning) i stället för den generiska "VM-poolen", så det
+är otvetydigt vilket rum listan gäller (Daniels feedback). Utan ett aktivt rum (eller tomt namn)
+faller eyebrow:n till "Ditt rum" , vi gissar aldrig ett rumsnamn.
+
+**Beslut (redundant sektions-kollaps borttagen, del B):** Per-rums-topplistan hade TVÅ kontroller
+(en sektions-`CollapsibleBody` "Fäll ihop" + list-"Visa alla N"). På en fokuserad flik ÄR listan
+flikens innehåll, så sektions-kollapsen var meningslös och förvirrande (två konkurrerande "fäll
+ihop"). Sektions-kollapsen är borttagen; bara list-komprimeringen (kompakt <-> alla, sticky följ-med)
+finns kvar.
+
+**Beslut (global topplista: topp-10 + din placering + din FÖRÄNDRING, del C):** Komprimerat default
+höjt från topp-5 till TOPP-10 + hjälten (din placering) + en rank-FÖRÄNDRINGS-indikator. **Data-
+beslut för "förändring" (källhänvisat, ingen rank-historik finns):** appen har varken DB-rank-
+snapshot eller en "senaste avgjorda omgång"-tabell, och att bygga server-side rank-historik för EN
+indikator vore för tungt (PRINCIPLES §0/§11). Vald renaste pragmatiska approach: **"sedan ditt
+senaste besök", per device, via localStorage** (`vm2026-total-rank-snapshot`, keyad på userId). Vi
+sparar den inloggades senast visade globala rank och jämför nästa besök => ▲/▼ delta, sen uppdaterar
+snapshoten. FÖRSTA besöket (ingen sparad rank) visar INGEN rörelse (gissar aldrig). Medveten
+avgränsning: per-device-scope (samma som tema/onboarding-flaggorna), dokumenterad, inte en låtsad
+cross-device-sanning. Rank (inte poäng) eftersom Daniel bad om rank-RÖRELSE (▲▼). Källa:
+`self-rank-snapshot.ts` (inline + här).
+
+**Beslut ("vad alla tippade" -> botten av Tips + drill-in, del D):** RevealView var inbakad i
+LeaderboardSection (renderades i Topplista) och var en vägg (allas tips per match inline). Den är
+FLYTTAD till en egen `RevealSection` SIST i Tips-fliken (där den tematiskt hör hemma), ihopfälld
+default. Utfälld = en PAGINERAD PLATT lista av KOMPAKTA matchrader (senaste spelade först, kickoff
+fallande), varje rad = lag + facit + ditt resultat. Tap på en rad -> DRILL-IN till den rika
+matchvyn (T86, via `MatchDetailTrigger`/`openMatch`), som visar allas tips. Resultat: EN sektions-
+kollaps + EN paginering + drill-in, aldrig två konkurrerande "fäll ihop" (north-star §2).
+
+**Beslut (egen rad markerad i ALLA listor, del E):** Användarens egna rad bär samma färg-oberoende
+"DU"-markering (`data-self` + DU-bricka, återanvänt mönster från topplistorna) i reveal-raderna.
+Konsekvent över per-rums-topplista, global topplista och avslöjande-listan.
+
+**Beslut (kollaps-scroll-fix i den DELADE komponenten, del F):** Klickar man "komprimera" långt ner
+i en utfälld lista kollapsade listan men SID-SCROLLEN stod kvar långt ner (desorienterande, Daniels
+bugg). Fix i den delade `collapsible-list` (`useCollapseScrollRestore` + wiring i `StickyFollowToggle`
+och per-rums-listans nedre toggle): vid komprimering skrollas sektionens ankare tillbaka i vy, med en
+mätt scroll-till-offset som KOMPENSERAR för app-barens höjd (`--vm-app-bar-height`, EN sanning, samma
+som sticky-baren) så rubriken inte hamnar under flik-raden. Smooth + reduced-motion-gatad (auto-hopp
+vid minskad rörelse, WCAG 2.3.3). Fixar alla långa listor på en gång.
+
+**Rebas-not (2026-06-16):** RevealSection i Tips wrappas dessutom i en egen `ErrorBoundary`
+(`label="vad alla tippade"`, resetKey=aktiv flik), samma white-screen-hotfix-mönster som de andra
+tunga sektionerna i HOTFIX-beslutet nedan, eftersom T92 rebasades ovanpå hotfixen.
+
+---
+## 2026-06-16 , T99 (#200): avstängda spelare-sektion (härledd ur kort-datan, uppskattad)
+
+**Beslut:** En "Avstängda spelare"-sektion i Turnering-fliken som HÄRLEDS ur kort-datan vi redan
+har (T86 `extractCards` via T87 `useCrossMatchEvents`) + den källåkrade matchplanen. INGEN ny
+datakälla. Ren logik i `src/features/tournament-stats/suspensions.ts` (`deriveSuspensions`), vy i
+`SuspensionsView.tsx`, wired i Turnering-panelen i en `ErrorBoundary label="avstangda"`.
+
+**Domänreglerna (KÄLLHÄNVISADE , gissas ALDRIG; VM 2026:s disciplinregler skiljer sig från
+tidigare VM, så de är extra lätta att gissa fel). Korsverifierade mot TVÅ oberoende källor:**
+
+- **Rött kort -> avstängd nästa match (S1).** Källa: MLSSoccer.com, "2026 FIFA World Cup yellow
+  card and suspension rules" ("If a player receives a red card ... suspended for ... the following
+  contest"). S1 fångar även andra-gult-UTVISNINGEN: API-Football v3 sätter event-detail
+  **"Yellow-Red Card"** för en utvisning på andra gult, och `parse-live.readCardColor` klassar den
+  strängen som färg `'red'` (den måste testas FÖRE includes('yellow'), eftersom strängen bär både
+  "yellow" och "red"), så händelsen når S1-grenen som ett rött kort. KÄLLA för enum-värdet
+  "Yellow-Red Card": korsverifierad mot tre oberoende källor (api-football.com event-detail,
+  Sportmonks "YELLOWREDCARD", live-score-api "yellowred"). RÄTTAD 2026-06-16 (F1): readCardColor
+  klassade tidigare "Yellow-Red Card" som `'yellow'`, så en andra-gult-utvisning räknades som ett
+  vanligt gult och INGEN avstängning härleddes. Korrekt även för T88:s kort-liga (utvisning = rött,
+  inte två gula). Bevisat genom seam-test som matar den exakta API-strängen (parse-live.test.ts,
+  match-stats.test.ts, suspensions.test.ts).
+- **Två ackumulerade gula i SKILDA matcher -> avstängd nästa match (S2).** Källa: MLSSoccer +
+  Yahoo/Athlon, "World Cup 2026 Yellow Card Rules: When Do Cards Reset". Vi räknar max ETT
+  ackumulerings-gult per match (ett andra gult samma match är en utvisning, S1).
+- **Gul-nollställning i TVÅ steg (VM 2026:s NYHET, S3):** ackumulerade gula nollställs EFTER
+  gruppspelet OCH igen EFTER kvartsfinalerna ("Following the Group Stage, all yellow cards will be
+  reset, and then reset again after the quarterfinals"). En redan UTLÖST avstängning raderas INTE
+  av nollställningen (Yahoo: "The reset only removes single pending yellows, not completed
+  suspensions"). Fas-block i koden: gruppspel | {R32, R16, kvart} | {semi, brons, final}.
+- **Längd = UPPSKATTAD 1 match (S4).** Vi VET INTE disciplinnämndens exakta beslut (ett grovt rött
+  kan ge fler), så default 1 match och hela sektionen märks tydligt "uppskattning" i UI:t (Daniels
+  direktiv: håll enkelt + var tydlig att det är en uppskattning). Ingen gissning om längre straff.
+- **Från-match + auto-bort när avtjänad (S5).** Avstängningen utlöses i en match och gäller lagets
+  NÄSTA match (matchplanens kronologi). När den matchen är SPELAD (live/färdig/avspark passerad
+  relativt nu) är straffet avtjänat -> posten försvinner. Inget gissande , ren tidsordning ur planen.
+
+**Varför uppskattat och inte exakt:** vi har ingen feed för disciplinnämndens faktiska beslut. Att
+härleda ur korten ger en RIMLIG approximation utan ny datakälla, och vi är ärliga om osäkerheten i
+UI:t i stället för att låtsas vara facit. Kort som inte kan placeras i en lag-sekvens (fixtures
+`api-<id>` utan app-koppling, eller lag utanför VM-bryggan) HOPPAS , vi gissar aldrig en
+from-/nästa-match. Negativ-kontroll körd på S2-tröskeln (>=2 -> >=3 = rött), S3-nollställningen
+(gren bortkopplad = rött) och S5-auto-bort (gren bortkopplad = rött), 2026-06-16.
+
+**SKADOR , MEDVETET SKIPPAT (Daniels besked):** en skade-sektion kräver API-Footballs
+`injuries`/`sidelined`-endpoint = en NY låg-frekvent poll (additiv edge-fn + cron). Daniel föredrar
+rent framför komplett här, så det är UTELÄMNAT nu. En valfri FRAMTIDA uppföljning (additiv
+injuries-poll, RÖR EJ livescore-pollaren) , inte byggt, medvetet, för att hålla det rent.
+
+---
+
+## 2026-06-16 , HOTFIX: white-screen live (Realtime kanal-namns-krock + saknad error boundary)
+
+**Symptom:** Den live-deployade appen (vm-2026.pages.dev) white-screenade för användare mitt under
+VM, headern syntes <1 s, sedan blev hela sidan blank. Bygget var intakt (HTTP 200), så ett
+runtime-fel. Verifierat i browsern: `#root` hade 0 barn (helt avmonterat träd), konsolen visade
+`Error: cannot add 'postgres_changes' callbacks for realtime:vm2026-tournament-stats after subscribe()`.
+
+**Rotorsak (verifierad, gissad aldrig):** Supabase Realtime cachar kanaler per TOPIC ,
+`client.channel(name)` returnerar SAMMA kanal-instans för samma namn. T83 håller ALLA flik-paneler
+monterade samtidigt, så de två alltid-monterade Turnering-vyerna `ScorerTableView` (T87) och
+`TournamentStatsView` (T88) anropade BÅDA `useCrossMatchEvents()`, som prenumererade på samma
+channelName `'vm2026-tournament-stats'`. Den andra prenumeranten fick tillbaka den förstas redan
+`subscribe()`:ade kanal och anropade `.on('postgres_changes', ...)` på den, vilket supabase-js
+förbjuder , felet kastades synkront i effekten. Eftersom appen INTE hade någon error boundary
+avmonterade ett enda sådant fel HELA React-trädet -> blank sida. Live-only: i fixtures-läge öppnas
+ingen kanal, så alla fixtures-tester + isolerade render-harness passerade (skarven testades aldrig).
+
+**Fix 1 (rotorsak):** `subscribeToTableChanges` (den enda Realtime-seamen) ger nu VARJE
+prenumeration ett unikt topic-suffix (`${channelName}:${++counter}`), så två konsumenter aldrig kan
+dela kanal-instans oavsett channelName. channelName är nu en läsbar namnrymds-PREFIX, inte ett delat
+lås. Regression: faithful Supabase-fake (topic-cache + throw-on-`.on()`-after-`subscribe()`) , två
+prenumerationer på samma namn kastar INTE längre; negativ-kontroll verifierad (revert -> RÖTT).
+
+**Fix 2 (strukturell, ovillkorlig):** Ny `ErrorBoundary` (klass-komponent, `getDerivedStateFromError`
++ `componentDidCatch` som `console.error`:ar fel + komponent-stack, fail-loud). Wrappar varje
+flik-panels innehåll (resetKey=aktiv flik), de tunga sektionerna var för sig (skytteliga,
+turneringsstatistik, dagens matcher, topplistor, turnerings-zonen) OCH app-roten som sista
+skyddsnät. En sektions-krasch kan ALDRIG mer blanka hela appen , den degraderar isolerat med en
+tillgänglig fallback (role=alert, fokuseras, statisk = reduced-motion-ok). Källa: hotfix-direktiv
+2026-06-16; browser-verifierad rotorsak.
+
+---
+
+## 2026-06-16 , T88 (#180): turneringsstatistik (rik uppsättning härledda VM-stats, near-live)
+
+**Beslut (vilka stats + varifrån de härleds, EN sanning per siffra):** Turneringsstatistiken i
+Turnering-fliken (under skytteligan) bygger en rik uppsättning aggregat, allt härlett ur befintlig
+data, aldrig en gissad siffra:
+- EVENTS-härlett (near-live via `useCrossMatchEvents`, T87): kort-liga (spelare + lag), snabbaste
+  mål, mål-per-15min-fördelning. (OBS: "flest mål per lag" + "turneringens mål-total/målsnitt" var
+  ursprungligen events-härledda HÄR, men FLYTTADES till facit-källan i T100 (#207) , se T100-raden
+  överst. Events täcker bara en delmängd matcher, så en match utan event-rad blev osynlig.)
+- STATISTICS-härlett (near-live via nya `useCrossMatchStats`): mest bollinnehav, flest skott, mest
+  fouls (null-medvetna lag-medel).
+- RESULTAT-härlett (den resolvade matchplanen ur ResultsProvider, dvs officiellt facit, slutgiltigt
+  vid FT): flest hållna nollor (clean sheets), största skrällarna (upsets).
+
+**Beslut (egenmål i "flest mål per lag", F1 , KÄLLHÄNVISAT, gissa aldrig):** Ett egenmål är gjort
+AV en spelare men räknas FÖR motståndarlaget; API-Footballs `team`-fält är tvetydigt och de stora
+fotbolls-API:erna är OENIGA om konventionen (kunde ej källverifieras, v3-doc 403; se T86-raden nedan).
+Vi tolkar därför ALDRIG om team-fältet: ett egenmål krediteras INTE till något lags mål-tally, det
+noteras bara separat (ownGoals). Ett lags `goals` = mål av lagets spelare EXKLUSIVE egenmål (öppet
+spel + straffmål, vars teamApiId är det icke-tvetydiga, gjorda-för-laget). MEN turneringens mål-TOTAL
+(`totalGoals`/målsnitt) RÄKNAR egenmålet (FIFA räknar egenmål i en turnerings måltotal , det föll ett
+mål), bara LAG-krediteringen av just egenmålet vågar vi inte. Källa: `isOwnGoalDetail` (detail "Own
+Goal", match-stats T86). Inline-källhänvisat i `tournament-stats-events.ts` (G1/G2) + empirisk
+NEGATIV-KONTROLL (ta bort egenmåls-gardet -> 3 F1-tester rödnar, verifierat 2026-06-16).
+
+**Beslut (skräll/upset-regel , KÄLLHÄNVISAT):** En skräll = en färdig match där det LÄGRE rankade
+laget (HÖGRE FIFA-rankingtal) vann; gapet = vinnarens rankingtal − förlorarens. Oavgjort = ingen
+skräll. Vinnaren avgörs av ordinarie+förlängning, vid lika av straffarna (samma vinnar-härledning som
+slutspels-trädet). Källa (ranking): FIFA/Coca-Cola Men's World Ranking, juniutgåvan 2026, samma
+källåkrade tabell som `team-profiles.ts` (`fifaRanking`, värde-låst i CI). Ett lag utan känd ranking
+hoppas (gissar aldrig ett gap). Clean sheet: motståndaren gjorde 0 mål i ordinarie+förlängning (straff-
+läggning räknas aldrig som insläppt; MatchResult bär redan mål exkl. straffar). Inline i
+`tournament-stats-tables.ts` (C1/U1).
+
+**Beslut (parallellt smalt cross-match-STATISTICS-läs-lager + delad near-live-spine, DRY rule-of-
+three):** Lag-medlen läser statistics via ett EGET smalt läs-lager (`live-stats-read.ts`,
+`getLiveStats`) som SELECTar bara `match_id, statistics` (spegelbild av T87:s `live-events-read.ts`,
+parser-skarven delas). Near-live-mekaniken (Realtime + 20 s poll + fokus/online/visibility) var nu
+upprepad en TREDJE gång (use-live-data T91, use-cross-match-events T87, denna), så den extraherades
+till en DELAD generisk hook `useNearLiveCollection`; `useCrossMatchEvents` (T87) skrevs om att
+delegera dit utan beteende-ändring (dess test = oförändrad negativ-kontroll, grönt). `useLiveData`
+delar idén men inte laddningen (drar `*` + indexerar per app-match-id för dagsvyn), så den lämnades
+utanför (KISS/YAGNI, ingen fel-abstraktion).
+
+**Beslut (placering UTANFÖR SimulationFrame + sim-grind, F2):** Vyn mountas i Turnering-fliken men
+utanför SimulationFrame, samma val som skytteligan. Event-/statistik-korten är oberoende av results-
+storen (egna live-hookar). De resultat-härledda korten läser results-storens matchlista, som i what-
+if-läge är de EFFEKTIVA (sim-overlaid) matcherna; vyn GATAR därför clean sheets/skrällar på att what-
+if-läget är AV (`simulating === false`) och visar en lugn "visas med verkliga resultat"-notering i
+sim-läge, så turneringsstatistiken aldrig speglar sandlåde-resultat.
+
+---
+
+## 2026-06-16 , T87 (#179): skytteliga + assist-liga (cross-match-aggregering, near-live)
+
+**Beslut (skytteliga-reglerna, KÄLLHÄNVISADE):** Skytteligan aggregeras ur live-event-datan över
+ALLA matcher med dessa regler:
+- **Egenmål räknas ALDRIG som skyttens mål.** Vi filtrerar `isOwnGoal === false` innan en spelares
+  mål-tally räknas. **Källa:** den regeln är universell och provider-oberoende (till skillnad från
+  egenmålets LAG-kreditering, som de stora fotbolls-API:erna är oeniga om och vi aldrig tolkar om ,
+  se T86-raden nedan + match-stats-types.ts MatchGoal-doc). `isOwnGoal` härleds ur API-Footballs
+  detail "Own Goal" (match-stats `isOwnGoalDetail`).
+- **Straffmål RÄKNAS som mål** (och noteras separat som "varav N straff"). **Källa:** så räknar
+  FIFA:s officiella skyttekungs-statistik (straffar i öppet spel ingår; bara straffläggning EFTER
+  120 min, dvs penalty shoot-out, räknas inte , och de kommer aldrig in i aggregeringen eftersom de
+  inte är ordinarie `goal`-events). `isPenalty` ur API-Footballs detail "Penalty" (match-stats
+  `isPenaltyGoal`).
+- **Grupperings-nyckel = spelar-id, inte namn** (namn stavas olika mellan svar, id:t är stabilt; en
+  mål/assist utan känt id hoppas , gissar aldrig att två okända skyttar är samma). **Källa:**
+  live-types `LiveEvent.playerId`-doc ("STABIL nyckel för cross-match-aggregering").
+- **Ranknings-sorteringen** (mål desc -> färre matcher -> fler assists -> namn) är en PRESENTATIONS-
+  konvention (rimlig tie-break), inte en officiell FIFA-regel, och hävdas inte som källhänvisad
+  sanning. Reglerna är inline-källhänvisade i `src/features/tournament-stats/scorer-table.ts` (R1-R4)
+  och bevisade med diskriminerande tester + en empiriskt verifierad negativ-kontroll (filtret borta
+  -> 3 R1-tester rödnar).
+
+**Beslut (lättviktigt cross-match-events-läs-lager, smalt SELECT):** Skytteligan/turneringsstatistiken
+läser events via ett EGET smalt läs-lager (`src/data/livescore/live-events-read.ts`,
+`getLiveEvents`) som SELECTar bara `match_id, events` , inte `*` (live-read.ts:s `getLiveData` drar
+ALLA tre blobbarna events+statistics+lineups per rad). **Varför:** en cross-match-aggregering rör
+bara events; att dra ner statistics/lineups för hundratals matcher är onödigt nät + parse. Parser-
+skarven (RawApiResponse-kuvert -> `parseEvents`) delas med live-read, så ingen tolknings-drift. T88
+återanvänder samma loader + den återanvändbara hooken `useCrossMatchEvents`.
+
+**Beslut (near-live = SAMMA T91-spine):** `useCrossMatchEvents` återanvänder dagsvyns auto-
+uppdaterings-spine (Realtime på `match_live_data` + 20 s poll-fallback + fokus/online/visibility-
+refetch), så aggregaten räknas om inom sekunder när ett mål skrivs. Gatat bakom live-läge; i
+fixtures/demo-läge en initial hämtning, sedan vila (ingen backend att väcka). **Varför:** EN sanning
+för "hur håller vi live-data färsk" (DRY), och samma robusthet som löste T91:s stale-score-bugg.
+
+**Beslut (placering UTANFÖR SimulationFrame):** Skytteligan mountas i Turnering-fliken men utanför
+`SimulationFrame`. **Varför:** den härleds ur den VERKLIGA live-event-datan, inte ur det lokala
+what-if-läget, så den ska aldrig bära sim-markeringen.
+
+---
+
+## 2026-06-16 , T86 (#178): rik live-matchvy , drill-in + delad match-stats-projektion
+
+**Beslut (drill-in = MODAL, inte route eller inline-expand):** Den rika matchvyn (tidslinje +
+statistik + laguppställning + "vad alla tippade") öppnas via DRILL-IN i en delad `<Modal>`
+(src/features/match-detail/), inte som inline-expand på livekortet och inte som en egen
+hash-route. **Varför:** north-star §2 säger att den TUNGA detaljen öppnas via drill-in (det
+eliminerar nästlade komprimera-knappar). En modal (inte en routad vy) är KISS i den router-lösa,
+hash-baserade flik-appen, och återanvänder den redan a11y-kompletta Modal-primitiven (fokus-fälla,
+Escape, portal, reduced-motion). Avvägning mot en delbar per-match-djuplänk: delning sker redan på
+app-nivå (vm-2026.pages.dev) och en per-match-URL var inget uttalat krav , KISS vägde över. Drill-
+in följer det etablerade mönstret `klickbar-entitet-oeppnar-en-delad-modal-overlay` (context +
+provider-renderar-en-gång + återanvändbar trigger), inkopplad från Idag-listans matchrader (T92
+kopplar in Tips-reveal-listans rader mot SAMMA openMatch-seam).
+
+**Beslut (EN delad match-stats-projektion, src/data/match-stats/):** En ny, MATCH-AGNOSTISK,
+team-/spelar-nyckad projektion (extractGoals/Cards/Subs/OtherEvents, normalizeTeamStats,
+extractLineup) ovanpå de redan-parsade live-typerna (parse-live.ts). **Varför:** T87 (skytteliga)
+aggregerar mål/assist per spelar-id över ALLA matcher, T88 (turneringsstatistik) aggregerar kort/
+innehav per lag-id över ALLA matcher , båda behöver team-/spelar-id bevarade, inte den sid-nyck(
+home/away)-form live-card-model.ts har (den tappar id:n och kräver ett homeApiId, rätt för EN
+match-vy men oanvändbart cross-match). Vi parsar ALDRIG om de råa svaren här (parse-live äger RÅ ->
+normaliserad, en sanning); projektionen tar bara den normaliserade formen ett steg till. För att
+bära skytt-/assist-id + tränare genom skarven utökades `LiveEvent` (playerId/assistId) och
+`LiveLineup` (coachName) additivt i parse-live (null-säkert, gissar aldrig ett id/namn).
+
+**Egenmåls-regel (KÄLLHÄNVISAD + flaggad osäkerhet, gissa aldrig):** `extractGoals` FLAGGAR egenmål
+via detail "Own Goal" (verifierbart, samma källa som live-card-model redan matchar) och straff via
+detail "Penalty". Den VERIFIERBARA, provider-oberoende regeln "ett egenmål är aldrig SKYTTENS mål"
+uttrycks genom att T87 filtrerar `isOwnGoal === false` innan den räknar en spelares tally. Vi tolkar
+INTE om vilket lag `teamApiId` pekar på för ett egenmål (om det är det gjorda-emot-laget eller det
+gynnade laget): de två stora fotbolls-API:erna är OENIGA om den konventionen (API-Football vs
+football-data.org / Sportmonks), och API-Footballs egen v3-doc svarar 403 mot automatiska hämtningar
+så den gick inte att bekräfta, och de committade fixtures innehåller inget egenmål att probe:a mot.
+**Beslut:** behåll `teamApiId` EXAKT som API:t attribuerar eventet (ingen omtolkning), tills regeln
+kan källverifieras mot ett riktigt egenmåls-svar live (eller mot den nåbara doc:en). T88:s ev. "mål
+för/emot per lag"-aggregering måste vänta in den verifieringen innan den litar på egenmålets team-
+fält. Negativ-kontroll bevisar att test:et som låser team-bevarandet rödnar om någon inför en flip.
+
+---
+
+## 2026-06-16 , T91 (#184): live-score auto-uppdatering , poll + fokus/online-skyddsnät ovanpå Realtime
+
+**Rotorsak (fastställd, inte gissad):** en pågående match uppdaterades inte i appen förrän en
+MANUELL omladdning (mål föll, ställningen stod stilla). `useLiveData` (src/features/daily/
+use-live-data.ts) hade ENBART Realtime-prenumerationen på `match_live_data` , inget skyddsnät om
+postgres_changes-WebSocketen missar eller tappar. Verifierat mot prod 2026-06-16: tabellen ligger
+korrekt i `supabase_realtime`-publikationen (T81-migrationen) OCH pollaren skriver färsk data
+(g-G-2 live, uppdaterad 16 s tidigare), så backend var friskt , felet var rent på läs-sidan.
+Realtime-loggen visade dessutom återkommande "Tenant has no connected users / shutdown", dvs
+klienter höll inte streamen öppen. Och `subscribeToTableChanges` förlitar sig EXPLICIT på "nästa
+fokus-refetch" som skyddsnät , men det skyddsnätet saknades i useLiveData (OfficialResultsProvider
+har det, live-vyn hade det inte). SW/HTTP-cache UTESLUTET som orsak: workbox-globben precachar bara
+statiska bygg-assets, ingen `runtimeCaching` rör Supabase-fetchar, och PostgREST-svaren bär inget
+`Cache-Control`/`ETag` , inget lager cachar live-läsningen.
+
+**Beslut:** Lägg till TVÅ skyddsnät i useLiveData ovanpå Realtime (som förblir primär väg), båda
+kör samma tysta re-fetch (bumpar refetch-nonce): (1) en periodisk POLL var 20 s medan live-läget är
+aktivt, (2) en om-hämtning vid `online` + `visibilitychange` (visible). Bara i live-läge; fixtures
+har ingen backend (negativ-kontroll i testet).
+
+**Varför poll-cadensen är 20 s (källhänvisad, inte godtycklig):** livescore-pollaren skriver
+`match_live_data` var ~30:e sekund under live (cron `'30 seconds'`, se supabase/functions/
+livescore-poller + memory "vm2026-livescore-feasibility"). En klient-poll på 20 s fångar därför
+varje ny snapshot inom några sekunder efter skrivning (kravet "inom några sekunder"), och eftersom
+Realtime normalt levererar pushen FÖRST är pollen i praktiken bara redundans. Lasten är en lätt,
+öppen-RLS Supabase-SELECT per vaken live-flik , ingen API-Football-kostnad (den ligger på pollaren,
+som vi inte rör). Ingen SW-/cache-ändring behövdes: live-vägen cachas inte av något lager (se
+rotorsak), så network-first vore en åtgärd mot ett icke-existerande problem (KISS/YAGNI).
+
+## 2026-06-16 , T83 (F4): ResultEntryView-testets formulär-räkning bytt från getAllByRole('group') till stabil markör
+
+**Beslut:** I `src/features/results/ResultEntryView.test.tsx` räknas synliga matchformulär via en
+ny hjälpare `visibleFormCount()` som använder den stabila markören `form[data-match-id]` (vars
+innersta `<li>` inte är `hidden`), i stället för `screen.getAllByRole('group').length` i de heta
+`waitFor`-looparna och fönster-/utfäll-jämförelserna.
+
+**Varför (samma patologi T90 fixade i App.test.tsx, north-star-specen tilldelar F4 till T83):**
+vyn renderar ALLA 104 matchformulär (out-of-window dolda med `hidden`, inte bortfiltrerade, C2),
+så trädet är stort. `getAllByRole('group')` tvingar Testing Library att för VARJE kandidat både
+matcha rollen OCH avgöra synlighet via `dom-accessibility-api`s `isInaccessible` -> jsdom
+`getComputedStyle`, vars kostnad växer med DOM-storleken; i en `waitFor`-loop betalas den om och
+om igen. Det blåste upp filen till ~31 s under full parallell svit-last (under 20 s-blockens
+timeout men sårbart). Markör-räkningen är ett O(n) `querySelectorAll` + en `hidden`-koll per nod
+(ingen a11y-namnberäkning), så den är billig och deterministisk. Mätt isolerat: filens test-tid
+~14,2 s -> ~9,2 s (~35 % ner), tyngsta testet ~2,8 s -> ~1,5 s.
+
+**Ekvivalent, inte svagare:** "synlig" definieras EXAKT som produktionskoden gör (kommentar i
+`ResultEntryView.tsx`: "getAllByRole('group') räknar bara de synliga"), nämligen ett kort vars
+innersta `<li>` inte är `hidden`. Markören sitter 1:1 med fieldset:en (role=group), så antalet är
+detsamma, och fönster-/utfäll-assertionerna behåller sin diskriminerande kraft (utfälld lista har
+strikt fler synliga formulär än fönstret; ihopfälld går tillbaka till fönster-antalet). De
+genuint a11y-semantiska enskilda queries:na (heading/region/alert/table/rowheader + scoped
+`getByLabelText`) lämnades orörda , de är enträffs- eller subträd-scopade och därmed billiga.
+
+## 2026-06-16 , T90 re-review-fix: App-testets install-knapp-query bytt från getByRole({name}) till stabil markör
+
+**Beslut:** I `src/App.test.tsx` hittas den kompakta install-knappen (onboarding-klar-grenen) via
+`document.querySelector('[data-install-button="native"]')` + en scoped assertion (knapp-element,
+tillgängligt namn, native-markör), INTE via `screen.getByRole('button', { name: /Installera som app/i })`.
+
+**Varför (mätt empiriskt, inte gissat):** När onboarding är KLAR finns ingen modal som gör resten
+av skalet inert, så hela app-trädet (~4400 DOM-element, ~145 knappar i fixtures-läget med den fyllda
+demo-datan) är tillgängligt. `getByRole({ name })` tvingar `dom-accessibility-api` att beräkna det
+tillgängliga NAMNET för VARJE knapp; varje sådan beräkning anropar jsdom:s `getComputedStyle`, vars
+kostnad växer med DOM-storleken (~450 ms/knapp under last). 145 knappar -> ~38 s, vilket spränger
+vitest test-timeout (15 s) och fällde testet. **Detta är en TEST-frågans kostnad, inte en mount-/
+prod-regression:** appen settlar på ~1,5 s, demo-bygget är en engångs-~30 ms (mätt). Bekräftat
+PRE-EXISTERANDE på develop (dc5d3ad): exakt samma test timeout:ar där också, så det är inte ett
+T90-fynd , T90 lägger bara till ~46 av 4400 element (~1 %). Syskon-testet (touren ÖPPEN) drabbas
+inte: den öppna modalen gör skalets knappar inert, så bara dialogens få knappar namn-beräknas.
+**Markör-fixen** är O(1)-uppslag och bevarar HELA beteende-assertionen (negativ-kontroll: muterad
+markör OCH muterat namn rödnar båda testet, verifierat). Den bredare DOM-storleks-/getComputedStyle-
+kostnaden i jsdom (syns även i `ResultEntryView.test.tsx`, ~31 s men under sin timeout) är en
+separat test-prestanda-fråga, ägd av flik-IA-tasken (T83) per north-star-specens bygg-ordning.
+
+## 2026-06-15 , T90 (#183): Global topplista RÄTTVIS (bästa rum) + helt global (server-side scoring)
+
+**Live fairness-/privacy-fix. SUPERSEDER T82-del-3-beslutet "summa per rum" nedan.**
+
+**Beslut 1 , aggregerings-regeln: bästa rum, INTE summa.** En deltagares globala poäng =
+deras BÄSTA ENSKILDA rum-poäng (inte summan över alla rum). Antal rum ger INGEN fördel.
+**Källa till regeln (gissas inte):** ägarens uttryckliga beslut i GitHub-issue #183 ("Rättvist
++ helt globalt", Daniel 2026-06-15) , den gamla summa-regeln lät en deltagare i N rum få N
+gångers poäng för samma skicklighet (ägaren kallar det fusk). "Bästa rum" väljs med SAMMA
+prioritet som rangordningen (poäng, sedan exakta träffar), så "bästa rum" och "global rank"
+vilar på en sanning (`aggregate-total.ts` `isBetterRoom` == `compareEntries`-prioriteten).
+Bevisat på REAL prod-data: en användare i 4 rum hade per-rum [7,6,7,6] -> global 7 (bästa),
+inte 26 (summa); en i 2 rum [11,7] -> 11, inte 18. Negativ-kontroll: byt best-room mot summa
+-> fairness-testet rödnar (verifierat, aggregate-total.test.ts).
+
+**Beslut 2 , listan omfattar ALLA deltagare i ALLA rum (200+), server-side.** Den gamla
+live-vägen (`loadRoomContributions(myRooms)`) laddade bara den inloggades EGNA rum -> "Global"
+visade ~54 av 263. Den nya vägen rangordnar ALLA. Det MÅSTE ske server-side: en vanlig
+medlems RLS ser bara egna rum + egna/avslöjade tips, så listan kan inte byggas i klienten
+utan att antingen utelämna folk eller läcka andras hemliga tips. **Privacy:** server-vägen
+läser råa tips (förbi RLS, service_role) men returnerar BARA (userId, displayName, points,
+rank, exactHits) , ALDRIG en rå tips-rad (bevisat: privacy-test + real-data-körning gav
+exakt de fem fälten, inga tips-fält i serialiseringen).
+
+**Beslut 3 , arkitektur: edge function kör SAMMA testade TS-motor (genererad bundle), INTE
+en SQL-reimplementation.** Att reimplementera poäng-reglerna (FIFA-tiebreak, bracket-
+härledning, score) i SQL vore en andra, drift-bar motor (ägarens #1-risk). I stället:
+en READ-ONLY edge function (`supabase/functions/global-leaderboard/`) kör `buildGlobalLeaderboard`
+ur en **genererad, bundlad kopia** av den rena src-grafen (`derivePoolFacit` + `buildTotalLeaderboard`
++ `applyRoomResults` + den källåkrade statiska planen), emitterad av
+`scripts/generate-global-leaderboard-core.ts` via esbuild. Genererad ur src = ingen hand-drift-
+yta (till skillnad från den hand-skrivna livescore-mirror:n). Paritet vaktas behavioralt i
+`global-leaderboard-mirror-parity.test.ts` (bundlar om src, jämför diskriminerande in->ut mot
+den committade mirror:n , en glömd regenerering rödnar i CI). Demo/fixtures-vägen kör SAMMA
+`buildTotalLeaderboard` lokalt -> demo + live delar exakt en rättvise-regel (ekvivalens-test).
+
+**Beslut 4 , UI: "med i N rum"-etiketten borttagen.** Under bästa-rum-modellen ger rum-antalet
+ingen fördel, så att visa det bredvid placering/poäng vore vilseledande. Raden + hjälten visar
+bara placering + namn + poäng (deltagarens bästa rum-resultat); `roomCount`-fältet är borttaget
+ur `TotalLeaderboardEntry`/`TotalSelfSummary`.
+
+**Data-integritet:** ingen migration, ingen schema-ändring; edge-funktionen gör BARA `.select()`
+(med `.order()`/`.range()`, rena läs-modifierare). Bot-/seed-datan är bevisat oförändrad (md5 på
+bot_accounts + predictions identisk före/efter).
+
+**Beslut 5 (F1, reviewer-fynd, must-fix): paginerad läsning MÅSTE vara totalordnad + completeness-
+vaktad.** `selectAll` läste predictions (~18k = 19 sidor), bracket_predictions (~8k) och
+group_predictions (~3k) sidvis med `.range()` i en loop UTAN `.order()`. **Regeln (gissas inte,
+källhänvisad):** PostgREST/Postgres garanterar INTE samma radordning mellan två sidanrop utan en
+total `ORDER BY` , under samtidiga skrivningar eller en annan query-plan kan en rad hoppas över
+(understruken poäng) eller dubbleras (samma match räknad två gånger -> uppblåst poäng) vid sid-
+gränsen, exakt den fairness-/integritets-bugg T90 skulle fixa. **Källa:** senior-developer-lärdom
+`paginerad-las-utan-stabil-order-...` (reviewer, eskalerad panel T90), verifierad mot live prod-
+radantal (predictions 18061 = 19 sidor, bracket_predictions 7931, group_predictions 3049, hämtade
+2026-06-15). **Fix:** (a) varje paginerad läsning ordnas på tabellens **PK** (en TOTAL ordning ,
+verifierat mot live-schemat: predictions `(room_id, match_id, user_id)`, bracket `(room_id, slot_id,
+user_id)`, group `(room_id, group_id, user_id)`, room_members `(room_id, user_id)`, official
+`(match_id)`); (b) loop-/completeness-logiken flyttad till en REN, testad funktion
+(`src/data/global-leaderboard/select-all-pages.ts`, bundlad in i mirror:n , edge-funktionen blir
+en tunn IO-wrapper, samma recept som resten av grafen) som verifierar hämtat antal mot ett
+`count: 'exact'` och **fail-loud:ar** vid under-/over-read; (c) ett test som KORSAR sid-gränsen
+(sidstorlek 3, > 1 sida) bevisar completeness + ingen tapp/dubblering + fail-loud
+(`select-all-pages.test.ts`), negativ-kontrollerat (completeness-vakten borttagen -> testet rödnar).
+Mirror-paritetsfixturen stärktes också med en deltagare som scorar OLIKA i två rum (u4: 1p/3p) så
+best-room-**selektionen** diskrimineras (negativ-kontroll: selektions-drift -> u4-assertionen rödnar).
+## 2026-06-16 , T93 (#186): Idag-vyn rullar till nästa matchdag när dagens sista match är slut (rollover)
+
+**Beslut:** Den auto-valda ("följ verklig dag") dagen i Idag-vyn väljs nu av `followDayIndex`
+(use-daily-matches.ts), inte enbart `initialDayIndex`. Regeln ovanpå kalender-valet: är HELA den
+kalendervalda dagens speldag FÄRDIGSPELAD (`status === 'finished'` för varje match den dagen) rullar
+vyn fram till dagen som rymmer NÄSTA KOMMANDE match. "Nästa kommande" hämtas ur EXAKT samma logik som
+hero:ns nedräkning (`computeCountdown`), så dagvalet och nedräkningen är EN sanning och inte kan
+divergera. Vald dag (datum-rad + hero + matchlista) rullar tillsammans.
+
+**Källa till regeln (domän, källhänvisad):** "nästa svenska kalenderdag" är inte en gissning utan en
+följd av tidszonen. En match med svensk avspark 00:00 (t.ex. Saudiarabien-Uruguay, kickoff
+`2026-06-15T22:00:00.000Z`) tillhör den svenska kalenderdagen 16 juni i Europe/Stockholm (sommartid
+UTC+2), inte UTC-dygnet 15 juni , samma off-by-one-skydd som `localDateKey`/`groupMatchesByDay` redan
+bär. Verifierad empiriskt mot fixtures-schemat (`src/data/wc2026/matches.ts`): civ-ecu spelas svensk
+15 juni 01:00, ksa-uru svensk 16 juni 00:00. Daniels skärmdump (~2026-06-15 23:07) bekräftar
+beteendet: nedräkningen pekade rätt (ksa-uru) men hero stod kvar på den spelade civ-ecu.
+
+**Varför:** asymmetri , nedräkningen (`computeCountdown`, tick-driven över ALLA matcher) rullade
+korrekt vid dygnsgränsen, men dagvalet var rent kalender-baserat och rullade bara vid kalender-midnatt.
+Sent på kvällen, när dagens matcher var slut men nästa avspark redan låg på nästa svenska dag, föll
+`selectMatchOfTheDay` tillbaka på dagens tidigaste (spelade) match. Genom att låta dagvalet anka på
+samma nästa-avspark-sanning som nedräkningen försvinner asymmetrin.
+
+**Bevarat (rör inte det som inte är trasigt):** dagens speldag har ännu en OSPELAD match (kommande
+eller live) -> stå kvar på idag; idag är en VILODAG (inga matcher) -> C7:s vilodags-val behålls
+(rollover gäller "när dagens sista match är slut", en vilodag har ingen sådan); före turneringen ->
+premiären; efter sista matchen (ingen kommande) -> sista dagen. Tester (use-daily-matches.test.tsx):
+Daniels exakta scenario (enhet + hook end-to-end), live-match-idag, mellan-dagar, sista speldagen,
+vilodag, före turneringen, tom lista. Negativ-kontroll: rollover avstängd -> exakt de 3
+rollover-asserterande testerna blir röda. Spårbart: #186 + denna rad + `followDayIndex`.
+
+**Rättning (2026-06-16, T93 F1, reviewer-fälld):** `followDayIndex` tar nu TVÅ klockor, inte en.
+Kalender-basen (`initialDayIndex`) matas med `calendarNow` (det dag-granulära, inom-dygnet FRUSNA
+`liveNowMs` från `useTodayKey`), men nästa-avspark-härledningen (`computeCountdown`, som filtrerar
+`kickoff > now`) matas med `realtimeNow` (det per-sekund tickande `nowMs`, samma klocka som hero:ns
+nedräkning). VARFÖR: en PWA-flik öppen hela dagen fryser `liveNowMs` vid dygnets början; matades
+`computeCountdown` den frusna klockan plockade den en match som redan kickat igång tidigare samma dag
+-> `nextKey` = dagens datum -> rollovern firade ALDRIG (exakt Daniels bugg återinförd). De injicerade-
+`now`-testerna missade detta för att de gav `liveNowMs === nowMs` (alltid färskt), så den dag-frusna
+grenen aldrig kördes. Nytt test (use-daily-matches.test.tsx): den dag-frusna grenen körs MEDVETET
+(kalender-klocka fryst vid dygnets början, realtids-klocka på kvällen) på både enhets- och hook-nivå;
+negativ-kontroll: delad klocka -> hook-testet rödnar (`'2026-06-15'` i st f `'2026-06-16'`).
+
+## 2026-06-15 , T83 (#175): flik-app , routning, scroll-modell, sim-läge över flikar (utfall av v2-inceptionens öppna beslut)
+
+T83 byggde flik-IA:n och avgjorde de tre öppna design-besluten v2-inceptionen listade nedan.
+
+**Beslut 1 , routning: hash + history.pushState, INGEN router-dependency (YAGNI, PRINCIPLES §11).**
+Appen har EN navigerings-axel (en av fem flikar), inga nästlade rutter, inga route-parametrar,
+ingen route-baserad kod-splitting (alla paneler är ändå monterade, se beslut 4). En `location.hash`
+(`#/idag`) + `history.pushState` räcker EXAKT för alla tre krav: delbar fliklänk, bakåt-knapp (en
+history-post per flik-byte), djuplänk vid kall-laddning (initial flik läses ur hashen vid montering).
+Ett router-paket (react-router m.fl.) vore bärvikt vi inte behöver. **Hash framför path** eftersom
+appen är en statiskt hostad SPA (Cloudflare Pages) utan server-rewrite: en path-rutt (`/tips`) ger
+404 vid direkt-laddning, medan en hash alltid serveras av index.html. Ren mappnings-logik i
+`tab-routing.ts` (testbar fristående), window/history-IO i `use-tab-routing.ts`.
+
+**Beslut 2 , scroll-container: EN sid-scroll, ingen nästlad scroll per flik.** Varje flik scrollar
+i sidans egna scroll (window), ingen flik äger en egen inre scroll-container. Den enda inre scrollen
+i appen är total-topplistans virtualiserade fönster (`CollapsibleScrollList`, T82 del 4, oförändrad).
+Eftersom bara EN flik-panel är synlig åt gången (resten `hidden`/display:none, tar ingen höjd) blir
+varje fliks scroll ren av sig själv. Detta är förutsättningen för F1-fixen (sticky följer sid-scroll).
+
+**Beslut 3 , sim-läge över flikar: GLOBALT state, frame per simulerad flik, EN hemvist för kontrollen.**
+What-if-läget bor redan globalt i den delade results-storen (`ResultsProvider` omsluter hela skalet,
+oförändrat). Flik-IA:n delar den gamla sammanhängande sim-zonen mellan Idag (daily) och Turnering
+(tabeller/träd/"vad krävs"). Beslut: VARJE flik som visar en simulerad vy bär sin egen `SimulationFrame`
+(ring + tint + sticky "Simuleringsläge"-badge när läget är PÅ) , Idag och Turnering har var sin frame.
+Frame:n är en REN wrapper som läser sim-seamen (`simulating`) ur storen, så två frames kan stå i två
+flikar utan dubblerad state (en sanning). What-if-KONTROLLEN (`SimulationBanner`: Starta/Återställ/
+Avsluta) + resultatinmatnings-grinden (`ResultEntryGate`) får EN tydlig hemvist: **Turnering**, direkt
+ovanför inmatningen (där sim-läget är mest meningsfullt , man spelar ut tänkta resultat och ser
+tabeller/träd ändras). Inga regressions: sim-flödet (starta/avbryt, badge, frame-attribut) bevisat i
+e2e (flows.spec, Turnering-scopat) + de oförändrade simulation-enhetstesterna.
+
+**Beslut 4 , alla flik-paneler MONTERADE samtidigt (inaktiv = `hidden`), inte villkorlig rendering.**
+Att rendera bara den aktiva fliken skulle (a) TAPPA vy-state vid flik-byte (formulär-inmatning, sök,
+utfällt läge, motion-layout-position lever i lokal useState , samma klass T82 del 4 skyddade genom
+`hidden` i stället för unmount), och (b) göra topplistan "kall" vid byte (ny hämtning). Med alla
+paneler monterade delas providers + live-data, och en `hidden` panel är ur layout OCH ur a11y-trädet
+(display:none), så skärmläsaren ser bara den aktiva fliken och varje flik scrollar rent. Bonus: de
+befintliga smoke-/integrationstesterna hittar allt innehåll i DOM:en (men `getByRole` ser inte roller
+i en `hidden` panel , därför navigerar App.test/e2e till rätt flik före roll-assertioner, vilket
+också bevisar vy-växlingen end-to-end).
+
+**Sektions-navet (T78/T79) avvecklat:** hela `src/features/section-nav/` borttaget (chip-rad, mobil-
+hamburgare, scroll-spy, sticky-band-offset, self-registrering), inga döda referenser kvar.
+
+## 2026-06-15 , T83 (#175): F1 sticky "följ-med"-kontroll , root cause + fix (containing block)
+
+**F1-buggen (Daniel + T82 del 4-entryn nedan):** den sticky komprimera-/"visa färre"-baren följde inte
+sidans scroll , den "fäste i ett inre fönster och gled ur vy", och fanns bara i några sektioner.
+
+**Root cause (verifierat):** `StickyFollowToggle` renderade den sticky baren (`position: sticky; top-16`)
+och den långa listan som SKILDA SYSKON. En `position: sticky`-yta kan bara klistra och FÖLJA MED inom
+sin egen CONTAINING BLOCK = föräldraelementets innehållsbox (CSS Positioned Layout L3 §6.2). När baren
+låg ensam i en wrapper med bara sin egen höjd fanns NOLL sträcka att följa med längs, så den skrollade
+ur synhåll direkt. (Det var INTE en faktisk nästlad overflow-scroll , den enda sådana är total-
+topplistans avsiktliga fönster.)
+
+**Fix:** baren OCH listan delar nu EN containing block , listan skickas som `children` till
+`StickyFollowToggle` och renderas i SAMMA wrapper EFTER baren. Då sträcker sig containing block:en över
+hela listans höjd, så `sticky top-16` klistrar baren under sajt-headern (~64px) och följer med ända ner
+i listan. **Bevisat:** (a) enhetstest på den strukturella invarianten (bar + lista delar parent) med en
+negativ-kontroll som rödnar om listan åter blir ett syskon; (b) browser-probe , bar-topp 337px före
+scroll, 64px efter att ha scrollat 800px ner (klistrad under headern, inte bortglidd). Tillämpat på ALLA
+tre konsumenter (resultat-listan, per-rums-topplistan, tips-listan), så täckningen är komplett där
+mönstret hör hemma. Källa: `src/components/collapsible-list/StickyFollowToggle.tsx` + `.test.tsx`.
+
+**Sticky-TÄCKNINGS-inventering (alla långa listor/sektioner per flik):**
+- Tips: match-tips-listan (`PredictionsView`, StickyFollowToggle , fixat) ✓; grupp-tips + bracket-tips
+  använder höjd-klipp-primitiven `CollapsibleSection` (T68, responsiva grid/träd, inte platta listor ,
+  rätt mönster, MEDVETET ingen StickyFollowToggle, se T82 del 4 nedan); rums-sektionen ingen lång lista.
+- Topplista: per-rums-topplistan (`LeaderboardView`, StickyFollowToggle , fixat) ✓; total-topplistan
+  (`CollapsibleScrollList`, eget virtualiserat fönster + inre sticky kontroll-rad, oförändrad) ✓.
+- Turnering: gruppspel/"vad krävs"/slutspelsträd använder `CollapsibleSection` (höjd-klipp, medvetet);
+  resultatinmatningen (`ResultEntryView`, StickyFollowToggle , fixat) ✓.
+- Idag: daily har datum-bläddring (inte en lång platt lista).
+- `ScoreGuide` (poäng-förklaringen, i Tips + Topplista): är en MODAL-dialog med egen inre scroll
+  (`max-h-[92dvh]` + overflow-y-auto), INTE en lång inline-lista , StickyFollowToggle är därför inte
+  rätt mönster för den (modalens egen scroll är rätt). Ärligt noterat: täckningen gäller inline-listor;
+  ScoreGuide täcks av sitt eget dialog-mönster (se Findings F2 i handoff).
+
+---
+
+## 2026-06-15 , v2-inception: appen blir en flik-app (5 flikar), inte en lång sida
+
+Faserna 0-3 är levererade och appen är live. Ägaren godkände ett v2-bygge (SPEC §13). Det
+bärande beslutet: gå från EN lång sida + sticky chip-rad (sektions-navet T78/T79) till en
+**flik-app med fem flikar** (Idag, Tips, Topplista, Turnering, Mer), flik-rad längst ner på
+mobil (sport-app-mönster), responsiv till top-/sido-nav på större skärm.
+
+**Varför:** den långa sidan skalade inte , för mycket på en gång skrämmer användaren, och chip-
+raden räckte inte (den hoppar bara, den fokuserar inte). Fokuserade flikar visar bara det
+relevanta. Befintliga vyer återanvänds oförändrat i sak; bara placering + navigering ändras
+(återanvänd, bygg inte om).
+
+**Kopplat beslut , scroll/sticky:** scroll-modellen görs om i flik-strukturen, och sticky-buggen
+(komprimera-kontrollen följer inte sidans scroll, den fäster i ett inre fönster , se T82-del-4-
+beslutet nedan + `StickyFollowToggle` `top-16`) löses holistiskt där, på ALLA långa listor.
+
+**Öppna design-beslut som T83 äger (logga utfallet här under bygget):**
+- Routing-modell (state + history/hash vs router-dependency).
+- Scroll-container-ägande (vem äger scrollen per flik).
+- **SimulationFrame/what-if spänner nu över flera flikar:** sim-läget omsluter i dag daily +
+  gruppspel + "vad krävs" + slutspelsträd + resultatinmatning som EN zon med en sticky badge.
+  Flik-IA:n delar zonen mellan Idag (daily) och Turnering (tabeller/träd/scenario). T83 måste
+  besluta: sim-läget blir globalt state, varje flik som visar en simulerad vy bär sim-ramen/badgen,
+  och what-if-kontrollen (Start/Återställ/Avsluta) + `ResultEntryGate` får EN tydlig hemvist.
+
+**Orört i v2:** live-pollaren + bot-/seednings-lagret (live och fungerar).
+
+## 2026-06-15 , T82 del 4 (#173): "sticky kontroll-rad + börja-komprimerad" bruten till delad byggsten + applicerad på de långa listorna
+
+Ägaren gillade total-topplistans sticky kontroll-rad ("följer med i listan") + att listan börjar
+komprimerad, och ville ha SAMMA mönster på alla långa listor, samt att resultat-listan längst ned
+"börjar bli lång bör startas komprimerad med några resultat synliga".
+
+**Beslut 1: bryt ut mönstret till EN husplats med TVÅ varianter** (`src/components/collapsible-list/`),
+valda per lista efter dess tvång (rule-of-three uppfyllt: total + resultat + tips + per-rums):
+- **Virtualiserat scroll-fönster + inre sticky kontroll-rad** (`CollapsibleList`/`CollapsibleScrollList`,
+  + den FLYTTADE delade `use-virtual-rows`) för fristående rader. **Total-topplistan refaktorerades att
+  KONSUMERA den** , dess beteende + alla dess tester är OFÖRÄNDRADE (den var redan granskad).
+- **Sticky FÖLJ-MED-toggle** (`StickyFollowToggle`) för listor som INTE kan virtualiseras: dag-grupperade
+  resultat/tips (osparad inmatning bevaras via `hidden`, virtualisering skulle unmounta + tappa den) och
+  per-rums-topplistan (motion-layout-glidet kräver mountade rader). Den klistrar BARA komprimera-kontrollen
+  (top-16, under headern) i utfällt läge; fönster/inmatning/sortering oförändrade.
+
+**Beslut 2: resultat-listan + tips-listan får sticky FÖLJ-MED, inte ett scroll-fönster.** De "börjar redan
+komprimerade" (3-dygns- resp dagens-fönster, oförändrat); det nya är att den övre komprimera-kontrollen blir
+sticky i utfällt läge så den följer med ner i den långa listan. VIRTUALISERAS MEDVETET INTE: resultat-/tips-
+formulären håller osparad inmatning i lokal `useState` och bevaras via `hidden`-på-`<li>` , en virtualisering
+(som unmountar rader) skulle tappa den. Inmatning + validering rörda = noll (taskens hårda krav).
+
+**Beslut 3: per-rums-topplistan börjar komprimerad (topp-N) över en längd-tröskel, INTE virtualiserad.**
+Seedade rum kan ha ~200 deltagare (bot-seed-planen), så lång nog att tjäna på det. Men dess signatur är
+motion-layout-glidet (rader glider till ny plats vid poäng-ändring), som kräver mountade rader , därför
+slice:ar vi bara den renderade mängden (topp-N komprimerat, allt utfällt) och låter `AnimatePresence` sköta
+in/ut, ingen virtualisering. Korta rum (<= tröskeln) är OFÖRÄNDRADE (ingen toggle).
+
+**Medvetet ORÖRDA:** gruppspels-tips, slutspelsträd, scenarier, gruppspelstabellen och bracket-tips
+använder REDAN den delade höjd-klipp-primitiven (`CollapsibleSection`, T68) , de är RESPONSIVA grid/träd,
+inte platta rad-listor, så "sticky kontroll-rad som följer en lista" passar inte (höjd-klippet är rätt
+mönster för dem, och de börjar redan komprimerade). Kommentar-tråden har sin egen chat-/load-more-semantik.
+
+**Beslut 4 (F1, reviewer-fynd): nav-ordningen rättad + mekaniskt vaktad.** `totalLeaderboard.order` var 75
+men sektionen MONTERAS efter per-rums-topplistan (order 80), så chip-raden inverterades mot sidan i live-
+läge (Global listades före Topplista men scrollade efter den). Satt till **85** (speglar monterings-
+ordningen). Ett nytt test (`section-order-mirrors-mount.test.ts`) läser App.tsx, sorterar sektionerna på
+deras FAKTISKA mount-position och kräver strikt stigande `order`, så driften fångas mekaniskt framöver.
+
+Kontrast MÄTT i webbläsaren på renderad yta (båda teman): komprimera 15.2/17.9, sök-fält 12.7/17.9,
+resultat-bar-knapp 9.8/13.4 (alla >> 4.5). Visuellt verifierat i `.vmshots/` (total + resultat, komprimerad
++ sticky mitt i listan). Recept: `docs/patterns.md` (sticky-kontroll-rad-...-borja-komprimerad).
+
+## 2026-06-15 , Global topplista: sticky kontroll-rad (komprimera nåbar från alla scroll-lägen) (#173)
+
+UX-tillägg ovanpå T82 del 3. Ägaren testade UI:t och hittade en riktig miss: "Komprimera"-kontrollen
+satt bara OVANFÖR det utfällda scroll-fönstret, så stod man på plats ~100 i den utfällda listan tvingades
+man skrolla tillbaka till toppen för att fälla in den. Helt korrekt fynd.
+
+**Beslut: en STICKY kontroll-rad INUTI scroll-fönstret, inte en toggle ovanför det.** Sök-fältet,
+"Hoppa till mig" OCH en "Komprimera"-kontroll bor nu i en `position: sticky; top: 0`-rad högst upp i det
+scrollande fönstret (`.vm-total-controls`, tokens.css §26), så de FÖLJER MED när man bläddrar djupt i
+listan. Komprimera är därmed alltid ETT tryck bort, oavsett om man står på plats 3 eller 203. Den sticky
+raden har en OPAK surface-fond + hårfin nederkant + mjuk skugga, så raderna som skrollar under den aldrig
+lyser igenom eller flimrar (anti-jitter). Verifierat pinnat till fönstrets topp i ALLA bredder (280px
+vikbar cover -> 1920 ultrawide) + båda teman.
+
+**Varför sticky rad och INTE en flytande "Komprimera"-knapp:** appen har redan en flytande/diskret
+"Hoppa till mig", och en andra flytande knapp i samma hörn riskerar att krocka visuellt + skymma rader. En
+sticky kontroll-RAD samlar alla tre kontrollerna (sök/hoppa/komprimera) på ETT ställe som följer med,
+vilket är mindre visuellt brus och en tydligare mental modell ("kontrollerna sitter alltid överst i
+listan") än flytande knappar. På vikbar cover (~280px) WRAPPAR hoppa+komprimera till två full-bredds-pillar
+(flex-wrap + flex-1) så ingen knapp klipps; på sm+ sitter de inline.
+
+**Beslut: View duplicerar inte sin egen expand-toggle i utfällt läge.** I KOMPRIMERAT läge äger View:n
+"Visa alla N"-toggeln (med `aria-expanded`/`aria-controls`); i UTFÄLLT läge tar listans sticky
+"Komprimera" över som den kanoniska komprimera-kontrollen (samma `aria-controls`). Annars skulle View:ns
+toggle skrolla ur synhåll, vilket var hela problemet. Fokus återförs till "Visa alla N"-toggeln när listan
+komprimeras via den sticky kontrollen (en `useEffect` kör efter att toggeln åter-monterats), så ingen
+tangentbords-fokus tappas när den sticky kontrollen avmonteras.
+
+**A11y:** komprimera-kontrollen är en riktig `<button>` (tangentbords-nåbar, fokus-ring via befintlig
+`.vm-total-control:focus-visible`), bär `aria-expanded="true"` + `aria-controls="total-leaderboard-full"`,
+och kontrast på den faktiskt renderade sticky-raden uppmätt (knapp-etikett 15.24:1 mörkt / 17.91:1 ljust,
+getComputedStyle, inte mot hex). Ingen horisontell scroll vid 280px (scrollWidth 360 <= 375).
+
+---
+
+## 2026-06-15 , Total (cross-rum) topplista T82 del 3 (#173)
+
+Den GLOBALA topplistan: en enda rankning av ALLA deltagare (botar + riktiga) över ALLA rum, vid
+sidan av den befintliga per-rums-topplistan (T17). Bygger UI:t + demo-fixtures + wiringen ovanpå den
+redan testade aggregeringen (`aggregate-total.ts`, byggd i del 3 av tasken).
+
+**Beslut: aggregerings-regeln = SUMMA per rum, rangordna globalt.** En deltagares totala poäng =
+summan av deras poäng ÖVER ALLA rum de är medlem i. Vi räknar INTE poäng på nytt (DRY, en sanning):
+vi kör den befintliga, testade poäng-motorn (`buildLeaderboard`) PER RUM och summerar varje distinkt
+deltagares per-rums-totaler. Match-/grupp-/bracket-/mästar-reglerna, facit-mappningen och
+tiebreak-måttet (exakta träffar, sedan namn alfabetiskt; delad "1224"-rank vid lika poäng) ärvs
+oförändrade. **Varför summa per rum (inte sammanslagna tips-listor):** en deltagare kan vara med i
+flera rum och tippa SAMMA match i båda. Regeln är "summan över alla rum", så två rum ger poäng två
+gånger (en per rum). Att i stället slå ihop tips-arrayerna och poängsätta en gång skulle tappa det
+andra rummets bidrag (en match räknas en gång i `scoreMember`). N i "X:a av N" = antalet DISTINKTA
+deltagare i totalen (en deltagare i tre rum räknas EN gång i N, men får sina tre rums poäng
+summerade). Regeln + härledningen bor också som modul-doc överst i `aggregate-total.ts`.
+
+**Beslut: Rhodos (och alla andra rum) läses som vilket rum som helst, READ-only.** Aggregeringen rör
+ALDRIG data, den läser och summerar. Ingen tyst special-hantering av ett enskilt rum. Skulle en
+sådan regel behövas vore den explicit + dokumenterad här, inte gömd i summeringen. INGEN anledning
+funnen att special-hantera Rhodos i denna task (flaggas i handoff om det ändras).
+
+**Beslut: en EGEN `TotalLeaderboardProvider`, miljö-gatad, INTE en utökning av den per-rums
+`LeaderboardProvider`.** Per-rums-providern laddar bara DET AKTIVA rummets medlemmar + RLS-synliga
+tips; totalen behöver bidrag från ALLA `myRooms`. En egen provider håller den per-rums-vyn orörd
+(bryt inte T17) och bär totalens egna data-väg. I DEMO/fixtures-läge bygger den `RoomContribution[]`
+ur en deterministisk demo-fixturuppsättning (botar). I LIVE-läge skulle den hämta per-rums-tips för
+alla `myRooms` och bygga samma `RoomContribution[]`. **Ärlighet om live-vägen:** demo-vägen är den
+som visuellt + test-verifieras i denna task (off-season, inget live-backend). Live-hämtningen följer
+exakt samma per-rum-API:er som T17 redan använder (`listRoom*Predictions` + `listMembers`), så den
+tänds utan ny aggregerings-kod, men den live-grenen körs inte skarpt förrän VM och flera rum finns.
+
+**Beslut: DEMO-fixtures genereras ur bot-motorn (T82 del 1) mot ett DELVIS spelat facit.** För att
+totalen ska se FYLLD ut direkt (~240 deltagare med spridda poäng) i dev/demo genererar vi personas
+(`generatePersonas`) + tips (`generateBotPredictions`) mot ett facit där en del av gruppspelet
+markerats spelat. Botarna sprids över hela listan (capAccuracy 0.62 håller dem under en topp-spelare,
+T82 del 1). Fixtures uppfyller KÄLLANS schema-typer (`RoomMember`, `MemberPredictions` =
+`Prediction`/`GroupPrediction`/`BracketPrediction`), inte konsument-formen (lessons: fixtures mot
+källans schema, annars döljs mappnings-drift). Den DELADE, riktiga `derivePoolFacit` används för
+facit (samma form live väver in), så aggregeringen bevisas mot den riktiga skarven.
+
+**Beslut: virtualisering hand-rullad (ingen ny dependency).** Utfällt läge renderar 240+ rader som
+EN scroll men virtualiserad: bara synliga rader (+ overscan) ligger i DOM:en, mätt mot scroll-position
+och fast radhöjd. PRINCIPLES §11 (minimera beroenden, lägg inte till ett paket för något trivialt):
+fast-höjd-windowing är en liten, väl förstådd beräkning (scrollTop + viewport -> synligt index-spann),
+så vi skriver en fokuserad `useVirtualRows`-hook i stället för att dra in `@tanstack/react-virtual`.
+Egen rad + topp-3 ligger UTANFÖR det virtualiserade fönstret (alltid renderade), så "din placering"
+och pallen aldrig kan saknas ur DOM:en även om de skrollats förbi.
+
+**Beslut: placering = EGEN prominent sektion ("Global topplista") överst i tävlings-ytan.** Totalen
+får ett eget chip i sektions-navet (`SECTIONS.totalLeaderboard`) och renderas FÖRE den per-rums
+topplistan, men inom samma live-gate (syns bara i live-läge, som de andra sociala sektionerna).
+"Din placering"-hjälten överst i sektionen gör att den inloggade spelarens egen position aldrig är
+svår att hitta (ägarens uttryckliga krav). Egen rad är dessutom färg-OBEROENDE framhävd (accent-ring
++ "DU"-bricka + tint, återbrukar T17:s `.vm-board-row[data-self]`-recept) både i komprimerat och
+utfällt läge.
+
+---
+
+## 2026-06-15 , Bot-seedning T82 (#173): atmosfär-botar, datalager + säkert seed-skript
+
+Bygger datalagret + det säkra seed-skriptet för ~240 diskreta "atmosfär"-botar (del 1 av flera).
+Liv-lagret (kommentarer/reaktioner) är nästa task; persona-fälten för det definieras redan nu.
+
+**Beslut: fördelning ~240 botar = 200 (20 nya rum, ojämnt) + 35 ('VM 2026') + 5 ('Full Stack
+United', coola smeknamn).** Källa: Daniels bot-seeding-plan (memory `vm2026-bot-seeding-plan`,
+2026-06-15). New-room-botarna tippar ALLT inkl. spelade matcher (får poäng, sprids över hela
+topplistan); vm2026/fsu tippar bara kommande matcher (börjar på 0). Rhodos-rummet rörs ALDRIG.
+
+**Beslut: poäng-skiktningens TAK = capAccuracy 0.62 (konfigurerbart), floor 0.15.** Varför just ett
+tak under 1: en bot får ALDRIG kunna toppa topplistan (skulle döda tävlings-känslan mot riktiga
+vänner). 0.62 är satt under vad en stark riktig spelare rimligen når (~0.9 i referens-testet), och
+bevisas i predict.test.ts (60+ botar håller sig under en stark referens-spelare, topplistans 1:a är
+spelaren inte en bot). Skiktningen modelleras genom att, per poängsatt enhet, med sannolikhet
+`accuracy` (= skill_tier skalat in i [floor, cap]) kopiera FACIT, annars generera ett rimligt fel.
+Detta är MIN design (T82), inte en extern regel; poäng-VÄRDENA (3/1, grupp 3/2, bracket 1..5,
+mästare 20) återanvänds oförändrade ur den befintliga motorn (score.ts/bonus-score.ts), de gissas
+inte om.
+
+**Beslut: determinism via egen seedad PRNG (mulberry32).** Källa för algoritmen: mulberry32 (Tommy
+Ettinger, publik domän), inline-citerad i prng.ts. Vald för att seedningen ska vara reproducerbar
+(samma seed -> samma personas + tips), så en dry-run alltid matchar en senare live-körning och
+fördelningen kan testas. Medvetet INTE kryptografisk (ingen säkerhet hänger på oförutsägbarhet).
+
+**Beslut: idempotens-ankaret = `bot_accounts.persona_key` (UNIQUE).** Registret bot_accounts är
+hela seedningens ångerknapp (user_id FK -> auth.users ON DELETE CASCADE: radera kontot => cascade
+städar medlemskap + tips). persona_key (kohort#index, deterministisk) gör en omkörning idempotent
+(redan seedade personas hoppas över). RLS deny-all (ingen klient når registret), samma mönster som
+app_config (T80). Seed-skriptet: dry-run default, --live/--teardown bakom env (service_role aldrig
+committad), Rhodos uteslutet i den rena planeraren, och ett FÖRE/EFTER-skydd som räknar riktig
+(icke-bot) data och avbryter om den ändras. Byggaren kör aldrig live; koden är ändå körbar för ägaren.
+
+**Beslut (fix-pass): rumskoden för ett seedat rum härleds INJEKTIVT (bas-32-växling), inte via en
+siffer-bump.** rooms.code är UNIQUE (rooms_code_format `^[a-z2-9]{4,12}$`, T14-migrationen). Den
+första `roomCodeForIndex` byggde koden som `'liga' + String(index+22)` med en `<2 -> +2`-bump , den
+är INTE injektiv (index 8 och 10 gav båda `liga32`), så det 11:e rum-insertet hade kastat på UNIQUE
+mitt i en skarp körning. Fixen bas-växlar index till `ROOM_CODE_ALPHABET` (32 tecken, bijektion),
+noll-paddat till 3 tecken = 32^3 = 32 768 unika koder (`liga` + 3, längd 7, inom 4-12). Bor i
+`src/data/rooms/room-code.ts` (samma sanning som alfabetet, kan aldrig drifta), enhetstestat över
+hela domänen (alla N unika + format-regex, negativ-kontroll körd mot den gamla varianten -> rött).
+
+**Beslut (fix-pass): före/efter-skyddet räknar icke-bot-data SERVER-SIDE (RPC), inte via en
+NOT-IN-lista i URL:en.** Den första versionen fogade ~240 bot-UUID:er (~8,9 kB) i ett PostgREST
+`not in`-filter i GET-URL:en, nära/över URL-längd-taket , efter-räkningen (som körs EFTER
+skrivningarna) kunde då faila och lämna en halv-seedad DB. Fixen: en SECURITY DEFINER-RPC
+`count_non_bot_rows(p_table)` (migration `20260615140000_t82_count_non_bot_rows.sql`) som gör NOT-IN
+i SQL (`not exists`-subquery mot bot_accounts), så URL:en bär bara tabellnamnet. p_table allowlist:as
+till `room_members | predictions`, EXECUTE bara service_role (samma mönster som apply_auto_facit, T80).
+Skydds-BESLUTET (kasta vid ändrad räkning) bröts ut till en ren, enhetstestad funktion
+(`src/data/bots/seed-protection.ts`), så nätet bevisligen kan kasta (negativ-kontroll körd).
+
+**Beslut (fix-pass): Rhodos-vakten gjordes ÄKTA (kollar planen mot Rhodos id, kan faktiskt utlösa).**
+Den gamla `assertRhodosUntouched` jämförde `rhodos.name === VM2026_ROOM_NAME` , men `findRoomByName`
+hade redan matchat på namnet 'Rhodos', så jämförelsen var alltid falsk och vakten kunde ALDRIG kasta
+(PRINCIPLES §8: en fail-loud som inte kan faila är teater). Fixen kollar den FÄRDIGA planen: om Rhodos
+finns i snapshot:en, kasta om något planerat 'existing'-mål refererar Rhodos id. Finns Rhodos inte i
+snapshot:en är det en säker no-op (inget id att råka peka på). Negativ-kontroll körd (en plan som
+pekar på Rhodos id -> vakten kastar).
+
+## 2026-06-15 , Bot-liv-lagret T82 del 2 (#173): reaktioner + sparsamma kommentarer
+
+Liv-lagret som får sidan att kännas naturligt LEVANDE utan att spamma. Ägarens regel (HARD):
+kommenterar ibland, inte för mycket; blir en kommentar inte naturlig är det BÄTTRE att boten är tyst
+och bara reagerar. Reaktioner är primärt + billigt, kommentarer en sällsynt krydda.
+
+**Beslut: match-stämning (mood) härleds ENBART ur det facit faktiskt bär (ordinarie Scoreline).**
+`moodFromScoreline` (src/data/bots/match-mood.ts) klassar en spelad match som målfest / mållöst /
+oavgjort / rafflande / klar seger / knapp seger. Vi härleder MEDVETET INTE "skräll" (kräver
+odds/förväntan) eller "sen vinst" (kräver matchminut) , den datan finns inte i facit-formen
+(`PoolFacit.matches[i].actual = Scoreline`, derive-facit.ts), och att hitta på dem ur en ren siffra
+vore en gissning maskerad som fakta (lessons "lattgissad-domanregel-styr-otestad-gren"). Prioritets-
+ordningen (målfest före thriller osv.) är en VAL-invariant, testad med diskriminerande fixturer
+(en 4-3 = målfest, inte thriller) + negativ-kontroll (operator-mutation rödnar). Mood är EN sanning
+som både reaktions- och kommentar-genereringen läser (DRY).
+
+**Beslut: emoji-reaktioner styrs av mood + ton, ALLTID ur den kurerade 8-listan.** `generateBotReactions`
+(react.ts) väljer emoji ur en mood-palett (målfest -> ⚽/🎉, mållöst -> 🧊 osv.) med en liten ton-nyans,
+alltid ur klientens `REACTION_EMOJIS` (reactions-api.ts) som speglar DB:ns `room_reactions_emoji_allowed`
+-CHECK 1:1 (en sanning). Kadens via personans `reactionChance` (0..0.5), spritt (seed per index), en
+reaktion per (bot, match) = PK-invarianten. Kohort: new-room reagerar på SPELADE matcher (de var med),
+vm2026/fsu på KOMMANDE (de har inte sett facit) med en neutral "het match"-emoji 🔥.
+
+**Beslut: kommentarer är KURERADE svenska fraspooler per (mood, ton), med en TYSTHETS-DEFAULT.**
+Poolerna (comment-pools.ts) har FLERA varianter per (mood, ton) så texten varierar (inte mekaniska
+mallar som upprepas , det skulle se botigt ut). En bot kommenterar en spelad match bara om (a) den
+är new-room OCH (b) en dragning < `commentChance * COMMENT_SCALE` (0.35) faller , annars INGEN
+kommentar (boten är tyst). Sparsamheten är BEVISAD kvantitativt (en högt pratig bot kommenterar
+~5 % av matcherna, summan över alla botar < 15 % av taket) + tysthets-defaulten testad (lågbenägen
+bot i en mållös turnering = 0 kommentarer, med negativ-kontroll som rödnar). Det finns ingen extern
+"rätt" formulering att källåkra , poolerna är ett medvetet designval, inte en gissad regel.
+
+**Beslut: "svar mellan botar" approximeras som följd-fraser i samma match-tråd (schemat saknar svars-
+koppling).** room_comments har INGEN parent_id/reply-kolumn (bekräftat i migrationerna
+20260612103836_t66 + 20260613144345_t77: bara en nullable `match_id` som delar in i match-trådar,
+ingen rad-till-rad-referens). En bot kan alltså inte peka ett svar på en SPECIFIK kommentar. `planReplies`
+(comment.ts) lägger därför sparsamt en kort medhålls-fras i en tråd som REDAN har minst en ANNAN bots
+kommentar (en giltig befintlig konversation, aldrig ett svar i en tom/egen tråd), per rum (svar korsar
+aldrig rum). Ärlig avvägning: det läses som ett svar utan att vara en hård FK-länk. Vill vi senare ha
+äkta trådar krävs en parent_id-migration (ej i scope här).
+
+**Beslut: kommentar-idempotens via deterministisk id (room_comments saknar naturligt unik-index).**
+En bot kan ha flera kommentarer per match, så det finns ingen `(rum,bot,match)`-unikhet att upserta på.
+Exekvereraren (seed-bots.ts) härleder ett DETERMINISTISKT uuid (v5-stil SHA-1 över rum+bot+match+isReply
++body) och upsertar på `id`, så en omkörning byter raden i stället för att dubbla. Reaktioner upsertas på
+sin PK `(room_id,user_id,match_id)` (samma modell som klientens upsertMyReaction). Teardown städar båda
+via cascade (FK on delete cascade mot auth.users, verifierat i migrationerna). Rhodos-vakten utökad att
+täcka liv-lagret (reaktioner + kommentarer riktas också mot rum), negativ-kontroll körd: reaktions-/
+kommentar-grenen kan utlösa på egen hand (membership/prediction-grenen bortmuterad -> vakten kastar ändå).
+
 ## 2026-06-15 , Livescore pollare-v3: per-match-polling med fönster-gating (full rik data LIVE)
 
 Byter pollarens modell: en LIVE match får full rik data UNDER matchen (målskytt/assist/kort/

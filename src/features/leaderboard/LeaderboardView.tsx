@@ -25,11 +25,27 @@
 //
 // UTAN aktivt rum: "gå med i ett rum" (topplistan är per rum, samma som T15/T16).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
-import { useRegisterSection, SECTIONS } from '../section-nav';
+import { useRoomsStore } from '../rooms';
+import { StickyFollowToggle, useCollapseScrollRestore } from '../../components/collapsible-list';
+import { ExpandToggle } from '../../components/ExpandToggle';
+
+// Etikett (eyebrow) ovanför per-rums-topplistans rubrik när INGET aktivt rum kan namnges
+// (utan rum / namnet saknas). Med ett aktivt rum visas rummets NAMN i stället (T92 del A),
+// så det är otvetydigt VILKET rum listan gäller (Daniels feedback: den generiska
+// "VM-poolen" sa inget om vilket rum man tittade på).
+const GENERIC_ROOM_EYEBROW = 'Ditt rum';
+
+// Hur många rader topplistan visar i KOMPRIMERAT default-läge (toppen). En per-rums-topplista
+// kan bli lång (seedade rum har upp till ~200 deltagare, bot-seed-planen), så vi börjar
+// komprimerad med pallen + lite till och fäller ut resten på begäran , samma "börja
+// komprimerad + sticky följ-med-kontroll"-mönster som den globala topplistan (#173 T82 del 4,
+// ägarens feedback). Under tröskeln (korta vänskaps-rum) renderas hela listan som förr (inget
+// att komprimera), så det vanliga lilla rummet är OFÖRÄNDRAT.
+const COLLAPSED_VISIBLE = 8;
 
 /** Spring för layout-glidet: en tävlings-tight men mjuk fjäder (premium, ingen wobble). */
 const LAYOUT_SPRING = { type: 'spring', stiffness: 520, damping: 38, mass: 0.9 } as const;
@@ -131,12 +147,52 @@ function LeaderboardRow({
 
 export function LeaderboardView() {
   const store = useLeaderboardStore();
-  // Anmäl sektionen till chip-navet (T78, #165). Vyn monteras bara i live-läge (skalet
-  // gatar på rooms.enabled), så "Topplista"-chipet finns bara då.
-  useRegisterSection(SECTIONS.leaderboard);
+  const rooms = useRoomsStore();
   const reduceMotion = useReducedMotion();
   // Animera placerings-ändringar bara om användaren inte valt minska rörelse.
   const animateLayout = !reduceMotion;
+
+  // PER-RUMS-TYDLIGHET (T92 del A): eyebrow:n visar det AKTIVA RUMMETS namn så det är
+  // otvetydigt vilket rum listan gäller. activeRoom är källan (Rooms-providern, EN sanning
+  // för "vilket rum är jag i"). Utan ett aktivt rum (eller om namnet saknas) faller vi till
+  // en generisk etikett , vi gissar aldrig ett rumsnamn. Trimmar för att inte visa en tom
+  // eyebrow om ett rum råkar ha bara blanksteg som namn.
+  const activeRoomName = rooms.activeRoom?.name?.trim();
+  const roomEyebrow = activeRoomName ? activeRoomName : GENERIC_ROOM_EYEBROW;
+
+  // KOMPRIMERA/UTFÄLL (#173 T82 del 4): en lång per-rums-topplista börjar komprimerad (topp-N)
+  // och fälls ut på begäran, med en STICKY följ-med-komprimera-kontroll i utfällt läge. Vi
+  // VIRTUALISERAR INTE här (till skillnad från den globala topplistan): rad-glidet (motion.li
+  // layout) kräver mountade rader, så vi slice:ar bara den renderade mängden och låter
+  // AnimatePresence sköta in/ut. Korta rum (<= tröskeln) rör vi inte (ingen toggle).
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
+  // Fokus-flytt vid ihopfällning (samma a11y-grepp som resultat-/tips-listan): den NEDRE
+  // toggeln kan ligga långt ner i en utfälld lista. Fäller man ihop därifrån ska fokus föras
+  // upp till den ÖVRE (sticky) kontrollen vid listans topp.
+  const topToggleRef = useRef<HTMLButtonElement>(null);
+  // KOLLAPS-SCROLL-FIX (T92 del F): den NEDRE toggeln ligger långt ner; fäller man ihop därifrån
+  // ska sektionens ankare också skrollas tillbaka i vy (inte bara fokus flyttas), annars står
+  // sid-scrollen kvar långt ner. Den ÖVRE (sticky) toggeln sköter sin egen scroll via
+  // StickyFollowToggle, så vi scrollar BARA från den nedre här (ingen dubbel-scroll).
+  const { anchorRef, scrollAnchorIntoView } = useCollapseScrollRestore<HTMLElement>();
+  function toggleExpanded() {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (!next) {
+        requestAnimationFrame(() => topToggleRef.current?.focus());
+      }
+      return next;
+    });
+  }
+  // Kollaps från den NEDRE toggeln: fäll ihop + skrolla ankaret tillbaka i vy (del F).
+  function collapseFromBottom() {
+    setExpanded(false);
+    requestAnimationFrame(() => {
+      topToggleRef.current?.focus();
+      scrollAnchorIntoView();
+    });
+  }
 
   const ready = store.enabled && store.status === 'ready';
 
@@ -183,14 +239,43 @@ export function LeaderboardView() {
   }, [store.leaderboard, ready]);
 
   return (
-    <section aria-labelledby="leaderboard-heading" data-leaderboard-view="">
+    // anchorRef = sektionens topp-ankare för kollaps-scroll-fixen (del F): kollaps från den
+    // nedre toggeln skrollar hit tillbaka, så man inte blir kvar långt ner i ett tomrum.
+    <section ref={anchorRef} aria-labelledby="leaderboard-heading" data-leaderboard-view="">
       <header className="flex flex-col gap-2">
-        <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-warning">
-          VM-poolen
+        {/* Eyebrow = AKTIVA RUMMETS namn (T92 del A), så det syns vilket rum listan gäller.
+            data-leaderboard-room = stabil krok för test + design-frontend. */}
+        <p
+          data-leaderboard-room=""
+          className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-warning"
+        >
+          {roomEyebrow}
         </p>
         <h2 id="leaderboard-heading" className="font-display text-xl font-semibold sm:text-2xl">
           Topplista
         </h2>
+
+        {/* LIVE/PRELIMINÄR-indikator (T84, #176): syns ENDAST när minst en match pågår just nu
+            och dess löpande ställning räknas in i placeringarna. Ärligt märkt , poängen är
+            PRELIMINÄR (kan ändras tills matchen är klar och det officiella resultatet matats in),
+            samma ärliga "preliminärt läge"-anda som det levande slutspelsträdet (T56). När ingen
+            match pågår visas inget av detta och topplistan är det officiella läget exakt som förr.
+            Den pulsande pricken (vm-live-dot) stannar vid reducerad rörelse (index.css). aria-live
+            polite så en skärmläsare hör när läget slår om till live utan att stjäla fokus. */}
+        {store.livePreliminary ? (
+          <p
+            data-leaderboard-live=""
+            aria-live="polite"
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-accent"
+          >
+            <span
+              aria-hidden="true"
+              className="vm-live-dot inline-block h-2 w-2 rounded-pill bg-accent"
+            />
+            <span>Live, preliminära placeringar medan matcher pågår</span>
+          </p>
+        ) : null}
+
         <p className="max-w-2xl text-sm text-fg-muted">
           Vem tippar bäst? Poängen tickar in när matcher avgörs, från match-resultat, gruppvinnare
           och slutspel. Lika poäng delar placering.
@@ -234,22 +319,93 @@ export function LeaderboardView() {
         </p>
       ) : null}
 
-      {/* Topplistan: en placerings-ordnad lista som glider vid ändring. */}
-      {ready && store.leaderboard.length > 0 ? (
-        <ol data-leaderboard-list="" className="mt-5 flex list-none flex-col gap-2 p-0">
-          <AnimatePresence initial={false}>
-            {store.leaderboard.map((entry) => (
-              <LeaderboardRow
-                key={entry.userId}
-                entry={entry}
-                animateLayout={animateLayout}
-                isSelf={store.currentUserId !== null && entry.userId === store.currentUserId}
-                rankChanged={animateLayout && changedIds.has(entry.userId)}
-              />
-            ))}
-          </AnimatePresence>
-        </ol>
-      ) : null}
+      {/* Topplistan: en placerings-ordnad lista som glider vid ändring. Lång lista (seedat
+          rum) börjar KOMPRIMERAD (topp-N) med en sticky följ-med-komprimera-kontroll i utfällt
+          läge; korta rum visar hela listan (ingen toggle, oförändrat). */}
+      {ready && store.leaderboard.length > 0
+        ? (() => {
+            const hasMore = store.leaderboard.length > COLLAPSED_VISIBLE;
+            // Rendera bara topp-N i komprimerat läge; allt i utfällt. AnimatePresence sköter
+            // in/ut, layout-glidet behålls på den renderade mängden (ingen virtualisering).
+            const visible =
+              hasMore && !expanded
+                ? store.leaderboard.slice(0, COLLAPSED_VISIBLE)
+                : store.leaderboard;
+            const hiddenCount = store.leaderboard.length - COLLAPSED_VISIBLE;
+            // Listan byggs EN gång (DRY) och placeras antingen inuti StickyFollowToggle
+            // (lång lista => sticky följ-med-bar som följer med ner i listan, F1-fix:
+            // bar + lista delar EN containing block) eller renderas naken (kort rum, ingen
+            // toggle, oförändrat). Samma `<ol id={listId}>` i båda fallen.
+            const list = (
+              <ol
+                id={listId}
+                data-leaderboard-list=""
+                data-expanded={hasMore ? (expanded ? 'true' : 'false') : undefined}
+                className="mt-5 flex list-none flex-col gap-2 p-0"
+              >
+                <AnimatePresence initial={false}>
+                  {visible.map((entry) => (
+                    <LeaderboardRow
+                      key={entry.userId}
+                      entry={entry}
+                      animateLayout={animateLayout}
+                      isSelf={store.currentUserId !== null && entry.userId === store.currentUserId}
+                      rankChanged={animateLayout && changedIds.has(entry.userId)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </ol>
+            );
+            return (
+              <>
+                {/* ÖVRE kontroll: i UTFÄLLT läge en STICKY följ-med-bar (komprimera alltid ett
+                  tryck bort oavsett scroll), i komprimerat en vanlig "Visa alla N"-inline-
+                  kontroll. Bara när listan är längre än tröskeln. Listan ligger som `children`
+                  i baren (F1-fix T83): bar + lista delar EN containing block, så den sticky
+                  baren följer med ner i listan i stället för att glida ur vy. */}
+                {hasMore ? (
+                  <StickyFollowToggle
+                    expanded={expanded}
+                    labels={{
+                      expand: `Visa alla ${store.leaderboard.length}`,
+                      collapse: 'Komprimera',
+                    }}
+                    controls={listId}
+                    onToggle={toggleExpanded}
+                    buttonRef={topToggleRef}
+                    name="leaderboard"
+                  >
+                    {list}
+                  </StickyFollowToggle>
+                ) : (
+                  list
+                )}
+
+                {/* NEDRE kontroll (dubblerad, bara i UTFÄLLT läge): så man kan fälla ihop utan att
+                  skrolla tillbaka upp. Identisk semantik som den övre (samma ExpandToggle); vid
+                  ihopfällning förs fokus upp till den övre (sticky) kontrollen OCH sektionens
+                  ankare skrollas tillbaka i vy (del F, collapseFromBottom), så man inte blir kvar
+                  i ett tomrum långt ner. */}
+                {hasMore && expanded ? (
+                  <div className="mt-4 flex">
+                    <ExpandToggle
+                      expanded={expanded}
+                      hiddenCount={hiddenCount}
+                      labels={{
+                        expand: `Visa alla ${store.leaderboard.length}`,
+                        collapse: 'Komprimera',
+                      }}
+                      controls={listId}
+                      onToggle={collapseFromBottom}
+                      position="bottom"
+                      name="leaderboard"
+                    />
+                  </div>
+                ) : null}
+              </>
+            );
+          })()
+        : null}
     </section>
   );
 }

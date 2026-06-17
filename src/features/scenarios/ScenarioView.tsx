@@ -21,7 +21,6 @@ import type { Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupScenarios } from './use-group-scenarios';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 // Premium-visuella lagret (status-chips, arena-kort, väntande-tillstånd). Stylas
 // ENBART via seamens data-attribut + klass-hakar nedan, så senior-devs semantik +
 // alla tester står kvar (samma seam-princip som GroupTable/BracketView, T7/T9).
@@ -191,14 +190,12 @@ export function ScenarioView() {
   // gruppspel + inmatning). Måste renderas inuti en ResultsProvider.
   const { status, scenarios, teams, mode, error } = useGroupScenarios();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
-  // Anmäl sektionen till chip-navet (T78, #165) medan vyn är monterad.
-  useRegisterSection(SECTIONS.scenarios);
 
   return (
     <section aria-labelledby="vad-kravs-rubrik" className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="vad-kravs-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+          <h2 id="vad-kravs-rubrik" className="font-display text-xl font-semibold sm:text-2xl">
             Vad krävs
           </h2>
           {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}

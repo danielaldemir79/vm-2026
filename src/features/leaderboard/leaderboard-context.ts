@@ -31,6 +31,16 @@ export interface LeaderboardStore {
   activeRoomId: string | null;
   /** Den rangordnade topplistan (högsta poäng först, delad rank vid lika). */
   leaderboard: readonly LeaderboardEntry[];
+  /**
+   * Är topplistan just nu PRELIMINÄR? (T84, #176) true ENBART när minst en match faktiskt
+   * PÅGÅR (live/paus) och dess löpande ställning lagts på som ett provisoriskt resultat ovanpå
+   * det officiella facit. Driver den ärligt märkta "live/preliminär"-indikatorn i vyn. När
+   * ingen match pågår är den false och topplistan visar det officiella läget exakt som vanligt
+   * (inget live-lager, ingen indikator). Live-poängen skriver ALDRIG det officiella facit , den
+   * är en härledd, display-only overlay som konvergerar mot facit när det matas in (se
+   * apply-live-results.ts).
+   */
+  livePreliminary: boolean;
   /** Tips-avslöjandet per avgjord+låst match (andras tips synliga efter deadline). */
   reveal: readonly RevealedMatch[];
   /** Lag-listan (Team.id -> namn för avslöjande-vyns match-rubriker). */

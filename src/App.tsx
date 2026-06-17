@@ -1,36 +1,59 @@
-// App-shell , den färdiga app-vyn.
+// App-shell , den färdiga app-vyn (T83, #175: flik-app).
 //
-// Headern bär wordmark + tema-toggle + nät-status, och main:en de RIKTIGA vyerna
-// (daglig matchvy, gruppspel, "vad krävs", slutspelsträd, resultatinmatning,
-// tips-ligan). T2:s "designfundament"-showcase (palett/rörelse/typografi-prov)
-// togs bort i T31 (#51, Daniels feedback): den var byggnadsställning som inte
-// hör hemma i den färdiga appen. Tema-TOGGLEN i headern är INTE showcasen och
-// är kvar, den är en riktig funktion.
+// IA (T83): appen är en FLIK-APP med fem flikar (Idag/Tips/Topplista/Turnering/Mer),
+// inte längre EN lång sida med en sticky chip-rad (sektions-navet T78/T79, avvecklat).
+// Flik-raden ligger längst ner på mobil (sport-app-mönster) och blir en top-rad på
+// desktop (TabBar + tabs.css). Varje befintlig vy återanvänds OFÖRÄNDRAD i sak; bara
+// placeringen (vilken flik) + navigeringen ändras (återanvänd, bygg inte om). Se
+// docs/decisions.md 2026-06-15 (flik-IA + scroll/sticky + sim-läge över flikar).
+//
+// ALLA flik-paneler hålls MONTERADE samtidigt (inaktiv = `hidden`), så vy-state
+// (formulär, sök, utfällt läge), providers och live-data delas och inget nollställs
+// vid flik-byte (se TabPanel för det fulla varför). Det gör också att de befintliga
+// smoke-/integrationstesterna hittar allt innehåll i DOM:en oförändrat.
+//
+// SIMULERING ÖVER FLIKAR (T83-beslut): what-if-läget är globalt state i den delade
+// results-storen (ResultsProvider omsluter hela skalet, oförändrat). Varje flik som
+// visar en SIMULERAD vy bär sin egen SimulationFrame (ring + tint + sticky badge när
+// sim-läget är PÅ): Idag (daily) och Turnering (tabeller/träd/"vad krävs"). What-if-
+// KONTROLLEN (SimulationBanner) + resultatinmatnings-grinden (ResultEntryGate) bor på
+// EN plats: Turnering , där sim-läget är mest meningsfullt (man spelar ut tänkta
+// resultat och ser tabeller/träd ändras). Frame:n är en ren wrapper som läser sim-
+// seamen, så den kan stå i två flikar utan dubblerad state (en sanning).
 
-import type { ReactNode } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { Fade, Slide } from './motion';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
+import { Surface } from './components/Surface';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { DailyMatchesView } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { GoalCelebrationOverlay, ResultEntryGate, ResultsProvider } from './features/results';
 import { ScenarioView } from './features/scenarios';
+import { ScorerTableView, SuspensionsView, TournamentStatsView } from './features/tournament-stats';
 import { SimulationBanner, SimulationFrame } from './features/simulation';
 import { TeamProfileProvider } from './features/team-profile';
 import {
   RoomSection,
+  RoomPill,
   RoomsProvider,
   ReactionsProvider,
   MatchCommentsProvider,
+  focusRoomForm,
   useRoomsStore,
 } from './features/rooms';
 import { OfficialResultsProvider } from './features/official-results';
 import { PredictionSection, PredictionsProvider } from './features/predictions';
 import { GroupPredictionSection } from './features/group-predictions';
 import { BracketPredictionSection } from './features/bracket-predictions';
-import { LeaderboardProvider, LeaderboardSection } from './features/leaderboard';
-import { FavoriteTeamProvider } from './features/favorite-team';
+import { LeaderboardProvider, LeaderboardSection, RevealSection } from './features/leaderboard';
+import { MatchDetailProvider } from './features/match-detail';
+import { TotalLeaderboardSection } from './features/total-leaderboard';
+import { FavoriteTeamProvider, FavoriteTeamSection } from './features/favorite-team';
+import { MinSidaSection } from './features/min-sida';
+import { PushOptInSection } from './features/push';
 import { AdminSection } from './features/admin';
 import {
   InstallButton,
@@ -40,16 +63,53 @@ import {
   UpdatePrompt,
   useOnboarding,
 } from './features/app-settings';
-import { SectionNav, SectionNavMobile, SectionNavProvider } from './features/section-nav';
+import { TabBar, TabPanel, useTabRouting } from './features/tabs';
+import { SectionNav, type SectionNavItem } from './components/section-nav';
 import { VersionStamp } from './components/VersionStamp';
 
-/** Ett innehållskort på en yt-token, delad yt-form för app-vyns sektioner. */
+/** Id-bas för flik-panelerna (TabBar:s aria-controls + TabPanel:s id pekar hit). */
+const TAB_PANEL_BASE = 'vm-tabpanel';
+
+/**
+ * Sektions-navet i Turnering (T103, Daniels önskemål: en meny som hoppar direkt till
+ * rätt sektion). Ordningen + id:na MÅSTE matcha sektionernas ankare i Turnering-panelen
+ * nedan (en sanning: navet skrollar till exakt dessa id:n, scroll-spy:n läser dem).
+ * What-if-kontrollen + resultatinmatningen är en SIM-kontroll, inte en "statistik-
+ * sektion", så de utelämnas medvetet ur navet (läser renast , man navigerar till det
+ * man vill TITTA på, inte till en inmatnings-widget).
+ */
+const TURNERING_SECTIONS: readonly SectionNavItem[] = [
+  { id: 'turnering-grupper', label: 'Grupper' },
+  { id: 'turnering-vad-kravs', label: 'Vad krävs' },
+  { id: 'turnering-slutspel', label: 'Slutspel' },
+  { id: 'turnering-skytteligan', label: 'Skytteligan' },
+  { id: 'turnering-statistik', label: 'Statistik' },
+  { id: 'turnering-avstangda', label: 'Avstängda' },
+];
+
+/**
+ * GLOBALA (cross-rum) TOPPLISTAN TILLFÄLLIGT DÖLJD (T96, #193).
+ *
+ * TotalLeaderboardSection läser en edge-funktion (global-leaderboard) som
+ * BOOT-KRASCHAR (503, trasig sedan T90) i live-läge. Tills den är fixad (eget spår)
+ * döljer vi sektionen helt bakom denna flagga, i stället för att visa en trasig/fel-
+ * ruta för den globala topplistan. Per-rums-topplistan (LeaderboardSection) + "vad
+ * alla tippade"-listan (RevealSection) är KVAR och opåverkade , bara den globala
+ * cross-rum-rankningen tas bort ur Topplista-fliken.
+ *
+ * TÄND IGEN: när edge-funktionen är fixad, flippa denna till `true`. Inget annat
+ * behöver röras , render-grenen nedan tänder då TotalLeaderboardSection igen oförändrad.
+ */
+const GLOBAL_LEADERBOARD_ENABLED = false;
+
+/**
+ * Ett innehållskort, delad yt-form för app-vyns sektioner. Nu en tunn wrapper runt
+ * den ENA delade Surface-primitiven (D3/D4): alla `surface={...}`-render-props i
+ * appen funnlas hit, så hela appen bär EXAKT samma kort-stil (radie/kant/fond/skugga/
+ * luft). Tidigare var kort-idiomet handkopierat här, nu en sanning i Surface.
+ */
 function Panel({ children }: { children: ReactNode }) {
-  return (
-    <section className="rounded-card border border-border bg-surface p-5 shadow-[var(--vm-shadow-card)] sm:p-7">
-      {children}
-    </section>
-  );
+  return <Surface>{children}</Surface>;
 }
 
 /**
@@ -82,7 +142,14 @@ export default function App() {
             (Personliga statistiken läser LeaderboardStore, inte denna.) Vilande utan
             effekt om inget lag är pinnat; helt oberoende av Supabase. */}
         <FavoriteTeamProvider>
-          <AppShell />
+          {/* ROT-SKYDDSNÄT (HOTFIX, white-screen): sista boundaryn. Skulle något oväntat
+              kasta UTANFÖR de finkorniga boundaryerna nedan, visar vi en lugn helsides-
+              fallback i stället för en blank sida. Per-flik- och per-sektion-boundaryerna
+              fångar normalt felet långt innan det når hit (isolerat), men roten garanterar
+              att appen ALDRIG mer kan bli helt blank. */}
+          <ErrorBoundary label="appen">
+            <AppShell />
+          </ErrorBoundary>
         </FavoriteTeamProvider>
       </OfficialResultsProvider>
     </RoomsProvider>
@@ -93,13 +160,32 @@ function AppShell() {
   // EN onboarding-instans ägs här och delas med både touren och install-gaten,
   // så "är touren öppen?" är EN sanning (inte två divergerande hook-tillstånd).
   const onboarding = useOnboarding();
+  // Aktiv flik <-> URL-hash (delbar länk, bakåt-knapp, djuplänk vid kall-laddning).
+  const { activeTab, selectTab } = useTabRouting();
+
+  // GENVÄG TILL RUM-HANTERINGEN (T96, #193): rum-pillen i app-baren (RoomPill) kan
+  // skicka en hit "skapa rum" / "gå med i rum" från VILKEN flik som helst (även när man
+  // inte är med i något rum än). Vi byter till Tips (där RoomSection ligger överst) och
+  // scrollar + fokuserar RÄTT formulär via focusRoomForm. Tips-panelen är alltid monterad
+  // men `hidden` tills fliken är aktiv, så målet får layout först EFTER flik-bytets commit
+  // + paint , därför dubbel rAF innan vi scrollar/fokuserar (annars är formuläret ännu utan
+  // layout och scroll/focus blir no-op). Själva DOM-delen bor i focusRoomForm (testbar seam).
+  const openRooms = useCallback(
+    (target: 'create' | 'join') => {
+      selectTab('tips');
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() =>
+          window.requestAnimationFrame(() => focusRoomForm(target))
+        );
+      } else {
+        focusRoomForm(target);
+      }
+    },
+    [selectTab]
+  );
+
   return (
-    // SectionNavProvider (T78, #165) omsluter hela skalet: sektionerna registrerar sig
-    // själva när de FAKTISKT renderar (useRegisterSection i varje vy), och den sticky
-    // chip-raden under headern (SectionNav) läser registret + scroll-spy:n. En sektion som
-    // returnerar null (fixtures-/icke-live-läge) registrerar sig aldrig, så raden får aldrig
-    // ett dött chip. Providern är vilande utan registrerade sektioner (raden döljs då).
-    <SectionNavProvider>
+    <>
       {/* min-h-dvh + overflow-x-clip = aldrig horisontell scroll på någon skärm.
           Den dekorativa gröna glow-fonden ligger bakom innehållet via en pseudo-yta. */}
       <div className="relative min-h-dvh overflow-x-clip">
@@ -114,25 +200,33 @@ function AppShell() {
           }}
         />
 
-        {/* Header: wordmark + tema-toggle. Frostat glas-band (tema-troget via
-          color-mix mot --color-surface), sticky så toggle alltid är nåbar.
-          data-app-header = den STABILA, entydiga kroken SectionNav mäter höjden mot
-          (T78, F1): appen har många <header>-element (sektionsvyer, dialoger), så en
-          ren document.querySelector('header') skulle binda mätningen till det FÖRSTA i
-          DOM-ordning, en ordnings-tillfällighet en framtida banner/portal kan bryta. */}
+        {/* APP-BAR (D5/D8): header + flik-rad läses som EN sammanhållen, frostad
+          app-bar på desktop. Headern bär INGEN egen botten-kant på desktop
+          (sm:border-b-0); flik-radens egen kant fortsätter bandet, så de två
+          banden inte ser ut som två lösa lister utan en enhetlig topp-app-bar. På
+          mobil (där flik-raden ligger längst ner) behåller headern sin kant som
+          förr. data-app-header = den STABILA kroken sticky-offsetterna mäter mot. */}
         <header
           data-app-header=""
-          className="sticky top-0 z-10 border-b border-border backdrop-blur-md"
+          className="sticky top-0 z-30 border-b border-border backdrop-blur-md sm:border-b-0"
         >
           <div
             className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-8"
             style={{ backgroundColor: 'color-mix(in srgb, var(--color-surface) 70%, transparent)' }}
           >
             <Wordmark className="text-xl sm:text-2xl" />
-            {/* Nät-status + inställningar (kugghjul) + tema-toggle. Status-chippet
-              döljs på de minsta skärmarna (sm:inline-flex) så headern aldrig
-              trängs; offline-läget syns ändå tydligt via offline-bannern nedan. */}
+            {/* RUM-PILLEN (T96, #193) + nät-status + inställningar (kugghjul) + tema-
+              toggle. Pillen ligger HÄR i app-bar-headern (utanför flik-panelerna), så
+              det AKTIVA rummet syns , och kan bytas , på ALLA flikar (Idag/Tips/
+              Topplista/Turnering/Mer), inte bara i RoomSection (Tips). Menyn bär också
+              skapa/gå-med-genvägar (onOpenRooms ovan: byter till Tips + scrollar/
+              fokuserar rätt formulär), så man når rum-hanteringen var man än står. Den
+              renderar null i fixtures-/lokalt läge (app-baren ser ut precis som förr då);
+              utan aktivt rum blir den en "Rum"-CTA (skapa/gå-med), eftersom onOpenRooms
+              alltid ges här. Status-chippet döljs på de minsta skärmarna (sm:inline-flex)
+              så headern aldrig trängs; offline-läget syns ändå via offline-bannern. */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <RoomPill onOpenRooms={openRooms} />
               <span className="hidden sm:inline-flex">
                 <SyncAwareOnlineStatus />
               </span>
@@ -142,389 +236,451 @@ function AppShell() {
           </div>
         </header>
 
-        {/* Sticky sektions-navet (T78, #165) DIREKT under headern, hoppar till varje sektion
-          på den långa en-sides-appen. Renderar bara för sektioner som FAKTISKT finns i DOM:en
-          (registret), så aldrig en död länk. Lean per Daniels krav: rums- och admin-ytorna
-          hålls utanför. RESPONSIV VÄXLING (T79, #167): på DESKTOP (>= sm) chip-raden
-          (SectionNav), på MOBIL (< sm) en hamburgare-meny (SectionNavMobile) som listar ALLA
-          sektioner vertikalt, så man inte missar dem bakom en sidled-swipe (Daniels T78-
-          feedback). Bara EN syns åt gången via Tailwind sm:-klasser (ren CSS, ingen JS-resize-
-          gissning); båda läser SAMMA store. Funktionell + tillgänglig struktur här; design-
-          frontend lägger premium-finishen ovanpå (chip-/band-styling, ikon, panel, animation). */}
-        <SectionNav />
-        <SectionNavMobile />
+        {/* FLIK-RADEN: tillgänglig tablist. På desktop (>= sm) en top-rad direkt under
+          headern (del av app-baren); på mobil en fast rad längst ner (sport-app-
+          mönster), se tabs.css. Ikoner + glidande aktiv-indikator + mjuk motion
+          ligger nu på via .vm-tab*-hakarna (D1/D2). */}
+        <TabBar activeTab={activeTab} onSelect={selectTab} panelIdBase={TAB_PANEL_BASE} />
 
-        <main className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-10 sm:px-8 sm:py-16">
-          {/* Hero. Wordmark som h1 (bär appens tillgängliga namn, håller smoke-testet). */}
-          <Fade>
-            <section className="flex flex-col items-start gap-5 py-6 sm:py-10">
-              <span className="rounded-pill border border-border bg-surface px-3 py-1 text-xs font-medium text-fg-muted">
-                USA · Kanada · Mexiko · sommaren 2026
-              </span>
-              <Wordmark as="h1" className="text-5xl leading-none sm:text-7xl" />
-              <p className="max-w-xl text-balance text-lg text-fg-muted sm:text-xl">
-                Följ mästerskapet tillsammans. Matcher, tabeller och ett slutspelsträd som lever,
-                plus tips-ligan med kompisarna. Allt i en app du delar med en länk.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <span className="rounded-pill bg-accent px-5 py-2.5 font-display text-sm font-semibold text-accent-fg shadow-md">
-                  48 lag · 12 grupper
-                </span>
-                <span className="rounded-pill border border-border px-5 py-2.5 font-display text-sm font-semibold">
-                  Installeras som app
-                </span>
-              </div>
-            </section>
-          </Fade>
-
-          {/* Den KOMPAKTA install-knappen (T63, #113): ytan överst är en diskret,
-            klickbar "Installera som app"-pill, INGEN informationsruta som tar fokus
-            (Daniels förtydligande). Install-INFON visas bara NÄR man klickar: ett
-            klick ger webbläsarens äkta install-prompt på Android/desktop (T39:s
-            beforeinstallprompt-mekanik), öppnar kom-igång-guiden (T54) på iPhone-
-            fliken på iOS, eller öppnar guiden som ärlig fallback när ingen prompt finns
-            (aldrig en död knapp). HELT dold i app-läge (standalone): InstallButton
-            renderar då ingenting (Daniels skarpa krav, "onödigt surr där då den redan
-            är installerad"). Bär sin egen synlighets-logik (useInstallPrompt), så den
-            tar ingen plats när dold.
-
-            ERSÄTTER den gamla InstallBannern (T13/T39) på huvudytan: bannern var just
-            den informationsruta Daniel inte vill ha framme. Den diskreta knappen är ett
-            enradigt erbjudande som inte stjäl fokus; den utförliga guiden (samma som
-            inställnings-portalens "Kom igång") når man bakom ett klick. Kom-igång-raden
-            i inställningarna (SettingsControl) finns kvar som gömd hjälp-yta.
-
-            GATAD bakom onboarding (T39/#68, F1): touren är en z-50 helskärms-overlay
-            vid FÖRSTA besöket och ligger ÖVER denna yta, så en första-gångs-vän som
-            öppnar delningslänken inte kan klicka knappen förrän touren stängts (den
-            skulle se ut att "inte göra något"). Medan touren är öppen visas därför INTE
-            knappen; när touren är klar/hoppad faller den tillbaka på sin vanliga logik
-            (ej standalone => visas, väg enligt plattform/event). */}
-          {onboarding.open ? null : (
-            <Slide direction="up">
-              <div className="flex">
-                <InstallButton />
-              </div>
-            </Slide>
-          )}
-
-          {/* Gruppspelsvyn (T5) + resultatinmatningen (T6) delar EN ResultsProvider
-            (T6:s delade store): en inmatning i ResultEntryView uppdaterar samma
-            matcher som gruppspelstabellerna härleds ur, så tabellerna räknas om
-            live (härledd state, SPEC §6). Den FUNKTIONELLA + tillgängliga
-            strukturen byggs här; design-frontend ger premium-polish + den
-            visuella målfirande-animationen ovanpå. */}
+        {/* data-tab-content bär botten-luft så den FASTA mobil-flikraden aldrig skymmer
+          sidans sista innehåll (tabs.css; noll på desktop). Alla providers omsluter
+          panelerna, så en monterad-men-dold flik delar samma store/live-data. */}
+        <main
+          data-tab-content=""
+          className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-10 sm:px-8 sm:py-16"
+        >
+          {/* EN delad ResultsProvider (T6) + LeaderboardProvider (T58) + PredictionsProvider
+            (T64) + TeamProfileProvider (T10) omsluter de flikar som delar deras store, så
+            data räknas EN gång och delas över flikarna (en sanning, härledd state). De
+            ligger här utanför panelerna just för att Idag (daily), Tips (tips) och Turnering
+            (tabeller/träd) alla läser samma matcher/poäng utan dubbelhämtning. */}
           <ResultsProvider>
-            {/* Lag-profiler (T10): klickbara lagnamn i matchkort + tabeller öppnar en
-              profil-modal (FIFA-ranking, stjärnspelare, kuriosa, lagets väg). Providern
-              ligger INNANFÖR ResultsProvider eftersom profil-modalen läser den delade
-              storen (lag/grupper/matcher), och OMSLUTER alla vyer med klickbara lagnamn
-              (daily, gruppspel, resultatinmatning) så profilen kan öppnas från dem alla. */}
             <TeamProfileProvider>
-              {/* What-if-simulatorn (T12): slå på sim-läget och spela ut tänkta
-              resultat, så tabell + slutspelsträd + "Vad krävs" ändras live UTAN
-              att de riktiga resultaten rörs. SimulationFrame omsluter banner:n +
-              alla simulerade vyer och lägger, NÄR sim-läget är PÅ, en violett
-              ram + svag tint + en sticky "Simuleringsläge"-badge runt hela zonen,
-              så ingen förväxlar en simulering med de riktiga resultaten. Ramen är
-              en tunn wrapper som bara läser sim-seamen i storen (en sanning); i
-              vilo-läge är den helt neutral (ingen ram, ingen tint). */}
-              <SimulationFrame>
-                {/* Daglig matchvy (T7): startskärmens hjärta, dagens matcher +
-                datumnavigering + "Match of the day"-hero med live-nedräkning. Läser
-                SAMMA delade store som gruppspelet och inmatningen. Den FUNKTIONELLA
-                + tillgängliga strukturen byggs här; design-frontend ger WOW-hero +
-                premium-matchkort + nedräknings-visual ovanpå.
+              <LeaderboardProvider>
+                <PredictionsProvider>
+                  {/* MatchDetailProvider (T86, #178): den rika matchvyns drill-in. Ligger HÄR,
+                      innanför Results + Leaderboard (matchvyn läser matcher/lag ur results-
+                      storen + reveal ur leaderboard-storen) och omsluter ALLA flik-paneler så
+                      en matchrad i Idag (nu) eller Tips-reveal (T92) kan öppna vyn. Overlayn
+                      renderas bara när ett match-id är öppet, så den vilar tills man drillar in. */}
+                  <MatchDetailProvider>
+                    {/* ===================== IDAG ===================== */}
+                    <TabPanel tabId="idag" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      {/* IDAG, AVLASTAD (U2, north-star §4): fliken leder med EN sak , dagens
+                      live/nästa-match + matchlista. Den långa marknads-heron (wordmark +
+                      paragraf + pills), install-knappen och favoritlags-väljaren är BORTA
+                      härifrån: de var sekundära ytor som tryckte ner matcherna och gjorde
+                      Idag till en vägg. Install + favoritlag bor nu i Mer (de är install/
+                      inställning), så Idag = nedräkning/live + matcher, inget annat.
+                      En SLANK rad bär ändå appens namn (h1, tillgängligt namn + smoke-test)
+                      som en lugn flik-titel, inte en hel landningssida. */}
+                      {/* SAMMA TOPP-NIVÅ-RYTM SOM ÖVRIGA FLIKAR (gap-12 = 48px): Idag bar förr en
+                      egen, tätare rytm (gap-8 sm:gap-10) utan principiellt skäl. Nu vilar flik-
+                      titeln -> dagens-hjärta på exakt samma luft som kort-mot-kort i Tips/
+                      Topplista/Turnering/Mer, så HELA appen andas på EN skala (north-star §4). */}
+                      <div className="flex flex-col gap-12">
+                        <Fade>
+                          <div className="flex flex-col gap-1">
+                            <span className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                              USA · Kanada · Mexiko · 2026
+                            </span>
+                            <Wordmark as="h1" className="text-3xl leading-none sm:text-4xl" />
+                          </div>
+                        </Fade>
 
-                ReactionsProvider (T24, #24) omsluter BARA dagens-vyn (den enda ytan med
-                reaktions-rad i MVP, decisions.md T24): emoji-reaktioner på matchkorten,
-                per rum, live via Realtime. Vilande (enabled=false) utan Supabase/aktivt
-                rum, så fixtures-/lokalt läge är oförändrat och korten ser ut precis som
-                förr. Ligger innanför RoomsProvider (läser rooms-synk-seamen).
+                        {/* Daglig matchvy (T7) , Idag-flikens hjärta: dagens matcher +
+                        LIVE-matchen (LiveNowSection åker med) + nedräkning. SimulationFrame
+                        runt daily bär sim-markeringen NÄR what-if-läget är PÅ (kontrollen bor
+                        i Turnering, men daily speglar ett simulerat resultat live, så ramen
+                        ska synas här med). ReactionsProvider + MatchCommentsProvider omsluter
+                        bara dagens-vyn (de enda ytorna med reaktioner/match-trådar).
+                        showFavoritePicker={false}: väljaren är en INSTÄLLNING och bor i Mer (U2). */}
+                        <SimulationFrame>
+                          <Slide direction="up">
+                            <ReactionsProvider>
+                              <MatchCommentsProvider>
+                                {/* Idag-flikens hjärta (live + matcher) i egen boundary:
+                                    ett fel i livekortet/dagslistan släcker aldrig hela
+                                    appen, bara den här ytan degraderar lugnt. */}
+                                <ErrorBoundary label="dagens matcher" resetKey={activeTab}>
+                                  <DailyMatchesView showFavoritePicker={false} />
+                                </ErrorBoundary>
+                              </MatchCommentsProvider>
+                            </ReactionsProvider>
+                          </Slide>
+                        </SimulationFrame>
+                      </div>
+                    </TabPanel>
 
-                MatchCommentsProvider (T77, #161) omsluter SAMMA dagens-vy: de HOPFÄLLDA
-                per-match kommentar-trådarna på matchkorten, per rum, live via Realtime.
-                Samma vilande-modell (enabled=false utan Supabase/aktivt rum) + samma
-                rooms-synk-seam som reaktionerna. SKILD från rums-chatten (T66,
-                CommentsProvider i RoomSection): den här bär bara match-trådarna. */}
-                <Slide direction="up">
-                  <ReactionsProvider>
-                    <MatchCommentsProvider>
-                      <DailyMatchesView />
-                    </MatchCommentsProvider>
-                  </ReactionsProvider>
-                </Slide>
+                    {/* ===================== TIPS ===================== */}
+                    <TabPanel tabId="tips" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      {/* Hela Tips-panelens innehåll i en boundary (per-flik): ett fel i
+                          tips-/rums-vyerna degraderar fliken lugnt, övriga flikar lever vidare. */}
+                      <ErrorBoundary label="tips-fliken" resetKey={activeTab}>
+                        <div className="flex flex-col gap-12">
+                          {/* RUM-VALET FÖRST (T96, #193): RoomSection flyttad till TOPPEN av Tips
+                          (låg förr sist, efter match-/grupp-/bracket-tipsen). Rum-valet är
+                          PRIMÄRT , man väljer rum FÖRST (vem tippar man mot), sen tippar man, och
+                          rum-kontexten styr både dessa tips OCH Topplistan. Skapa rum / gå med via
+                          kod + T94:s komprimerade medlems-rutnät bor kvar i RoomSection. Den
+                          persistenta rum-pillen i app-baren (RoomPill) speglar samma aktiva rum på
+                          alla flikar och låter en byta utan att scrolla hit. */}
+                          <Slide direction="up">
+                            <RoomSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
 
-                <Slide direction="up">
-                  <GroupStageView />
-                </Slide>
+                          {/* Tips-motorn (T15): match-tips per rum. ScoreGuide (poäng-förklaringen)
+                          renderas inuti PredictionsView, så den följer Tips-fliken. */}
+                          <Slide direction="up">
+                            <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
 
-                {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista
-                gruppomgången, vad varje lag behöver för att gå vidare (Klar/Ute/
-                Beror på). Läser SAMMA delade store, så scenarierna räknas om när ett
-                resultat matas in. Den FUNKTIONELLA + tillgängliga strukturen +
-                data-seamen byggs här; design-frontend ger premium-finish ovanpå. */}
-                <Slide direction="up">
-                  <ScenarioView />
-                </Slide>
+                          {/* Gruppvinnar-tipsen (T16): tippa 1:an + 2:an i varje grupp. */}
+                          <Slide direction="up">
+                            <GroupPredictionSection
+                              surface={(children) => <Panel>{children}</Panel>}
+                            />
+                          </Slide>
 
-                {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. Läser
-                SAMMA delade store som gruppspelet, så det justeras under gruppspelet
-                (möjliga lag), låses vid grupp-slut (FIFA-seedningen) och för fram
-                vinnaren när ett slutspelsresultat matas in. Den FUNKTIONELLA +
-                tillgängliga strukturen + data-seamen byggs här; design-frontend ger
-                premium-trädet med kopplingslinjer + vinnar-animation ovanpå. */}
-                <Slide direction="up">
-                  <BracketView />
-                </Slide>
+                          {/* Bracket-/slutspels-tipsen (T16b, #59): VM-vinnaren + slot-vinnare. */}
+                          <Slide direction="up">
+                            <BracketPredictionSection
+                              surface={(children) => <Panel>{children}</Panel>}
+                            />
+                          </Slide>
 
-                {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + statusmeddelandet)
-                sitter DIREKT ovanför resultatinmatningen (T32, #54, Daniels feedback
-                4, fynd 2). Sim-läget handlar om RESULTAT (man spelar ut tänkta
-                resultat), så kontrollen får tydlig koppling genom att stå vid
-                inmatnings-sektionen i stället för högst upp på sidan. Sim-RAMEN
-                (SimulationFrame) omsluter fortfarande ALLA påverkade vyer (daily,
-                gruppspel, "Vad krävs", slutspelsträd, inmatning) och bär den globala
-                "labbet"-markeringen + den sticky badge:n; det är bara själva
-                kontroll-banner:n som flyttat hit. */}
-                <Slide direction="up">
-                  <SimulationBanner />
-                </Slide>
+                          {/* "Vad alla tippade" (T92 del D): FLYTTAD hit från Topplista-fliken
+                          (där den var inbakad i LeaderboardSection). Den hör tematiskt till tipsen
+                          ("vad alla tippade") och ligger SIST i Tips, ihopfälld default. Vid
+                          utfällning: en paginerad, kompakt matchlista (senaste först), tap på en
+                          rad -> rik matchvy (drill-in, T86, via MatchDetailProvider som omsluter
+                          alla flik-paneler). EN sektions-kollaps + EN paginering, aldrig två.
+                          Egen boundary (HOTFIX-mönstret): en krasch i den tunga reveal-listan
+                          degraderar isolerat och släcker aldrig hela Tips-fliken eller appen. */}
+                          <Slide direction="up">
+                            <ErrorBoundary label="vad alla tippade" resetKey={activeTab}>
+                              <RevealSection />
+                            </ErrorBoundary>
+                          </Slide>
+                        </div>
+                      </ErrorBoundary>
+                    </TabPanel>
 
-                {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): i live
-                  visas inmatningen BARA när what-if-läget är PÅ, för ALLA inkl.
-                  arrangören (då är den den lokala "tänk om"-leken, skriver aldrig
-                  delat/officiellt facit, se ResultEntryGate). Officiella resultat
-                  matas in via AdminResultEntry (AdminSection). I fixtures-läge är den
-                  oförändrat alltid synlig. ResultEntryGate renderar inget (inkl. Panelen
-                  via `surface`) när vyn ska döljas, så ingen tom ruta blir kvar. Design-
-                  frontends premium-firande kopplas in via render-proppen (kroken styr
-                  trigger/timing/reduced-motion, overlayn ritar bara explosionen). */}
-                <Slide direction="up">
-                  <ResultEntryGate
-                    surface={(children) => <Panel>{children}</Panel>}
-                    renderCelebration={(celebration) => (
-                      <GoalCelebrationOverlay celebration={celebration} />
-                    )}
-                  />
-                </Slide>
-              </SimulationFrame>
+                    {/* ===================== TOPPLISTA ===================== */}
+                    <TabPanel tabId="topplista" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      <div className="flex flex-col gap-12">
+                        {/* Per-rums-topplistan (T17): vem tippar bäst i DITT rum. ScoreGuide
+                        renderas inuti LeaderboardSummary, så den följer Topplista-fliken.
+                        Egen boundary: en krasch i en topplista släcker inte den andra. */}
+                        <Slide direction="up">
+                          <ErrorBoundary label="topplistan" resetKey={activeTab}>
+                            <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
+                          </ErrorBoundary>
+                        </Slide>
+
+                        {/* Den GLOBALA (cross-rum) topplistan (T82 del 3, #173): EN rankning av
+                        ALLA deltagare över ALLA rum. TILLFÄLLIGT DÖLJD (T96, #193): edge-
+                        funktionen global-leaderboard 503:ar (trasig sedan T90), så vi renderar
+                        inte sektionen alls tills den är fixad (flagga GLOBAL_LEADERBOARD_ENABLED
+                        överst). Visar ingen trasig/fel-ruta , den globala raden är bara borta.
+                        Per-rums-topplistan ovan + reveal-listan i Tips är kvar. */}
+                        {GLOBAL_LEADERBOARD_ENABLED && (
+                          <Slide direction="up">
+                            <ErrorBoundary label="den globala topplistan" resetKey={activeTab}>
+                              <TotalLeaderboardSection
+                                surface={(children) => <Panel>{children}</Panel>}
+                              />
+                            </ErrorBoundary>
+                          </Slide>
+                        )}
+                      </div>
+                    </TabPanel>
+
+                    {/* ===================== TURNERING ===================== */}
+                    <TabPanel tabId="turnering" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      {/* SEKTIONS-NAV (T103, Daniels önskemål): en sticky genvägs-meny överst i den
+                      LÅNGA Turnering-fliken, så man (a) ser vilka sektioner som finns och (b) hoppar
+                      direkt dit. Pinnar under app-baren (header på mobil; header + flik-rad på
+                      desktop, se section-nav.css). Chipsen skrollar till ankarna nedan (under nav-
+                      kanten, reduced-motion-gatat) och den aktiva chippen följer scrollen (scroll-
+                      spy). Sektions-listan är en sanning i TURNERING_SECTIONS ovan. */}
+                      <SectionNav
+                        items={TURNERING_SECTIONS}
+                        ariaLabel="Hoppa till sektion i Turnering"
+                      />
+                      {/* SAMMA TOPP-NIVÅ-RYTM SOM ÖVRIGA FLIKAR (gap-12): Turnering saknade förr
+                      en delad flex-gap-behållare, så avståndet mellan sim-zonen (SimulationFrame)
+                      och stat-sektionerna (skytteliga/turneringsstatistik/avstängda) , och mellan
+                      stat-sektionerna inbördes , blev noll (bara det `Slide`-wrapparna råkade ge).
+                      Tips/Topplista/Mer omsluter sina toppsektioner i `flex flex-col gap-12`; nu gör
+                      Turnering det med, så ALLA flikar har EXAKT samma luft mellan sina kort.
+                      scroll-mt-32: ett ankar-marginal-fallback (sektionerna bär stabila id:n nedan)
+                      så även en ren #hash-navigering landar under app-baren, inte bakom den. */}
+                      <div className="flex flex-col gap-12 [&_[data-section-anchor]]:scroll-mt-32">
+                        {/* SimulationFrame runt HELA turnerings-zonen: tabeller + "vad krävs" +
+                      slutspelsträd + what-if-kontrollen + resultatinmatningen är alla
+                      simulerings-PÅVERKADE, så ramen/badgen omsluter dem som EN zon (precis
+                      som förr, fast nu i Turnering-fliken). Daily-ramen i Idag bär samma
+                      markering där, eftersom sim-läget är globalt (en sanning i storen). Den är
+                      ETT toppsektions-block här (samma gap-12-rytm mot stat-sektionerna under),
+                      medan dess EGNA delvyer behåller sin tätare inre rytm (SimulationFrame). */}
+                        <SimulationFrame>
+                          {/* Hela turnerings-zonen (tabeller + scenarier + slutspelsträd +
+                            inmatning) i en boundary: en krasch i en härledd vy (t.ex.
+                            slutspelsträdet på en oväntad ställning) degraderar zonen lugnt i
+                            stället för att släcka hela appen. */}
+                          <ErrorBoundary label="turneringsvyn" resetKey={activeTab}>
+                            {/* Gruppspelstabellerna (T5): härledda ur den delade storen.
+                              data-section-anchor + id = sektions-navets hoppmål (T103). */}
+                            <div id="turnering-grupper" data-section-anchor="">
+                              <Slide direction="up">
+                                <GroupStageView />
+                              </Slide>
+                            </div>
+
+                            {/* "Vad krävs"-kalkylatorn (T11): live-scenarier för sista gruppomgången. */}
+                            <div id="turnering-vad-kravs" data-section-anchor="">
+                              <Slide direction="up">
+                                <ScenarioView />
+                              </Slide>
+                            </div>
+
+                            {/* Slutspelsträdet (T9): det levande trädet sextondel -> final. */}
+                            <div id="turnering-slutspel" data-section-anchor="">
+                              <Slide direction="up">
+                                <BracketView />
+                              </Slide>
+                            </div>
+
+                            {/* What-if-KONTROLLEN (Starta/Återställ/Avsluta + status): EN hemvist,
+                        här i Turnering DIREKT ovanför resultatinmatningen (T32, #54). Sim-
+                        läget handlar om RESULTAT, så kontrollen sitter vid inmatningen, och
+                        ramen (ovan) omsluter alla påverkade vyer i fliken. */}
+                            <Slide direction="up">
+                              <SimulationBanner />
+                            </Slide>
+
+                            {/* Resultatinmatningen (T6), GRINDAD i live-läge (T48, #81): EN hemvist
+                        här i Turnering. I live visas den bara när what-if-läget är PÅ (lokal
+                        "tänk om"-lek, skriver aldrig delat facit). Officiella resultat matas
+                        in via AdminSection (Mer). I fixtures-läge alltid synlig. */}
+                            <Slide direction="up">
+                              <ResultEntryGate
+                                surface={(children) => <Panel>{children}</Panel>}
+                                renderCelebration={(celebration) => (
+                                  <GoalCelebrationOverlay celebration={celebration} />
+                                )}
+                              />
+                            </Slide>
+                          </ErrorBoundary>
+                        </SimulationFrame>
+
+                        {/* Skytteligan (T87, #179) , den första roliga turnerings-stat-delen.
+                      UTANFÖR SimulationFrame: den härleds ur den VERKLIGA live-event-datan
+                      (near-live via cross-match-hooken), inte ur det lokala what-if-läget, så
+                      den ska aldrig bära sim-markeringen. I fixtures-läge renderas en demo-
+                      skytteliga ur committade events (ingen backend). Egen boundary: en krasch
+                      här (t.ex. en oväntad live-data-form) får aldrig släcka hela appen. */}
+                        <div id="turnering-skytteligan" data-section-anchor="">
+                          <Slide direction="up">
+                            <ErrorBoundary label="skytteligan" resetKey={activeTab}>
+                              <ScorerTableView />
+                            </ErrorBoundary>
+                          </Slide>
+                        </div>
+
+                        {/* Turneringsstatistiken (T88, #180) , den rika "roliga VM-stats"-delen
+                      (kort-liga, mål-fördelning, lag-mål, lag-medel, clean sheets, skrällar).
+                      UTANFÖR SimulationFrame, samma val som skytteligan (T87): de
+                      event-/statistik-härledda korten kommer ur den VERKLIGA live-datan (egna
+                      cross-match-hookar, oberoende av what-if-läget), och de resultat-härledda
+                      korten (clean sheets/skrällar) gatas i vyn på att what-if-läget är AV, så
+                      de aldrig speglar sandlåde-resultat (se F2 + vyns simulating-grind). Egen
+                      boundary, isolerad från skytteligan ovan. */}
+                        <div id="turnering-statistik" data-section-anchor="">
+                          <Slide direction="up">
+                            <ErrorBoundary label="turneringsstatistiken" resetKey={activeTab}>
+                              <TournamentStatsView />
+                            </ErrorBoundary>
+                          </Slide>
+                        </div>
+
+                        {/* Avstängda spelare (T99, #200) , härledd ur kort-datan (rött / 2 gula),
+                      uppskattad längd, auto-bort när avtjänad. UTANFÖR SimulationFrame (samma val
+                      som skytteligan/turneringsstatistiken: härleds ur den VERKLIGA live-event-
+                      datan via cross-match-hooken, inte what-if-läget). Egen boundary, isolerad
+                      från statistiken ovan: en krasch här får aldrig släcka hela appen (hotfix-
+                      mönstret). Skador byggs INTE (ny datakälla, medvetet skippat, se decisions). */}
+                        <div id="turnering-avstangda" data-section-anchor="">
+                          <Slide direction="up">
+                            <ErrorBoundary label="avstangda" resetKey={activeTab}>
+                              <SuspensionsView />
+                            </ErrorBoundary>
+                          </Slide>
+                        </div>
+                      </div>
+                    </TabPanel>
+
+                    {/* ===================== MER ===================== */}
+                    <TabPanel tabId="mer" activeTab={activeTab} panelIdBase={TAB_PANEL_BASE}>
+                      {/* Hela Mer-panelens innehåll i en boundary (per-flik): ett fel i en
+                          arrangörs-/inställnings-yta degraderar fliken lugnt utan att släcka appen. */}
+                      <ErrorBoundary label="Mer-fliken" resetKey={activeTab}>
+                        <div className="flex flex-col gap-12">
+                          {/* MIN SIDA (T97): den personliga profil-hubben , vem du är + din
+                        ställning + dina rum + favoritlag. Leder Mer ("om mig") och gatar
+                        honest: inget i fixtures/lokalt läge eller utan identitet + rum. */}
+                          <Slide direction="up">
+                            <MinSidaSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
+
+                          {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
+                        arrangören och gäller GLOBALT. Hör hemma i Mer (hjälp-/arrangörsytor). */}
+                          <Slide direction="up">
+                            <AdminSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
+
+                          {/* FAVORITLAGS-VÄLJAREN (U2): flyttad hit från Idag , det är en
+                        INSTÄLLNING, inte dagens-innehåll. Avlastar Idag-fliken. */}
+                          <Slide direction="up">
+                            <FavoriteTeamSection
+                              surface={(children) => <Panel>{children}</Panel>}
+                            />
+                          </Slide>
+
+                          {/* MÅL-NOTISER opt-in (T85, #177): web-push-fundamentet. En
+                        INSTÄLLNING (slå på pling vid mål), bor i Mer bredvid favoritlag.
+                        Sektionen visar sig ärligt per läge (stöds ej / iOS-hint / nekad /
+                        aktivera / på + test). Samma Panel-yta som resten av Mer. */}
+                          <Slide direction="up">
+                            <PushOptInSection surface={(children) => <Panel>{children}</Panel>} />
+                          </Slide>
+
+                          {/* Den KOMPAKTA install-knappen (T63, #113): "Installera som app"-pill.
+                        Flyttad hit från Idag (U2): install är en åtgärd som hör hemma i Mer,
+                        inte före dagens matcher. GATAD bakom onboarding-touren (T39/#68, F1):
+                        medan touren är öppen visas den inte; annars enligt plattform/event. */}
+                          {onboarding.open ? null : (
+                            <Slide direction="up">
+                              <Panel>
+                                <div className="flex flex-col gap-3">
+                                  <header className="flex flex-col gap-1">
+                                    <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+                                      Appen
+                                    </p>
+                                    <h2 className="font-display text-xl font-semibold sm:text-2xl">
+                                      Installera som app
+                                    </h2>
+                                    <p className="text-sm text-fg-muted">
+                                      Lägg VM 2026 på hemskärmen, så öppnas den som en egen app,
+                                      även offline.
+                                    </p>
+                                  </header>
+                                  <div className="flex">
+                                    <InstallButton />
+                                  </div>
+                                </div>
+                              </Panel>
+                            </Slide>
+                          )}
+
+                          {/* Footern (T44, #75): appens synliga adress + upphovs-kortet (signaturen)
+                        + versionsstämpel. Hör hemma i Mer (lugn samlingsplats). */}
+                          <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
+                            {/* Footerns ledtext + appens SYNLIGA adress (T44, #75): adressen ska gå
+                          att LÄSA och säga högt. vm-2026.pages.dev som synlig, klickbar länk-
+                          text; href bär hela URL:en. Egen-flik + tabnabbing-skydd. */}
+                            <p>
+                              VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela
+                              appen med vänner,{' '}
+                              <a
+                                href="https://vm-2026.pages.dev"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Öppna appens adress vm-2026.pages.dev i en ny flik"
+                                className="rounded-sm font-medium text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                              >
+                                vm-2026.pages.dev
+                              </a>
+                              .
+                            </p>
+
+                            {/* UPPHOVS-KORTET (T38 signatur -> T44 runda 2, #75): footern lyfter
+                          Daniel. data-app-signature = stabil krok + testad semantik (T38/T39-
+                          testerna vaktar "Daniel Aldemir" + länk-kontraktet). */}
+                            <div data-app-signature="" className="flex flex-col gap-3">
+                              <div className="flex items-center gap-2.5">
+                                <span aria-hidden="true" className="vm-signature-seal">
+                                  DA
+                                </span>
+                                <span className="flex flex-col leading-tight">
+                                  <span className="text-xs text-fg-muted">Byggd av</span>
+                                  <a
+                                    href="https://www.danielaldemir.com"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
+                                    className="rounded-sm font-display text-base font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
+                                  >
+                                    Daniel Aldemir
+                                  </a>
+                                </span>
+                              </div>
+
+                              {/* Titel-raden (T44, #75): promotar Daniel som utvecklaren. */}
+                              <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
+
+                              {/* HEMSIDE-CTA:n (T44 runda 2, #75): danielaldemir.com som en
+                            uppenbart klickbar pill (delade .vm-install-pill-formen). */}
+                              <a
+                                href="https://www.danielaldemir.com"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Öppna danielaldemir.com i en ny flik"
+                                className="vm-install-pill self-start"
+                              >
+                                danielaldemir.com
+                                <svg
+                                  aria-hidden="true"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="vm-install-pill-icon"
+                                >
+                                  <path d="M15 3h6v6" />
+                                  <path d="M10 14 21 3" />
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                </svg>
+                              </a>
+                            </div>
+
+                            {/* Version-stämpel (T43, #74): diskret bygg-identifierare. */}
+                            <VersionStamp />
+                          </footer>
+                        </div>
+                      </ErrorBoundary>
+                    </TabPanel>
+                  </MatchDetailProvider>
+                </PredictionsProvider>
+              </LeaderboardProvider>
             </TeamProfileProvider>
           </ResultsProvider>
-
-          {/* Tips-ligan (T14): skapa/gå med i ett rum, se medlemmar, dela koden.
-            Det FUNKTIONELLA + tillgängliga rums-UI:t byggs här (stabil semantik +
-            data-attribut); design-frontend ger premium-finish ovanpå. RoomSection
-            renderar HELA kortet bara när Supabase är konfigurerat (live-läge), i
-            lokalt läge syns ingenting, så appen fungerar precis som förr. */}
-          <Slide direction="up">
-            <RoomSection surface={(children) => <Panel>{children}</Panel>} />
-          </Slide>
-
-          {/* EN DELAD LeaderboardProvider (T58, #99) omsluter tips-poolens sektioner OCH
-            topplistan, så tips-sektionens poäng-summering (TipsScoreSummary) och
-            topplistan läser SAMMA store och delar EN hämtning, ingen dubbelhämtning mot
-            Supabase. Providern är vilande (enabled=false) utan Supabase/aktivt rum, så
-            ingen sektion påverkas i fixtures-läge. Tidigare ägde LeaderboardSection sin
-            egen provider; den hoistades hit just för att tips-vyn skulle nå samma store. */}
-          <LeaderboardProvider>
-            {/* EN DELAD PredictionsProvider (T64, #118) omsluter match-tips-sektionen OCH
-              grupp-tips-sektionen, så grupp-tips-vyns SIMULERADE slutspelsträd kan läsa
-              MINA MATCH-tips (och härleda de 8 bästa treorna ur dem, Article 13 + Annexe
-              C) UTAN en andra hämtning. Tidigare ägde PredictionSection sin egen provider;
-              den hoistades hit (samma mönster som LeaderboardProvider, T58) just för att
-              den tips-härledda treplats-seedningen skulle nå samma match-tips-store.
-              Providern är vilande (enabled=false) utan Supabase/aktivt rum, så fixtures-
-              läget är oförändrat. */}
-            <PredictionsProvider>
-              {/* Tips-motorn (T15): vänner gissar resultat före avspark. Tips är per rum,
-                så PredictionSection visar tips-vyn när det sociala lagret är konfigurerat
-                (live-läge), med "gå med i ett rum för att tippa" tills ett rum är aktivt.
-                Deadline-låset (inget tips efter avspark) + tips-sekretessen (andras tips
-                dolda före avspark) upprätthålls SERVER-SIDE av RLS, bevisat med riktiga
-                sessioner. Poäng-summeringen överst (T58) läser den delade providern.
-                Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik +
-                data-attribut, samma #39-formspråk som resultatinmatningen); design-
-                frontend ger premium-finish ovanpå. */}
-              <Slide direction="up">
-                <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
-              </Slide>
-
-              {/* Gruppvinnar-tipsen (T16, VM-poolens kärna): tippa 1:an + 2:an i varje
-                grupp FÖRE gruppspelet. Per rum, deadline per grupp (gruppens första
-                match), server-side RLS-lås + sekretess (bevisat med riktiga sessioner).
-                Funktionellt + tillgängligt UI byggs här; design-frontend ger finishen.
-                Den tips-härledda slutspelsbilden under kupongerna (T51/T64) läser mina
-                grupp-tips OCH mina match-tips (treorna seedas ur match-tipsen). */}
-              <Slide direction="up">
-                <GroupPredictionSection surface={(children) => <Panel>{children}</Panel>} />
-              </Slide>
-            </PredictionsProvider>
-
-            {/* Bracket-/slutspels-tipsen (T16b, #59): tippa VM-vinnaren + vem som går
-              vidare ur varje slutspels-slot (M73-M104). Per rum, deadline per slot
-              (slottens egen avspark) + champion vid turneringsstart, server-side
-              RLS-lås + sekretess (bevisat i T16). En slot tippas först när dess två lag
-              är kända (gissa aldrig laget). Funktionellt + tillgängligt UI byggs här;
-              design-frontend ger finishen ovanpå (datakärnan finns från T16). */}
-            <Slide direction="up">
-              <BracketPredictionSection surface={(children) => <Panel>{children}</Panel>} />
-            </Slide>
-
-            {/* Arrangörs-facit (T42, #72): de OFFICIELLA matchresultaten matas in av
-              arrangören (Daniel) och gäller GLOBALT för alla rum. För en admin visas
-              facit-inmatningen; för en vanlig deltagare en read-only-not + en lågmäld
-              arrangörs-inloggning (e-post magic-link/OTP). Bara i live-läge, precis som
-              de andra sociala sektionerna. Poäng-källan för topplistan nedan är detta
-              globala facit (inte längre per-rum). Funktionell bas här; premium-design
-              i T42b (samma arbetsdelning som T16/T16b). */}
-            <Slide direction="up">
-              <AdminSection surface={(children) => <Panel>{children}</Panel>} />
-            </Slide>
-
-            {/* Topplistan + tips-avslöjandet (T17, #17): vem tippar bäst (poäng från
-              ALLA tre tips-typer mot facit, delad placering vid lika, rörelse-animation
-              vid placeringsändring) + vad alla tippade per avgjord match (avslöjas
-              FÖRST efter avspark, sekretessen är server-side i RLS, T15/T16). Per rum,
-              "gå med i ett rum" tills ett rum är aktivt. Konsumerar den delade providern
-              ovan (T58). Det FUNKTIONELLA + tillgängliga UI:t byggs här (stabil semantik
-              + data-attribut); design-frontend ger premium-finish (medaljer, glow,
-              finputsad rörelse) ovanpå. */}
-            <Slide direction="up">
-              <LeaderboardSection surface={(children) => <Panel>{children}</Panel>} />
-            </Slide>
-          </LeaderboardProvider>
-
-          <footer className="flex flex-col gap-5 border-t border-border pt-6 text-sm text-fg-muted">
-            {/* Footerns ledtext + appens SYNLIGA adress (T44, #75, Daniels feedback): appen
-              sprids muntligt/genom att skrivas av, så adressen ska gå att LÄSA och säga
-              högt, inte bara gömmas bakom en delningsknapp. Därför står vm-2026.pages.dev
-              som synlig, klickbar länk-text (utan https-prefixet, det läses/sägs renare),
-              medan href bär hela URL:en. Egen-flik + tabnabbing-skydd (noopener noreferrer)
-              precis som signatur-länken (T39), samma säkerhets-recept i hela footern. */}
-            <p>
-              VM 2026, USA, Kanada och Mexiko. Följ mästerskapet tillsammans, dela appen med vänner,{' '}
-              <a
-                href="https://vm-2026.pages.dev"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Öppna appens adress vm-2026.pages.dev i en ny flik"
-                className="rounded-sm font-medium text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
-              >
-                vm-2026.pages.dev
-              </a>
-              .
-            </p>
-
-            {/* UPPHOVS-KORTET (T38 signatur -> T44 runda 2, #75, Daniels feedback "footern ska
-              lyfta upp mig, få med hela min hemsida så man ser att man kan klicka dit"): den
-              tidigare LUGNA signaturraden var FÖR blygsam. Daniel vill att footern LYFTER honom
-              och att hela danielaldemir.com SYNS och ser uppenbart klickbar ut. Två medvetna
-              höjningar, byggda HELT av redan AA-bevisade mönster (ingen ny färgkombination,
-              alltså ingen ny kontrast-mätning):
-
-              1. NAMNET som blickfång (inte en bisats): "DA"-sigillet (.vm-signature-seal,
-                 solid accent-bricka med accent-fg-ink = den färg-oberoende solid-bricka-formen,
-                 10.85:1 mörkt / 5.40:1 ljust, T38-mätt) bredvid namnet i full fg + display-vikt
-                 (--vm-fg, 17.04:1 mörkt / 16.25:1 ljust, T38-mätt) på en EGEN, framträdande rad,
-                 med "Byggd av" som en liten dämpad eyebrow (fg-muted, FULL opacitet = 8.39:1
-                 mörkt / 5.92:1 ljust, T38-mätt) ovanför. Titel-raden ".NET-systemutvecklare"
-                 (fg-muted, full opacitet, samma mätta par) står som stödtext direkt under, inte
-                 längre som en undanskuffad sista rad.
-
-              2. HEMSIDAN som en UPPENBART klickbar CTA-pill: danielaldemir.com återanvänder den
-                 delade .vm-install-pill-formen (tokens.css §22) , surface-tonad pill med kant,
-                 hover tänder en accent-kant + lyfter ytan, focus-visible ger den delade accent-
-                 ringen, plus en extern-länk-ikon (pil ut ur ruta). Pillen är appens ETABLERADE
-                 "tydligt klickbar"-affordans (samma som install-knappen), så det är omisskännligt
-                 att man kan klicka dit. Texten är fg på opak surface (README-mätt brödtext-par
-                 12.6:1 - 17.9:1 i BÅDA teman, sektion 0 i tokens.css), ikonen är accent-dekor
-                 (aria-hidden) , INGEN ny färgkombination införs, så T44-höjningen ärver de redan
-                 uppmätta AA-värdena utan ny mätning.
-
-              data-app-signature = stabil krok + testad semantik (T38-testet vaktar "Daniel
-              Aldemir" i signaturen). Namn-länkens kontrakt (href/target/rel mot
-              www.danielaldemir.com) är OFÖRÄNDRAT, så T39-testet håller. Hela kortet står på
-              sidans FOND (--vm-bg), inte en surface-yta, men pill-ytan är opak surface, så
-              pill-textens README-par gäller; eyebrow/namn/titel mättes mot fonden i T38. */}
-            <div data-app-signature="" className="flex flex-col gap-3">
-              {/* Avsändar-raden: sigill + "Byggd av" / namnet i två rader, namnet är blickfånget. */}
-              <div className="flex items-center gap-2.5">
-                <span aria-hidden="true" className="vm-signature-seal">
-                  DA
-                </span>
-                <span className="flex flex-col leading-tight">
-                  <span className="text-xs text-fg-muted">Byggd av</span>
-                  <a
-                    href="https://www.danielaldemir.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Daniel Aldemir, öppna www.danielaldemir.com i en ny flik"
-                    className="rounded-sm font-display text-base font-semibold text-fg underline-offset-[3px] decoration-accent decoration-2 hover:underline focus-visible:underline"
-                  >
-                    Daniel Aldemir
-                  </a>
-                </span>
-              </div>
-
-              {/* Titel-raden (T44, #75): promotar Daniel som utvecklaren, nu som stödtext under
-                namnet i stället för en undanskuffad sista rad. Full opacitet = AA-säkert. */}
-              <p className="text-xs text-fg-muted">.NET-systemutvecklare</p>
-
-              {/* HEMSIDE-CTA:n (T44 runda 2, #75-kärnan, "se att man kan klicka dit"): hela
-                danielaldemir.com som en uppenbart klickbar pill, den delade .vm-install-pill-
-                formen (DRY mot install-knappen, ingen ny färgkombination). Visas utan https-
-                prefix (renare läsning), href bär hela URL:en. Extern-länk-ikonen (pil ut ur
-                ruta) + pill-affordansen gör klickbarheten omisskännlig. Egen-flik + tabnabbing-
-                skydd, samma säkerhets-recept som resten av footern. */}
-              <a
-                href="https://www.danielaldemir.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Öppna danielaldemir.com i en ny flik"
-                className="vm-install-pill self-start"
-              >
-                danielaldemir.com
-                {/* Extern-länk-ikon (pil ut ur ruta), dekorativ; texten bär adressen. */}
-                <svg
-                  aria-hidden="true"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="vm-install-pill-icon"
-                >
-                  <path d="M15 3h6v6" />
-                  <path d="M10 14 21 3" />
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                </svg>
-              </a>
-            </div>
-
-            {/* Version-stämpel (T43, #74): diskret bygg-identifierare (kort commit-SHA
-              + byggtid) så live-versionen kan verifieras mot develop-HEAD. Löser
-              framtida "är det live?"-förvirring (debug-agentens förbättring). */}
-            <VersionStamp />
-          </footer>
         </main>
 
-        {/* Onboarding-touren (T13): visas EN gång vid första start (localStorage-
-          flagga), aldrig igen efter klar/hoppad. Ligger på rot-nivå (utanför main)
-          så modalen täcker hela skärmen. Får den DELADE onboarding-instansen så
-          install-gaten ovan och touren stänger i takt (EN sanning, T39/#68 F1). */}
+        {/* Onboarding-touren (T13): visas EN gång vid första start. Ligger på rot-nivå
+          (utanför main) så modalen täcker hela skärmen. Får den DELADE onboarding-
+          instansen så install-gaten och touren stänger i takt (EN sanning, T39/#68 F1). */}
         <OnboardingDialog onboarding={onboarding} />
 
-        {/* "Ny version finns"-prompten (T43, #74): registrerar SW:n (registerType
-          'prompt') och visar en diskret banner när en ny app-version väntar, så en
-          användare aldrig fastnar på en gammal cachad version, ETT klick uppdaterar.
-          Ligger på rot-nivå (utanför main, fixed längst ner) så den aldrig tränger
-          layouten och syns över allt innehåll. */}
+        {/* "Ny version finns"-prompten (T43, #74): diskret banner när en ny app-version
+          väntar. Ligger på rot-nivå (utanför main, fixed) så den aldrig tränger layouten. */}
         <UpdatePrompt />
       </div>
-    </SectionNavProvider>
+    </>
   );
 }

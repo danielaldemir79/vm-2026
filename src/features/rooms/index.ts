@@ -2,6 +2,10 @@
 
 export { RoomsProvider, type RoomsProviderProps } from './RoomsProvider';
 export { RoomPanel, RoomSection } from './RoomPanel';
+// T96 (#193): persistent rum-väljare i app-baren (aktivt rum + snabbyte på alla flikar).
+export { RoomPill, type RoomFormTarget } from './RoomPill';
+// T96 (#193): genväg-fokus till RoomSection-formulären (skapa/gå-med), bruten ut för test.
+export { focusRoomForm } from './focus-room-form';
 export {
   useRoomsStore,
   useRoomsSync,

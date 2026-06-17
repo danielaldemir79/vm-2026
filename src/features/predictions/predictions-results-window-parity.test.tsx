@@ -122,6 +122,11 @@ async function visibleInBothViews(
   now: Date
 ): Promise<{ res: string[]; pred: string[] }> {
   predData.matches = matches;
+  // PINNA den fake-klockan till `now` (DATE-STABILT): resultatvyn läser useTodayKey() ur
+  // systemklockan, så utan detta ankrade den på den RIKTIGA dagen och testet bröts vid
+  // dygnsskifte (t.ex. 2026-06-16 -> 06-17). Tips-vyn får `now` via propen; nu delar BÅDA
+  // exakt samma "nu" oavsett när testet körs. (Header-kommentaren förutsatte detta anrop.)
+  vi.setSystemTime(now);
   const res = render(
     <ResultsProvider env={{} as ImportMetaEnv} dataSource={fixedDataSource(matches)}>
       <ResultEntryView />

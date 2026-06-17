@@ -25,7 +25,12 @@ export interface UseRealtimeSubscriptionOptions {
   enabled: boolean;
   /** Klienten, eller null i vilande läge (då öppnas ingen kanal). */
   client: VmSupabaseClient | null;
-  /** Unikt kanalnamn. */
+  /**
+   * Kanalnamns-PREFIX (läsbar namnrymd). Behöver INTE vara globalt unikt: seamen
+   * (subscribeToTableChanges) lägger på ett unikt suffix per prenumeration, så två
+   * konsumenter som råkar ange samma prefix ändå får skilda kanal-instanser (white-
+   * screen-fixen, se realtime-subscriptions.ts).
+   */
   channelName: string;
   /** Tabeller (+ ev. filter) att lyssna på. */
   tables: TableSubscription[];

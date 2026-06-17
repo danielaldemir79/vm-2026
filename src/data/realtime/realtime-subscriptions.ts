@@ -46,6 +46,23 @@ export interface TableSubscription {
 /** En unsubscribe-funktion som river kanalen (idempotent: säker att kalla flera gånger). */
 export type Unsubscribe = () => void;
 
+/**
+ * Monoton räknare som gör VARJE öppnad kanals topic UNIK (HOTFIX, white-screen).
+ *
+ * VARFÖR (rotorsaken till den blanka sidan): Supabase cachar kanaler per TOPIC ,
+ * `client.channel('x')` returnerar SAMMA kanal-instans om en redan finns med det
+ * namnet. T83 håller alla flik-paneler monterade, så två alltid-monterade vyer
+ * (ScorerTableView + TournamentStatsView) prenumererade BÅDA på samma channelName
+ * ('vm2026-tournament-stats' via useCrossMatchEvents). Den andra fick tillbaka den
+ * FÖRSTAS redan subscribe():ade kanal och anropade `.on('postgres_changes', ...)` på
+ * den , vilket supabase-js förbjuder ("cannot add postgres_changes callbacks ...
+ * after subscribe()"). Felet kastades synkront i effekten, och UTAN error boundary
+ * släcktes hela trädet. Genom att ge varje prenumeration ett unikt topic-suffix kan
+ * två konsumenter ALDRIG mer dela kanal-instans, oavsett om de råkar ange samma
+ * channelName. channelName blir en läsbar namnrymds-PREFIX, inte ett delat lås.
+ */
+let channelInstanceCounter = 0;
+
 export interface RealtimeSubscriptionConfig {
   /** Den typade Supabase-klienten (samma singleton som äger auth-sessionen). */
   client: VmSupabaseClient;
@@ -80,7 +97,11 @@ export function subscribeToTableChanges(config: RealtimeSubscriptionConfig): Uns
   // subscribe ändå skickar token vid join och en miss faller till skyddsnäten.
   void client.realtime.setAuth();
 
-  let channel = client.channel(channelName);
+  // UNIKT topic per prenumeration (se channelInstanceCounter): channelName är en läsbar
+  // namnrymds-prefix, suffixet gör topic:en unik så två konsumenter aldrig delar kanal-
+  // instans (rotorsaken till white-screen). Supabase tillåter valfria topic-strängar.
+  const channelTopic = `${channelName}:${++channelInstanceCounter}`;
+  let channel = client.channel(channelTopic);
   for (const { table, filter } of tables) {
     channel = channel.on(
       'postgres_changes',

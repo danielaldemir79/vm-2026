@@ -1,0 +1,111 @@
+/* DELAD "STICKY KONTROLL-RAD + utfälld lång lista"-byggstens FINISH (#173 T82 del 4).
+ *
+ * Single-source för det mönster ägaren uppskattade på den globala topplistan: en STICKY
+ * kontroll-rad som följer med i en lång, scrollbar lista (komprimera/sök/hoppa alltid ett
+ * tryck bort), och ett höjd-begränsat scroll-fönster runt listan. Lyft ur tokens.css §26
+ * (.vm-total-*) och generaliserat, så total-topplistan, resultat-listan och övriga långa
+ * listor delar EXAKT samma yt-recept (PRINCIPLES §3-4). De gamla .vm-total-*-klasserna
+ * GRUPPERAS in i samma regler (alias), så total-topplistans redan testade klassnamn
+ * (vm-total-controls/-control/-scroll) fortsätter gälla utan en parallell CSS-variant.
+ *
+ * Stylas ENBART via klass-hakarna; semantiken bärs av .tsx-komponenterna, inte CSS:en.
+ * Kontrast: kontroll-raden + scroll-fönstret bär INGEN egen text (kontrollerna i raden har
+ * sina egna README-mätta fg-på-surface-par), så de kan aldrig sänka någon text-kontrast. */
+
+/* DET SCROLLANDE FÖNSTRET: en hårfin border + surface-fond, så den långa listan läser som en
+   avgränsad, scrollbar yta (inte ett oändligt fält). Bär ingen egen text. */
+.vm-collapsible-scroll,
+.vm-total-scroll {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  /* Mjukare scrollstopp mot den sticky raden (faller tillbaka rent där osupportat). */
+  scroll-padding-top: 56px;
+}
+
+/* STICKY KONTROLL-RAD (komprimera + ev. sök/hoppa): fäst överst i scroll-fönstret (position:
+   sticky sätts via Tailwind i .tsx) så kontrollerna ALDRIG skrollas ur synhåll , man kan
+   komprimera/söka/hoppa från VILKEN scroll-position som helst (ägarens feedback, #173).
+
+   ANTI-JITTER + INGEN GENOMLYSNING: raden har en OPAK fond (samma surface som fönstret) så
+   raderna som skrollar UNDER den aldrig lyser igenom eller skapar flimmer. En hårfin nederkant
+   + en mjuk skugga skiljer raden från innehållet under den utan att hoppa. z-index (i .tsx)
+   håller raden över de absolut-positionerade raderna. */
+.vm-collapsible-controls,
+.vm-total-controls {
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  /* Mjuk skugga UNDER raden så den läser som ett "tak" över listan, utan en hård kant.
+     Negativ spridning håller skuggan smal (ingen layout-påverkan, ingen CLS). */
+  box-shadow: 0 6px 12px -8px color-mix(in srgb, var(--color-fg) 22%, transparent);
+}
+
+/* KONTROLL-PILLARNA (komprimera, sök-knapp, visa alla, hoppa-till-mig): en diskret surface-
+   pill med fg-text + border, hover tänder en accent-kant + lyfter ytan (samma affordans som
+   install-pillen, tokens.css §22). Färg-only hover (ingen transform), bryter ingen reduced-
+   motion. Token-drivet => ärver de redan README-mätta fg-på-surface-paren. */
+.vm-collapsible-control,
+.vm-total-control,
+.vm-total-jump {
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vm-collapsible-control,
+  .vm-total-control,
+  .vm-total-jump {
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease;
+  }
+}
+
+.vm-collapsible-control:hover,
+.vm-total-control:hover,
+.vm-total-jump:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background-color: var(--color-surface-raised);
+}
+
+.vm-collapsible-control:focus-visible,
+.vm-total-control:focus-visible,
+.vm-total-jump:focus-visible,
+.vm-total-search:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* STICKY "FÖLJ-MED"-BAR (#173 T82 del 4): för en lång lista som INTE virtualiseras (dag-
+ * grupperade resultat, motion-animerad per-rums-topplista) , i stället för byggstenens
+ * scroll-fönster klistrar bara KOMPRIMERA-kontrollen direkt under sajt-headern och FÖLJER
+ * MED ner i listan, så komprimera alltid är ett tryck bort oavsett scroll-position (ägarens
+ * "rad som följer med"-feedback). Sticky-positionen + opak fond/skugga bor här; konsumenten
+ * sätter top-offsetten via Tailwind (top-16 = under sajt-headern). Bär ingen egen text
+ * (ExpandToggle har sina README-mätta par), så baren kan inte sänka någon text-kontrast.
+ *
+ * ANTI-GENOMLYSNING: en opak, lätt blur:ad fond (samma recept som dag-rubrikens platta) så
+ * raderna som skrollar UNDER baren aldrig lyser igenom kontrollen. En mjuk nederkant-skugga
+ * skiljer baren från listan utan en hård linje. */
+.vm-sticky-follow-bar {
+  background-color: color-mix(in srgb, var(--color-bg) 86%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 12px -8px color-mix(in srgb, var(--color-fg) 22%, transparent);
+}
+
+/* TOP-OFFSET PER BRYTPUNKT (F1/T83): baren ska klistra DIREKT under den sticky app-baren,
+ * och app-baren har OLIKA höjd i de två lägena:
+ *   - MOBIL (<640px): bara headern är top-sticky (flik-raden är `fixed bottom-0`), så
+ *     offseten = header-höjden. Konsumenten sätter den via Tailwind `top-16` (64px = 4rem).
+ *   - DESKTOP (>=640px): app-baren är header + flik-rad (~117px), båda top-sticky. Med bara
+ *     `top-16` skulle "följ-med"-baren klistra MITT I flik-raden (tuckas under den). Här
+ *     flyttar vi den till app-barens FULLA höjd (--vm-app-bar-height, en sanning), så baren
+ *     pinnar precis under hela app-baren. !important slår Tailwinds `top-16`-utility (samma
+ *     specificitet, men källordningen är inte garanterad mellan utility- och komponent-CSS). */
+@media (min-width: 640px) {
+  .vm-sticky-follow-bar {
+    top: var(--vm-app-bar-height) !important;
+  }
+}

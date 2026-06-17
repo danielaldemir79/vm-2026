@@ -18,6 +18,12 @@
 //     bär den, så den läses även när färgerna sammanfaller, och T7 kan sen ge
 //     success en egen ton utan att bryta designen.
 //   - Inga råa hex: allt går via semantiska tokens (color-mix mot --color-*).
+//
+// RESPONSIV TÄTHET (T103): på smala telefoner (ner till 360px) visas en KOMPAKT
+// kolumn-uppsättning (#, Lag, S, MS, P) så poäng-kolumnen P aldrig klipps i sidled.
+// Fler kolumner (V/O/F vid >=sm, GM/IM vid >=md) avslöjas progressivt när det finns
+// plats. Detta är ren VISUELL täthet via media-queries (REVEAL_CLASS); ALLA 10
+// kolumn-headers + celler är kvar i DOM:en, så tabell-semantiken/a11y är oförändrad.
 
 import type { CSSProperties } from 'react';
 import type { GroupStanding, GroupId, Team } from '../../domain/types';
@@ -37,24 +43,69 @@ interface ColumnDef {
   /**
    * Visuell vikt. Poäng + målskillnad är de avgörande talen och hålls starka;
    * gjorda/insläppta mål är stödsiffror och dämpas (visuell komprimering, SPEC
-   * §7), så ögat läser tabellen i rätt ordning utan att en kolumn tas bort
-   * (a11y: alla 8 statistik-kolumner är alltid kvar i DOM).
+   * §7), så ögat läser tabellen i rätt ordning utan att en kolumn tas bort.
    */
   emphasis?: 'strong' | 'muted';
+  /**
+   * RESPONSIV KOLUMN-AVSLÖJNING (T103, Daniels skärmdump: P klipptes på mobil).
+   * Tabellen har 8 statistik-kolumner bredvid #/Lag i ett SMALT grupp-kort (1 kol
+   * på mobil). På en ~360px-telefon blev raden för bred, kortet skrollade i sidled
+   * och den HÖGRA, viktigaste kolumnen , P (poäng) , hamnade utanför kanten.
+   *
+   * FIX: en KOMPAKT kolumn-uppsättning på de smalaste skärmarna, fler kolumner
+   * avslöjas progressivt när det finns plats. `revealAt` styr när cellen visas:
+   *   - 'always'  : # / Lag / S / MS / P , standard kompakt fotbollstabell, P
+   *                 ryms ALLTID (även på 360px). Avgörande tal (MS, P) + spelade (S).
+   *   - 'sm'      : V/O/F , utfall (vunna/oavgjorda/förlorade) när det finns plats.
+   *   - 'md'      : GM/IM , stöd-siffror (gjorda/insläppta) sist, bara på breda kort.
+   * Detta är KOLUMN-REDUKTION, inte sid-skroll: P kan aldrig skrollas ur vy.
+   * I jsdom (testerna) tillämpas inga media-queries, så ALLA 10 kolumn-headers är
+   * i DOM:en , a11y/semantiken är oförändrad, bara den VISUELLA tätheten skiljer.
+   */
+  revealAt: 'always' | 'sm' | 'md';
 }
 
 // Sifferkolumnerna i FIFA-tabellordning. Lag + placering hanteras separat (de är
 // rad-header respektive en egen ledande cell), resten är numeriska data-celler.
+// `revealAt` ger den kompakta mobil-uppsättningen (#, Lag, S, MS, P) + progressiv
+// avslöjning, så P (poäng) alltid syns helt , se ColumnDef.revealAt (T103).
 const NUMERIC_COLUMNS: readonly ColumnDef[] = [
-  { label: 'S', title: 'Spelade matcher', value: (r) => r.played },
-  { label: 'V', title: 'Vunna', value: (r) => r.won },
-  { label: 'O', title: 'Oavgjorda', value: (r) => r.drawn },
-  { label: 'F', title: 'Förlorade', value: (r) => r.lost },
-  { label: 'GM', title: 'Gjorda mål', value: (r) => r.goalsFor, emphasis: 'muted' },
-  { label: 'IM', title: 'Insläppta mål', value: (r) => r.goalsAgainst, emphasis: 'muted' },
-  { label: 'MS', title: 'Målskillnad', value: (r) => r.goalDifference, emphasis: 'strong' },
-  { label: 'P', title: 'Poäng', value: (r) => r.points, emphasis: 'strong' },
+  { label: 'S', title: 'Spelade matcher', value: (r) => r.played, revealAt: 'always' },
+  { label: 'V', title: 'Vunna', value: (r) => r.won, revealAt: 'sm' },
+  { label: 'O', title: 'Oavgjorda', value: (r) => r.drawn, revealAt: 'sm' },
+  { label: 'F', title: 'Förlorade', value: (r) => r.lost, revealAt: 'sm' },
+  { label: 'GM', title: 'Gjorda mål', value: (r) => r.goalsFor, emphasis: 'muted', revealAt: 'md' },
+  {
+    label: 'IM',
+    title: 'Insläppta mål',
+    value: (r) => r.goalsAgainst,
+    emphasis: 'muted',
+    revealAt: 'md',
+  },
+  {
+    label: 'MS',
+    title: 'Målskillnad',
+    value: (r) => r.goalDifference,
+    emphasis: 'strong',
+    revealAt: 'always',
+  },
+  { label: 'P', title: 'Poäng', value: (r) => r.points, emphasis: 'strong', revealAt: 'always' },
 ];
+
+/**
+ * Tailwind-synlighetsklasser per `revealAt`. EN sanning för hur en kolumn döljs/
+ * visas, delas av <th> och <td> så header + cell ALLTID följs åt (annars glider
+ * de isär och en rubrik pekar på fel kolumn). `table-cell` återställer display
+ * vid brytpunkten (vi döljer med `hidden`, som är display:none).
+ *   - always: alltid synlig (kompakt mobil-set: #, Lag, S, MS, P).
+ *   - sm    : dold < 640px, visas >= sm (V/O/F).
+ *   - md    : dold < 768px, visas >= md (GM/IM).
+ */
+const REVEAL_CLASS: Record<ColumnDef['revealAt'], string> = {
+  always: '',
+  sm: 'hidden sm:table-cell',
+  md: 'hidden md:table-cell',
+};
 
 export interface GroupTableProps {
   groupId: GroupId;
@@ -148,8 +199,8 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
               key={col.label}
               scope="col"
               className={`w-7 px-0.5 pb-2 text-right font-semibold tabular-nums ${
-                col.emphasis === 'muted' ? 'opacity-70' : ''
-              }`}
+                REVEAL_CLASS[col.revealAt]
+              } ${col.emphasis === 'muted' ? 'opacity-70' : ''}`}
               title={col.title}
             >
               <abbr title={col.title} className="no-underline">
@@ -229,6 +280,8 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
                 <td
                   key={col.label}
                   className={`px-0.5 py-2 text-right align-middle tabular-nums ${
+                    REVEAL_CLASS[col.revealAt]
+                  } ${
                     col.emphasis === 'strong'
                       ? 'font-semibold text-fg'
                       : col.emphasis === 'muted'

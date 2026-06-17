@@ -34,11 +34,20 @@ export function PredictionSection({ surface }: { surface: (children: ReactNode) 
   // den delade leaderboard-storen (samma hämtning) och GATAR sig själva tyst när det
   // inte finns en egen rad/statistik att visa, så ordningen är "din ställning -> hur du
   // tippar -> kupongerna".
+  //
+  // SPACING (Daniels feedback 2026-06-16, "kort som har ingen space"): de tre delvyerna
+  // är tre kort-lika paneler (poäng-summeringen + statistik-panelen + tippnings-vyn) som
+  // stod som NAKNA syskon utan en gemensam gap-behållare, så de KLISTRADE mot varandra
+  // (uppmätt 0 px mellan summeringen och statistik-panelen, 0 px till tippnings-vyn).
+  // Vi samlar dem nu i EN `flex flex-col gap-4`, samma intra-sektions-rytm som
+  // LeaderboardSection ger sina paneler (Summary + View, gap-4), så "kort-i-en-sektion"
+  // har EN konsekvent luft i hela appen. TipsScoreSummarys gamla `mt-4` (som bara gav
+  // luft mot Panelens topp-padding) tas bort, gap-behållaren bär nu all rytm.
   return surface(
-    <>
+    <div className="flex flex-col gap-4">
       <TipsScoreSummary />
       <PersonalStatsSection />
       <PredictionsView />
-    </>
+    </div>
   );
 }

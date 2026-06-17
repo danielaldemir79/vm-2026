@@ -20,7 +20,6 @@ import { Fade, Slide, transitions } from '../../motion';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupData } from './use-group-data';
 import { GroupTable } from './GroupTable';
-import { useRegisterSection, SECTIONS } from '../section-nav';
 
 /**
  * Teckenförklaring för kolumn-förkortningarna, så de inte är kryptiska (a11y).
@@ -89,8 +88,10 @@ function GroupCard({
           </span>
         </div>
 
-        {/* Tabellen. overflow-x-auto fångar ev. överflöd på riktigt smala skärmar
-            utan att klippa innehåll (a11y: inget göms, alla kolumner kvar). */}
+        {/* Tabellen. Den responsiva kolumn-avslöjningen (GroupTable, T103) håller raden
+            inom kort-bredden ner till 360px , poäng-kolumnen P klipps aldrig. overflow-x-auto
+            blir bara en sista skyddsnät-rem mot oväntat långa lag-namn (inget göms, P förblir
+            synlig utan att skrolla eftersom de breda stöd-kolumnerna fälls bort först). */}
         <div className="overflow-x-auto px-3 py-2">
           <GroupTable groupId={table.groupId} standings={table.standings} teamsById={teamsById} />
         </div>
@@ -130,14 +131,12 @@ export function GroupStageView() {
   // vyn är en ren konsument. Måste därför renderas inuti en ResultsProvider.
   const { status, tables, teams, mode, error } = useGroupData();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
-  // Anmäl sektionen till chip-navet (T78, #165) medan vyn är monterad.
-  useRegisterSection(SECTIONS.groups);
 
   return (
     <section aria-labelledby="gruppspel-rubrik" className="flex flex-col gap-6">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 id="gruppspel-rubrik" className="font-display text-2xl font-bold sm:text-3xl">
+          <h2 id="gruppspel-rubrik" className="font-display text-xl font-semibold sm:text-2xl">
             Gruppspelet
           </h2>
           {mode === 'fixtures' ? <span className="vm-demo-chip">Demo-data</span> : null}

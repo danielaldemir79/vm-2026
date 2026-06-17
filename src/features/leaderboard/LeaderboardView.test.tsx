@@ -3,6 +3,9 @@ import { act, render, screen, within } from '@testing-library/react';
 import { LeaderboardView } from './LeaderboardView';
 import { LeaderboardStoreContext, type LeaderboardStore } from './leaderboard-context';
 import type { LeaderboardEntry } from './aggregate-scores';
+import { RoomsStoreContext } from '../rooms/rooms-context';
+import type { RoomsStore } from '../rooms';
+import type { RoomSummary } from '../../data/rooms';
 
 function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
   return {
@@ -11,6 +14,7 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
     error: null,
     activeRoomId: 'r1',
     leaderboard: [],
+    livePreliminary: false,
     reveal: [],
     teams: [],
     currentUserId: null,
@@ -21,11 +25,39 @@ function store(partial: Partial<LeaderboardStore>): LeaderboardStore {
   };
 }
 
-function renderView(s: LeaderboardStore) {
+// LeaderboardView läser nu det AKTIVA RUMMETS namn ur rums-storen (T92 del A), så testerna
+// ger en minimal rums-store-stub via context (samma mönster som rooms egna tester). Default:
+// ett aktivt rum "VM 2026" så eyebrow:n visar ett rumsnamn; överskrid activeRoom för andra fall.
+const ROOM_VM2026: RoomSummary = { id: 'r1', name: 'VM 2026', code: 'ABC123' };
+
+function roomsStore(activeRoom: RoomSummary | null): RoomsStore {
+  return {
+    enabled: true,
+    status: 'ready',
+    error: null,
+    userId: null,
+    myRooms: activeRoom ? [activeRoom] : [],
+    activeRoom,
+    members: [],
+    results: [],
+    tipsRefreshNonce: 0,
+    createRoom: async () => {},
+    joinRoom: async () => true,
+    selectRoom: async () => {},
+    leaveRoom: async () => {},
+    refresh: async () => {},
+    saveResult: async () => {},
+    copyMyTips: vi.fn(),
+  };
+}
+
+function renderView(s: LeaderboardStore, activeRoom: RoomSummary | null = ROOM_VM2026) {
   return render(
-    <LeaderboardStoreContext.Provider value={s}>
-      <LeaderboardView />
-    </LeaderboardStoreContext.Provider>
+    <RoomsStoreContext.Provider value={roomsStore(activeRoom)}>
+      <LeaderboardStoreContext.Provider value={s}>
+        <LeaderboardView />
+      </LeaderboardStoreContext.Provider>
+    </RoomsStoreContext.Provider>
   );
 }
 
@@ -62,6 +94,55 @@ describe('LeaderboardView, lägen', () => {
   it('TOM lista (inga medlemmar) visar tom-text', () => {
     const { container } = renderView(store({ leaderboard: [] }));
     expect(container.querySelector('[data-leaderboard-empty]')).toBeInTheDocument();
+  });
+});
+
+describe('LeaderboardView, live/preliminär-indikator (T84, #176)', () => {
+  it('visar live-indikatorn ENBART när livePreliminary är true (en match pågår)', () => {
+    const { container } = renderView(
+      store({ leaderboard: [entry('u1', 'Anna', 3, 1)], livePreliminary: true })
+    );
+    const indicator = container.querySelector('[data-leaderboard-live]');
+    expect(indicator).toBeInTheDocument();
+    expect(indicator).toHaveTextContent('Live, preliminära placeringar medan matcher pågår');
+  });
+
+  it('döljer live-indikatorn när ingen match pågår (livePreliminary false = dagens beteende)', () => {
+    const { container } = renderView(
+      store({ leaderboard: [entry('u1', 'Anna', 5, 1)], livePreliminary: false })
+    );
+    expect(container.querySelector('[data-leaderboard-live]')).not.toBeInTheDocument();
+  });
+});
+
+describe('LeaderboardView, per-rums-tydlighet (T92 del A: eyebrow = aktiva rummets namn)', () => {
+  it('visar det AKTIVA RUMMETS namn i eyebrow:n (inte den generiska "VM-poolen")', () => {
+    const { container } = renderView(store({ leaderboard: [entry('u1', 'Anna', 5, 1)] }), {
+      id: 'r9',
+      name: 'Kompisligan',
+      code: 'XYZ999',
+    });
+    const eyebrow = container.querySelector('[data-leaderboard-room]');
+    expect(eyebrow).toHaveTextContent('Kompisligan');
+    // NEGATIV-KONTROLL: den gamla generiska etiketten ska INTE längre stå där (annars hade
+    // den här ändringen inte gjort något , beviset att rumsnamnet faktiskt tog över).
+    expect(eyebrow).not.toHaveTextContent('VM-poolen');
+  });
+
+  it('faller till en generisk etikett när inget rum kan namnges (gissar aldrig ett namn)', () => {
+    const { container } = renderView(store({ leaderboard: [entry('u1', 'Anna', 5, 1)] }), null);
+    const eyebrow = container.querySelector('[data-leaderboard-room]');
+    // Utan aktivt rum visas "Ditt rum" (lugn fallback), aldrig ett påhittat rumsnamn.
+    expect(eyebrow).toHaveTextContent('Ditt rum');
+  });
+
+  it('faller till den generiska etiketten om rummets namn är tomt/blanksteg', () => {
+    const { container } = renderView(store({ leaderboard: [entry('u1', 'Anna', 5, 1)] }), {
+      id: 'r1',
+      name: '   ',
+      code: 'ABC123',
+    });
+    expect(container.querySelector('[data-leaderboard-room]')).toHaveTextContent('Ditt rum');
   });
 });
 
@@ -175,9 +256,11 @@ describe('LeaderboardView, placerings-puls (data-rank-changed nollas så den kan
       const rerenderWith = (leaderboard: LeaderboardEntry[]) =>
         act(() => {
           rerender(
-            <LeaderboardStoreContext.Provider value={store({ leaderboard })}>
-              <LeaderboardView />
-            </LeaderboardStoreContext.Provider>
+            <RoomsStoreContext.Provider value={roomsStore(ROOM_VM2026)}>
+              <LeaderboardStoreContext.Provider value={store({ leaderboard })}>
+                <LeaderboardView />
+              </LeaderboardStoreContext.Provider>
+            </RoomsStoreContext.Provider>
           );
         });
 
@@ -200,5 +283,75 @@ describe('LeaderboardView, placerings-puls (data-rank-changed nollas så den kan
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// #173 T82 del 4 (ägarens feedback "den där raden som följer med i listorna"): en LÅNG per-
+// rums-topplista (seedat rum, upp till ~200 deltagare) ska börja KOMPRIMERAD (topp-N) och
+// fällas ut på begäran, med en STICKY följ-med-komprimera-kontroll i utfällt läge. KORTA rum
+// (<= tröskeln) rör vi inte. Motion-glidet bevaras (ingen virtualisering: vi slice:ar bara
+// den renderade mängden). jsdom saknar layout, så vi bevisar STRUKTUREN (renderad delmängd,
+// sticky-klassen, toggle-semantik), inte den faktiska visuella stickyn (se .vmshots).
+describe('LeaderboardView, lång lista: börja komprimerad + sticky följ-med', () => {
+  function manyEntries(n: number): LeaderboardEntry[] {
+    return Array.from({ length: n }, (_, i) => entry(`u${i}`, `Spelare ${i}`, n - i, i + 1));
+  }
+  const topToggle = (c: HTMLElement): HTMLButtonElement =>
+    c.querySelector('button[data-leaderboard-toggle-position="top"]') as HTMLButtonElement;
+
+  it('en KORT lista (<= tröskeln) visar alla rader och ingen komprimera-kontroll', () => {
+    const { container } = renderView(store({ leaderboard: manyEntries(8) }));
+    expect(container.querySelectorAll('[data-leaderboard-row]').length).toBe(8);
+    expect(container.querySelector('[data-leaderboard-toggle-bar]')).not.toBeInTheDocument();
+  });
+
+  it('en LÅNG lista börjar KOMPRIMERAD (bara topp-N i DOM:en) med en "Visa alla N"-kontroll', () => {
+    const { container } = renderView(store({ leaderboard: manyEntries(120) }));
+    // Komprimerat: bara topp-8 renderas (inte 120 = ingen DOM-vägg).
+    expect(container.querySelectorAll('[data-leaderboard-row]').length).toBe(8);
+    const toggle = topToggle(container);
+    expect(toggle).toHaveTextContent('Visa alla 120');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls');
+    // Listan är markerad komprimerad.
+    expect(container.querySelector('[data-leaderboard-list]')).toHaveAttribute(
+      'data-expanded',
+      'false'
+    );
+    // I komprimerat läge är toggle-baren INTE sticky (inget att följa med i).
+    expect(container.querySelector('[data-leaderboard-toggle-bar]')!.className).not.toContain(
+      'sticky'
+    );
+  });
+
+  it('utfäll visar ALLA rader och gör den övre kontrollen STICKY (följer med)', () => {
+    const { container } = renderView(store({ leaderboard: manyEntries(120) }));
+    act(() => {
+      topToggle(container).click();
+    });
+    // Alla 120 raderna renderas i utfällt läge (ingen match går förlorad).
+    expect(container.querySelectorAll('[data-leaderboard-row]').length).toBe(120);
+    // Baren är nu sticky (följer med ner i listan) och pinnas under sajt-headern.
+    const bar = container.querySelector('[data-leaderboard-toggle-bar]')!;
+    expect(bar.getAttribute('data-sticky')).toBe('true');
+    expect(bar.className).toContain('sticky');
+    expect(bar.className).toContain('top-16');
+    expect(topToggle(container)).toHaveTextContent('Komprimera');
+    expect(topToggle(container)).toHaveAttribute('aria-expanded', 'true');
+    // En NEDRE komprimera-kontroll dubbleras i utfällt läge (samma semantik).
+    const bottom = container.querySelector('button[data-leaderboard-toggle-position="bottom"]');
+    expect(bottom).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('[data-leaderboard-list]')).toHaveAttribute(
+      'data-expanded',
+      'true'
+    );
+  });
+
+  it('den egna raden behåller sin markering (data-self) i komprimerat läge (topp-N)', () => {
+    // u0 ligger först (rank 1), så den är inom topp-N även komprimerat.
+    const { container } = renderView(store({ leaderboard: manyEntries(120), currentUserId: 'u0' }));
+    const myRow = container.querySelector('[data-user-id="u0"]')!;
+    expect(myRow).toHaveAttribute('data-self', 'true');
+    expect(within(myRow as HTMLElement).getByText('Du')).toBeInTheDocument();
   });
 });

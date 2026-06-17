@@ -54,6 +54,41 @@ export type Database = {
         };
         Relationships: [];
       };
+      // T82 (#173): bot-register för seedning av tipsligan. RLS deny-all för anon/
+      // authenticated (bara service_role når raderna). persona_key är idempotens-
+      // ankaret (UNIQUE). user_id FK -> auth.users on delete cascade (ångra = radera
+      // auth.users-raden). Hand-tillagd för att spegla 20260615130000_t82_bot_accounts.sql
+      // (regenerera med generate_typescript_types när schemat nästa gång rörs).
+      bot_accounts: {
+        Row: {
+          cohort: string;
+          created_at: string;
+          display_name: string;
+          persona_key: string;
+          personality: string;
+          skill_tier: number;
+          user_id: string;
+        };
+        Insert: {
+          cohort: string;
+          created_at?: string;
+          display_name: string;
+          persona_key: string;
+          personality: string;
+          skill_tier: number;
+          user_id: string;
+        };
+        Update: {
+          cohort?: string;
+          created_at?: string;
+          display_name?: string;
+          persona_key?: string;
+          personality?: string;
+          skill_tier?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       // T16 (#16): bracket-/slutspels-tips (vem går vidare per slot + VM-vinnaren).
       bracket_predictions: {
         Row: {
@@ -316,6 +351,60 @@ export type Database = {
             referencedColumns: ['id'];
           },
         ];
+      };
+      // T85 (#177): web-push-prenumerationer (en rad per enhet). RLS: en användare
+      // ser/skapar/raderar BARA sina egna (user_id = auth.uid()); service_role
+      // (push-sender) förbigår RLS och läser alla. endpoint UNIQUE = idempotent
+      // upsert-ankare. Hand-tillagd för att spegla
+      // 20260616120000_t85_push_subscriptions.sql (samma "regenerera om schemat
+      // ändras"-kontrakt som övriga tabeller).
+      // T89 (#182): + preferens-kolumner (notify_enabled / quiet_hours_enabled /
+      // match_scope / favorite_team_id) ur 20260616160100_t89_push_preferences.sql.
+      push_subscriptions: {
+        Row: {
+          auth_key: string;
+          created_at: string;
+          endpoint: string;
+          favorite_team_id: string | null;
+          id: string;
+          match_scope: string;
+          notify_enabled: boolean;
+          p256dh: string;
+          quiet_hours_enabled: boolean;
+          user_agent: string | null;
+          user_id: string;
+        };
+        Insert: {
+          auth_key: string;
+          created_at?: string;
+          endpoint: string;
+          favorite_team_id?: string | null;
+          id?: string;
+          // Default 'all' i DB:n.
+          match_scope?: string;
+          // Default true i DB:n (notiser på när enheten prenumererar).
+          notify_enabled?: boolean;
+          p256dh: string;
+          // Default false i DB:n (nattläge av).
+          quiet_hours_enabled?: boolean;
+          user_agent?: string | null;
+          // Default auth.uid() i DB:n, så klienten behöver inte skicka det.
+          user_id?: string;
+        };
+        Update: {
+          auth_key?: string;
+          created_at?: string;
+          endpoint?: string;
+          favorite_team_id?: string | null;
+          id?: string;
+          match_scope?: string;
+          notify_enabled?: boolean;
+          p256dh?: string;
+          quiet_hours_enabled?: boolean;
+          user_agent?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       // T66 (#121): kommentarer i rummet (medlemmar skriver korta meddelanden).
       room_comments: {
@@ -587,6 +676,16 @@ export type Database = {
       // skriv nekas, andras tips dolda). Returns string | null, INTE string, av
       // exakt samma säkerhets-skäl som match_kickoff nedan.
       bracket_deadline_kickoff: { Args: { p_slot_id: string }; Returns: string | null };
+      // T82 (#173): räkna RIKTIGA (icke-bot) rader server-side för seedningens
+      // före/efter-skydd, utan en jätte-NOT-IN-lista i URL:en. p_table allowlist:as
+      // till 'room_members' | 'predictions' i SQL:en. SECURITY DEFINER, EXECUTE bara
+      // service_role. Hand-tillagd för att spegla
+      // 20260615140000_t82_count_non_bot_rows.sql (regenerera med
+      // generate_typescript_types när schemat nästa gång rörs).
+      count_non_bot_rows: {
+        Args: { p_table: 'room_members' | 'predictions' };
+        Returns: number;
+      };
       create_room: {
         Args: { p_code: string; p_display_name: string; p_name: string };
         Returns: {

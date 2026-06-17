@@ -22,21 +22,13 @@
 // över ALLA 360 hue:er, värsta fallet gult). Uppmätta AA-värden, svept över hela
 // hue-spannet + bekräftade på renderade pixlar (båda teman): docs/decisions.md.
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type CSSProperties,
-  type FormEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useRoomsStore } from './rooms-context';
-import { avatarHueFromId, initialsFromName } from './member-avatar';
 import { buildInviteText, copyText, shareInvite } from './share-room';
 import { CopyTipsControl } from './CopyTipsControl';
 import { CommentsProvider } from './CommentsProvider';
 import { RoomComments } from './RoomComments';
+import { MemberGrid } from './MemberGrid';
 import './rooms.css';
 
 // Delade fält-klasser, SAMMA premium-formspråk som resultatinmatningen (#39,
@@ -85,47 +77,6 @@ export function RoomSection({ surface }: { surface: (children: ReactNode) => Rea
     return null;
   }
   return surface(<RoomPanel />);
-}
-
-/**
- * En medlems monogram-avatar + namn-chip. Avatar-färgen härleds STABILT ur
- * user-id (member-avatar.ts), så samma person känns igen på färgen i varje
- * rendering. Den egna medlemmen ("(du)") får en accent-tonad kant så man hittar
- * sig själv direkt. Avatar-färgen är DEKOR; initialerna + namnet bär identiteten
- * (färg-oberoende, a11y). Hue:n sätts som CSS-variabel så rooms.css kan klampa
- * lightness PER hue och hålla ink-kontrasten AA i båda teman (kontrast-vakt).
- */
-function MemberChip({
-  userId,
-  displayName,
-  isSelf,
-}: {
-  userId: string;
-  displayName: string;
-  isSelf: boolean;
-}) {
-  const hue = avatarHueFromId(userId);
-  const initials = initialsFromName(displayName);
-  return (
-    <li
-      data-rooms-member
-      data-rooms-member-self={isSelf}
-      className="vm-rooms-member flex items-center gap-2 rounded-pill border border-border bg-surface py-1 pl-1 pr-3 text-sm"
-      data-self={isSelf}
-    >
-      <span
-        aria-hidden="true"
-        className="vm-rooms-avatar flex h-7 w-7 shrink-0 items-center justify-center rounded-pill font-display text-xs font-bold leading-none"
-        style={{ '--vm-avatar-hue': hue } as CSSProperties}
-      >
-        {initials}
-      </span>
-      <span className="min-w-0 truncate">
-        {displayName}
-        {isSelf && <span className="text-fg-muted"> (du)</span>}
-      </span>
-    </li>
-  );
 }
 
 // Rensar en pågående återställnings-timeout och nollar reffen. Delas av CopyButton
@@ -461,19 +412,12 @@ export function RoomPanel() {
 
           {/* Biljett-kroppen: medlemmar, delade resultat, lämna. */}
           <div className="border-t border-border bg-surface p-5 sm:p-6">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-fg-muted">
-              Medlemmar ({store.members.length})
-            </h4>
-            <ul className="mb-4 flex flex-wrap gap-2" data-rooms-members>
-              {store.members.map((m) => (
-                <MemberChip
-                  key={m.userId}
-                  userId={m.userId}
-                  displayName={m.displayName}
-                  isSelf={m.userId === store.userId}
-                />
-              ))}
-            </ul>
+            {/* Medlemslistan (T94, #187): komprimerad default + linjerat rutnät, egen
+                rad pinnad överst. Presentationen bor i MemberGrid (ren komponent), så
+                panelen bara matar in medlemmarna + den egna user-id:n. */}
+            <div className="mb-4">
+              <MemberGrid members={store.members} selfUserId={store.userId} />
+            </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p

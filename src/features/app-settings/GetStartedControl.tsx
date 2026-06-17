@@ -73,7 +73,7 @@ export function GetStartedControl({
               // stället för en kopierad klass-sträng (F1, Daniels direktiv).
               'vm-install-pill'
             : inline
-              ? 'inline-flex items-center gap-2 rounded-pill bg-accent px-5 py-2 font-display text-sm font-semibold text-accent-fg shadow-md outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_88%,black)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]'
+              ? 'inline-flex items-center gap-2 rounded-pill bg-accent px-5 py-2 font-display text-sm font-semibold text-accent-fg shadow-[var(--vm-shadow-button)] outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_88%,black)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]'
               : 'flex w-full items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3 text-left outline-none transition-colors hover:border-accent/60 hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]'
         }
       >

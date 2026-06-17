@@ -6,6 +6,9 @@ export { FavoriteTeamControl } from './FavoriteTeamControl';
 export type { FavoriteTeamControlProps } from './FavoriteTeamControl';
 export { FavoriteTeamPicker } from './FavoriteTeamPicker';
 export type { FavoriteTeamPickerProps } from './FavoriteTeamPicker';
+// Mer-flikens favoritlags-sektion (U2): väljaren som en egen inställnings-yta.
+export { FavoriteTeamSection } from './FavoriteTeamSection';
+export type { FavoriteTeamSectionProps } from './FavoriteTeamSection';
 export { useFavoriteTeam } from './favorite-team-context';
 export type { FavoriteTeamStore } from './favorite-team-context';
 

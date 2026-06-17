@@ -36,12 +36,15 @@ export function AdminSection({ surface }: { surface: (children: ReactNode) => Re
   if (official.isAdmin === true) {
     return surface(
       <div data-admin="" className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-display text-lg font-semibold">Arrangörens verktyg</h3>
+        <header className="flex flex-col gap-1">
+          <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+            Arrangör
+          </p>
+          <h2 className="font-display text-xl font-semibold sm:text-2xl">Arrangörens verktyg</h2>
           <p className="text-sm text-fg-muted">
             Mata in officiella resultat och se ligastatistiken. Fäll ut när du behöver dem.
           </p>
-        </div>
+        </header>
         <CollapsibleBody
           name="admin"
           toggleLabels={{ expand: 'Visa arrangörsverktygen', collapse: 'Visa färre' }}
@@ -75,13 +78,16 @@ export function AdminSection({ surface }: { surface: (children: ReactNode) => Re
   // laddar om admin-status så vyn växlar till inmatningen utan reload.
   return surface(
     <div data-admin-readonly="" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h3 className="font-display text-lg font-semibold">Officiella resultat</h3>
+      <header className="flex flex-col gap-1">
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+          Resultat
+        </p>
+        <h2 className="font-display text-xl font-semibold sm:text-2xl">Officiella resultat</h2>
         <p className="text-sm text-fg-muted">
           Matchresultaten matas in av arrangören och gäller automatiskt för alla rum. Du behöver
           inte fylla i något, poängen räknas ut åt dig när matcherna spelats.
         </p>
-      </div>
+      </header>
       {organizerEntry ? (
         <div data-admin-organizer-entry="" className="mt-1">
           <AdminLogin

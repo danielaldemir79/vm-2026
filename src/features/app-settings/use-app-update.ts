@@ -9,11 +9,12 @@
 // (prompt-tillstånd, uppdatera, avfärda) körs utan att röra den virtuella modulen.
 //
 // UPPDATERINGS-MODELL (verifierad mot vite-plugin-pwa-docs, se docs/decisions.md
-// T43): appen kör registerType 'prompt'. En ny SW INSTALLERAS men VÄNTAR; vi får
-// onNeedRefresh och visar en diskret "ny version"-prompt. Användaren klickar EN
-// gång -> updateApp() anropar updateSW() som aktiverar den väntande SW:n och
-// laddar om sidan med den nya koden. Så ingen fastnar på en gammal cache, och
-// ingen får en oväntad omladdning mitt i något (valet är användarens).
+// T43 + T102): appen kör registerType 'autoUpdate' (skipWaiting + clientsClaim). En ny
+// SW tas i bruk AUTOMATISKT och register-sw.ts laddar om sidan EN gång (controllerchange),
+// så ingen fastnar på en gammal cache utan handgrepp. För att en ny SW ska UPPTÄCKAS även
+// på en frusen PWA-återöppning (iOS) pollar vi aktivt (sw-update-scheduler, T102). Denna
+// hook behåller ändå onNeedRefresh/offlineReady + updateApp() som ett MANUELLT skyddsnät
+// (om en miljö ändå skulle leverera en väntande SW via prompt-vägen).
 
 import { useCallback, useEffect, useState } from 'react';
 import { registerAppSw, type RegisterAppSw } from './register-sw';

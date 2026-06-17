@@ -131,6 +131,14 @@ export default defineConfig({
       // förrän T14 (Supabase). workbox genererar en service worker som precachar
       // hela byggets statiska skal (JS/CSS/HTML/ikoner/typsnitt).
       workbox: {
+        // PUSH-HANTERARE (T85, #177): vi BEHÅLLER generateSW (byter INTE till
+        // injectManifest), och injicerar våra egna push-/notificationclick-lyssnare i
+        // den genererade service workern via importScripts. custom-push-sw.js ligger i
+        // public/ (kopieras till dist-roten), så sökvägen är rot-relativ. Den importeras
+        // FÖRST i den genererade SW:n, så lyssnarna registreras i samma SW-scope som
+        // workbox-precachen. Källa: vite-plugin-pwa / workbox generateSW importScripts-
+        // docs. Se docs/decisions.md (T85).
+        importScripts: ['custom-push-sw.js'],
         // Vilka filtyper som precachas. woff2 läggs till explicit så det
         // självhostade typsnittet är tillgängligt offline (annars faller texten
         // tillbaka till systemfonten utan nät, fungerande men inte premium).

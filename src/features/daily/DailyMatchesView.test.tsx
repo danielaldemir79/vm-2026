@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { TeamProfileProvider } from '../team-profile';
+import { MatchDetailProvider } from '../match-detail';
 import { DailyMatchesView } from './DailyMatchesView';
 import type { DataSource } from '../../data';
 import type { LiveDataResult } from './use-live-data';
@@ -40,7 +41,12 @@ function fixturesEnv(): ImportMetaEnv {
 function renderView(env: ImportMetaEnv, children: ReactNode, dataSource?: DataSource) {
   return render(
     <ResultsProvider env={env} dataSource={dataSource}>
-      <TeamProfileProvider>{children}</TeamProfileProvider>
+      <TeamProfileProvider>
+        {/* MatchDetailProvider (T86, #178): listans matchkort bär nu en drill-in-trigger
+            (MatchDetailTrigger), som fail-loud:ar utan provider. Den riktiga appen wrappar
+            alltid Idag-fliken i provideren, så dessa render-tester gör likadant. */}
+        <MatchDetailProvider>{children}</MatchDetailProvider>
+      </TeamProfileProvider>
     </ResultsProvider>
   );
 }
@@ -160,6 +166,34 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
     }
 
     expect(restPanelSeen).toBe(true);
+  });
+});
+
+// U2 (design-frontend): favoritlags-väljaren är en INSTÄLLNING. Idag-fliken döljer
+// den (showFavoritePicker=false) och visar den i Mer i stället, så Idag avlastas.
+// Default (ingen prop) bevarar tidigare beteende (väljaren synlig), för standalone-
+// render / fixtures. Vaktar BÅDA grenarna av flaggan.
+describe('DailyMatchesView, favoritlags-väljarens synlighet (U2)', () => {
+  it('visar favoritlags-väljaren som DEFAULT (showFavoritePicker ej satt)', async () => {
+    const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
+    await waitSettled();
+    await waitFor(() => {
+      expect(container.querySelector('[data-favorite-team-control]')).not.toBeNull();
+    });
+  });
+
+  it('DÖLJER favoritlags-väljaren när showFavoritePicker={false} (Idag-fliken, U2)', async () => {
+    const { container } = renderView(
+      fixturesEnv(),
+      <DailyMatchesView showFavoritePicker={false} />
+    );
+    await waitSettled();
+    // Vänta in att matchkorten är på plats (data redo) och bekräfta sedan att väljaren
+    // ALDRIG renderats (den är gatad på flaggan, inte på data-laddning).
+    await waitFor(() => {
+      expect(screen.getAllByRole('article').length).toBeGreaterThan(0);
+    });
+    expect(container.querySelector('[data-favorite-team-control]')).toBeNull();
   });
 });
 

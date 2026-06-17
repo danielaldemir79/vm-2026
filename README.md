@@ -28,9 +28,9 @@ under turneringen.
 | --- | --- |
 | ![Gruppspelets tabeller](docs/screenshots/04-group-stage.png) | ![Lagprofil-modal](docs/screenshots/05-team-profile.png) |
 
-| Mobil (den primära ytan) | Hela sidan |
+| Mobil (den primära ytan) | Idag-fliken |
 | --- | --- |
-| ![Mobil startsida](docs/screenshots/06-mobile-home-dark.png) | ![Hela scroll-sidan](docs/screenshots/01-home-full-dark.png) |
+| ![Mobil startsida](docs/screenshots/06-mobile-home-dark.png) | ![Idag-fliken](docs/screenshots/01-home-full-dark.png) |
 
 Skärmdumparna genereras från den faktiskt byggda appen i fixtures-läge (utan backend) via ett
 Playwright-skript, se [Regenerera skärmdumparna](#regenerera-skärmdumparna).
@@ -39,14 +39,16 @@ Playwright-skript, se [Regenerera skärmdumparna](#regenerera-skärmdumparna).
 
 ## Vad det är, och vad den användes till
 
-VM 2026 är en single-page, installerbar webbapp (PWA). Den delades med vänner och
-klasskompisar som en länk, lades till på deras hemskärmar på mobilen och användes flitigt
-genom hela VM 2026: man följde dagens matcher, la in tips före avspark, såg grupptabellerna
-och slutspelsträdet uppdateras live, och tävlade på resultattavlan i sin egen miniliga.
+VM 2026 är en installerbar webbapp (PWA) med fem flikar: **Idag, Tips, Topplista, Turnering**
+och **Mer**. Den delades med vänner och klasskompisar som en länk, lades till på deras
+hemskärmar på mobilen och användes flitigt genom hela VM 2026: man följde dagens matcher,
+la in tips före avspark, såg grupptabellerna och slutspelsträdet uppdateras live, och tävlade
+på resultattavlan i sin egen miniliga.
 
-Den är medvetet byggd som en enda lång scroll-sida (ingen router): varje sektion ligger på
-sidan, layouten är mobil-först eftersom appen lever på en telefon i en gruppchatt, och den
-fungerar offline när den väl är installerad.
+Appen är en klient-side SPA med hash-baserad flik-navigering (ingen server-router): varje
+flik är djuplänkbar via URL-hash, layouten är mobil-först eftersom appen lever på en telefon
+i en gruppchatt (flik-rad längst ned på mobil, app-bar med flikar högst upp på desktop), och
+den fungerar offline när den väl är installerad.
 
 ---
 
@@ -57,10 +59,10 @@ Plus en uppsättning informationsskärmar runt båda.
 
 ### Live-tracker
 
-- **Dagens matcher.** Dagens matcher med avsparkstid (i svensk lokal tid), svensk TV-kanal,
-  vilken omgång det gäller och arenan. Bläddra dag för dag genom hela turneringen. En hero
-  för "dagens match" och en nedräkning till nästa avspark. Dagens accent-tema skiftar med
-  lagen som spelar.
+- **Dagens matcher (Idag-fliken).** Dagens matcher med avsparkstid (i svensk lokal tid),
+  svensk TV-kanal, vilken omgång det gäller och arenan. Bläddra dag för dag genom hela
+  turneringen. En hero för "dagens match" och en nedräkning till nästa avspark. Dagens
+  accent-tema skiftar med lagen som spelar.
 - **Matchkort** komprimerar informationen visuellt i stället för en textrad: lagens emblem,
   TV-kanalen som en badge, omgången, och på varje kort **arenan (arena, stad, land) med dess
   kapacitet** och lagens **FIFA-ranking**.
@@ -74,9 +76,12 @@ Plus en uppsättning informationsskärmar runt båda.
   när det faktiskt finns data att visa.
 - **Bläddringsbar historik.** Live-datan sparas permanent och fryses när en match är klar. Man kan
   bläddra tillbaka dagar efteråt och se statistik och målskyttar, inte bara för pågående matcher.
-- **Gruppspelet, 12 grupper (A till L).** Live-uträknade tabeller (poäng, spelade, målskillnad,
-  gjorda/insläppta mål) som uppdateras i samma stund ett resultat matas in. Tabellerna är
-  härledda, lagras aldrig dubbelt.
+- **Live-uppdaterad topplista (Topplista-fliken).** Placeringarna rör sig i realtid medan
+  matcher spelas - när ett mål bekräftas räknas poängen om och raderna glider till sina nya
+  platser (preliminärt, märkt; det officiella facit rörs aldrig).
+- **Gruppspelet, 12 grupper (A till L) (Turnering-fliken).** Live-uträknade tabeller (poäng,
+  spelade, målskillnad, gjorda/insläppta mål) som uppdateras i samma stund ett resultat matas
+  in. Tabellerna är härledda, lagras aldrig dubbelt.
 - **Dynamiskt slutspelsträd.** Trädet från sextondelsfinal till final byggs och justeras under
   gruppspelet (vem kan möta vem), låses när grupperna är avgjorda, och animerar de avancerande
   lagen allteftersom slutspelsresultaten kommer in. Seedningen av de 8 bästa grupptreorna följer
@@ -87,6 +92,12 @@ Plus en uppsättning informationsskärmar runt båda.
 - **Vad händer om-simulator.** Spela upp hypotetiska resultat och se tabellerna och trädet
   förändras, tydligt märkt som en simulering så att ingen blandar ihop laboratoriet med riktig
   data.
+- **Rik turneringsstatistik (Turnering-fliken).** Skytteliga och assist-liga, kort-liga (spelare
+  och lag), snabbaste mål, mål-fördelning över matchtiden, flest mål per lag, mål per match,
+  clean sheets, största skrällarna (ranking-baserat) och avstängda spelare (härlett ur
+  kort-data). Near-live ur den verkliga matchdatan.
+- **Sektions-meny i Turnering.** En sektions-meny som hoppar direkt till rätt del (Grupper,
+  Vad krävs, Slutspel, Skytteligan, Statistik, Avstängda).
 - **Lagprofiler.** Tryck på vilket lag som helst för att se dess FIFA-ranking, stjärnspelare,
   kuriosa och lagets väg genom gruppen, i en proffsig och tillgänglig modal.
 - **Inmatning av officiella resultat (endast admin).** De riktiga, gemensamma turneringsresultaten
@@ -101,13 +112,13 @@ Plus en uppsättning informationsskärmar runt båda.
 
 ### Tipsspel
 
-- **Matchtips.** Varje vän tippar resultatet före avspark. Poängen per match visas för varje
-  match i tips-vyn, med en uppdelning av varför.
+- **Matchtips (Tips-fliken).** Varje vän tippar resultatet före avspark. Poängen per match visas
+  för varje match i tips-vyn, med en uppdelning av varför.
 - **Gruptips.** Tippa grupettorna och grupptvåorna före gruppspelet, för bonuspoäng.
 - **Mästar- / slutspelstips.** Tippa vilka som går vidare i varje slutspelsomgång, och vem som
   vinner VM (20 poäng), för bonuspoäng.
-- **Resultattavla.** Vem som tippar bäst, med en sammanfattning överst (totala poäng och placering)
-  och poängen per match under.
+- **Resultattavla (Topplista-fliken).** Vem som tippar bäst, med en sammanfattning överst
+  (totala poäng och placering) och poängen per match under.
 - **Tips-avslöjande.** När avsparks-deadlinen låser ser alla vad var och en har tippat.
 - **Märken.** Bedrifter (streaks, "förutspådde skrällen", "perfekt omgång" med flera).
 - **Reaktioner.** En kurerad uppsättning emoji på matcher, en reaktion per person och match, och
@@ -116,10 +127,17 @@ Plus en uppsättning informationsskärmar runt båda.
 - **Favoritlag och personlig statistik.** Nåla fast ett favoritlag (en inställning per enhet) så
   att dess matcher flyter upp överst, och se din egen träffsäkerhet över tid.
 
-### Rum och introduktion
+### Rum, profil och introduktion
 
 - **Miniligor (rum).** Flera vänkretsar, var och en sitt eget rum med sin egen rumskod, sina
   medlemmar och sin resultattavla. Vänner går med via en länk eller en kod.
+- **Persistent rum-väljare.** Se vilket rum du är i och byt rum (eller skapa/gå med) från vilken
+  flik som helst, via rum-väljaren i app-baren.
+- **"Min sida" (Mer-fliken).** En personlig profil-hub med avatar och namn, din placering i aktivt
+  rum, träffsäkerhet, dina rum och favoritlag.
+- **Push-notiser (mål-push).** PWA-push när ett mål görs i en match man följer ("MÅL! Spanien
+  2-1"), opt-in i Mer-fliken, med natt-läge (tyst på natten) och val av omfattning. Fungerar
+  även när appen är stängd.
 - **Kom igång / installera / PWA.** En introduktionsturné vid första besöket, en ärlig
   "lägg till på hemskärmen"-guide som anpassar sig till webbläsaren (aldrig en död knapp), och
   offline-stöd när den väl är installerad.
@@ -220,9 +238,13 @@ npm run preview    # serve the built dist/ locally
 - **Frontend:** React + TypeScript + Vite.
 - **Styling och rörelse:** Tailwind CSS + Motion (paketet `motion`, tidigare Framer Motion);
   animationerna är det som får den att kännas levande.
-- **PWA:** vite-plugin-pwa (installerbar, offline app-skal, manifest, ikoner, tyst
-  auto-uppdaterande service worker).
+- **PWA:** vite-plugin-pwa (installerbar, offline app-skal, manifest, ikoner, auto-uppdaterande
+  service worker som aktivt söker efter nya versioner så att användare får uppdateringar utan
+  att starta om manuellt).
 - **Moln:** Supabase (Postgres + Auth + Realtime + Row Level Security).
+- **Push-notiser:** web-push (VAPID) via Supabase Edge Functions - server-side mål-detektion
+  som reagerar på live-data utan att röra pollaren, idempotent (inga dubbel-notiser), styrd av
+  varje användares eget opt-in.
 - **Hosting:** Cloudflare Pages (git-integration, inga hemligheter i repot). Produktion
   driftsätts från `develop`; varje pull request får sin egen preview-URL.
 
@@ -241,10 +263,12 @@ npm run preview    # serve the built dist/ locally
   växlar till live-Supabase via miljövariabler utan att ändra något anropsställe. Det är vad som
   lät hela appen byggas och testas före, och oberoende av, något backend-konto. Livekortet renderas
   mot bundlad exempeldata i fixtures-läge; i live-läge läses datan ur Supabase (publik läsning,
-  realtidsuppdaterad) som matas av en budget-medveten schemalagd edge-funktion mot ett gratis
-  fotbolls-data-API (100 anrop per dag, kostnadsfritt).
-- **En scroll-sida, ingen router.** Varje sektion renderas på sidan; vendor-kodsplittning (React,
-  Motion, Supabase) håller den initiala laddningen lätt.
+  realtidsuppdaterad) som matas av en budget-medveten schemalagd edge-funktion mot en betald
+  Pro-plan för fotbolls-data (rikare data: events, statistik och laguppställningar) som pollas
+  near-live.
+- **5-flik klient-side SPA.** Fem flikar (Idag, Tips, Topplista, Turnering, Mer) med
+  hash-baserad navigering; varje flik är djuplänkbar. Vendor-kodsplittning (React, Motion,
+  Supabase) håller den initiala laddningen lätt.
 
 ---
 
@@ -258,7 +282,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Formatkontroll | `npm run format:check` |
 
-- **2106 passerande tester** över 217 testfiler (Vitest) på en färsk klon, med 56 tester som
+- **2921 passerande tester** över 276 testfiler (Vitest) på en färsk klon, med 56 tester som
   hoppas över med flit (live-Supabase RLS-integrationstesterna, som bara körs när Supabase-env
   är konfigurerat, se nedan). Verifierat genom att köra `npm test`.
 - **Säkerhet bevisad, inte antagen.** Row Level Security-modellen (bara admin kan skriva
