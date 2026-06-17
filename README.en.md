@@ -27,9 +27,9 @@ badges, reactions and comments). Built and run live for real friends during the 
 | --- | --- |
 | ![Group stage tables](docs/screenshots/04-group-stage.png) | ![Team profile modal](docs/screenshots/05-team-profile.png) |
 
-| Mobile (the primary surface) | Full page |
+| Mobile (the primary surface) | Today tab |
 | --- | --- |
-| ![Mobile home](docs/screenshots/06-mobile-home-dark.png) | ![Full scroll page](docs/screenshots/01-home-full-dark.png) |
+| ![Mobile home](docs/screenshots/06-mobile-home-dark.png) | ![Today tab](docs/screenshots/01-home-full-dark.png) |
 
 Screenshots are generated from the real built app in fixtures mode (no backend) via a
 Playwright capture script, see [Regenerating the screenshots](#regenerating-the-screenshots).
@@ -38,13 +38,15 @@ Playwright capture script, see [Regenerating the screenshots](#regenerating-the-
 
 ## What it is, and what it was used for
 
-VM 2026 is a single-page, installable web app (PWA). It was shared with friends and
-classmates as a link, added to their phone home screens, and used actively through the 2026
-World Cup: people followed the daily matches, entered tips before kickoff, watched the group
-tables and bracket update live, and competed on the leaderboard in their own mini-league.
+VM 2026 is an installable web app (PWA) with five tabs: **Today, Tips, Leaderboard,
+Tournament** and **More**. It was shared with friends and classmates as a link, added to
+their phone home screens, and used actively through the 2026 World Cup: people followed the
+daily matches, entered tips before kickoff, watched the group tables and bracket update live,
+and competed on the leaderboard in their own mini-league.
 
-It is deliberately one long scroll-page (no router): every section is on the page, the
-layout is mobile-first because the app lives on a phone in a group chat, and it works
+The app is a client-side SPA with hash-based tab navigation (no server router): each tab is
+deep-linkable via URL hash, the layout is mobile-first because the app lives on a phone in a
+group chat (tab bar at the bottom on mobile, top app-bar with tabs on desktop), and it works
 offline once installed.
 
 ---
@@ -56,10 +58,10 @@ on top of it. Plus a set of information screens around both.
 
 ### Live tracker
 
-- **Daily matches.** Today's matches with kickoff time (shown in Swedish local time), the
-  Swedish TV channel, the stage, and the venue. Browse day by day through the whole
-  tournament. A "match of the day" hero and a countdown to the next kickoff. The day's
-  accent theme shifts with the teams playing.
+- **Daily matches (Today tab).** Today's matches with kickoff time (shown in Swedish local
+  time), the Swedish TV channel, the stage, and the venue. Browse day by day through the whole
+  tournament. A "match of the day" hero and a countdown to the next kickoff. The day's accent
+  theme shifts with the teams playing.
 - **Match cards** compress the information visually instead of a text row: team emblems, the
   TV channel as a badge, the stage, and on each card the **venue (arena, city, country) with
   its capacity** and the **FIFA ranking** of the teams.
@@ -74,9 +76,12 @@ on top of it. Plus a set of information screens around both.
   appears when there is actually data to show.
 - **Browsable history.** Live data is stored permanently and frozen when a match ends. You can
   scroll back days later and see the stats and goalscorers, not just for ongoing matches.
-- **Group stage, 12 groups (A to L).** Live-computed standings (points, played, GD, goals
-  for/against) that update the instant a result is entered. Tables are derived, never stored
-  twice.
+- **Live-updated leaderboard (Leaderboard tab).** Rankings update in real time as matches play
+  out - when a goal is confirmed the points recalculate and rows slide to their new positions
+  (preliminary, flagged; the official results are never touched).
+- **Group stage, 12 groups (A to L) (Tournament tab).** Live-computed standings (points,
+  played, GD, goals for/against) that update the instant a result is entered. Tables are
+  derived, never stored twice.
 - **Dynamic knockout bracket.** The Round of 32 to final tree is built and adjusted during
   the group stage (who can meet whom), locks once the groups are decided, and animates the
   advancing teams as knockout results come in. The seeding of the 8 best third-placed teams
@@ -86,6 +91,12 @@ on top of it. Plus a set of information screens around both.
   "if X wins, Y goes through", the most exciting minutes of a group stage.
 - **What-if simulator.** Play out hypothetical results and watch the tables and bracket
   change, clearly badged as a simulation so nobody confuses the lab with real data.
+- **Rich tournament statistics (Tournament tab).** Top scorers and assists, card table
+  (players and teams), fastest goals, goal distribution over match time, most goals per team,
+  goals per match, clean sheets, biggest upsets (ranking-based), and suspended players
+  (derived from card data). Near-live from real match data.
+- **Section menu in Tournament.** A section menu that jumps directly to the right section
+  (Groups, What's needed, Knockout, Top scorers, Statistics, Suspended).
 - **Team profiles.** Tap any team to see its FIFA ranking, star player, trivia, and the
   team's path through the group, in a polished accessible modal.
 - **Official result entry (admin only).** The real, global tournament results (the source of
@@ -101,14 +112,14 @@ on top of it. Plus a set of information screens around both.
 
 ### Prediction game
 
-- **Match tips.** Each friend predicts the scoreline before kickoff. The per-match points
-  are shown for every match in the tips view, with a breakdown of why.
+- **Match tips (Tips tab).** Each friend predicts the scoreline before kickoff. The per-match
+  points are shown for every match in the tips view, with a breakdown of why.
 - **Group tips.** Predict the group winners and runners-up before the group stage, for bonus
   points.
 - **Champion / bracket tips.** Predict who advances each knockout round, and the World Cup
   winner (20 points), for bonus points.
-- **Leaderboard.** Who is tipping best, with a summary at the top (total points and placing)
-  and the per-match points underneath.
+- **Leaderboard (Leaderboard tab).** Who is tipping best, with a summary at the top (total
+  points and placing) and the per-match points underneath.
 - **Tips reveal.** After the kickoff deadline locks, everyone sees what each person predicted.
 - **Badges.** Achievements (streaks, "called the upset", "perfect round" and more).
 - **Reactions.** A curated set of emoji on matches, one reaction per person per match, and
@@ -117,10 +128,17 @@ on top of it. Plus a set of information screens around both.
 - **Favorite team and personal stats.** Pin a favorite team (a per-device preference) so its
   matches float to the top, and see your own prediction accuracy over time.
 
-### Rooms and onboarding
+### Rooms, profile and onboarding
 
 - **Mini-leagues (rooms).** Several friend groups, each its own room with its own room code,
   members and leaderboard. Friends join via a link or a code.
+- **Persistent room selector.** See which room you are in and switch rooms (or create/join)
+  from any tab, via the room selector in the app bar.
+- **"My page" (More tab).** A personal profile hub with avatar and name, your ranking in the
+  active room, accuracy stats, your rooms and favorite teams.
+- **Push notifications (goal push).** PWA push when a goal is scored in a match you follow
+  ("GOAL! Spain 2-1"), opt-in in the More tab, with night mode (silent at night) and scope
+  selection. Works even when the app is closed.
 - **Get started / install / PWA.** An onboarding tour on first visit, an honest "add to home
   screen" guide that adapts to the browser (never a dead button), and offline support once
   installed.
@@ -220,9 +238,13 @@ npm run preview    # serve the built dist/ locally
 - **Frontend:** React + TypeScript + Vite.
 - **Styling and motion:** Tailwind CSS + Motion (the `motion` package, formerly Framer Motion);
   the animations are what makes it feel alive.
-- **PWA:** vite-plugin-pwa (installable, offline app shell, manifest, icons, silent
-  auto-update service worker).
+- **PWA:** vite-plugin-pwa (installable, offline app shell, manifest, icons, auto-update
+  service worker that actively checks for new versions so users get updates without manually
+  restarting).
 - **Cloud:** Supabase (Postgres + Auth + Realtime + Row Level Security).
+- **Push notifications:** web-push (VAPID) via Supabase Edge Functions - server-side
+  goal-detection that reacts to live data without touching the poller, idempotent (no
+  double-notifications), gated by each user's own opt-in.
 - **Hosting:** Cloudflare Pages (git integration, no secrets in the repo). Production deploys
   from `develop`; every pull request gets its own preview URL.
 
@@ -242,10 +264,11 @@ npm run preview    # serve the built dist/ locally
   call-site. That is what let the entire app be built and tested before, and independently of,
   any backend account. The live card renders against bundled sample data in fixtures mode; in
   live mode, data is read from Supabase (public read, updated in real time) fed by a
-  budget-aware scheduled edge function against a free football data API (100 requests per day,
-  no cost).
-- **Single scroll-page, no router.** Every section renders on the page; vendor code-splitting
-  (React, Motion, Supabase) keeps the initial load lean.
+  budget-aware scheduled edge function against a paid Pro-plan for football data (richer data:
+  events, statistics and lineups) polled near-live.
+- **5-tab client-side SPA.** Five tabs (Today, Tips, Leaderboard, Tournament, More) with
+  hash-based navigation; each tab is deep-linkable. Vendor code-splitting (React, Motion,
+  Supabase) keeps the initial load lean.
 
 ---
 
@@ -259,7 +282,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Format check | `npm run format:check` |
 
-- **2106 passing tests** across 217 test files (Vitest) on a fresh clone, with 56 tests
+- **2921 passing tests** across 276 test files (Vitest) on a fresh clone, with 56 tests
   skipped by design (the live Supabase RLS integration tests, which only run when Supabase
   env is configured, see below). Verified by running `npm test`.
 - **Security proven, not assumed.** The Row Level Security model (only the admin can write
