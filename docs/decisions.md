@@ -5,6 +5,33 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-17 , Global topplista LIVE: CORS + OPTIONS för browser-anropade edge functions, 503:an var en stale deploy
+
+**Problem:** den globala (cross-rum) topplistan (server-side scoring via edge-funktionen
+`global-leaderboard`) gick inte att tända live trots att koden var klar. Den fastnade i två
+oberoende lager, båda lösta.
+
+**Lager 1 , 503 BOOT_ERROR (stale deploy, PR #220):** funktionen gav 503 BOOT_ERROR i prod fast
+källkoden var frisk hela tiden , det var den DEPLOYADE artefakten som var stale/korrupt, inte
+källan. `get_logs` visade inget eftersom boot-felet inträffar före loggningen. **Fix:** en ren
+omdeploy av den friska källan löste 503:an, varefter `GLOBAL_LEADERBOARD_ENABLED` slogs på.
+**Lärdom:** en 503 på boot med frisk källa = misstänk en stale deployad artefakt först, inte en
+kod-bugg, och reproducera boot:en lokalt i runtimen (Deno) i stället för att gissa via prod-prober.
+
+**Lager 2 , CORS saknades, browser-blockad fast curl funkade (PR #221):** funktionen svarade 200 på
+en server-side curl, men webbläsarens `client.functions.invoke` blockerades med "Failed to fetch"
+eftersom svaret saknade CORS-headers. **Fix:** CORS-headers + ett OPTIONS-preflight-svar på
+funktionen, samma mönster som `push-sender` + `goal-push-dispatcher`. **Varför det dolde sig:** curl
+talar inte CORS-preflight och skickar ingen Origin, så en grön curl bevisar aldrig att webbläsaren
+kan nå endpointen, och 503:an i lager 1 dolde CORS-bristen tills funktionen boot:ade. Bygger vidare
+på CORS-noten i T85-beslutet ("CORS + OPTIONS tidigt"): bekräftat att en browser-anropad edge
+function MÅSTE ha CORS + OPTIONS, och att den måste verifieras genom den faktiska webbläsar-klienten
+(Playwright network + console), inte en server-side curl.
+
+**Resultat:** den globala topplistan är live på fliken Topplista, en samlad lista över alla
+deltagare i alla rum (bara säkra, publika fält visas). Den per-rums-topplistan och den
+live-uppdaterade tavlan är oförändrade.
+
 ## 2026-06-16 , T89 (#182): Mål-push-notiser ("MÅL! Spanien 2-1")
 
 **Beslut (arkitektur , pollaren rörs ej, SPEC §13.3 out-of-scope):** mål-detekteringen körs SERVER-

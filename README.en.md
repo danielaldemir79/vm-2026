@@ -69,7 +69,9 @@ on top of it. Plus a set of information screens around both.
   gently ticking match clock (status-driven and safe across breaks, showing "Half time" during
   intervals, "45+" or "90+" at the half-time boundary, "Full time" when the match ends, never
   an invented minute), a live scoreline, goalscorers with assists, yellow and red cards, and
-  substitutions. All visible immediately, no tap required.
+  substitutions. All visible immediately, no tap required. When the scoreline changes it is
+  announced to screen readers via a polite aria-live region, so a new goal is read out without
+  moving focus.
 - **"Show more" (expandable stats and line-ups).** A clear expand button unfolds full match
   statistics (possession, shots, corners, offsides and more shown as comparison bars) and the
   starting line-ups with formations for each team, behind an honest promise: the button only
@@ -120,6 +122,10 @@ on top of it. Plus a set of information screens around both.
   winner (20 points), for bonus points.
 - **Leaderboard (Leaderboard tab).** Who is tipping best, with a summary at the top (total
   points and placing) and the per-match points underneath.
+- **Global leaderboard (all rooms).** Beyond your own mini-league, there is a combined
+  leaderboard across everyone playing, in every room, so you can see where you stand in the
+  whole field and not just your own circle. Only safe, public fields are shown (name and points,
+  never anyone's predictions or private data), computed server-side across the whole competition.
 - **Tips reveal.** After the kickoff deadline locks, everyone sees what each person predicted.
 - **Badges.** Achievements (streaks, "called the upset", "perfect round" and more).
 - **Reactions.** A curated set of emoji on matches, one reaction per person per match, and
@@ -282,7 +288,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Format check | `npm run format:check` |
 
-- **2921 passing tests** across 276 test files (Vitest) on a fresh clone, with 56 tests
+- **2926 passing tests** across 276 test files (Vitest) on a fresh clone, with 56 tests
   skipped by design (the live Supabase RLS integration tests, which only run when Supabase
   env is configured, see below). Verified by running `npm test`.
 - **Security proven, not assumed.** The Row Level Security model (only the admin can write
