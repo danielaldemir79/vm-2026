@@ -1,0 +1,8 @@
+#!/bin/sh
+# Diakritik-vakt: pre-commit-hook.
+# Tunn shim -> Node scannar de STAGADE .md/.ts/.tsx/.mjs/.sql/.js-filerna (se _scan.mjs).
+#
+# Körs via Git for Windows medföljande sh på Windows, och systemets sh på macOS/Linux.
+# Aktiveras av core.hooksPath=.githooks (sätts av npm-scriptet "prepare", se package.json).
+
+exec node "$(dirname "$0")/_scan.mjs" pre-commit
