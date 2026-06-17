@@ -5,7 +5,7 @@
 // steg, lagen, svensk TV-kanal och ev. arena. Ingen data-hämtning, ingen logik
 // utöver visnings-uppslag (match-display.ts).
 //
-// VISUELL DESIGN (design-frontend-agentens lager, ovanpå): premium-matchkort.
+// VISUELL DESIGN (design-lagret, ovanpå): premium-matchkort.
 // Komprimerar informationen visuellt (SPEC §7) i stället för en textig rad:
 //   - lag-emblem (TeamFlag) ger varje lag en igenkännbar färg-signatur,
 //   - TV-kanalen blir ett kännbart märke (TvBadge) i stället för lös text,
@@ -77,7 +77,7 @@ export interface MatchCardProps {
    * spelar dagens match) utan att kollidera, eftersom favoriten bara lägger en LÅGMÄLD
    * markering (data-favorite + en liten stjärn-bricka + ett ord i a11y-namnet), inte en
    * hero-behandling. Default false = ingen markering (kortet ser ut precis som förr).
-   * design-frontend finputsar den visuella markeringen ovanpå data-favorite-haken.
+   * designen finputsar den visuella markeringen ovanpå data-favorite-haken.
    */
   favorite?: boolean;
   /**
@@ -118,7 +118,7 @@ function teamCode(teamId: string | null, teamsById: ReadonlyMap<string, Team>): 
  * FIFA-rankingen (`ranking`, t.ex. "FIFA-ranking #14") visas DISKRET under namnet när den
  * finns. Den hanteras TYST när den saknas (okänt slutspelslag eller lag utan ranking): då
  * är `ranking` null och ingen rad renderas (ingen "FIFA-ranking #undefined"). data-fifa-ranking är
- * design-/test-haken; design-frontend finputsar placering/storlek ovanpå.
+ * design-/test-haken; designen finputsar placering/storlek ovanpå.
  */
 function TeamSide({
   teamId,
@@ -166,13 +166,13 @@ function TeamSide({
             a11y-namn, så den hålls LÄSBAR för skärmläsare (inget aria-hidden): en
             SR-användare hör "Mexiko, FIFA-ranking #14". Hela ordet "FIFA-ranking" (inte
             bara "#14") så det inte misstolkas som grupp-/tabellplacering (Daniels feedback).
-            BALANS (design-frontend, T4e): lugn + symmetrisk under båda lagnamnen,
+            BALANS (designen, T4e): lugn + symmetrisk under båda lagnamnen,
             tabular-nums så siffran sitter still och talar SAMMA sekundär-metadata-språk
             som tiden + resultatet (tabular-nums, fg-muted). font-normal + fg-muted +
             den lilla graden gör den diskret så den aldrig konkurrerar med lagnamnet,
             flaggan eller tipps-kontrollen. fg-muted är redan AA-mätt i båda teman
             (tokens.css sektion 0), ingen ny färg.
-            INGEN uppercase (medvetet, design-frontend): den längre etiketten
+            INGEN uppercase (medvetet, designen): den längre etiketten
             "FIFA-ranking #NN" blir VERSALT + tracking-wide 88px bred och rymdes inte i
             den speglade lag-kolumnen på vikbar 344px (uppmätt: kolumnen är 84px), så
             siffran "#NN" radbröts till en EGEN rad och lämnade just det viktigaste

@@ -5,7 +5,7 @@
 // rader. Ingen trådning, inga reaktioner (#24 är separat), ingen auto-scroll (KISS).
 //
 // SEMANTIK + DATA-HAKAR äger detta lager (data-comments-*, role/aria, etiketter);
-// design-frontend lägger premium-finishen ovanpå UTAN att röra logiken (samma
+// designen lägger premium-finishen ovanpå UTAN att röra logiken (samma
 // seam-princip som RoomPanel). Stilen lutar sig på rooms.css + Tailwind-klasserna här.
 //
 // SÄKER RENDERING (HARD): kommentar-texten renderas som ren React-text-nod (default-

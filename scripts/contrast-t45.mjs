@@ -1,5 +1,5 @@
 // Kontrast-mätning för T45 arrangörens kontrollpanel (admin-statistik-vyn),
-// canvas-komposit VÄRSTA fall. Engångs-verktyg (körs av design-frontend vid handoff,
+// canvas-komposit VÄRSTA fall. Engångs-verktyg (körs av designen vid handoff,
 // inte i CI): beräknar WCAG-kontrastförhållanden med KORREKT alfa-komposit (en token
 // vid given alfa blandad över sin BASYTA), så glow-på-text-fällan fångas i siffran,
 // inte gissas. Samma metod som T15/T16/T17/T54/T58-visuellt (decisions.md). Token-

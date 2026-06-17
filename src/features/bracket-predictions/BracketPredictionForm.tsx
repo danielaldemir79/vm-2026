@@ -16,7 +16,7 @@
 // och onSubmit får code:n. Brandningen sker i vyn vid UI-gränsen (teamCode()), så
 // API:t garanterat får en code , aldrig ett rått gemen Team.id (F1-fällan, tyst 0).
 //
-// VISUELL DESIGN (design-frontend, T16b): "vägen till bucklan". Två varianter, EN
+// VISUELL DESIGN (designen, T16b): "vägen till bucklan". Två varianter, EN
 // komponent (variant-propen styr):
 //   * CHAMPION ('champion'): HJÄLTE-momentet, "vem lyfter bucklan". En guld arena-
 //     glow-hero (.vm-champion-hero) med en pokal-glyf, en stor TeamFlag-förhands-

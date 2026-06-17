@@ -66,7 +66,7 @@ export function isFinished(match: Match): match is FinishedMatch {
 
 /**
  * Resultatet på formen "hemma-borta" i ordinarie tid, t.ex. "2-1". Bindestreck
- * (inte em-dash) per projektets svenska copy-regel (CLAUDE.md). Ren sträng-
+ * (inte em-dash) per projektets svenska copy-regel. Ren sträng-
  * formatering så matchkortets resultat-rad är enhetstestbar och konsekvent.
  */
 export function formatScore(result: MatchResult): string {

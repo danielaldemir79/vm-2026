@@ -1,6 +1,6 @@
 // Kontrast-mätning för T17 (topplista + tips-avslöjande), canvas-komposit VÄRSTA fall.
 //
-// Engångs-verktyg (körs av design-frontend vid handoff, inte i CI): beräknar WCAG-
+// Engångs-verktyg (körs av designen vid handoff, inte i CI): beräknar WCAG-
 // kontrastförhållanden med KORREKT alfa-komposit (en token vid given alfa blandad
 // över sin BASYTA), så "guld-text-på-tint"-fällan fångas i siffran, inte gissas.
 // Samma metod som T15/T16/T16b-visuellt (decisions.md). Värdena kopieras till

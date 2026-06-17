@@ -22,7 +22,7 @@
 // alltså resultatet först, gissningen tydligt etiketterad efteråt. På ett EJ avgjort kort
 // (inget facit) behåller rutorna full storlek , då är tipset fortfarande huvudsaken.
 //
-// VISUELL DESIGN (design-frontend-agentens lager, T15): en EGEN identitet , en
+// VISUELL DESIGN (design-lagret, T15): en EGEN identitet , en
 // TIPS-KUPONG. Resultatinmatningen är "arenan/scoreboarden" (grön pitch); tips-
 // kortet är "kupongen i handen" (varm pokal-guld), en spelkupong man fyller i FÖRE
 // avspark och hoppas på. Kupong-metaforen bärs av rena dekor-lager (guld topp-strip,
@@ -390,7 +390,7 @@ export function PredictionForm({
       data-prediction-form=""
       data-match-id={match.id}
       data-prediction-locked={locked || undefined}
-      // TIPS-KUPONG (T15, design-frontend): .vm-coupon-card bär kupong-dekoren
+      // TIPS-KUPONG (T15, designen): .vm-coupon-card bär kupong-dekoren
       // (guld topp-strip + hörn-glow, dämpad i låst läge) i tokens.css §10, så
       // STRUKTUREN här hålls ren. Hover-lyftet bor i CSS (annars vinner inline över
       // :hover). En aning rundare hörn + guld-tonad vilo-kant skiljer den varma

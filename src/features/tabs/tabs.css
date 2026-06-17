@@ -1,6 +1,6 @@
 /* Flik-radens layout + baseline-utseende (T83, #175).
  *
- * FUNKTIONELL + tillgänglig baseline; design-frontend lägger premium-finishen
+ * FUNKTIONELL + tillgänglig baseline; designen lägger premium-finishen
  * (ikoner, aktiv-indikator, mikro-animation) ovanpå via de stabila .vm-tab*-hakarna
  * + data-attributen (samma arbetsdelning som tidigare tasks). Här bor bara det som
  * gör raden ANVÄNDBAR och RESPONSIV: var den sitter, hur den klarar tangentbord

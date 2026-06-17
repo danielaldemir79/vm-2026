@@ -1,5 +1,5 @@
 // Tema-toggle (UI). Motorn (useTheme + toggleTheme) levererades av senior-dev,
-// medvetet utan knapp , den är design-frontend-agentens (T2).
+// medvetet utan knapp , den är designens (T2).
 //
 // A11y-design:
 //  - En riktig <button> (tangentbord + skärmläsare gratis).

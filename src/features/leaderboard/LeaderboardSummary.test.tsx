@@ -49,7 +49,7 @@ describe('LeaderboardSummary, egen-poäng-panel (ÖVERST)', () => {
     const { container } = renderView(store({ leaderboard: board, currentUserId: 'u3' }));
     const panel = container.querySelector('[data-leaderboard-self-summary]');
     expect(panel).not.toBeNull();
-    // Data-seam: rank + poäng på panelen (för design-frontend + test).
+    // Data-seam: rank + poäng på panelen (för designen + test).
     expect(panel?.getAttribute('data-rank')).toBe('3');
     expect(panel?.getAttribute('data-points')).toBe('5');
     // Synlig text (läses även av skärmläsare).

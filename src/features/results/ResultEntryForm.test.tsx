@@ -593,7 +593,7 @@ describe('ResultEntryForm, stabil kolumn-layout (#39)', () => {
     );
     const body = container.querySelector('[data-result-card-body]');
     expect(body).not.toBeNull();
-    // Grid-layouten är seamen som ger stabila kolumner (design-frontend kan
+    // Grid-layouten är seamen som ger stabila kolumner (designen kan
     // finslipa spåren, men det MÅSTE vara ett grid, inte den gamla flex-knuffen).
     expect(body).toHaveClass('grid');
   });

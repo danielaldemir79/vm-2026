@@ -53,7 +53,7 @@ export interface ExpandToggleProps {
  * Ihopfäll-/expandera-kontrollen (en accent-pill med chevron-affordans, #39).
  *
  * Den visuella finishen (accent-tint + chevron) är #39:s, ärvd oförändrad så
- * design-frontends premium-styling och de uppmätta AA-värdena gäller fortfarande.
+ * designens premium-styling och de uppmätta AA-värdena gäller fortfarande.
  */
 export function ExpandToggle({
   expanded,

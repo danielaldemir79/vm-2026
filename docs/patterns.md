@@ -483,7 +483,7 @@ variabler, roterade på `[data-theme]`. Isolera ALLA värden i EN fil (`src/them
 **Varför:** Strukturen (kontraktet) ägs av motorn och är stabil; värdena (palett, typografi)
 authoras av design-agenten utan att röra plumbing (provider/init/wiring). Roll-namn (inte råa
 färger) låter design byta hue/skala fritt. I VM 2026 är `tokens.css`-värdena de slutgiltiga
-premium-värdena, authorade av design-frontend-agenten i T2.
+premium-värdena, authorade av designern i T2.
 
 ### reduced-motion-i-tva-lager (motion/framer)
 
@@ -565,7 +565,7 @@ VM 2026:s React + Vite + Supabase-stack. Källa: T3 (env-gaten), tvåstegs-gaten
    ett state-update inte sker efter unmount.
 5. Presentations-komponenten är REN (tar färdig-härledd form, renderar bara). Bygg TILLGÄNGLIG semantik
    (riktig `<table>` med `<caption>`/`<th scope>`, `role="status"`/`role="alert"`), och lämna PREMIUM-
-   visuell styling till design-frontend, men gör strukturen lätt att styla: stabil semantik + data-attribut
+   visuell styling till designen, men gör strukturen lätt att styla: stabil semantik + data-attribut
    (t.ex. `data-qualified`) i stället för inbakade statusfärger (respektera T7-pinnen: accent/success-krock).
 6. Test-täckning: vyn renderar rätt antal element (12 grupper), tillgänglig struktur (roller/landmärken),
    den REAKTIVA omräkningen (sätt nya fakta via sättaren -> assertera ny härledd form), fel-vägen
@@ -579,7 +579,7 @@ VM 2026:s React + Vite + Supabase-stack. Källa: T3 (env-gaten), tvåstegs-gaten
 **Varför:** SPEC §6:s härledda state hela vägen ut i UI:t. En sanning (de råa fakta), den visade formen
 är en ren funktion av dem, så "live" blir gratis och korrekt utan en andra kopia. Hooken äger I/O +
 state, den rena modulen äger logiken (testbar fristående), komponenten äger bara presentation (frikopplad,
-lätt för design-frontend att ta över). Återanvänds av kommande vy-tasks (slutspelsträd, topplista). Källa:
+lätt för designen att ta över). Återanvänds av kommande vy-tasks (slutspelsträd, topplista). Källa:
 T5 (`src/features/groups/`: `deriveGroupTables` + `useGroupData` + `GroupTable`/`GroupStageView`).
 
 ### gissningskanslig-data-genereras-ur-auktoritativ-kalla-med-validerande-generator (VM 2026)
@@ -673,7 +673,7 @@ Tre saker värda att lyfta för nästa data-task:
    med innehållet + overlay-/panel-stilen. Fokus flyttas IN till stäng-knappen (stabil startpunkt) och
    ÅTERSTÄLLS till öppnaren. Innehållet HÄRLEDS av en ren funktion (`deriveTeamProfile`) och saknad data
    visas ärligt ("Data saknas"), aldrig gissat. Stabil semantik + data-attribut (`data-team-profile-panel/
-   -overlay/-trigger`, `data-profile-ranking/-stars/-trivia/-path`) som design-frontend stylar ovanpå.
+   -overlay/-trigger`, `data-profile-ranking/-stars/-trivia/-path`) som designen stylar ovanpå.
 5. TÄCKNING: trigger (öppnar rätt id, null -> ej knapp), navigering (öppna från BÅDA vyerna), dialog
    (stäng på 3 sätt, aria-modal + fokus-flytt), edge (okänt id -> ingen dialog, saknad data -> "Data
    saknas"), och fail-loud utan provider. Isolerade komponent-tester (MatchCard/GroupTable) wrappas i en
@@ -750,7 +750,7 @@ källa + valideringsgrind. Källa: T6 (`src/features/results/`).
    finished med minst ett mål), hoppar firandet vid `useReducedMotion()` (WCAG 2.3.3, ingen overlay tänds),
    auto-avklingar via en timeout (rensad vid nytt firande/unmount), och ger ett UNIKT `key` per firande
    (matchId + en räknare) så det visuella lagret re-mountar och spelar om även för samma match.
-2. Exponera ett `renderCelebration`-RENDER-PROP (aria-hidden slot) på vyn där DESIGN-FRONTEND lägger den
+2. Exponera ett `renderCelebration`-RENDER-PROP (aria-hidden slot) på vyn där DESIGNEN lägger den
    visuella premium-animationen (konfetti/mål-pop, bygger på T2:s motion-primitiver). Default = inget
    visuellt lager, så vyn är funktionellt komplett utan det (firandet är ren glädje-yta).
 3. Test: mocka `motion/react`s `useReducedMotion` (samma mönster som motion-primitives-testet), använd
@@ -758,7 +758,7 @@ källa + valideringsgrind. Källa: T6 (`src/features/results/`).
    efter sin varaktighet, dismiss stänger, INGET firande vid 0-0 och INGET vid reducerad rörelse.
 
 **Varför:** Frikopplar "när det firas + tillgänglighet" (senior-dev, deterministiskt + testbart) från
-"hur det ser ut" (design-frontend), så animationen kan göras premium utan att röra trigger/timing/a11y.
+"hur det ser ut" (designen), så animationen kan göras premium utan att röra trigger/timing/a11y.
 Render-propet är seamen mellan lagren. Källa: T6 (`src/features/results/goal-celebration.ts` +
 `ResultEntryView.tsx`).
 
@@ -778,7 +778,7 @@ bakgrund + kant, så markören är AA oavsett hue-kollision. Behåll en stabil `
 roller delar hue, och låser dessutom den andra rollen från att få en egen ton senare. Redundanta,
 färg-oberoende signaler läses i båda teman och låter en senare task färglägga fritt utan att bryta
 designen. Verifiera i webbläsaren att kollisionen är LIVE (läs `getComputedStyle` på `--vm-accent` vs
-`--vm-success`) och att zonen ändå läses. Källa: T5 design-frontend (`src/features/groups/GroupTable.tsx`,
+`--vm-success`) och att zonen ändå läses. Källa: T5 designen (`src/features/groups/GroupTable.tsx`,
 kvalificeringszonen, T7-pin).
 
 **Andra användningen (T7, daglig matchvy):** samma princip för "Dagens match"-framhävningen, men en
@@ -789,7 +789,7 @@ ink-text (`#1c1403`) gav garanterad AA i båda teman (5.03:1 ljust / 10.90:1 mö
 ljus/mellanljus i båda temana. Regel: när en framhävnings-roll ska bära LITEN TEXT, gör den till en
 solid bricka med kontrast-säker text, lägg inte rollens hue i texten mot en svag tint. Verifiera
 alltid den uträknade kontrasten i webbläsaren (composita tint:ens alfa mot ytan bakom, annars räknar
-du fel ratio). Källa: T7 design-frontend (`src/features/daily/MatchCard.tsx`, featured-varianten).
+du fel ratio). Källa: T7 designen (`src/features/daily/MatchCard.tsx`, featured-varianten).
 
 ### premium-hero-med-reduced-motion-saker-css-dekor-och-no-cls-nedrakning (design, VM 2026)
 
@@ -822,7 +822,7 @@ Den svepande globala reduced-motion-regeln fryser keyframes på sitt slutläge (
 dekor-rörelsen måste nollas EXPLICIT med `animation: none` för att hero:n ska bli helt statisk (en
 sanning ägd av decisions.md C5), och `tabular-nums` + fast tile-bredd gör en
 sekund-tickande nedräkning till en nollkostnad för CLS. Återanvänds av kommande hero/levande vyer
-(slutspelsträd, topplista). Källa: T7 design-frontend (`src/features/daily/DailyMatchesView.tsx` +
+(slutspelsträd, topplista). Källa: T7 designen (`src/features/daily/DailyMatchesView.tsx` +
 `vm-pulse`/`vm-sheen` i `src/index.css`).
 
 ### lag-identitet-utan-asset-beroende-och-kanal-badge-med-fg-kontrast (design, VM 2026)
@@ -839,7 +839,7 @@ sekund-tickande nedräkning till en nollkostnad för CLS. Återanvänds av komma
    mörkt), så badgen läses skarpt oavsett kanalfärg. Okänd kanal faller tillbaka på en neutral fg-ton.
 **Varför:** Ett matchkort utan lag-identitet blir en textrad; en deterministisk disc ger varje lag en
 igenkännbar signatur till noll prestanda-kostnad. Kanal-tonen i bakgrund/kant (inte i texten) ger
-kanal-igenkänning utan att riskera en låg färg-på-färg-kontrast. Källa: T7 design-frontend
+kanal-igenkänning utan att riskera en låg färg-på-färg-kontrast. Källa: T7 designen
 (`src/features/daily/TeamFlag.tsx` + `TvBadge.tsx`).
 
 ### deterministiskt-haerlett-dekor-tema-som-seam-kontrast-saekert (VM 2026)
@@ -875,7 +875,7 @@ kanal-igenkänning utan att riskera en låg färg-på-färg-kontrast. Källa: T7
    maskera inte tyst (lessons `tyst-maskerande-fallback`).
 4. SEAMEN är en tunn hook (`use-<x>-theme.ts`): memoiserar härledningen och returnerar `style` (CSS-var)
    + stabila data-attribut att SPREADA på dekor-ytan. Senior-dev äger NÄR/HUR tonen härleds (deterministiskt,
-   testbart, kontrast-säkert); design-frontend äger HUR den ser ut (bygger gradienten ur hue:n i CSS-tokens).
+   testbart, kontrast-säkert); designen äger HUR den ser ut (bygger gradienten ur hue:n i CSS-tokens).
    Samma lager-uppdelning som målfirande-kroken.
 5. ÖVERGÅNGAR via en CSS-transition på dekor-ytans `[data-*]`-hake, gatad på
    `@media (prefers-reduced-motion: no-preference)`, så den befintliga reduced-motion-grinden nollar den.
@@ -915,7 +915,7 @@ dekor-token i `tokens.css` sektion 6).
    gruppspel + inmatning), härleder via `useMemo` gatad på `status === 'ready'` (samma stale-kontrakt som
    useGroupData, C8). Vyn (`BracketView`) renderar stabil semantik (region per runda, slot som list-rad) +
    DATA-ATTRIBUT (`data-bracket-round/-match/-slot`, `data-slot-resolution`, `data-winner`,
-   `data-bracket-locked`, `data-bracket-scroll`) som design-frontend bygger premium-trädet + vinnar-
+   `data-bracket-locked`, `data-bracket-scroll`) som designen bygger premium-trädet + vinnar-
    animationen ("drag fram vinnaren") ovanpå, utan att röra härledningen. Responsiv-förberedd:
    `overflow-x-auto` + fasta rund-kolumner (horisontell scroll på mobil, inget kläms ihop).
 6. TÄCKNING: enhetstesta härledningen i alla tre lägen + fel-vägar (lika utan straffar, ofullständigt
@@ -1006,7 +1006,7 @@ frontend (`src/features/bracket/bracket.css` + `BracketView.tsx`).
    räcker som trea"). Gissa aldrig en garanti du inte kan bevisa lokalt.
 5. SEAM som de andra härledda vyerna: ren motor (testbar fristående) -> tunn hook på den DELADE storen
    (`useMemo` gatad på `status === 'ready'`, C8-kontraktet) -> vy med stabil semantik + data-attribut
-   (`data-scenario-*`) för design-frontend. Färg-OBEROENDE status-chip (text + form, inte bara färg,
+   (`data-scenario-*`) för designen. Färg-OBEROENDE status-chip (text + form, inte bara färg,
    T7-pin).
 6. TÄCKNING: edge-fall (redan klart, omöjligt, beror på annan grupp, ej startad, tom grupp), tröskel-
    randen (n-1/n/n+1 på vakten + mjuk too-early-degradering), OCH ett KONSERVATIVITETS-test (ett
@@ -1048,7 +1048,7 @@ osäkert syns som "beror på" i stället för att maskeras. Generaliserar de tid
    sandlådan), och en (om)seedning lämnar sim-läget + tömmer overlayn (datan sandlådan byggdes på
    byttes ut). Allt idempotent.
 6. MARKERING i en egen app-global komponent (sim-läget rör ALLA vyer): ett uppläst statusmeddelande
-   (`role="status"`) + ett `data-simulation-active`-attribut som design-frontend hänger en premium-
+   (`role="status"`) + ett `data-simulation-active`-attribut som designen hänger en premium-
    banner på. Toggle + "Återställ allt". Funktionellt komplett utan styling.
 7. TÄCKNING: ren overlay (tom -> kopia, isolering, blanda, företräde, ordning, fail-loud-nyckel),
    store-seamen (toggle/idempotens, isolering riktig data orörd efter avsluta, blanda, reset,
@@ -1258,7 +1258,7 @@ både fönster-regeln och kontrollen. Källa: T27/#39 (resultatinmatning), gener
 **Varför:** "gör sidan överblickbar" (#129) löses bäst av EN delad primitiv, inte 8 handgjorda
 komprimeringar som driver isär. Höjd-klipp + fade respekterar responsiv "första raden" utan att gissa
 brytpunkten, och genom att återanvända `ExpandToggle` ärver hela sidan en redan testad, AA-säker
-kontroll med rätt a11y. Design-frontend stylar via de stabila `data-${name}-toggle` / `data-collapsible-*`-
+kontroll med rätt a11y. Designen stylar via de stabila `data-${name}-toggle` / `data-collapsible-*`-
 hakarna. Källa: T68 (#129), `src/components/CollapsibleSection.tsx` + wiring i groups/scenarios/bracket/
 group-predictions/bracket-predictions/admin/leaderboard.
 

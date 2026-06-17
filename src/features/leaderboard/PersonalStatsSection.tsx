@@ -1,5 +1,5 @@
 // PERSONLIG TIPS-STATISTIK i tips-vyn (T23, #23). FUNKTIONELLT + a11y-lager
-// (senior-dev); PREMIUM-FINISH (design-frontend) ovanpå data-attribut-seamen.
+// (senior-dev); PREMIUM-FINISH (designen) ovanpå data-attribut-seamen.
 //
 // VARFÖR (acceptanskriterium): varje användare ska se sin egen träffsäkerhet över
 // tid, bästa call och antal rätt utfall/exakta. Datan HÄRLEDS ur SAMMA score.ts-
@@ -12,7 +12,7 @@
 // som deriveSelfSummary (hellre ärligt tomt än en gissad 0 %).
 //
 // DESIGN-HAKAR: data-personal-stats + data-stat (accuracy/exact/outcome/miss) +
-// data-best-call, så design-frontend kan finputsa utan att röra semantiken.
+// data-best-call, så designen kan finputsa utan att röra semantiken.
 
 import { useMemo } from 'react';
 import { useLeaderboardStore } from './leaderboard-context';

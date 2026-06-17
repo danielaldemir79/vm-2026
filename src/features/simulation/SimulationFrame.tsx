@@ -1,6 +1,6 @@
 // What-if-simulatorns APP-GLOBALA visuella ram (T12, issue #12).
 //
-// Ansvar (design-frontends visuella lager): göra så att HELA den simulerade
+// Ansvar (designens visuella lager): göra så att HELA den simulerade
 // zonen tydligt KÄNNS hypotetisk när what-if-läget är PÅ, så ingen förväxlar en
 // simulering med de riktiga resultaten. Komponenten är en TUNN wrapper som läser
 // sim-läget ur den delade storen och speglar det till `data-simulation-active`,

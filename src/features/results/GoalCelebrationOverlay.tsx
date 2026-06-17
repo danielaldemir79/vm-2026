@@ -1,5 +1,5 @@
 // Det VISUELLA målfirande-LAGRET, overlay-komponenten (T6, issue #6, SPEC §12).
-// Design-frontends premium-yta ovanpå den funktionella kroken (useGoalCelebration).
+// Designens premium-yta ovanpå den funktionella kroken (useGoalCelebration).
 //
 // ARBETSDELNING: kroken (goal-celebration.ts) avgör NÄR ett firande tänds, dess
 // timing/auto-avkling och reduced-motion-tystnaden (vid "minska rörelse" ger den

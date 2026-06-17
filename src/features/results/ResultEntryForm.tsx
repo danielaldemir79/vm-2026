@@ -6,7 +6,7 @@
 // formuläret tangentbordsstyrt (native input + submit). Validering körs vid
 // submit och felen visas i en role="alert"-lista (fail loud, men användarvänligt).
 //
-// VISUELL DESIGN (design-frontend-agentens lager, ovanpå): premium-styling av
+// VISUELL DESIGN (design-lagret, ovanpå): premium-styling av
 // fält/knappar + målfirande-animationen (kroken useGoalCelebration ger seamen).
 // Strukturen är gjord lätt att styla: stabila roller + data-attribut, inga
 // inbakade statusfärger (T7-pin: accent === success i ljust tema).
@@ -523,7 +523,7 @@ export function ResultEntryForm({ match, teamsById, onSubmit, onSaved }: ResultE
 
         {/* Straffläggning (FIFA Article 14): visas BARA för en slutspelsmatch som
             matas in som spelad med lika ordinarie ställning. data-penalties-row är
-            en stabil hake för design-frontend (och tester). Layout speglar score-
+            en stabil hake för designen (och tester). Layout speglar score-
             raden: hemma-straff / "straffar" / borta-straff, fast bredd så det
             linjerar med score-rutorna ovanför. */}
         {showPenalties ? (

@@ -21,13 +21,13 @@ export { shouldShowResultEntry } from './result-entry-gate-rule';
 export { ResultEntryForm } from './ResultEntryForm';
 export type { ResultEntryFormProps } from './ResultEntryForm';
 
-// Det visuella målfirande-lagret (design-frontends premium-yta ovanpå kroken).
+// Det visuella målfirande-lagret (designens premium-yta ovanpå kroken).
 // Kopplas in via ResultEntryViews renderCelebration-render-prop. Namnet skiljer
 // sig från krokens GoalCelebration-TYP (firande-tillståndet): detta är overlay-
 // KOMPONENTEN, så bägge kan samexistera i den publika ytan utan namnkrock.
 export { GoalCelebrationOverlay } from './GoalCelebrationOverlay';
 
-// Målfirande-kroken (funktionell + reduced-motion-säker seam, design-frontend
+// Målfirande-kroken (funktionell + reduced-motion-säker seam, designen
 // lägger den visuella animationen ovanpå).
 export { useGoalCelebration } from './goal-celebration';
 export type { GoalCelebration, GoalCelebrationApi } from './goal-celebration';

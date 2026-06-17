@@ -112,7 +112,7 @@ describe('TabBar, klick + tangentbords-navigering', () => {
   });
 });
 
-// PREMIUM-FINISHEN (design-frontend, T83): ikoner (D1) + aktiv-indikator (D2).
+// PREMIUM-FINISHEN (designen, T83): ikoner (D1) + aktiv-indikator (D2).
 // Vaktar att varje flik bär sin glyf och att aktiv-markeringen INTE bara är färg
 // (en indikator-nod + det tillgängliga namnet är fortfarande etiketten, inte ikonen).
 describe('TabBar, ikoner (D1) + aktiv-indikator (D2)', () => {

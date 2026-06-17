@@ -1,6 +1,6 @@
 // Kontrast-mätning för T38-signaturen (footer-upphovsraden), canvas-komposit VÄRSTA fall.
 //
-// Engångs-verktyg (körs av design-frontend vid handoff, inte i CI): beräknar WCAG-
+// Engångs-verktyg (körs av designen vid handoff, inte i CI): beräknar WCAG-
 // kontrastförhållanden med KORREKT alfa-komposit (en token vid given alfa blandad
 // över sin BASYTA), så "dämpad-text-med-opacitet"-fällan fångas i siffran, inte gissas.
 // Samma metod som T15/T16/T16b/T17-visuellt (decisions.md). Token-värdena nedan är

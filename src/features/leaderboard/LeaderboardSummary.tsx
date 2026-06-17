@@ -1,6 +1,6 @@
 // SAMMANFATTNING ÖVERST (T46, #79): aktuell användares totala poäng + placering, plus
 // "Så funkar poängen"-förklaringen. FUNKTIONELLT + a11y-lager (senior-dev); premium-
-// finish (design-frontend) ovanpå data-attribut-seamen, samma arbetsdelning som T15/T16/T42.
+// finish (designen) ovanpå data-attribut-seamen, samma arbetsdelning som T15/T16/T42.
 //
 // VARFÖR ÖVERST (Daniels begäran, pre-share-blockerare): man ska se SINA EGNA poäng utan
 // att skrolla hela vägen ner till topplistan, innan länken delas med vänner. Panelen är en
@@ -22,7 +22,7 @@ import { deriveSelfSummary } from './self-summary';
 /**
  * Egen-poäng-panelen: visar aktuell användares totala poäng + placering ("av N"). Renderas
  * bara när vi kan peka ut en egen rad (deriveSelfSummary !== null), annars inget (hellre
- * tyst än en gissad rad). Stabil semantik + data-attribut, premium-finish av design-frontend.
+ * tyst än en gissad rad). Stabil semantik + data-attribut, premium-finish av designen.
  */
 function SelfScorePanel() {
   const store = useLeaderboardStore();

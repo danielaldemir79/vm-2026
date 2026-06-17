@@ -8,7 +8,7 @@
 //
 // DESIGN-SEAM: vyn bär stabil semantik + DATA-ATTRIBUT (data-scenario-group,
 // data-scenario-team, data-scenario-status, data-scenario-margin-dependent,
-// data-scenario-decided) som design-frontend stylar premium-finishen ovanpå
+// data-scenario-decided) som designen stylar premium-finishen ovanpå
 // utan att röra logik/semantik (samma princip som GroupTable/BracketView).
 //
 // FÄRG-OBEROENDE status (T7-pin, samma anda som kvalificeringszonen): chip:en

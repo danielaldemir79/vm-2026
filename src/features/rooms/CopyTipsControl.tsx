@@ -13,7 +13,7 @@
 // MÅLET = det AKTIVA rummet (store.activeRoom). Vi kopierar alltid IN till det rum man
 // står i, så riktningen är självklar: "jag är i rum B, hämta mina tips från rum A".
 //
-// PREMIUM-FINISH (design-frontend, T52): kontrollen är en EGEN underzon i biljett-
+// PREMIUM-FINISH (designen, T52): kontrollen är en EGEN underzon i biljett-
 // kroppen ("Kopiera dina tips hit"), avgränsad med en hårfin guld-list i samma
 // kvällsljus-familj som resten av rummet. Varje käll-rum är en rad med ett kopiera-
 // affordans (en ⧉-glyf, samma som CopyButton) och ett pågår-läge med en lugn spinner.
