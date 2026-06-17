@@ -87,7 +87,7 @@ describe('ResultEntryView, fel-väg (fail loud)', () => {
 });
 
 describe('ResultEntryView, målfirande-seam', () => {
-  it('renderar render-prop-lagret (design-frontends krok) i ett aria-hidden slot', async () => {
+  it('renderar render-prop-lagret (design-/UI-lagrets krok) i ett aria-hidden slot', async () => {
     const { container } = render(
       <ResultsProvider env={fixturesEnv()}>
         <ResultEntryView

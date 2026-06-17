@@ -15,8 +15,15 @@ playwright-report/
 test-results/
 .playwright/
 
-# Design-frontends visuella verifierings-skärmdumpar (scratch, körs vid handoff, ej i CI)
+# Vitest junit-rapport (auktoritativ test-räkning på Windows, körs ad hoc vid
+# verifiering, ska aldrig checkas in)
+test-results*.xml
+
+# Visuella verifierings-skärmdumpar (scratch, körs vid handoff, ej i CI)
 .vmshots/
+
+# Supabase CLI lokal scratch (länkat projekt-id m.m., skapas av CLI:t, ska aldrig checkas in)
+supabase/.temp/
 
 # Env och hemligheter
 .env

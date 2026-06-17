@@ -4,7 +4,7 @@
 // Logiken (finns en ny version? ta i bruk den? avfärda?) ägs av useAppUpdate;
 // denna komponent renderar bara. Estetiken speglar OnlineStatusIndicator/
 // InstallBanner (samma yt-tokens, pill-knappar, status-prick) så den känns hemma
-// i appens "arena i kvällsljus"-uttryck. Design-frontend ger finputs ovanpå; en
+// i appens "arena i kvällsljus"-uttryck. Designen ger finputs ovanpå; en
 // funktionell, tillgänglig bas räcker här.
 //
 // TILLGÄNGLIGHET: role="status" + aria-live="polite" ligger på TEXTBLOCKET (rubrik +

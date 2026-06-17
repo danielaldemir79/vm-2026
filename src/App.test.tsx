@@ -108,7 +108,7 @@ describe('App-skalet', () => {
 
     // Render-test (inte bara en konstant): bevisar att signaturen faktiskt NÅR
     // DOM:en, så en framtida refaktor inte tappar raden tyst. Data-attributet är
-    // krok för design-frontends finputs. T44 runda 2 (#75, Daniels feedback "footern
+    // krok för designens finputs. T44 runda 2 (#75, Daniels feedback "footern
     // ska lyfta upp mig"): avsändar-prefixet ändrades från "Made by" till svenska
     // "Byggd av" och namnet lyftes till en egen, framträdande rad (blickfång), så
     // testet vaktar nu den svenska eyebrow:n + namnet, inte den gamla engelska copyn.
@@ -238,7 +238,7 @@ describe('App-skalet, flik-navigering (T83)', () => {
   });
 });
 
-// DESIGN-POLISHEN (design-frontend, T83): U2 (avlastad Idag) + U2-relocations + F3.
+// DESIGN-POLISHEN (designen, T83): U2 (avlastad Idag) + U2-relocations + F3.
 // Vaktar att Idag-fliken inte återfår sin marknads-vägg, att favoritlags-väljaren +
 // install bor i Mer, och att den svävande "ny version"-prompten lyfts ovanför flik-
 // raden (F3) i stället för att lägga sig över den.

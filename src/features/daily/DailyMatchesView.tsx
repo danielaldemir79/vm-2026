@@ -6,7 +6,7 @@
 // tillstånden (loading/error/tom dag). All data + logik kommer från useDailyMatches
 // (delad store + rena härledningar); vyn är en tunn konsument.
 //
-// VISUELL DESIGN (design-frontend-agentens lager, ovanpå): WOW-hero, premium-
+// VISUELL DESIGN (design-lagret, ovanpå): WOW-hero, premium-
 // matchkort, nedräknings-visual. Vyn ger en STABIL semantik + data-attribut
 // (data-match-card, data-highlight, data-countdown) att hänga premium-styling på,
 // och håller färg via semantiska tokens (inga inbakade statusfärger, T7-pin:
@@ -243,10 +243,10 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
 
   // Dynamiskt DAGS-TEMA (T8): härled en subtil, deterministisk accent-hue ur den
   // valda dagens lag och lägg den som en CSS-variabel + stabilt data-attribut på
-  // hero:ns dekor-yta. Påverkar BARA dekorativa ytor (design-frontend väver in
+  // hero:ns dekor-yta. Påverkar BARA dekorativa ytor (designen väver in
   // hue:n i gradienter/glow), aldrig text-/yt-tokens, så läsbarheten (WCAG AA)
   // aldrig sänks (kontrast-vakt, decisions.md T8). Mjuka övergångar vid dag-byte
-  // sköts av en CSS-transition på ytan (design-frontend), som reduced-motion-
+  // sköts av en CSS-transition på ytan (designen), som reduced-motion-
   // grinden i index.css nollar. Tom/ingen vald dag -> default-tema (ingen hue).
   const { dayThemeProps } = useDayTheme(
     selectedDay?.matches ?? [],

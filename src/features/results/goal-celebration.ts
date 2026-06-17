@@ -7,14 +7,14 @@
 // AUTO-AVKLINGAR firandet efter en stund. Den bygger på T2:s reduced-motion-
 // princip: vid "minska rörelse" görs INGET visuellt firande (ingen overlay tänds),
 // så kontraktet är deterministiskt och testbart. Den VISUELLA premium-animationen
-// (konfetti, mål-pop, ljud-känsla) lägger DESIGN-FRONTEND-agenten ovanpå denna
+// (konfetti, mål-pop, ljud-känsla) lägger DESIGNEN ovanpå denna
 // krok, den läser `celebration`-tillståndet och renderar sitt lager, utan att röra
 // triggers/timing/a11y här.
 //
 // VARFÖR en krok och inte inbakat i formuläret: firandet ska kunna triggas från
 // FLERA ställen senare (live-uppdatering T18, slutspelsresultat) och renderas av
 // ett separat premium-lager. En liten, ren krok med ett tydligt API frikopplar
-// "när" (här) från "hur det ser ut" (design-frontend), composition over coupling.
+// "när" (här) från "hur det ser ut" (designen), composition over coupling.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
@@ -22,7 +22,7 @@ import { useReducedMotion } from 'motion/react';
 /** Hur länge ett firande är "aktivt" innan det auto-avklingar (ms). */
 const CELEBRATION_DURATION_MS = 2200;
 
-/** Det aktiva firandets data, som design-frontends visuella lager läser. */
+/** Det aktiva firandets data, som designens visuella lager läser. */
 export interface GoalCelebration {
   /** Stabilt id per firande (matchens id + en räknare), så React kan re-mounta lagret. */
   key: string;

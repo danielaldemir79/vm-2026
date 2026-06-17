@@ -3,7 +3,7 @@
 //
 // SCOPE (senior-devs FUNKTIONELLA + a11y-lager): en liten popover med en lista
 // (namn + tid), placerad OVANFÖR ankaret (brickan) och klampad inom viewporten (ingen
-// overflow utanför skärmen). design-frontend lägger premium-finishen ovanpå UTAN att
+// overflow utanför skärmen). Designen lägger premium-finishen ovanpå UTAN att
 // röra logik/positionering (samma seam-princip som RoomComments/MatchReactions): den
 // hänger bara på data-reaction-authors-* + de rena positions-värdena.
 //
@@ -19,7 +19,7 @@
 // på via aria-describedby (sätts i MatchReactions). Innehållet är riktig text (namn +
 // <time>), inte bara visuellt, så en skärmläsare läser upp vilka som reagerat.
 //
-// VISUELL FINISH (design-frontend, T74 finputs): popovern får en liten PIL/pekare mot
+// VISUELL FINISH (designen, T74 finputs): popovern får en liten PIL/pekare mot
 // ankar-brickan (`.vm-reaction-authors-arrow`, aria-hidden dekor) så det är tydligt
 // vilken reaktion listan gäller, en diskret in-känsla (`.vm-reaction-authors-in`,
 // keyframes i rooms.css GATAD på prefers-reduced-motion), och en MAX-HÖJD + lugn scroll

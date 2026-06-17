@@ -8,7 +8,7 @@
 // Förkortningarna får title-attribut + en synlig teckenförklaring i vyn
 // (GroupStageView). computeStandings har redan sorterat raderna och satt rank.
 //
-// VISUELL DESIGN (design-frontend-agentens lager, ovanpå strukturen): den
+// VISUELL DESIGN (design-lagret, ovanpå strukturen): den
 // "arena i kvällsljus"-premiumkänslan. Den lyfter utan att röra a11y-semantiken:
 //   - Kvalificeringszonen (etta + tvåa) markeras FÄRG-OBEROENDE: en placerings-
 //     medalj (rank-disc), en vänsterställd accent-list, en diskret upphöjd

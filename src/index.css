@@ -3,7 +3,7 @@
 
 /* Tema-systemets tokens (tokens.css) äger nu färg/typografi via CSS-variabler
    som växlar på [data-theme]. T1:s hårdkodade platshållar-bakgrund är ersatt.
-   Design-frontend-agenten authorar de slutgiltiga token-värdena i tokens.css. */
+   Designern authorar de slutgiltiga token-värdena i tokens.css. */
 body {
   margin: 0;
 }
@@ -16,7 +16,7 @@ body {
   outline-offset: 2px;
 }
 
-/* Dekorativ rörelse för den dagliga matchvyns hero (T7, design-frontend):
+/* Dekorativ rörelse för den dagliga matchvyns hero (T7, designen):
    - vm-pulse: en lugn andnings-puls på live-nedräkningens "prick", så hero:n
      KÄNNS levande utan att vara stökig (SPEC §7).
    - vm-sheen: en långsam ljus-svep över hero-fonden ("arena-ljus" som rör sig).

@@ -2,7 +2,7 @@
 //
 // Den FUNKTIONELLA + tillgängliga basen (stabil semantik + data-attribut som seam).
 // Premium-design (det subtila "admin-läget", arena-estetiken) lämnas till
-// design-frontend i T42b, samma arbetsdelning som T15/T16. Vanliga vänner ser inte
+// designen i T42b, samma arbetsdelning som T15/T16. Vanliga vänner ser inte
 // detta som något de behöver, det är en lågmäld "arrangörs-inloggning".
 //
 // FLÖDE: ange e-post -> få en 6-siffrig kod i mejlet -> ange koden -> sessionen

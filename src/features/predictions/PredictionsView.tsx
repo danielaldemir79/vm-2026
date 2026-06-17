@@ -5,7 +5,7 @@
 // läge efter avspark, och mitt tips synligt. UTAN ett aktivt rum visas "gå med i
 // ett rum för att tippa" (tips är per rum).
 //
-// VISUELL DESIGN (design-frontend, T15): tips-ligan är det SOCIALA hjärtat, det ska
+// VISUELL DESIGN (designen, T15): tips-ligan är det SOCIALA hjärtat, det ska
 // kännas KUL att tippa. Vyn får en guld-tonad eyebrow + rubrik (kupong-identiteten),
 // en inbjudande "gå med i ett rum"-ruta som pekar mot rum-sektionen, och korten
 // (PredictionForm) bär kupong-finishen. Stabil semantik + data-attribut bevaras,

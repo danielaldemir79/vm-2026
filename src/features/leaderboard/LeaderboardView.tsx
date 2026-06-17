@@ -1,5 +1,5 @@
 // TOPPLISTE-VYN (T17, #17). FUNKTIONELLT + a11y-lager (senior-dev) + PREMIUM-FINISH
-// (design-frontend), ett lager.
+// (designen), ett lager.
 //
 // IDENTITET (taskens KRÖNING): topplistan är vad kompisarna kollar VARJE dag, den ska
 // kännas LEVANDE och TÄVLINGSINRIKTAD. Tre saker bär den känslan:
@@ -244,7 +244,7 @@ export function LeaderboardView() {
     <section ref={anchorRef} aria-labelledby="leaderboard-heading" data-leaderboard-view="">
       <header className="flex flex-col gap-2">
         {/* Eyebrow = AKTIVA RUMMETS namn (T92 del A), så det syns vilket rum listan gäller.
-            data-leaderboard-room = stabil krok för test + design-frontend. */}
+            data-leaderboard-room = stabil krok för test + designen. */}
         <p
           data-leaderboard-room=""
           className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-warning"

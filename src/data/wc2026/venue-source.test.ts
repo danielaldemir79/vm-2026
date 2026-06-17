@@ -185,7 +185,7 @@ describe('Arenor: integritet i den committade matches.ts', () => {
   });
 
   it('inga em-dashes eller diakrit-skador i arena-strängarna (svensk copy-regel + UTF-8)', () => {
-    // CLAUDE.md: inga em-dashes (— / –) i datan. Arenanamnen är dessutom ASCII (inga
+    // Repots em-dash-regel: inga em-dashes (— / –) i datan. Arenanamnen är dessutom ASCII (inga
     // å/ä/ö), så ett mojibake-substitut (Ã¥ o.d.) skulle synas; vi låser att strängen
     // bara har väntade tecken (bokstäver, siffror, mellanslag, komma, &, apostrof,
     // bindestreck). Fångar en encoding-regression i källan/genereringen.

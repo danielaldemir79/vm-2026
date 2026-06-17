@@ -5,6 +5,40 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-17 , Diakritik-vakt: git-hook som blockerar ASCII-substitut i svensk text
+
+**Beslut:** En git-hook (`.githooks/` + `src/lib/diakritik-vakt.mjs`) blockerar commits där
+svensk text smugit in med ASCII-substitut för å/ä/ö ("pa", "fran", "nar", "slutlaaget"). All <!-- diakritik-vakt:exempel -->
+scan-logik bor i EN modul som både hookarna och Vitest-testet importerar (en sanning), så
+testet bevisar exakt det körningen kör. Aktiveras automatiskt via `npm install` (`prepare` ->
+`git config core.hooksPath .githooks`); `npm run hooks:install` sätter om det explicit.
+**Varför:** ASCII-substitut i commit-meddelanden (och ibland kommentarer/SQL-strängar) har varit
+repots vanligaste återkommande kvalitetsmiss, roten är att PowerShell strippar UTF-8 i
+commit-meddelanden inline på Windows + manuella slarv. Manuell disciplin räckte inte; en
+mekanisk grind är enda hållbara fixen.
+
+**Beslut:** Bindestreck (`-`) räknas som ord-gräns-tecken i scannern (`GRANS = [\p{L}\p{N}_-]`),
+så ett denylist-ord klämt mellan bindestreck (`-pa-`, `-nar-`) aldrig matchar.
+**Varför:** Repots docs och kod-kommentarer refererar pervasivt till kebab-case-identifierare
+(lärdoms-id och mönster-namn, t.ex. `delad-rums-data-med-rls-pa-auth-uid`,
+`aa-kontrast-pastad-pa-genererad-farg`) som bär svensk-lika segment mellan bindestreck. Dessa
+är stabila kors-referens-nycklar, inte prosa. Utan bindestrecks-gränsen gav de falsklarm, vilket
+hade blockerat alla commits i repot. Äkta prosa-substitut ("rootMargin pa mobil-bandet", ordet <!-- diakritik-vakt:exempel -->
+omgivet av mellanslag) fångas ändå. Bekräftat genom att köra scannern mot hela trädet:
+0 falska positiver.
+
+**Beslut:** Scannade filtyper = `.md`, `.ts`, `.tsx`, `.mjs`, `.sql`, `.js`.
+**Varför:** Det är där svensk prosa bor. `.sql` med flit (migrationerna har svenska kommentarer
+OCH `comment on`-strängar som persisteras live i DB:n, en känd fälla), `.tsx` för React-UI-text,
+`.js` för service-worker-/config-filer med svensk prosa. Denylistan är kurerad SMAL: bara
+starkt indikativa svenska ord utan diakrit, ordgräns-matchade. Tvetydiga ord ("for", "are",
+"har", "andra", "laget", "sa", "ga", "manga") är medvetet uteslutna så legitim engelsk kod,
+fotbolls-/lånord och korrekt svenska aldrig ger falsklarm. Modulen + dess test undantas från
+scan (de citerar substituten avsiktligt). Override: markören `diakritik-vakt:exempel` på en rad
+(synligt + spårbart), eller `git commit --no-verify` som engångskringgång.
+
+---
+
 ## 2026-06-17 , Global topplista LIVE: CORS + OPTIONS för browser-anropade edge functions, 503:an var en stale deploy
 
 **Problem:** den globala (cross-rum) topplistan (server-side scoring via edge-funktionen
@@ -662,7 +696,7 @@ ny hjälpare `visibleFormCount()` som använder den stabila markören `form[data
 innersta `<li>` inte är `hidden`), i stället för `screen.getAllByRole('group').length` i de heta
 `waitFor`-looparna och fönster-/utfäll-jämförelserna.
 
-**Varför (samma patologi T90 fixade i App.test.tsx, north-star-specen tilldelar F4 till T83):**
+**Varför (samma patologi T90 fixade i App.test.tsx, F4 hör till T83:s ansvar):**
 vyn renderar ALLA 104 matchformulär (out-of-window dolda med `hidden`, inte bortfiltrerade, C2),
 så trädet är stort. `getAllByRole('group')` tvingar Testing Library att för VARJE kandidat både
 matcha rollen OCH avgöra synlighet via `dom-accessibility-api`s `isInaccessible` -> jsdom
@@ -699,7 +733,7 @@ inte: den öppna modalen gör skalets knappar inert, så bara dialogens få knap
 **Markör-fixen** är O(1)-uppslag och bevarar HELA beteende-assertionen (negativ-kontroll: muterad
 markör OCH muterat namn rödnar båda testet, verifierat). Den bredare DOM-storleks-/getComputedStyle-
 kostnaden i jsdom (syns även i `ResultEntryView.test.tsx`, ~31 s men under sin timeout) är en
-separat test-prestanda-fråga, ägd av flik-IA-tasken (T83) per north-star-specens bygg-ordning.
+separat test-prestanda-fråga, ägd av flik-IA-tasken (T83) per v2-bygg-ordningen.
 
 ## 2026-06-15 , T90 (#183): Global topplista RÄTTVIS (bästa rum) + helt global (server-side scoring)
 
@@ -1216,7 +1250,7 @@ mirror:n rödnar nu i CI (negativ-kontrollerat: muterad mirror -> rött). Det by
 `src/test/setup.ts` gatar därför sin DOM-stubbning på `HAS_DOM`.
 
 **Avgränsning:** v3 rör BARA pollaren/data-logiken (backend). Live-kortets RENDERING (visa
-målskytt/kort direkt under matchen) är frontend och hör till en design-frontend-task, inte hit.
+målskytt/kort direkt under matchen) är frontend och hör till en design-task, inte hit.
 
 ## 2026-06-15 , Livescore pollare-v2: full lag-brygga + skarv-fix + auto-mappning + robust facit-fångst
 
@@ -1266,7 +1300,7 @@ fail-loud:ar bara på faktiskt avgjorda, vi statuskollar först).
 
 ## 2026-06-15 , Livescore Bit 3a (T81): klient-läs-lager + realtime för live-data
 
-Bit 3a är LÄS-sidan (ingen UI än, det är Bit 3b/design-frontend): hämta `match_live_data` ur
+Bit 3a är LÄS-sidan (ingen UI än, det är Bit 3b/designen): hämta `match_live_data` ur
 Supabase och projicera till en klient-vänlig modell (`LiveData`) via Bit 1:s parsers, plus en
 realtids-prenumeration + en klock-brygga, så Bit 3b kan rendera ett livekort direkt.
 
@@ -1434,7 +1468,7 @@ MAX-höjden över alla `[data-section-nav]`-band (det CSS-dolda bandet rapporter
 höjd 0). MAX (inte summa) gör skrivningen idempotent: båda bandens mät-effekter räknar fram SAMMA värde, så
 ingen kamp om CSS-variabeln oavsett körordning.
 
-**Beslut: a11y-baslinjen för hamburgare-panelen** (kärnan i tasken, design-frontend polerar utseendet):
+**Beslut: a11y-baslinjen för hamburgare-panelen** (kärnan i tasken, designen polerar utseendet):
 knappen bär `aria-expanded`/`aria-controls` (-> panelens `useId`-id)/`aria-haspopup` + tillgängligt namn
 ("Sektioner" / "Sektioner: <aktiv>", så scroll-spy-värdet syns på mobil). Escape stänger; `pointerdown`
 utanför band + panel stänger (lyssnarna läggs bara när panelen är öppen). Fokus flyttas IN till första
@@ -1447,28 +1481,28 @@ portal-baserad helskärms-dialog (fixed inset-0 z-50); hamburgare-menyn är ett 
 nedfälld panel i bandets flöde (knuffar innehåll, överlappar inte), så Modal hade varit fel form. A11y-
 semantiken (Escape/fokus-in-och-retur/fokus-fälla) följer ändå samma kontrakt.
 
-**Beslut (C4, Copilot-runda-1): scroll-spy observerar ALLA band, inte bara det forsta.**
+**Beslut (C4, Copilot-runda-1): scroll-spy observerar ALLA band, inte bara det första.**
 `useSectionSpy` anropade `querySelectorAll('[data-section-nav]')` men implementationen hade en
 bugg: mock i testet fyrade `emitResize` oavsett om bandet faktiskt observerades, vilket dolde
-att bara forsta bandet observerades. Fixt: observern byggs om med `querySelectorAll` och ett
-tvabands-harness-test verifierar att hogjdandring i mobil-bandet (panel oppnas) triggar om-
-byggnad av observern med ny rootMargin. Negativ-kontroll bekraftad: querySelector-revert
-(bara ett band) rodnar bada C4-testerna. Utan fixen: stale rootMargin pa mobil-bandet vid
-panel-oppning, scroll-spy uppfattar knappt att aktiv sektion byts.
+att bara första bandet observerades. Fixt: observern byggs om med `querySelectorAll` och ett
+tvåbands-harness-test verifierar att höjdändring i mobil-bandet (panel öppnas) triggar om-
+byggnad av observern med ny rootMargin. Negativ-kontroll bekräftad: querySelector-revert
+(bara ett band) rödnar båda C4-testerna. Utan fixen: stale rootMargin på mobil-bandet vid
+panel-öppning, scroll-spy uppfattar knappt att aktiv sektion byts.
 
-**Beslut (C5, Copilot-runda-1): CSS-var-cleanup ar VILLKORAD pa att inga band kvar i DOM.**
-Bada banden skriver samma `--vm-section-nav-offset` via `useStickyBandOffset`. Vid unmount
+**Beslut (C5, Copilot-runda-1): CSS-var-cleanup är VILLKORAD på att inga band kvar i DOM.**
+Båda banden skriver samma `--vm-section-nav-offset` via `useStickyBandOffset`. Vid unmount
 av ett band (t.ex. ResizeObserver-recompute) rensades variablerna alltid - vilket nollade
-offseten medan det andra bandet levde. Fix: rensa bara nar `document.querySelectorAll
+offseten medan det andra bandet levde. Fix: rensa bara när `document.querySelectorAll
 ('[data-section-nav]').length === 0` (inget band kvar). Negativ-kontroll: alltid-rensa-revert
-rodnar testet som verifierar att variablerna behalles efter ett bands unmount.
+rödnar testet som verifierar att variablerna behålles efter ett bands unmount.
 
-**Beslut (C6, Copilot-runda-2): aria-controls villkorad pa att panelen ar monterad.**
-Hamburgare-knappen bar `aria-controls` som pekade pa panelens id. Panelen renderas bara nar
-menyn ar oppen (open === true); i stangt lage ar IDREF:en ogiltig (pekar pa ett omonterat
+**Beslut (C6, Copilot-runda-2): aria-controls villkorad på att panelen är monterad.**
+Hamburgare-knappen bar `aria-controls` som pekade på panelens id. Panelen renderas bara när
+menyn är öppen (open === true); i stängt läge är IDREF:en ogiltig (pekar på ett omonterat
 element). Fix: `aria-controls={open ? panelId : undefined}`. `aria-expanded` (alltid
-satt) och `aria-haspopup` barer knappens tillstand oforandrat. Kontrakt-testet skarptes:
-aria-controls ska SAKNAS i stangt lage och peka pa panelens id i oppet lage.
+satt) och `aria-haspopup` bärer knappens tillstånd oförändrat. Kontrakt-testet skärptes:
+aria-controls ska SAKNAS i stängt läge och peka på panelens id i öppet läge.
 
 ---
 
@@ -1506,7 +1540,7 @@ hoppar direkt (`behavior:'auto'`) via den delade `useReducedMotion` (motion/reac
 **Beslut: rums- och admin-sektionerna hålls UTANFÖR raden** (hjälp-/arrangörsytor), per Daniels lean-krav,
 så de saknar både katalog-post i `SECTIONS` och registrerings-anrop. Etiketter korta: Idag, Grupper, Vad
 krävs, Slutspel, Match-tips, Grupp-tips, Mästare, Topplista. Tom rad (inga registrerade) -> hela navet
-renderar `null` (ingen tom sticky-list). Funktionell + tillgänglig kärna byggd här; design-frontend stylar
+renderar `null` (ingen tom sticky-list). Funktionell + tillgänglig kärna byggd här; designen stylar
 mot `data-section-nav` / `data-section-chip` / `aria-current` / `--vm-section-nav-offset`.
 
 **Beslut (C4, prestanda, Copilot-runda-2): contexten DELAS på frekvens, kanoniskt React-mönster.**
@@ -1531,11 +1565,11 @@ mäter den faktiska renderade positionen mot viewporten och är korrekt för sti
 Alltid använda `getBoundingClientRect` vid mätning av sticky-band som ska offseta scroll-mål.
 
 **Beslut (C5, Copilot-runda-3): CSS-variabler rensas vid providerns unmount.**
-`--vm-section-nav-offset` och `--vm-section-nav-header-top` skrivs pa `<html>` av `SectionNavProvider`.
-Om providern unmountas (t.ex. via React.StrictMode dubbelmount eller framtida dynamisk routing) maste
+`--vm-section-nav-offset` och `--vm-section-nav-header-top` skrivs på `<html>` av `SectionNavProvider`.
+Om providern unmountas (t.ex. via React.StrictMode dubbelmount eller framtida dynamisk routing) måste
 CSS-variablerna rensas (sättas till '' via `document.documentElement.style.removeProperty`) i cleanup-
 funktionen av den useEffect som skriver dem, annars lever de stale-värdena kvar och skjuter
-scroll-margin-top fel pa sektionerna. Rensningen bevisad negativt: utan den failar ett test som kontrollerar
+scroll-margin-top fel på sektionerna. Rensningen bevisad negativt: utan den failar ett test som kontrollerar
 att variablerna är tomma efter unmount.
 
 ---
@@ -1612,7 +1646,7 @@ kännas direkt. Tröskeln är en namngiven konstant (`LONG_PRESS_THRESHOLD_MS`) 
 Daniels krav "det måste visas så fingret inte blockar infot" , popovern läggs ovanför ankaret
 (position fixed, underkant strax över brickan) och klampas horisontellt/vertikalt inom skärmen
 (ingen overflow utanför viewporten). Funktionell positionering (getBoundingClientRect + klamp i
-useLayoutEffect) ägs av senior-dev; design-frontend finputsar utseendet (pil, in-animation gatad av
+useLayoutEffect) ägs av senior-dev; designen finputsar utseendet (pil, in-animation gatad av
 reduced-motion) UTAN att röra positionerings-logiken eller a11y-hakarna (role=tooltip + aria-describedby).
 
 **Beslut (namn-källa): userId -> displayName slås upp i room_members.** EN sanning (samma karta
@@ -1662,7 +1696,7 @@ grönt).
 **UX (tip vs facit):** de stora siffer-rutorna är användarens TIPS men lästes lätt som slutresultatet.
 Ett LÅST kort med ett eget tips får nu en omisskännlig "Ditt tips"-etikett (`data-prediction-tip-label`)
 direkt vid rutorna; facit-brickan har sin "Facit"-etikett. Funktionell struktur + rena hakar levereras
-här; design-frontend äger den slutliga visuella hierarkin (storlek/placering/mobil, balans tips vs facit).
+här; designen äger den slutliga visuella hierarkin (storlek/placering/mobil, balans tips vs facit).
 
 **GruppPredictions-vyn:** har INTE samma lucka , den tippar grupp-1:a/2:a och visar ett tips-härlett
 (simulerat) slutspelsträd, inte facit per match, så ingen isFinished-gatad facit-/poäng-yta att väva in.
@@ -1750,7 +1784,7 @@ committad fil bär svensk kommentar per konvention, nästa `db reset` återstäl
 
 **Bakgrund (Daniels feedback 2026-06-13, #149):** "mer matchinfo på kortet, BALANSERAT, utan att
 stöka till det." Domare SKIPPAS (inte sourcebart i förväg). Två tillägg: (1) åskådarkapacitet per
-arena, och (2) lagets FIFA-ranking. Funktionellt + a11y-byggt av senior-dev; design-frontend
+arena, och (2) lagets FIFA-ranking. Funktionellt + a11y-byggt av senior-dev; designen
 finputsar placering/balans (kapacitet diskret efter arenan, ranking under lagnamnet) på mobil.
 
 **1) Arena-kapacitet (NY data, källåkrad, gissas ALDRIG).** Kapaciteten är PER ARENA (16 värden),
@@ -1804,7 +1838,7 @@ hanteras TYST (ingen "FIFA-ranking #undefined"). Ingen ny datakälla.
 
 **UI/a11y:** MatchCard wirar in kapaciteten i Arena-`<dd>:n` (`data-venue-capacity`-hak) och rankingen
 under lagnamnet (`data-fifa-ranking`-hak). Rankingen är LÄSBAR för skärmläsare (inte aria-hidden), då
-den inte redan ligger i kortets a11y-namn. Rena hakar lämnade åt design-frontend för balans/mobil.
+den inte redan ligger i kortets a11y-namn. Rena hakar lämnade åt designen för balans/mobil.
 
 ---
 
@@ -1901,7 +1935,7 @@ toppknappen; mus/touch får dessutom den visuella pilen. WCAG 2.3.3 (reduced-mot
 cue-animationen) och AA bevaras (samma token-färgade pill som förr).
 
 **Bevarat:** alla befintliga data-hakar (`data-collapsible`, `-body`, `-fade`, `data-collapsed`) +
-ExpandToggle oförändrade. Ny stabil hak `data-collapsible-cue` för styling/test. Design-frontend gav
+ExpandToggle oförändrade. Ny stabil hak `data-collapsible-cue` för styling/test. Designen gav
 cue:n ett tydligt klickbart utseende (hover/active-affordans, ingen :focus-affordans eftersom cue:n
 avsiktligt är icke-fokuserbar) på den nya haken.
 
@@ -1943,7 +1977,7 @@ på AVGJORDA matcher (status 'finished'), samma poäng-/avslöjande-modell som t
 EDGE-fall (alla rena, testade i personal-stats.test.ts): inga tips / inga avgjorda matcher / allt miss ger
 tom statistik (accuracy null eller 0, bestCall null), så den börjar tom och fylls löpande när matcher avgörs.
 
-**T23-visuellt (design-frontend, premium-finish ovanpå senior-devs bas): HIERARKI-disciplin, ingen tävlar.**
+**T23-visuellt (designen, premium-finish ovanpå senior-devs bas): HIERARKI-disciplin, ingen tävlar.**
 Designvärdena bor i `src/theme/tokens.css` §25 (`.vm-favorite-chip` + `.vm-personal-stats` + syskon). Tre delar:
 - **Favorit-chippet (matchkortet):** en DISKRET markering som ligger på SAMMA kort som hero-kortets SOLIDA
   guld-"Dagens match"-bricka och kan SAMMANFALLA med den. Därför med flit en LUGNARE form: en UTLINJERAD
@@ -2063,7 +2097,7 @@ URL:en, för att hålla signaturen som en tät, balanserad enhet. Daniels nya fe
 så det valet frångås uttryckligt.
 
 **Runda 1 (senior-dev, 9bf727c):** lugn variant med inline-länk bredvid namnet + punkt-divider.
-**Runda 2 (Daniels live-feedback + design-frontend, a2a0b76):** "footern ska lyfta upp mig, få med
+**Runda 2 (Daniels live-feedback + designen, a2a0b76):** "footern ska lyfta upp mig, få med
 hela min hemsida så man ser att man kan klicka dit" - hela strukturen skrevs om till shippad form:
 
 1. **Appens adress synlig i ledtexten** (`App.tsx` footer-`<p>`): "dela appen med vänner, **vm-2026.pages.dev**"
@@ -2466,7 +2500,7 @@ nästa-steg (se handoff Next), så denna task håller fokus och inte sväller.
 
 ---
 
-## 2026-06-12 , T24-visuellt (#24, design-frontend): reaktionsradens premium-finish, AA UPPMÄTT i båda teman
+## 2026-06-12 , T24-visuellt (#24, designen): reaktionsradens premium-finish, AA UPPMÄTT i båda teman
 
 **Beslut:** Den visuella finishen på reaktionsraden bor i `rooms.css` §9 (`.vm-reaction-*`), samma seam
 och samma fil som kommentarernas finish (§8, T66), INTE i `tokens.css`. **Varför:** reaktionsraden är en
@@ -2677,9 +2711,9 @@ båda. Den fulla admin-vägen kan inte bevisas via klienten i prod (vi gör inte
 
 **UI:** `AdminStats` renderas inifrån `AdminResultEntry` (bakom `official.isAdmin`, AdminSection-gaten),
 så vanliga medlemmar ser den aldrig (dubbel gating: UI + server-RPC). Funktionell + tillgänglig bas
-(semantiska tabeller, data-*-hakar); premium-design polerar design-frontend efter.
+(semantiska tabeller, data-*-hakar); premium-finishen poleras ovanpå efteråt.
 
-## 2026-06-12 , T45-visuellt (#76): arrangörens kontrollpanel, premium-finish (design-frontend)
+## 2026-06-12 , T45-visuellt (#76): arrangörens kontrollpanel, premium-finish (designen)
 
 **Beslut (identitet):** admin-statistiken är Daniels EGNA kontrollpanel (enda yta bara arrangören ser).
 Funktion före fluff, men den ska höra hemma i appens premium-familj, inte vara en grå admin-tabell. Tre
@@ -3281,7 +3315,7 @@ listan skriver delta-FÖRST med en mittpunkt ("+3 · Exakt resultat"), orden är
 (matchPointLabel), bara ordningen i brickan skiljer. Data-hakar: `data-tip-result`, `data-tip-points`,
 `data-tip-point-type` (för design-finish + test).
 
-**Beslut 5, PREMIUM-FINISH (design-frontend, 2026-06-12, ovanpå data-attribut-seamen):** den
+**Beslut 5, PREMIUM-FINISH (designen, 2026-06-12, ovanpå data-attribut-seamen):** den
 funktionella basen (besluten ovan) polerades till appens "arena i kvällsljus"-språk utan att röra
 logik, härledningar eller test-hakar.
 
@@ -3434,10 +3468,10 @@ testad (olåst match, status live, picks i datan -> 0 avslöjade).
 
 **UX-platsen (picks vid matchkortet, rotorsak 3 i issuen):** medvetet UTANFÖR denna task (#99/T58 tar
 helheten). reveal-ändringen är gjord ÅTERANVÄNDBAR därifrån (exporterad union + pending-typer i
-`leaderboard/index.ts`). Pågår-lägets premium-finish poleras av design-frontend ovanpå data-attribut-
+`leaderboard/index.ts`). Pågår-lägets premium-finish poleras av designen ovanpå data-attribut-
 hakarna (`data-reveal-status="live"`, `data-reveal-live-pick`, `data-reveal-pending`).
 
-**Design-finish (design-frontend, samma task):** pågår-kortet fick en BESLÄKTAD MEN EGEN identitet mot
+**Design-finish (designen, samma task):** pågår-kortet fick en BESLÄKTAD MEN EGEN identitet mot
 facit-kortet. Facit-kortet bär "kvällsljus"-GULD (det avgjorda, "domen är fälld"); pågår-kortet bär
 appens PITCH-GRÖNA accent (matchen lever, tipsen ligger på bordet), samma gröna live-identitet som
 dagshero:ns nedräknings-prick (T7). De två kort-typerna skiljs alltså på en blink BÅDE i färg (grön mot
@@ -3594,7 +3628,7 @@ T16/F1, vaktad av test som assertar i id-rymden).
 
 **Placering:** vyn ligger direkt under grupp-tips-kupongerna i `GroupPredictionsView` (samma
 `GroupPredictionsProvider`, läser mina tips ur samma store), eftersom det är där Daniel var när han
-bad om den. Visar en uppmaning tills minst en grupp är tippad. Design-frontend polerar ovanpå de
+bad om den. Visar en uppmaning tills minst en grupp är tippad. Designen polerar ovanpå de
 återanvända bracket.css-hakarna (tipped/open-third/tbd via `data-tips-slot-resolution`).
 
 **Copilot runda 1-fixar (samma task, #88):**
@@ -3633,7 +3667,7 @@ Gäller alla tre kupong-typerna (match/grupp/bracket-slot) via samma data-attrib
 sanning. Champion-hero:n (egen `.vm-champion-hero[data-bracket-prediction-locked]`) har kvar sin egen
 hjälte-låst-stil (den är inte en `.vm-coupon-card`).
 
-**AC#1, visuell finish (design-frontend):** två justeringar lyfte "låst"-läsningen från "en aning
+**AC#1, visuell finish (designen):** två justeringar lyfte "låst"-läsningen från "en aning
 dämpad" till omisskännlig på en armlängds avstånd, verifierat live i båda teman + på vikbar-cover-bredd
 (265px, ingen overflow): (1) tinten höjd 6% -> 8% fg så kort-KROPPEN läser grå, inte "nästan surface";
 (2) den streckade RIVER-perforeringen, den sista starka guld-signalen, neutraliseras till en grå
@@ -3643,7 +3677,7 @@ HELHETEN är medvetet TVÅDELAD: de grå låsta kupongerna (formulär-ifyllninga
 den VARMT guldhållna champion-hero:n (firande, "trädets krona avgjord"), en hierarki, inte en
 inkonsekvens, eftersom de bär samma hänglås + lås-notis-signatur men hero:n förtjänar sin värme.
 
-**AC#3, deadline-radens TON (design-frontend):** hänglås-glyfen i `DeadlineNotice` bär nu radens
+**AC#3, deadline-radens TON (designen):** hänglås-glyfen i `DeadlineNotice` bär nu radens
 dämpade `text-fg-muted`-ton (var warning-amber), så raden läser som en vänlig UPPLYSNING ("bra att
 veta NÄR det låses"), inte en VARNING, warning-amber drog ögat som ett larm. Den exakta TIDEN
 (`<time>`, `text-fg` semibold) är det enda som lyfts. Medveten kontrast mot det POST-lås amber-
@@ -3851,7 +3885,7 @@ T48-PR:en "Closes" INTE #81. Issue #81 hålls öppen tills T48b mergats; då st�
 
 **Bevarat:** T46 poäng-presentation, tippning + deadline-sekretess (RLS + klient-gate), TeamCode-
 kontraktet (T16, orört , samma `applyRoomResults`/`derivePoolFacit`), auto-update-hotfixen (vite.config
-+ register-sw, ej rörd). Premium-design på admin/gate-ytan lämnas till design-frontend (samma arbets-
++ register-sw, ej rörd). Premium-design på admin/gate-ytan lämnas till designen (samma arbets-
 delning som T42/T16). **Källa:** Daniels task-direktiv T48 (#81) + T42-beslutet i denna logg (official
 results = facit, RLS-bevisat) + patterns.md `global-admin-gatad-facit` / `inmatning-mot-delad-store`.
 
@@ -3889,7 +3923,7 @@ utlovas som inte är wirade.
 
 **ARBETSDELNING (samma som T15/T16/T42):** funktionell + tillgänglig bas här (stabil semantik +
 data-attribut `data-leaderboard-self-summary/-score-legend/-reveal-reason`, `vm-board-self-summary`/
-`vm-board-legend`-klasser som seam), premium-finish + estetik -> design-frontend. Inga stabila
+`vm-board-legend`-klasser som seam), premium-finish + estetik -> designen. Inga stabila
 statusfärger inbakade (T7-pin); poäng-text behåller T17:s warning/fg-muted-hakar.
 
 ## 2026-06-11 , T42 (#72): admin-UI (funktionell bas) + T42b-split + Behöver-Daniel
@@ -4163,7 +4197,7 @@ uppdatering stod man i INGET rum och de delade inmatningarna syntes inte (de fan
 man var inte i rummet). Kritisk UX-bug före delning. Auto-val efter skapa/gå-med fanns redan (T14),
 men valet persisterades inte; nu gör det det.
 
-**T38-visuellt (upphovs-signaturen + LIVE-bevis för persistensen, design-frontend):**
+**T38-visuellt (upphovs-signaturen + LIVE-bevis för persistensen, designen):**
 
 *Signaturen (footerns avsändarrad).* Daniels stolta lilla avsändarrad i "arena i kvällsljus"-
 estetiken: ett "DA"-monogram-SIGILL (liten rund accent-bricka med mörk/vit ink = den färg-oberoende
@@ -4184,7 +4218,7 @@ eftersom footern står direkt i <main>, inte i en Panel; BÅDA teman):*
 satte `text-fg-muted/80` (80% opacitet PÅ fg-muted). Uppmätt: det faller till 3.83:1 i LJUST tema =
 UNDER AA, exakt token-som-text-med-opacitet-fällan (lessons-familjen aa-kontrast-...-varsta-fall: en
 token som redan ligger nära tröskeln tippar under när man lägger opacitet på den, och bara i ETT
-tema). Design-frontend bytte till full opacitet på fg-muted för "Made by" + full fg för namnet, så
+tema). Designen bytte till full opacitet på fg-muted för "Made by" + full fg för namnet, så
 raden klarar AA i båda teman med marginal. Verifierad i browsern (computed color `rgb(156,178,166)` =
 #9cb2a6 full opacitet i mörkt, `rgb(79,98,88)` = #4f6258 i ljust).
 
@@ -4318,7 +4352,7 @@ så de GLIDER till sin nya plats när poäng/ordning ändras. Reduced-motion: `M
 reducedMotion="user"` (MotionProvider) stänger AUTOMATISKT av layout-/transform-animationer, OCH
 `layout` gatas explicit på `useReducedMotion` (dubbelt skydd, WCAG 2.3.3). Funktionellt lager:
 stabil semantik (`<ol>`, aria-label "Placering N") + data-attribut (`data-leaderboard-row/-rank/
--points`, `data-user-id` som stabil animations-key); premium-finish (medaljer, glow) -> design-frontend.
+-points`, `data-user-id` som stabil animations-key); premium-finish (medaljer, glow) -> designen.
 
 **ARKITEKTUR (DRY, lägsta koppling):** tre RENA moduler (derive-facit / aggregate-scores / reveal,
 React-fritt, fristående testbara) + en LÄS-ONLY provider (T17 skriver inga tips, aggregerar de
@@ -4328,7 +4362,7 @@ och sektionen kan ligga UTANFÖR ResultsProvider, alongside tips-sektionerna). E
 (samma mönster som T15 C14 / T16). Sektionen gatas på `rooms.enabled` (samma som T15/T16-sektionerna).
 
 **DISPOSITION:** topplistan + tips-avslöjandet byggda FULLT (taskens kärna). Realtids-synk (T18) +
-mini-ligor (T20) out of scope. Premium-finish (medaljer, rörelse-polish) lämnas till design-frontend
+mini-ligor (T20) out of scope. Premium-finish (medaljer, rörelse-polish) lämnas till designen
 ovanpå data-attribut-seamen (samma arbetsdelning som T15/T16).
 
 ## 2026-06-11 , T17-visuellt (#17): topplistans + tips-avslöjandets premium-finish (KRÖNINGEN)
@@ -4405,7 +4439,7 @@ färg-oberoende reveal-markörer + sr-only-orden). 1006 gröna (var 999).
 ## 2026-06-11 , T16b-visuellt (#59): bracket-tips-lagrets premium-finish ("vägen till bucklan")
 
 **Kontext:** ovanpå senior-devs funktionella lager (data-attribut-seam + semantik + tester) la
-design-frontend den visuella finishen för slutspels-tipset. Det är det episka momentet, "vem tror
+designen den visuella finishen för slutspels-tipset. Det är det episka momentet, "vem tror
 du tar sig hela vägen till final och vinner VM". Identitet: "VÄGEN TILL BUCKLAN". Två lager, EN
 `BracketPredictionForm` (en ny `variant`-prop styr presentationen, semantiken är oförändrad):
 
@@ -4493,7 +4527,7 @@ id) bevisar att `teamCode()` fail-loud:ar (`^[A-Z]{3}$`) i stället för att tys
 
 **DISPOSITION:** per-slot-tippningen + champion byggda FULLT (taskens kärna), inget pinnat. UI:t är
 det funktionella + a11y-lagret (stabila roller + data-attribut som seam); premium-finish (kupong-
-formspråk, flaggor, träd-känsla) lämnas till design-frontend ovanpå, samma arbetsdelning som T16.
+formspråk, flaggor, träd-känsla) lämnas till designen ovanpå, samma arbetsdelning som T16.
 
 ---
 
@@ -4523,7 +4557,7 @@ otypad sträng ändå slinker in via en seam. De två lagren kompletterar varand
 (`..._t16_group_predictions_schema/rls.sql` + bracket-motsvarigheten). Decisions.md T16 F1-raden
 förutsåg detta ("branded type kan läggas ovanpå senare utan att ändra kontraktet"), C1+C2 realiserar det.
 
-## 2026-06-11 , T16-visuellt (#16): gruppvinnar-tips premium-finish, PODIUM-KUPONG (design-frontend)
+## 2026-06-11 , T16-visuellt (#16): gruppvinnar-tips premium-finish, PODIUM-KUPONG (designen)
 
 Det visuella lagret ovanpå senior-devs funktionella grupp-tips-UI. Mål: "tippa hela gruppspelet"-
 momentet , VM-kupongen man fyller i med kompisarna , ska kännas KUL och tydligt, utan att lämna
@@ -4801,7 +4835,7 @@ vid avsparks-minuter). Samma PWA-medvetna kadens som `useTodayKey` (minut-`setIn
 RIKTIGA låset; detta gör bara VISNINGEN sann. Regression: PredictionsView.test.tsx (falska timers,
 öppen -> låst när tiden passerar avspark).
 
-## 2026-06-11 , T15-visuellt (#15): tips-UI premium-finish, TIPS-KUPONG-identitet (design-frontend)
+## 2026-06-11 , T15-visuellt (#15): tips-UI premium-finish, TIPS-KUPONG-identitet (designen)
 
 Det visuella lagret ovanpå senior-devs funktionella tips-UI. Mål: en EGEN identitet för tips
 (tips =/= resultat), så det känns KUL att tippa, utan att lämna "arena i kvällsljus"-familjen.
@@ -5514,7 +5548,7 @@ en alfa-blend (`--vm-sim` @ 6 %) över sidans fond, mätt genom att komponera f�
   **7.49:1 (mörkt) / 5.50:1 (ljust)**; brödtext (fg) **14.1:1 / 13.5:1**.
 - Alla >= 4.5:1 (normal text). Ringen + glow:en bär ALDRIG text, kan inte sänka kontrast.
 Mätmetod + lärdom (fast HSL/alfa garanterar inte fast kontrast, mät värsta fallet): lessons
-`design-frontend.md` (aa-kontrast-canvas-komposit). Verifierat 280-1440 px (ingen horisontell
+design-lärdomarna (aa-kontrast-canvas-komposit). Verifierat 280-1440 px (ingen horisontell
 scroll vid 280) och i båda teman.
 
 **Spårbarhet:** UX/produkt + intern design-regel, ingen extern auktoritativ källa. Spårbar via
@@ -5570,11 +5604,11 @@ inmatnings-grinden), så T9:s straff-regel (FIFA Article 14: en slutspelsmatch s
 KRÄVER straffar) gäller även hypotetiska slutspelsresultat. Ingen ny domänregel definieras i
 T12, bara overlay-mekaniken ovanpå.
 
-**Beslut (MARKERING + ÅTERSTÄLLNING, design-frontend tar visuell finish):** En egen
+**Beslut (MARKERING + ÅTERSTÄLLNING, designen tar visuell finish):** En egen
 `SimulationBanner` (app-globalt band, eftersom sim-läget rör ALLA vyer) bär den FUNKTIONELLA +
 tillgängliga markeringen: i sim-läge ett uppläst statusmeddelande (`role="status"`, "Simulering
 pågår, de riktiga resultaten påverkas inte") + ett `data-simulation-active`-attribut som
-design-frontend hänger en premium-banner/badge på. Toggle (Starta/Avsluta) + "Återställ allt"
+designen hänger en premium-banner/badge på. Toggle (Starta/Avsluta) + "Återställ allt"
 (töm overlayn, stanna i sandlådan). **Spårbarhet:** UX/produkt-regel + intern arkitektur,
 ingen extern auktoritativ källa, spårbar via #12 + denna rad + testerna (`apply-simulation.test.ts`
 isolering/blanda/fail-loud, `simulation-store.test.tsx` toggle/reset/isolering/blanda/validering
@@ -5612,7 +5646,7 @@ ett lag som FAKTISKT spelar i sista matchen behåller sitt egna krav-villkor (te
 
 ---
 
-## 2026-06-10 , T11 (issue #11, design-frontend): premium-finish på "Vad krävs", FÄRG-OBEROENDE status-chips + AA UPPMÄTT i båda teman
+## 2026-06-10 , T11 (issue #11, designen): premium-finish på "Vad krävs", FÄRG-OBEROENDE status-chips + AA UPPMÄTT i båda teman
 
 **Beslut (visuellt lager, rör ALDRIG semantiken):** Premium-finishen byggs ENBART ovanpå senior-devs
 data-attribut (`data-scenario-group/-team/-status/-phase`, `data-scenario-margin-dependent`,
@@ -5681,7 +5715,7 @@ inkl. re-iteration, T3/T4). INGEN egen tabellogik. Hooken (`use-group-scenarios.
 konsument av den delade results-storen (samma sanning som gruppspel/inmatning/träd), så scenarierna
 är "live": en inmatning -> ny matchlista -> useMemo räknar om. Vyn (`ScenarioView.tsx`) bär stabil
 semantik + data-attribut (`data-scenario-group/-team/-status/-phase/-margin-dependent/-decided`) som
-design-frontend stylar premium-finishen ovanpå.
+designen stylar premium-finishen ovanpå.
 
 **Beslut (W/D/L-APPROXIMATIONEN, var den ligger + åt vilket håll den är konservativ, HARD):** en
 W/D/L-enumeration fixerar POÄNGEN exakt men INTE målsiffrorna, och exakta mål påverkar tiebreaks
@@ -5797,7 +5831,7 @@ kraschade samma kontroll på `reading 'mex'` vid import. Build/test/lint/format 
 
 ---
 
-## 2026-06-10 , T10 (issue #10): lag-profil-modalen, premium-finish (design-frontend)
+## 2026-06-10 , T10 (issue #10): lag-profil-modalen, premium-finish (designen)
 
 **Beslut (visuellt lager ovanpå senior-devs funktionella dialog):** Lag-profil-modalen fick en
 "arena i kvällsljus"-finish (SPEC §7) UTAN att röra logik/semantik. All a11y-dialog-semantik
@@ -5936,7 +5970,7 @@ IHOPFÄLLNING flyttas fokus till den ÖVRE kontrollen (via `requestAnimationFram
 användaren förs upp till listans topp i stället för att bli kvar långt ner vid en kontroll som just
 försvann (a11y: "tappa inte bort användaren"). Bara vid ihopfällning, vid utfällning stannar fokus
 där användaren var (rätt). Den visuella finishen (accent-tint + chevron, #39) ärvs oförändrad, så de
-uppmätta AA-värdena gäller fortfarande. Design-finishen lämnas till design-frontend via stabila
+uppmätta AA-värdena gäller fortfarande. Design-finishen lämnas till designen via stabila
 data-attribut (`data-result-day`, `data-result-day-heading`, `data-match-context`, `data-result-time`,
 `data-result-stage`, `data-results-toggle-position`).
 
@@ -5947,7 +5981,7 @@ rundnamn, ren rad utan uppläst prick, ikon/chip-a11y), `ResultEntryView.test.ts
 (dag-rubriker i ihopfällt läge + över fönster-gränsen, dubblerad kontroll med identisk aria, fokus-flytt
 vid ihopfällning).
 
-**Beslut (3, VISUELL FINISH, design-frontend-lagret ovanpå):** premium-finish på de tre
+**Beslut (3, VISUELL FINISH, design-lagret ovanpå):** premium-finish på de tre
 kontext-elementen via seamarna, struktur orörd (samma seam-princip).
 
 - *Dag-rubriken* blev en ELEGANT, STICKY avdelare ("arena i kvällsljus"-tonen): en kort accent-glödande
@@ -6054,7 +6088,7 @@ uppdatering in (dirty nollat).
 
 ---
 
-## 2026-06-10 , T9 (issue #9, design-frontend): premium-bracket ovanpå seamen, AA UPPMÄTT i båda teman
+## 2026-06-10 , T9 (issue #9, designen): premium-bracket ovanpå seamen, AA UPPMÄTT i båda teman
 
 **Beslut (visuellt lager, rör ALDRIG semantiken):** Det premium-visuella trädet byggs ENBART ovanpå
 senior-devs data-attribut (`data-bracket-round/-match/-slot`, `data-slot-resolution`, `data-winner`,
@@ -6104,7 +6138,7 @@ den verifierade T4-motorn (`bracket-structure.ts`, `build-bracket.ts`, `seedThir
 definierar INGEN ny strukturell slutspelsregel. Vyn (`BracketView` + `useBracketData`) är en tunn
 konsument av den delade results-storen (samma sanning som gruppspel + inmatning), gatad på `ready`
 (samma stale-kontrakt som useGroupData, C8). Designseam: stabila data-attribut (`data-bracket-round/
--match/-slot`, `data-slot-resolution`, `data-winner`, `data-bracket-locked`) så design-frontend bygger
+-match/-slot`, `data-slot-resolution`, `data-winner`, `data-bracket-locked`) så designen bygger
 premium-trädet + vinnar-animationen utan att röra semantiken.
 
 **Beslut (KÄLLHÄNVISAD FIFA-REGEL 1, gissas ALDRIG): rankningen av grupptreorna -> de 8 bästa.**
@@ -6191,7 +6225,7 @@ står kvar under "#39 (T27) senior-developer: resultatinmatning, stabilt kolumn-
 
 ---
 
-## 2026-06-10 , #39 (T27) design-frontend: premium-finish på resultatinmatningen (kompakta kort + tydlig expandera)
+## 2026-06-10 , #39 (T27) designen: premium-finish på resultatinmatningen (kompakta kort + tydlig expandera)
 
 **Beslut (kompakta kort, "arena i kvällsljus"):** ResultEntryForm-kortet komprimerades ovanpå senior-devs
 stabila grid (seamen `data-result-card-body` orörd): padding 16 -> 14px (mobil), kort-gap + fieldset-gap
@@ -6201,7 +6235,7 @@ som premium-detalj. Lagnamn fick avsiktlig ellipsis-typografi (dämpad ton + tig
 avdelaren en guld-skiftad ton. Resultat: kort-höjden gick från 213 -> 192px (mobil) och 128px (desktop/
 vikbar inner), den "luftiga spill-ytan" i Daniels skärmdump är borta.
 **Varför:** Daniels mobil-feedback (#39): korten var luftiga med mycket död yta. Kompaktionen rör BARA
-spårbredder/typografi/spacing/dekor (design-frontends lager), aldrig grid-strukturen eller a11y-haken
+spårbredder/typografi/spacing/dekor (designens lager), aldrig grid-strukturen eller a11y-haken
 (`w-16`, `truncate`, `data-result-card-body` är låsta av strukturtesten och bevarade). Inga råa hex, allt
 via `color-mix` mot semantiska tokens (samma husstil som GroupTable), så det följer temat.
 
@@ -6248,7 +6282,7 @@ inte konkurrerar om den trunkerade bredden).
 **Varför:** Daniels mobil-feedback (#39): olika långa lagnamn knuffade poängrutorna i sidled kort för
 kort, och namn höggs av fult. Med `flex-1` ärver kolumnbredden innehållet, så rutorna kunde aldrig
 linjera mellan kort. Ett grid där bara kontroll-spåret är flexibelt låser score-kolumnerna på samma
-plats oavsett namnlängd. Grundlayouten (grid-spåren) ägs av senior-dev; design-frontend finjusterar
+plats oavsett namnlängd. Grundlayouten (grid-spåren) ägs av senior-dev; designen finjusterar
 spår/typografi via seamen `data-result-card-body`. Ingen horisontell overflow 280px (vikbar) -> desktop.
 
 **Beslut (3-dagars fönster + expandera):** Inmatningslistan visar default bara matcher inom de närmaste
@@ -6267,7 +6301,7 @@ källhänvisa), spårbar via #39 + denna rad.
 
 ---
 
-## 2026-06-10 , T8 (issue #8) design-frontend: dags-tonen vävd in i heron + T8-PIN löst (success-ton)
+## 2026-06-10 , T8 (issue #8) designen: dags-tonen vävd in i heron + T8-PIN löst (success-ton)
 
 **Beslut (T8-PIN LÖST, success får en egen AA-ton i ljust tema):** I ljust tema var
 `--vm-success` === `--vm-accent` (#0e7a44), pinnat olöst genom T2 -> T5 -> T7. success får nu en
@@ -6342,7 +6376,7 @@ nedåt, så en framtida kort-CSS-regel som LÄSER `var(--vm-day-hue)` vore osynl
 bara läser inline-style. (2) Käll-scannen (`day-theme-contrast-guard.test.ts`) stänger den luckan
 DOM-oberoende: den läser KÄLLFILERNA och failar om `var(--vm-day-hue)` KONSUMERAS utanför en
 `.vm-daily-hero*`-scopad CSS-regel (eller i någon annan källfil än `tokens.css`). Invarianten vilar
-alltså på SÄTTNING-vakt (DOM) + KONSUMTION-vakt (källa), inte på en enda DOM-koll. Design-frontend
+alltså på SÄTTNING-vakt (DOM) + KONSUMTION-vakt (källa), inte på en enda DOM-koll. Designen
 bygger den slutgiltiga dekoren ur hue:n i `tokens.css` sektion 6 (hsl()/color-mix), äger HUR det ser ut.
 
 **Beslut (edge-fall, alla explicita):**
@@ -6359,17 +6393,17 @@ bygger den slutgiltiga dekoren ur hue:n i `tokens.css` sektion 6 (hsl()/color-mi
 befintliga reduced-motion-grinden (`index.css`) stänger av den för den som bett om minskad rörelse.
 Ingen egen JS-grind behövs (samma princip som body-färgövergången).
 
-**T8-PIN (success-token, ÄGARE design-frontend) , [ERSATT 2026-06-10, se nyaste T8-raden överst:
+**T8-PIN (success-token, ÄGARE designen) , [ERSATT 2026-06-10, se nyaste T8-raden överst:
 "T8-PIN löst (success-ton)"]:** Pinnet ÄR numera löst, success fick en egen AA-ton (#0f766e) i ljust
-tema. Texten nedan är HISTORIK (läget när senior-dev skrev den, innan design-frontend åtgärdade), den
+tema. Texten nedan är HISTORIK (läget när senior-dev skrev den, innan designen åtgärdade), den
 beskriver INTE nuläget , behåll den bara som spår, ändra aldrig nuläget efter den. Aktuell sanning +
 mätvärden står i den översta T8-raden.
 > _(historik, ej längre sant)_ I ljust tema var `--vm-success` fortfarande == `--vm-accent` (#0e7a44).
 > Det funktionella dags-tema-lagret RÖR INTE den krocken (dags-temat ligger helt i dekor, inte i
 > success-tokenet), så ingen del av T8:s funktion berodde på separationen. Att VÄLJA det nya
 > success-färgvärdet var ett design-authored token-värde (mönstret `tema-tokens-som-kontrakt`:
-> senior-dev gissar inte färgvärden), så det lämnades distinkt till design-frontend i `tokens.css`.
-> Acceptanstest design-frontend: i ljust tema ska `--vm-success` skilja sig från `--vm-accent` och
+> senior-dev gissar inte färgvärden), så det lämnades distinkt till designen i `tokens.css`.
+> Acceptanstest designen: i ljust tema ska `--vm-success` skilja sig från `--vm-accent` och
 > klara AA mot ytorna. (Uppfyllt: #0f766e, se översta T8-raden.)
 
 ---
@@ -6495,9 +6529,9 @@ kommande match) och exakt-vid-avspark hanteras explicit och testbart.
 platshållaren (`isVenuePlaceholder`, mönster-baserad detektion), i stället för att visa den som
 verifierad arena-data. **Varför:** Källan bär ännu inte arena/stad (känd lucka, gissas aldrig);
 att visa platshållaren vore att presentera en icke-verifierad uppgift som data. Döljs tills riktig
-arena-data finns. Design-frontend finputsar (dölj/dämpa) ovanpå.
+arena-data finns. Designen finputsar (dölj/dämpa) ovanpå.
 
-**Beslut (design-frontend, premium-lager):** Hero:n byggs som "arena i kvällsljus": en mörk yta med
+**Beslut (designen, premium-lager):** Hero:n byggs som "arena i kvällsljus": en mörk yta med
 två radiella ljus (pitch-grön ur övre hörnet, varm guld ur det nedre) plus ett långsamt rörligt
 ljus-svep (`vm-sheen`) och en pulsande live-prick (`vm-pulse`). Båda CSS-animationerna är RENT
 dekorativa och stängs AV explicit vid `prefers-reduced-motion` (`animation: none` på `.vm-hero-sheen`
@@ -6566,7 +6600,7 @@ data-punkt). Källa: Svensk TV-tablå (Daniel), ur SPEC §8 (svenskafans, fotbol
 
 ---
 
-## 2026-06-09 , T6 (issue #6): målfirande-overlayn (design-frontends visuella lager)
+## 2026-06-09 , T6 (issue #6): målfirande-overlayn (designens visuella lager)
 
 **Beslut:** Det visuella målfirandet är en egen overlay-komponent (`GoalCelebrationOverlay`) som
 kopplas in via `ResultEntryView`s `renderCelebration`-render-prop. Den ritar en "arena i kvällsljus"-
@@ -6619,13 +6653,13 @@ skyddsnät och kastar vid ogiltig data, så ett brutet programflöde aldrig korr
 fel och tvingar try/catch; ett diskriminerat returvärde ger bättre UX + a11y och samma data till både
 formulär och store-mutator.
 
-**Beslut (målfirande-KROK som seam, design-frontend äger det visuella):** Firandet ligger i en krok
+**Beslut (målfirande-KROK som seam, designen äger det visuella):** Firandet ligger i en krok
 `useGoalCelebration` som äger NÄR (en match blir finished med minst ett mål) + a11y (vid reducerad
 rörelse tänds INGET firande, WCAG 2.3.3) + timing (auto-avklingar) + unikt key per firande (re-mount).
-`ResultEntryView` exponerar ett `renderCelebration`-render-prop (aria-hidden slot) där design-frontend
+`ResultEntryView` exponerar ett `renderCelebration`-render-prop (aria-hidden slot) där designen
 lägger den visuella premium-animationen (bygger på T2:s motion-primitiver). Funktionellt fungerar
 inmatningen helt utan firandet (ren glädje-yta).
-**Varför:** Frikopplar "när" (senior-dev: funktionellt + a11y) från "hur det ser ut" (design-frontend),
+**Varför:** Frikopplar "när" (senior-dev: funktionellt + a11y) från "hur det ser ut" (designen),
 så animationen kan byggas premium utan att röra inmatnings-logik/timing/tillgänglighet.
 
 ---
@@ -6643,7 +6677,7 @@ Källa: Copilot-fynd C8, runda 2.
 
 ---
 
-## 2026-06-09 , T5 design-frontend: premium gruppspels-design, kvalificeringszon färg-oberoende
+## 2026-06-09 , T5 designen: premium gruppspels-design, kvalificeringszon färg-oberoende
 
 **Beslut (kvalificeringszon, T7-pin):** Etta + tvåa (går vidare) framhävs med FYRA samtidiga,
 FÄRG-OBEROENDE signaler i stället för en statusfärg: (1) en placerings-MEDALJ i rank-cellen, guld-ring
@@ -6702,7 +6736,7 @@ WC2026-datan direkt (vilket vore en parallell väg som inte motsvarar live-grene
 **Beslut (T7-pin respekterad):** Kvalificeringszonen (etta + tvåa går vidare) markeras med ett
 `data-qualified`-attribut + dold skärmläsar-text, INTE med en statusfärg. T7 äger success-tonen (i
 ljust tema krockar accent och success på #0e7a44), så T5 bakar inte in en färg-krock, bara en stabil
-hake som design-frontend målar.
+hake som designen målar.
 
 ---
 
@@ -6900,7 +6934,7 @@ reserveras för framtida formella releaser och är inte kopplad som produktion �
 `develop` (den samlade nästa-versionen), så det är den grenen som ska vara den skarpa publika URL:en.
 Att vänta med en `main`-baserad produktion tills det finns formella releaser undviker en tom/inaktuell
 huvud-adress. Detta KORRIGERAR tidigare dokumentation (deploy.md, inception- och T1-besluten nedan,
-samt SPEC §3 och CLAUDE.md) som sa "produktion = `main`", det var en plan innan kopplingen gjordes.
+samt SPEC §3 och projektets konventioner) som sa "produktion = `main`", det var en plan innan kopplingen gjordes.
 En sanning per fakta: alla de raderna är nu uppdaterade till `develop` så ingen doc-drift kvarstår.
 
 ---
@@ -6957,11 +6991,11 @@ duplicerade-strängar" (Astro/`define:vars`) anpassad till React + Vite (`transf
 semantiska roll-namn (`--color-bg/surface/accent/...`) som pekar på tema-växlande variabler
 (`--vm-*`), roterade på `[data-theme]`. ALLA värden bor isolerat i EN fil, `src/theme/tokens.css`.
 **Varför:** Token-STRUKTUREN (kontraktet) ägs av tema-motorn och ska vara stabil, men VÄRDENA
-(premium-palett, typografi, känsla) authoras av design-frontend-agenten. Genom att isolera
+(premium-palett, typografi, känsla) authoras av designern. Genom att isolera
 värdena i en fil kan design äga dem utan att röra plumbingen (provider, init-script, wiring).
 Semantiska roll-namn (inte råa färger) låter design byta hue/skala fritt utan att bryta
 konsumenter. Värdena i `tokens.css` är de slutgiltiga premium-värdena (palett, typografi,
-känsla), authorade av design-frontend-agenten i T2.
+känsla), authorade av designern i T2.
 
 **Beslut:** Rörelse-primitiver (`Fade`/`Slide`/`Spring`) byggs som tunna wrappers över
 `motion`-paketets `motion.div`. Reducerad rörelse hanteras i två lager: `MotionProvider`

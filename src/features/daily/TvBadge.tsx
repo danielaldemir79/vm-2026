@@ -1,7 +1,7 @@
 // TV-kanal-badge (PRESENTATIONS-komponent, ren): visar den svenska TV-kanalen
 // som ett litet, kännbart märke i stället för en lös textrad.
 //
-// DESIGN (design-frontend, T7): en match ska gå att skumma. Kanalen är en av de
+// DESIGN (designen, T7): en match ska gå att skumma. Kanalen är en av de
 // första sakerna en tittare letar efter ("var ser jag den?"), så den får ett
 // eget, igenkännbart märke med en liten "live-prick" och kanalens egen ton i
 // stället för att gömmas i metadata-raden. Tonerna är MEDVETET dämpade

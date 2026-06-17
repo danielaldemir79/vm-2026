@@ -169,7 +169,7 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
   });
 });
 
-// U2 (design-frontend): favoritlags-väljaren är en INSTÄLLNING. Idag-fliken döljer
+// U2 (designen): favoritlags-väljaren är en INSTÄLLNING. Idag-fliken döljer
 // den (showFavoritePicker=false) och visar den i Mer i stället, så Idag avlastas.
 // Default (ingen prop) bevarar tidigare beteende (väljaren synlig), för standalone-
 // render / fixtures. Vaktar BÅDA grenarna av flaggan.
@@ -205,7 +205,7 @@ describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
 
     const hero = container.querySelector<HTMLElement>('[data-daily-hero]');
     expect(hero).not.toBeNull();
-    // Seamen är på plats: stabilt data-attribut för design-frontend/test.
+    // Seamen är på plats: stabilt data-attribut för designen/test.
     expect(hero?.getAttribute('data-day-theme')).not.toBeNull();
     // Fixtures startar på premiärdagen (matcher med kända lag) -> aktivt tema med
     // en hue satt som inline CSS-variabel på hero:ns dekor-yta.

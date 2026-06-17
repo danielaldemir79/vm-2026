@@ -11,7 +11,7 @@
 // låset. Minut-tick (useDeadlineTick) så ett lås flippar utan omladdning (en grupp
 // startar mitt på dagen, useTodayKey vore för grov, T15 C1-lärdomen).
 //
-// VISUELL DESIGN (design-frontend, T16): VM-poolens samlade kupong-vy. Rubriken bär
+// VISUELL DESIGN (designen, T16): VM-poolens samlade kupong-vy. Rubriken bär
 // pool-identiteten (guld-eyebrow + motiverande öppen-räknare), grupp-korten är en
 // responsiv kupong-grid (1 kolumn på smal mobil -> 2 -> 3 på bred skärm), och
 // "gå med i ett rum"-läget är en INBJUDANDE guld-tonad port (kupong-ikon + tydlig

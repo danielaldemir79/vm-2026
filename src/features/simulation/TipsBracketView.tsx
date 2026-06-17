@@ -3,7 +3,7 @@
 // DANIELS ÖNSKAN: efter att ha tippat grupperna vill han SE hur sextondelen
 // (och vägen mot finalen) blir UR TIPSEN, "vilka som möter varandra". Denna vy
 // renderar deriveTipsBracket-bilden som ett träd, med EXAKT samma layout-hakar
-// som det riktiga slutspelsträdet (BracketView) så design-frontends premium-
+// som det riktiga slutspelsträdet (BracketView) så designens premium-
 // bracket-CSS (bracket.css) gäller utan dubblering.
 //
 // HARD ÄRLIGHET (gissa aldrig + tydlig märkning, AC i #88):
@@ -17,7 +17,7 @@
 //
 // SEMANTIK + a11y FÖRST (senior-devs lager): section + rubrik, en lista per runda,
 // varje slot en list-rad med läsbar etikett. Stabila data-attribut (data-bracket-
-// round/-match/-slot, data-tips-slot-resolution) som design-frontend bygger
+// round/-match/-slot, data-tips-slot-resolution) som designen bygger
 // premium ovanpå. Den horisontella kolumn-layouten tål mobil (overflow-x-auto).
 
 import { useMemo, type ReactNode } from 'react';

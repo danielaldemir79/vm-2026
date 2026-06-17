@@ -72,7 +72,7 @@ export type AdvancementStatus =
 
 /**
  * En människo-läsbar slutsats för ett lag: status + en svensk villkorstext +
- * maskinläsbara flaggor (för UI:t/design-frontend att gruppera och styla).
+ * maskinläsbara flaggor (för UI:t/designen att gruppera och styla).
  */
 export interface TeamScenario {
   /** Laget (Team.id). */
