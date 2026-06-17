@@ -393,6 +393,57 @@ describe('LiveMatchCard, status-styrd klocka (vattenpaus-säker)', () => {
   });
 });
 
+describe('LiveMatchCard, a11y: artig live-region annonserar mål/slut', () => {
+  const announceOf = () =>
+    screen.getByRole('region').querySelector('[data-live-announce]');
+
+  it('speglar ställningen i en aria-live="polite"-region medan matchen är live', () => {
+    renderCard({ status: 'live', homeGoals: 1, awayGoals: 0 });
+    const announce = announceOf();
+    expect(announce).not.toBeNull();
+    expect(announce).toHaveAttribute('aria-live', 'polite');
+    expect(announce).toHaveAttribute('aria-atomic', 'true');
+    expect(announce?.textContent).toMatch(/Nederländerna 1-0 Japan/);
+  });
+
+  it('uppdaterar annonsen när ett mål faller (ställningen ändras 1-0 -> 1-1)', () => {
+    const { rerender } = renderCard({ status: 'live', homeGoals: 1, awayGoals: 0 });
+    expect(announceOf()?.textContent).toMatch(/1-0/);
+    rerender(
+      <LiveMatchCard
+        data={live({ status: 'live', homeGoals: 1, awayGoals: 1 })}
+        homeName="Nederländerna"
+        awayName="Japan"
+        homeApiId={HOME}
+        homeCode="NED"
+        awayCode="JPN"
+        now={SYNC_MS}
+      />
+    );
+    expect(announceOf()?.textContent).toMatch(/1-1/);
+  });
+
+  it('EXKLUDERAR den tickande klockan (minuten får inte spamma uppläsningar)', () => {
+    // Klockan visar "34'" på kortet, men annonsen bär BARA ställningen (ingen minut),
+    // så en minut-tick var 60:e sekund inte triggar en ny uppläsning.
+    renderCard({ status: 'live', elapsedMinute: 29 }, SYNC_MS + min(5));
+    expect(within(screen.getByRole('region')).getByText("34'")).toBeInTheDocument();
+    expect(announceOf()?.textContent).not.toMatch(/\d+\+?'/);
+  });
+
+  it('annonserar SLUTRESULTAT när matchen är slut', () => {
+    renderCard({ status: 'finished', frozen: true, homeGoals: 2, awayGoals: 1 }, SYNC_MS + min(120));
+    expect(announceOf()?.textContent).toMatch(/Slutresultat: Nederländerna 2-1 Japan/);
+  });
+
+  it('är TOM före avspark (scheduled): inget pågående skeende att annonsera', () => {
+    renderCard({ status: 'scheduled', homeGoals: 0, awayGoals: 0 });
+    const announce = announceOf();
+    expect(announce).not.toBeNull();
+    expect(announce?.textContent).toBe('');
+  });
+});
+
 describe('LiveMatchCard, "Visa mer" fäller ut statistik + laguppställning', () => {
   it('detaljerna är DOLDA default, "Visa mer"-knappen syns (aria-expanded=false)', () => {
     renderCard();
