@@ -19,17 +19,21 @@ badges, reactions and comments). Built and run live for real friends during the 
 
 ## Screenshots
 
-| Home (dark) | Home (light) |
+| Today, the day's matches (dark) | Today, the day's matches (light) |
 | --- | --- |
-| ![Home, dark theme](docs/screenshots/02-hero-daily-dark.png) | ![Home, light theme](docs/screenshots/03-hero-daily-light.png) |
+| ![Today tab with countdown and the day's matches, dark theme](docs/screenshots/01-idag-dark.png) | ![Today tab with countdown and the day's matches, light theme](docs/screenshots/02-idag-light.png) |
 
-| Group tables | Team profile |
+| Group tables (Tournament) | Tournament statistics (Tournament) |
 | --- | --- |
-| ![Group stage tables](docs/screenshots/04-group-stage.png) | ![Team profile modal](docs/screenshots/05-team-profile.png) |
+| ![Group stage tables](docs/screenshots/03-group-stage.png) | ![Top scorers and tournament statistics](docs/screenshots/04-tournament-stats.png) |
 
-| Mobile (the primary surface) | Today tab |
+| Global leaderboard (Leaderboard) | Team profile |
 | --- | --- |
-| ![Mobile home](docs/screenshots/06-mobile-home-dark.png) | ![Today tab](docs/screenshots/01-home-full-dark.png) |
+| ![The global cross-room leaderboard](docs/screenshots/05-global-leaderboard.png) | ![Team profile modal](docs/screenshots/06-team-profile.png) |
+
+| Mobile (the primary surface) | |
+| --- | --- |
+| ![Mobile Today tab with the day's matches and bottom tab bar](docs/screenshots/07-mobile-idag-dark.png) | |
 
 Screenshots are generated from the real built app in fixtures mode (no backend) via a
 Playwright capture script, see [Regenerating the screenshots](#regenerating-the-screenshots).
@@ -78,6 +82,10 @@ on top of it. Plus a set of information screens around both.
   appears when there is actually data to show.
 - **Browsable history.** Live data is stored permanently and frozen when a match ends. You can
   scroll back days later and see the stats and goalscorers, not just for ongoing matches.
+- **"Watch highlights".** A finished match card gains a "Watch highlights" link that opens a
+  YouTube search for that exact match in a new tab. It only appears on completed matches (an
+  upcoming or ongoing match has no highlights yet), and the search is built from the same team
+  names the card already shows, so it lands on the right match.
 - **Live-updated leaderboard (Leaderboard tab).** Rankings update in real time as matches play
   out - when a goal is confirmed the points recalculate and rows slide to their new positions
   (preliminary, flagged; the official results are never touched).
@@ -288,7 +296,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Format check | `npm run format:check` |
 
-- **2926 passing tests** across 276 test files (Vitest) on a fresh clone, with 56 tests
+- **3071 passing tests** across 286 test files (Vitest) on a fresh clone, with 56 tests
   skipped by design (the live Supabase RLS integration tests, which only run when Supabase
   env is configured, see below). Verified by running `npm test`.
 - **Security proven, not assumed.** The Row Level Security model (only the admin can write

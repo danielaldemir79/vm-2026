@@ -8,7 +8,10 @@ import { DailyMatchesView } from './DailyMatchesView';
 import type { DataSource } from '../../data';
 import type { LiveDataResult } from './use-live-data';
 import type { LiveData } from '../../data/livescore';
+import type { Group, Match, Team } from '../../domain/types';
 import { createFailingDataSource } from '../../test/failing-data-source';
+import { HIGHLIGHTS_SEEN_KEY } from '../app-settings';
+import { HIGHLIGHTS_FEATURE_LAUNCH_MS } from './match-display';
 
 // useLiveData mockas så HERO-/dags-tema-/etikett-testerna (no-live-vägen) är
 // DETERMINISTISKA. Fixtures-läget bär numera en PÅGÅENDE demo-match (g-F-1), så utan
@@ -397,5 +400,148 @@ describe('DailyMatchesView, lägesmedvetet topp-fält när en match pågår (Bit
 
     expect(container.querySelector('[data-daily-hero]')).not.toBeNull();
     expect(container.querySelector('[data-live-now]')).toBeNull();
+  });
+});
+
+// HÖJDPUNKTER NYTT-BADGEN: visas BARA (inom tidsfönstret) OCH (användaren inte klickat
+// än); efter första klicket på valfritt kort försvinner den på ALLA kort (per enhet,
+// persisterat). Tidsfönstret (isHighlightsFeatureNew) är BACKUP för den som aldrig klickar.
+//
+// Deterministisk setup: vi fejkar BARA Date (toFake: ['Date'], samma mönster som
+// hero-etikett-testerna ovan) och pinnar klockan på lanseringsdagen (inom fönstret),
+// samt injicerar en datakälla med EN färdigspelad match (bär höjdpunkts-pillen) + EN
+// kommande match samma svenska dag (så dagen inte rullar vidare och hero:n har en
+// ospelad "dagens match"). Den färdigspelade matchen visas i LISTAN med pillen + badgen.
+describe('DailyMatchesView, höjdpunkter NYTT-badge: visa, dölj vid klick + tidsbox-backup', () => {
+  const team = (id: string, name: string): Team => ({
+    id,
+    name,
+    code: id.toUpperCase(),
+    group: 'A',
+  });
+  const teams: Team[] = [
+    team('mex', 'Mexiko'),
+    team('rsa', 'Sydafrika'),
+    team('fra', 'Frankrike'),
+    team('arg', 'Argentina'),
+  ];
+  const groups: Group[] = [{ id: 'A', teamIds: ['mex', 'rsa', 'fra', 'arg'] }];
+
+  /** En färdigspelad gruppmatch (bär höjdpunkts-pillen) på lanseringsdagens svenska dag. */
+  const finishedMatch: Match = {
+    id: 'g-A-1',
+    stage: 'group',
+    groupId: 'A',
+    homeTeamId: 'mex',
+    awayTeamId: 'rsa',
+    kickoff: '2026-06-18T10:00:00.000Z',
+    venue: 'Arena ej verifierad (egen data-punkt)',
+    tvChannel: 'TV4',
+    status: 'finished',
+    result: { homeGoals: 2, awayGoals: 1 },
+  };
+  /** En KOMMANDE match samma svenska dag, så followDayIndex inte rullar vidare (todayAllFinished=false). */
+  const scheduledMatch: Match = {
+    id: 'g-A-2',
+    stage: 'group',
+    groupId: 'A',
+    homeTeamId: 'fra',
+    awayTeamId: 'arg',
+    kickoff: '2026-06-18T18:00:00.000Z',
+    venue: 'Arena ej verifierad (egen data-punkt)',
+    tvChannel: 'TV4',
+    status: 'scheduled',
+    result: null,
+  };
+
+  function highlightsSource(): DataSource {
+    return {
+      getTeams: () => Promise.resolve(teams),
+      getGroups: () => Promise.resolve(groups),
+      getMatches: () => Promise.resolve([finishedMatch, scheduledMatch]),
+    };
+  }
+
+  /** Höjdpunkts-länken i den färdigspelade matchens kort (g-A-1, Mexiko-Sydafrika). */
+  async function findHighlightsLink() {
+    return screen.findByRole('link', {
+      name: /Se höjdpunkter.*Mexiko mot Sydafrika/,
+    });
+  }
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    // Fejka bara Date (samma som hero-etikett-testerna): providerns async-seed + waitFor
+    // kör på riktiga timers. Pinnad på lanseringsdagen (HIGHLIGHTS_FEATURE_LAUNCH_MS, UTC-
+    // midnatt 2026-06-18) + 8h = klart INOM 14-dagars-fönstret.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(HIGHLIGHTS_FEATURE_LAUNCH_MS + 8 * 60 * 60 * 1000));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  it('(a) VISAR NYTT-badgen när inom fönstret OCH ej sedd (ingen flagga satt)', async () => {
+    renderView(fixturesEnv(), <DailyMatchesView />, highlightsSource());
+    await waitSettled();
+    const link = await findHighlightsLink();
+    // Inom fönstret + ej klickat -> NYTT (data-haken satt, "(ny funktion)" i a11y-namnet).
+    expect(link).toHaveAttribute('data-highlights-new', '');
+    expect(link).toHaveAccessibleName(/Se höjdpunkter \(ny funktion\)/);
+  });
+
+  it('(b) DÖLJER NYTT-badgen när seen-flaggan redan är satt (även inom fönstret)', async () => {
+    // Klickat på en TIDIGARE enhets-session: flaggan är satt -> ingen badge trots fönstret.
+    window.localStorage.setItem(HIGHLIGHTS_SEEN_KEY, '1');
+    renderView(fixturesEnv(), <DailyMatchesView />, highlightsSource());
+    await waitSettled();
+    const link = await findHighlightsLink();
+    expect(link).not.toHaveAttribute('data-highlights-new');
+    expect(link).toHaveAccessibleName(/Se höjdpunkter för Mexiko mot Sydafrika/);
+  });
+
+  it('(c) KLICK på pillen sätter flaggan + badgen FÖRSVINNER (på kortet)', async () => {
+    renderView(fixturesEnv(), <DailyMatchesView />, highlightsSource());
+    await waitSettled();
+    const link = await findHighlightsLink();
+    expect(link).toHaveAttribute('data-highlights-new', '');
+
+    fireEvent.click(link);
+
+    // Flaggan persisterades (per enhet) och badgen försvinner (re-render utan NYTT).
+    expect(window.localStorage.getItem(HIGHLIGHTS_SEEN_KEY)).toBe('1');
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: /Se höjdpunkter.*Mexiko mot Sydafrika/ })
+      ).not.toHaveAttribute('data-highlights-new');
+    });
+  });
+
+  it('(d) klicket BLOCKERAR INTE navigeringen (href/target intakt, ingen preventDefault)', async () => {
+    renderView(fixturesEnv(), <DailyMatchesView />, highlightsSource());
+    await waitSettled();
+    const link = await findHighlightsLink();
+    const href = link.getAttribute('href') ?? '';
+    expect(href.startsWith('https://www.youtube.com/results?')).toBe(true);
+    expect(link).toHaveAttribute('target', '_blank');
+
+    // fireEvent.click (RTL-wrappat i act) returnerar false om eventet AVBRÖTS
+    // (preventDefault kallades). true här = ingen preventDefault -> webbläsaren
+    // navigerar som vanligt. Ett onClick som e.preventDefault():ar rödnar detta.
+    const notPrevented = fireEvent.click(link);
+    expect(notPrevented).toBe(true);
+  });
+
+  it('(e) tidsbox-BACKUP: ej sedd men EFTER fönstret -> badgen dold', async () => {
+    // Efter 14-dagars-fönstret (launch + 14 dygn + 1h): isHighlightsFeatureNew=false, så
+    // badgen är dold ÄVEN för en användare som aldrig klickat (frånvarande seen-flagga).
+    const afterWindow = HIGHLIGHTS_FEATURE_LAUNCH_MS + 14 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000;
+    vi.setSystemTime(new Date(afterWindow));
+    renderView(fixturesEnv(), <DailyMatchesView />, highlightsSource());
+    await waitSettled();
+    const link = await findHighlightsLink();
+    expect(window.localStorage.getItem(HIGHLIGHTS_SEEN_KEY)).toBeNull(); // aldrig klickat
+    expect(link).not.toHaveAttribute('data-highlights-new');
   });
 });
