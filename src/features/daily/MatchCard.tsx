@@ -31,6 +31,7 @@ import { resolveApiTeamId } from '../../data/livescore';
 import { LiveMatchCard } from './LiveMatchCard';
 import { formatKickoffTime } from './format-datetime';
 import {
+  buildHighlightsSearchUrl,
   formatFifaRanking,
   formatPenalties,
   formatScore,
@@ -235,6 +236,12 @@ export function MatchCard({
   const score = finished ? formatScore(match.result) : null;
   const penalties = finished ? formatPenalties(match.result) : null;
 
+  // "Se höjdpunkter"-länk: BARA på en färdigspelad match (Daniels önskan). En kommande/
+  // live-match har inga höjdpunkter än, så länken visas inte då. Sökningen byggs av de
+  // SAMMA visningsnamnen kortet redan visar (home/away via teamDisplayName), så den matchar
+  // det användaren ser. Ren YouTube-söklänk (ingen API/nyckel/kostnad), se match-display.ts.
+  const highlightsUrl = finished ? buildHighlightsSearchUrl(home, away) : null;
+
   // Tillgängligt namn: en mening som sammanfattar kortet. För en spelad match
   // läses "Mexiko 2-1 Sydafrika" (resultatet i mitten); annars "Mexiko mot
   // Sydafrika" (ospelad). Straffar läggs till efteråt så slutspel inte är tvetydigt.
@@ -434,6 +441,35 @@ export function MatchCard({
                   </span>
                 </>
               ) : null}
+            </dd>
+          </div>
+        ) : null}
+        {/* "SE HÖJDPUNKTER" (Daniels önskan): BARA på en färdigspelad match (highlightsUrl
+            är null annars, alltså osynlig på kommande/live). En extern YouTube-söklänk,
+            DISKRET placerad i kortets meta-rad så den känns som en naturlig del av kortet,
+            inte dominerar. target=_blank + rel=noopener noreferrer (säker extern länk, samma
+            konvention som appens övriga externa länkar). aria-label namnger BÅDA lagen + att
+            den öppnas i ny flik, så en skärmläsare hör exakt vart länken går. Pilen (▶) är
+            dekorativ (aria-hidden), texten "Se höjdpunkter" bär betydelsen. fg-muted är redan
+            AA-mätt i båda teman (tokens.css); accent-understruket på hover/fokus markerar den
+            som en länk. focus-visible-ring för tangentbords-fokus. */}
+        {highlightsUrl !== null ? (
+          <div className="flex items-center gap-1">
+            <dt className="sr-only">Höjdpunkter</dt>
+            <dd>
+              <a
+                data-highlights-link=""
+                href={highlightsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Se höjdpunkter för ${home} mot ${away} på YouTube (öppnas i ny flik)`}
+                className="inline-flex items-center gap-1 rounded-sm font-medium text-fg-muted underline-offset-[3px] decoration-accent decoration-2 hover:text-fg hover:underline focus-visible:underline"
+              >
+                <span aria-hidden="true" className="text-[0.625rem] leading-none">
+                  ▶
+                </span>
+                <span>Se höjdpunkter</span>
+              </a>
             </dd>
           </div>
         ) : null}
