@@ -13,14 +13,22 @@
 // WHAT THE SET SHOWS (the current FIVE-TAB app: Idag/Tips/Topplista/Turnering/Mer):
 // the views below are chosen to read as a cohesive product tour and to land on what
 // fixtures mode actually renders (every shot is a real, populated view, never faked):
-//   - Idag, with the LIVE-NOW panel leading (a match is in progress in fixtures, so
-//     the daily view leads with the live block, not the static countdown hero), in
-//     dark and light theme.
+//   - Idag, framed on the upcoming match cards ("Nästa avspark" countdown + the day's
+//     scheduled matches with kickoff time, Swedish TV channel, venue and FIFA ranking),
+//     in dark and light theme.
 //   - Turnering: the live group tables, and the rich tournament statistics (top
 //     scorers + the stats cards), both populated from the bundled demo data.
 //   - Topplista: the global (cross-room) leaderboard, populated with the demo field.
 //   - A team profile modal.
 //   - The mobile layout (the primary surface for friends in a group chat).
+//
+// WHY NOT LEAD WITH THE LIVE-NOW PANEL: in fixtures mode the bundled live snapshot is
+// a 0-0 in-play scoreline carrying a rich event blob borrowed from a DIFFERENT match
+// (goalscorers from the wrong teams, a 90+' event under a sub-30' clock). With real
+// live data the panel is coherent; in fixtures it reads as a data bug, so the Idag
+// shots are framed on the upcoming-match surface (the "Nästa avspark" pillar onwards),
+// which is internally consistent. The live-now panel sits above that frame and is
+// described in the README feature tour rather than shown.
 //
 // HONESTY NOTE (fixtures limits): the "Se höjdpunkter" link only appears on a
 // FINISHED match card, and the dynamic knockout bracket only fills once group
@@ -59,33 +67,69 @@ async function dismissUpdatePrompt(page: Page): Promise<void> {
   }
 }
 
-// IDAG, dark: a match is live in fixtures, so the day view LEADS with the live-now
-// panel (live clock + scoreline + goalscorers) over the "next kickoff" countdown.
-// A viewport shot (not fullPage) frames the above-the-fold: flik-title + live block +
-// the next-kickoff pillar, the app's first impression.
-test('idag, live panel (dark)', async ({ page }) => {
+/**
+ * Scroll the Idag view so it is framed on the UPCOMING-match surface and capture a
+ * viewport shot. We anchor the "Nästa avspark" countdown pillar just below the sticky
+ * header band: that places the coherent surface (countdown -> day navigation -> the
+ * day's scheduled match cards with TV channel / venue / FIFA ranking) in frame, and
+ * pushes the fixtures live-now panel (the incoherent 0-0-with-foreign-goalscorers
+ * artefact) ABOVE the frame. We assert the day list actually has a populated match card
+ * so we never commit an empty frame. The countdown pillar only exists while a match is
+ * live (in fixtures it always is), so we wait for it, then scroll it into place.
+ *
+ * The app header is `position: sticky; top: 0` on every breakpoint, so a plain
+ * scrollIntoView({ block: 'start' }) would tuck the pillar's top edge UNDER it
+ * (clipping the countdown tiles). On DESKTOP the tab bar is also sticky directly under
+ * the header (so the top band = header + tab bar); on MOBILE the tab bar is a FIXED
+ * BOTTOM bar (not part of the top band). We therefore measure the TOP sticky band's
+ * bottom from the DOM (the header always, plus the tab bar only when it sits at the
+ * top) and scroll so the pillar's top lands a small gap below it, so the "Nästa
+ * avspark" pillar reads in full on both layouts (no magic numbers, no clipping).
+ */
+async function frameUpcomingMatches(page: Page): Promise<void> {
+  const pillar = page.locator('[data-next-kickoff]');
+  await pillar.waitFor();
+  // Assert a real, populated match card is in the day list (never an empty frame).
+  await expect(page.locator('[data-match-card]').first()).toBeVisible();
+  await pillar.evaluate((el) => {
+    const GAP = 16; // breathing room below the sticky band
+    const header = document.querySelector('[data-app-header]');
+    let bandBottom = header ? header.getBoundingClientRect().bottom : 0;
+    // Include the tab bar in the top band only when it sits at the TOP (desktop sticky
+    // row), not when it is the fixed BOTTOM bar (mobile): a top-positioned tab bar has
+    // its top within the upper region of the viewport.
+    const tabBar = document.querySelector('[role="tablist"]');
+    if (tabBar) {
+      const rect = tabBar.getBoundingClientRect();
+      if (rect.top < window.innerHeight / 2) {
+        bandBottom = Math.max(bandBottom, rect.bottom);
+      }
+    }
+    const pillarTop = el.getBoundingClientRect().top;
+    // Move the page so the pillar top lands GAP px under the top sticky band's bottom.
+    window.scrollBy({ top: pillarTop - bandBottom - GAP, behavior: 'instant' });
+  });
+}
+
+// IDAG, dark: framed on the upcoming matches. The "Nästa avspark" countdown leads,
+// followed by the day navigation and the day's scheduled match cards (kickoff time,
+// Swedish TV channel, venue, FIFA ranking). A viewport shot (not fullPage) frames this
+// coherent surface; the fixtures live-now panel sits above the frame (see header note).
+test('idag, upcoming matches (dark)', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 980 });
   await openApp(page, { theme: 'dark' });
-  // Assert the live panel is actually present (the lead this shot is built around) and
-  // that its clock shows a real in-play minute (not the "45+"/"Slut" degraded cap), so
-  // we never commit a shot of a frozen/capped clock. A live snapshot's elapsed minute is
-  // a number like "29'"; we require a digit-led minute, not a boundary/finished label.
-  await page.locator('[data-live-now]').waitFor();
-  const clock = (
-    await page.locator('[data-live-clock], .vm-live-clock').first().innerText()
-  ).trim();
-  expect(clock).toMatch(/^\d/);
+  await frameUpcomingMatches(page);
   await dismissUpdatePrompt(page);
-  await page.screenshot({ path: `${OUT}/01-idag-live-dark.png` });
+  await page.screenshot({ path: `${OUT}/01-idag-dark.png` });
 });
 
-// IDAG, light: same lead, light theme, to show the dual-theme polish.
-test('idag, live panel (light)', async ({ page }) => {
+// IDAG, light: same framing, light theme, to show the dual-theme polish.
+test('idag, upcoming matches (light)', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 980 });
   await openApp(page, { theme: 'light' });
-  await page.locator('[data-live-now]').waitFor();
+  await frameUpcomingMatches(page);
   await dismissUpdatePrompt(page);
-  await page.screenshot({ path: `${OUT}/02-idag-live-light.png` });
+  await page.screenshot({ path: `${OUT}/02-idag-light.png` });
 });
 
 // TURNERING, group tables: the live-computed standings for all 12 groups. The
@@ -147,11 +191,15 @@ test('team profile modal (dark)', async ({ page }) => {
 });
 
 // Mobile viewport (iPhone-ish): the app is a PWA shared in a group chat, so the
-// phone layout is the primary one for friends. Full page on a single mobile tab.
+// phone layout is the primary one for friends. Framed (like the desktop Idag shots) on
+// the upcoming-match surface: a VIEWPORT shot (not fullPage) anchored on the "Nästa
+// avspark" countdown so the day's scheduled match cards lead and the fixtures live-now
+// panel is scrolled above the frame (see header note). fullPage would re-include the
+// panel at the top, so we deliberately use a single-viewport clip here.
 test('mobile idag (dark)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openApp(page, { theme: 'dark' });
-  await page.locator('[data-live-now]').waitFor();
+  await frameUpcomingMatches(page);
   await dismissUpdatePrompt(page);
-  await page.screenshot({ path: `${OUT}/07-mobile-idag-dark.png`, fullPage: true });
+  await page.screenshot({ path: `${OUT}/07-mobile-idag-dark.png` });
 });

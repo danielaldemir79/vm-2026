@@ -20,9 +20,9 @@ under turneringen.
 
 ## Skärmdumpar
 
-| Idag, med livescore (mörkt) | Idag, med livescore (ljust) |
+| Idag, dagens matcher (mörkt) | Idag, dagens matcher (ljust) |
 | --- | --- |
-| ![Idag-fliken med live-panel, mörkt tema](docs/screenshots/01-idag-live-dark.png) | ![Idag-fliken med live-panel, ljust tema](docs/screenshots/02-idag-live-light.png) |
+| ![Idag-fliken med nedräkning och dagens matcher, mörkt tema](docs/screenshots/01-idag-dark.png) | ![Idag-fliken med nedräkning och dagens matcher, ljust tema](docs/screenshots/02-idag-light.png) |
 
 | Grupptabeller (Turnering) | Turneringsstatistik (Turnering) |
 | --- | --- |
@@ -34,7 +34,7 @@ under turneringen.
 
 | Mobil (den primära ytan) | |
 | --- | --- |
-| ![Mobil Idag-flik med live-panel och flikrad längst ned](docs/screenshots/07-mobile-idag-dark.png) | |
+| ![Mobil Idag-flik med dagens matcher och flikrad längst ned](docs/screenshots/07-mobile-idag-dark.png) | |
 
 Skärmdumparna genereras från den faktiskt byggda appen i fixtures-läge (utan backend) via ett
 Playwright-skript, se [Regenerera skärmdumparna](#regenerera-skärmdumparna).

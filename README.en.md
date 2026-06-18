@@ -19,9 +19,9 @@ badges, reactions and comments). Built and run live for real friends during the 
 
 ## Screenshots
 
-| Today, with live scores (dark) | Today, with live scores (light) |
+| Today, the day's matches (dark) | Today, the day's matches (light) |
 | --- | --- |
-| ![Today tab with live panel, dark theme](docs/screenshots/01-idag-live-dark.png) | ![Today tab with live panel, light theme](docs/screenshots/02-idag-live-light.png) |
+| ![Today tab with countdown and the day's matches, dark theme](docs/screenshots/01-idag-dark.png) | ![Today tab with countdown and the day's matches, light theme](docs/screenshots/02-idag-light.png) |
 
 | Group tables (Tournament) | Tournament statistics (Tournament) |
 | --- | --- |
@@ -33,7 +33,7 @@ badges, reactions and comments). Built and run live for real friends during the 
 
 | Mobile (the primary surface) | |
 | --- | --- |
-| ![Mobile Today tab with live panel and bottom tab bar](docs/screenshots/07-mobile-idag-dark.png) | |
+| ![Mobile Today tab with the day's matches and bottom tab bar](docs/screenshots/07-mobile-idag-dark.png) | |
 
 Screenshots are generated from the real built app in fixtures mode (no backend) via a
 Playwright capture script, see [Regenerating the screenshots](#regenerating-the-screenshots).
