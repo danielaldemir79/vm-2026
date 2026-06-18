@@ -101,6 +101,16 @@ export interface MatchCardProps {
    * Ligger på en egen rad efter live-/fotraden så den inte konkurrerar med lagnamns-knapparna.
    */
   detailAction?: ReactNode;
+  /**
+   * Visa en "NYTT"-badge på "Se höjdpunkter"-pillen (signalerar en ny funktion). Default
+   * false = ingen badge, så ett anrops-ställe som inte bryr sig är opåverkat. Flaggan
+   * härleds RENT av anroparen (DailyMatchesView via useTodayKey.nowMs +
+   * isHighlightsFeatureNew), så MatchCard förblir en ren presentations-komponent: den
+   * läser ingen klocka/settings själv, "är ny" kommer som prop. Påverkar bara ett
+   * FÄRDIGSPELAT kort (där pillen alls finns); på en kommande/live-match är pillen
+   * osynlig och flaggan därmed betydelselös.
+   */
+  highlightsIsNew?: boolean;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -204,6 +214,7 @@ export function MatchCard({
   liveData = null,
   now,
   detailAction = null,
+  highlightsIsNew = false,
 }: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
@@ -445,30 +456,47 @@ export function MatchCard({
           </div>
         ) : null}
         {/* "SE HÖJDPUNKTER" (Daniels önskan): BARA på en färdigspelad match (highlightsUrl
-            är null annars, alltså osynlig på kommande/live). En extern YouTube-söklänk,
-            DISKRET placerad i kortets meta-rad så den känns som en naturlig del av kortet,
-            inte dominerar. target=_blank + rel=noopener noreferrer (säker extern länk, samma
-            konvention som appens övriga externa länkar). aria-label namnger BÅDA lagen + att
-            den öppnas i ny flik, så en skärmläsare hör exakt vart länken går. Pilen (▶) är
-            dekorativ (aria-hidden), texten "Se höjdpunkter" bär betydelsen. fg-muted är redan
-            AA-mätt i båda teman (tokens.css); accent-understruket på hover/fokus markerar den
-            som en länk. focus-visible-ring för tangentbords-fokus. */}
+            är null annars, alltså osynlig på kommande/live). En extern YouTube-söklänk som
+            en accent-tonad PILL (.vm-highlights-pill, tokens.css §27) i kortets meta-rad, så
+            den STICKER UT och drar blicken men inte dominerar (kortet bär redan resultat +
+            målskyttar). target=_blank + rel=noopener noreferrer (säker extern länk, samma
+            konvention som appens övriga externa länkar). Pilen (▶) är dekorativ (aria-hidden),
+            texten "Se höjdpunkter" bär betydelsen; pillens text är full fg på en accent-9%-
+            tint, AA-mätt i båda teman (tokens.css §27).
+
+            NYTT-BADGEN (highlightsIsNew): en liten accent-bricka som signalerar en NY
+            funktion. Tidsbegränsad i logiken hos anroparen (auto-försvinner ~14 dygn efter
+            lansering), så den syns som nyhet NU men blir aldrig inaktuell. Badgen är
+            dekorativ (aria-hidden); funktions-nyheten vävs i stället begripligt in i
+            länkens aria-label ("(ny funktion)") medan den visas, så en skärmläsare hör det
+            utan att läsa en lös "NYTT"-glyf. */}
         {highlightsUrl !== null ? (
           <div className="flex items-center gap-1">
             <dt className="sr-only">Höjdpunkter</dt>
             <dd>
               <a
                 data-highlights-link=""
+                data-highlights-new={highlightsIsNew ? '' : undefined}
                 href={highlightsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`Se höjdpunkter för ${home} mot ${away} på YouTube (öppnas i ny flik)`}
-                className="inline-flex items-center gap-1 rounded-sm font-medium text-fg-muted underline-offset-[3px] decoration-accent decoration-2 hover:text-fg hover:underline focus-visible:underline"
+                aria-label={`Se höjdpunkter${
+                  highlightsIsNew ? ' (ny funktion)' : ''
+                } för ${home} mot ${away} på YouTube (öppnas i ny flik)`}
+                className="vm-highlights-pill"
               >
-                <span aria-hidden="true" className="text-[0.625rem] leading-none">
+                <span
+                  aria-hidden="true"
+                  className="vm-highlights-pill-icon text-[0.625rem] leading-none"
+                >
                   ▶
                 </span>
                 <span>Se höjdpunkter</span>
+                {highlightsIsNew ? (
+                  <span aria-hidden="true" className="vm-highlights-pill-new">
+                    Nytt
+                  </span>
+                ) : null}
               </a>
             </dd>
           </div>
