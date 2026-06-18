@@ -20,17 +20,21 @@ under turneringen.
 
 ## Skärmdumpar
 
-| Startsida (mörkt) | Startsida (ljust) |
+| Idag, med livescore (mörkt) | Idag, med livescore (ljust) |
 | --- | --- |
-| ![Startsida, mörkt tema](docs/screenshots/02-hero-daily-dark.png) | ![Startsida, ljust tema](docs/screenshots/03-hero-daily-light.png) |
+| ![Idag-fliken med live-panel, mörkt tema](docs/screenshots/01-idag-live-dark.png) | ![Idag-fliken med live-panel, ljust tema](docs/screenshots/02-idag-live-light.png) |
 
-| Grupptabeller | Lagprofil |
+| Grupptabeller (Turnering) | Turneringsstatistik (Turnering) |
 | --- | --- |
-| ![Gruppspelets tabeller](docs/screenshots/04-group-stage.png) | ![Lagprofil-modal](docs/screenshots/05-team-profile.png) |
+| ![Gruppspelets tabeller](docs/screenshots/03-group-stage.png) | ![Skytteliga och turneringsstatistik](docs/screenshots/04-tournament-stats.png) |
 
-| Mobil (den primära ytan) | Idag-fliken |
+| Global topplista (Topplista) | Lagprofil |
 | --- | --- |
-| ![Mobil startsida](docs/screenshots/06-mobile-home-dark.png) | ![Idag-fliken](docs/screenshots/01-home-full-dark.png) |
+| ![Den globala topplistan över alla rum](docs/screenshots/05-global-leaderboard.png) | ![Lagprofil-modal](docs/screenshots/06-team-profile.png) |
+
+| Mobil (den primära ytan) | |
+| --- | --- |
+| ![Mobil Idag-flik med live-panel och flikrad längst ned](docs/screenshots/07-mobile-idag-dark.png) | |
 
 Skärmdumparna genereras från den faktiskt byggda appen i fixtures-läge (utan backend) via ett
 Playwright-skript, se [Regenerera skärmdumparna](#regenerera-skärmdumparna).
@@ -78,6 +82,10 @@ Plus en uppsättning informationsskärmar runt båda.
   när det faktiskt finns data att visa.
 - **Bläddringsbar historik.** Live-datan sparas permanent och fryses när en match är klar. Man kan
   bläddra tillbaka dagar efteråt och se statistik och målskyttar, inte bara för pågående matcher.
+- **"Se höjdpunkter".** På ett färdigspelat matchkort dyker en "Se höjdpunkter"-länk upp som öppnar
+  en YouTube-sökning på just den matchen i en ny flik. Den visas bara på avgjorda matcher (en
+  kommande eller pågående match har inga höjdpunkter än), och sökningen byggs av samma lagnamn som
+  kortet redan visar, så den landar rätt.
 - **Live-uppdaterad topplista (Topplista-fliken).** Placeringarna rör sig i realtid medan
   matcher spelas - när ett mål bekräftas räknas poängen om och raderna glider till sina nya
   platser (preliminärt, märkt; det officiella facit rörs aldrig).
@@ -288,7 +296,7 @@ npm run preview    # serve the built dist/ locally
 | Lint | `npm run lint` |
 | Formatkontroll | `npm run format:check` |
 
-- **2926 passerande tester** över 276 testfiler (Vitest) på en färsk klon, med 56 tester som
+- **3071 passerande tester** över 286 testfiler (Vitest) på en färsk klon, med 56 tester som
   hoppas över med flit (live-Supabase RLS-integrationstesterna, som bara körs när Supabase-env
   är konfigurerat, se nedan). Verifierat genom att köra `npm test`.
 - **Säkerhet bevisad, inte antagen.** Row Level Security-modellen (bara admin kan skriva
