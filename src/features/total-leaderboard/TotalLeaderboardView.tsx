@@ -68,8 +68,9 @@ export function TotalLeaderboardView() {
           Global topplista
         </h2>
         <p className="max-w-2xl text-sm text-fg-muted">
-          Alla deltagare i alla rum, rangordnade på sin totala poäng. Din egen placering visas
-          överst, så du alltid ser var du står mot alla andra.
+          Alla som spelar, rangordnade på sitt bästa resultat. Är du med i flera rum räknas ditt
+          starkaste, så var och en syns en gång oavsett antal rum. Din egen placering visas överst,
+          så du alltid ser var du står mot hela fältet.
         </p>
       </header>
 
