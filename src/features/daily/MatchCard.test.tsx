@@ -286,7 +286,7 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     // Den synliga texten bär betydelsen (pilen är dekorativ).
     expect(link).toHaveTextContent('Se höjdpunkter');
-    // Pillen bär den delade pill-klassen (.vm-highlights-pill), inte en mut text-länk.
+    // Pillen bär den delade pill-klassen (.vm-highlights-pill), inte en dämpad text-länk.
     expect(link).toHaveClass('vm-highlights-pill');
     // Default (highlightsIsNew utelämnad): INGEN NYTT-badge.
     expect(link).not.toHaveAttribute('data-highlights-new');
