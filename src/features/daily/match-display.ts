@@ -180,3 +180,40 @@ export function buildHighlightsSearchUrl(homeName: string, awayName: string): st
   });
   return `https://www.youtube.com/results?${params.toString()}`;
 }
+
+/**
+ * Lanseringsdagen (epoch-ms) för "Se höjdpunkter"-pillen, som UTC-midnatt. En FAST
+ * konstant (inte "nu"): NYTT-markeringen ska räknas från en känd punkt, inte från när
+ * koden råkar köra, så fönstret är deterministiskt och testbart. Datumet är 2026-06-18
+ * (lanseringen). Vi använder UTC-midnatt som ankarpunkt så konstanten är en ren epoch-ms
+ * oberoende av maskinens tidszon; fönstret är 14 DYGN brett, så en någon-timmes glidning
+ * mellan UTC- och svensk midnatt är betydelselös för utfallet.
+ */
+export const HIGHLIGHTS_FEATURE_LAUNCH_MS = Date.UTC(2026, 5, 18); // månads-index 5 = juni
+
+/** Hur länge NYTT-markeringen visas efter lanseringen: 14 dygn, sedan bara pillen. */
+export const HIGHLIGHTS_FEATURE_NEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Är "Se höjdpunkter"-funktionen fortfarande NY (ska NYTT-badgen visas)? REN funktion
+ * med injicerat `now` (gissa aldrig en klocka inuti, lessons headline-tidsbeteende): true
+ * från lanseringen (`launch`) och i `windowMs` framåt, sedan false för alltid. Så badgen
+ * syns som nyhet vid lansering men blir aldrig inaktuell, och beteendet är bevisbart på
+ * BÅDA sidor av fönstret med ett injicerat `now` (negativ-kontroll, lessons).
+ *
+ * Vänster gräns INKLUSIVE (now === launch är ny), höger gräns EXKLUSIVE (now === launch +
+ * windowMs är INTE längre ny), så fönstret är exakt `windowMs` brett. Ett `now` FÖRE
+ * lanseringen (klocka fel-ställd / förhandsvisning) räknas inte som nytt heller (badgen
+ * hör till perioden EFTER lansering, inte före).
+ *
+ * @param now      Nuet (epoch-ms), injiceras av vyn (useTodayKey.nowMs), aldrig läst här.
+ * @param launch   Lanseringsdagen (epoch-ms), default HIGHLIGHTS_FEATURE_LAUNCH_MS.
+ * @param windowMs Fönstrets bredd i ms, default HIGHLIGHTS_FEATURE_NEW_WINDOW_MS (14 dygn).
+ */
+export function isHighlightsFeatureNew(
+  now: number,
+  launch: number = HIGHLIGHTS_FEATURE_LAUNCH_MS,
+  windowMs: number = HIGHLIGHTS_FEATURE_NEW_WINDOW_MS
+): boolean {
+  return now >= launch && now < launch + windowMs;
+}

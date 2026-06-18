@@ -4,7 +4,10 @@ import {
   buildHighlightsSearchUrl,
   formatPenalties,
   formatScore,
+  HIGHLIGHTS_FEATURE_LAUNCH_MS,
+  HIGHLIGHTS_FEATURE_NEW_WINDOW_MS,
   isFinished,
+  isHighlightsFeatureNew,
   isVenuePlaceholder,
   stageLabel,
   teamDisplayName,
@@ -171,6 +174,50 @@ describe('buildHighlightsSearchUrl, YouTube-söklänk för matchens höjdpunkter
     expect(new URL(url).searchParams.get('search_query')).toBe(
       'Åland Österrike VM 2026 höjdpunkter'
     );
+  });
+});
+
+describe('isHighlightsFeatureNew, tidsbegränsad NYTT-markering (injicerat now)', () => {
+  // En timme i ms, för att prova precis innanför/utanför fönster-gränserna.
+  const HOUR = 60 * 60 * 1000;
+
+  it('är NY vid lanseringen och en bit in i fönstret (vänster gräns inklusive)', () => {
+    // Exakt vid lanseringen: ny.
+    expect(isHighlightsFeatureNew(HIGHLIGHTS_FEATURE_LAUNCH_MS)).toBe(true);
+    // En timme efter lanseringen: fortfarande ny.
+    expect(isHighlightsFeatureNew(HIGHLIGHTS_FEATURE_LAUNCH_MS + HOUR)).toBe(true);
+    // En timme INNAN fönstret stänger: fortfarande ny.
+    expect(
+      isHighlightsFeatureNew(HIGHLIGHTS_FEATURE_LAUNCH_MS + HIGHLIGHTS_FEATURE_NEW_WINDOW_MS - HOUR)
+    ).toBe(true);
+  });
+
+  it('är INTE längre ny vid fönstrets slut och därefter (höger gräns exklusive)', () => {
+    // Exakt vid fönstrets slut (launch + windowMs): inte längre ny.
+    expect(
+      isHighlightsFeatureNew(HIGHLIGHTS_FEATURE_LAUNCH_MS + HIGHLIGHTS_FEATURE_NEW_WINDOW_MS)
+    ).toBe(false);
+    // En timme efter fönstret: inte ny.
+    expect(
+      isHighlightsFeatureNew(HIGHLIGHTS_FEATURE_LAUNCH_MS + HIGHLIGHTS_FEATURE_NEW_WINDOW_MS + HOUR)
+    ).toBe(false);
+    // Långt efter (ett år): inte ny, blir aldrig inaktuell genom att stå kvar.
+    expect(isHighlightsFeatureNew(HIGHLIGHTS_FEATURE_LAUNCH_MS + 365 * 24 * HOUR)).toBe(false);
+  });
+
+  it('är INTE ny FÖRE lanseringen (klocka fel-ställd / förhandsvisning)', () => {
+    expect(isHighlightsFeatureNew(HIGHLIGHTS_FEATURE_LAUNCH_MS - HOUR)).toBe(false);
+    expect(isHighlightsFeatureNew(0)).toBe(false);
+  });
+
+  it('respekterar ett INJICERAT launch + fönster (ingen ad-hoc-klocka inuti)', () => {
+    // Diskriminerande: samma `now` är ny relativt ETT fönster men inte ett annat,
+    // vilket bevisar att gränserna räknas mot de injicerade parametrarna, inte mot
+    // en intern klocka. now = 1000, fönster [1000, 1010) -> ny; fönster [0, 500) -> ej.
+    expect(isHighlightsFeatureNew(1000, 1000, 10)).toBe(true);
+    expect(isHighlightsFeatureNew(1000, 0, 500)).toBe(false);
+    // Och precis på höger gräns för det injicerade fönstret: exklusive.
+    expect(isHighlightsFeatureNew(1010, 1000, 10)).toBe(false);
   });
 });
 
