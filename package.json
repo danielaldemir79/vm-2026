@@ -1,6 +1,6 @@
 {
   "name": "vm-2026",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "type": "module",
   "description": "Proffsig PWA för att följa fotbolls-VM 2026 tillsammans med vänner.",
