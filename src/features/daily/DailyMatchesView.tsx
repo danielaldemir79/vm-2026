@@ -32,7 +32,7 @@ import { MatchDetailTrigger } from '../match-detail';
 import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favorite-team';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
-import { stageLabel, teamDisplayName } from './match-display';
+import { isHighlightsFeatureNew, stageLabel, teamDisplayName } from './match-display';
 
 /**
  * Etiketten ovanför hero:ns framträdande match: "Dagens match" BARA när matchen
@@ -202,7 +202,16 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
   // Dagens svenska kalenderdag (dag-medvetet: flyttar sig över midnatt/PWA-väckning,
   // se use-today-key). Driver hero-etiketten "Dagens match" vs matchens datum (#54).
-  const { todayKey } = useTodayKey();
+  // nowMs (stabilt inom dygnet) är appens BEFINTLIGA tidskälla, vi återbrukar den för
+  // höjdpunkts-pillens NYTT-markering i stället för en egen klocka (MatchCard förblir en
+  // ren presentations-komponent, "är ny" härleds RENT här och skickas in som prop).
+  const { todayKey, nowMs } = useTodayKey();
+
+  // Är höjdpunkts-funktionen fortfarande NY (visa NYTT-badgen)? Ren härledning ur appens
+  // tidskälla (nowMs) + den fasta lanseringsdagen: true ~14 dygn efter lansering, sedan
+  // false för alltid, så badgen syns som nyhet nu men blir aldrig inaktuell. Beräknas EN
+  // gång per render och skickas till båda matchkorts-anropen.
+  const highlightsIsNew = isHighlightsFeatureNew(nowMs);
 
   // PINNAT FAVORITLAG (T23, #23): lyft favoritlagets matcher DISKRET i listan (+ hero:n
   // om dagens match rör laget). Tolerant hook (ingen provider -> null), så vyn fungerar
@@ -392,6 +401,7 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
                               teamsById={teamsById}
                               highlight
                               highlightLabel={heroLabel}
+                              highlightsIsNew={highlightsIsNew}
                               favorite={matchHasFavorite(
                                 favoriteTeamId,
                                 matchOfTheDay.homeTeamId,
@@ -509,6 +519,7 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
                       match={match}
                       teamsById={teamsById}
                       liveData={liveByMatchId.get(match.id) ?? null}
+                      highlightsIsNew={highlightsIsNew}
                       detailAction={
                         // DRILL-IN (T86, #178): tryck på matchen -> rik matchvy (tidslinje +
                         // statistik + laguppställning + vad alla tippade). En tydlig egen

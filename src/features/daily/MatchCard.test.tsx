@@ -269,6 +269,8 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     renderCard(<MatchCard match={finished} teamsById={teamsById} />);
 
     // Tillgängligt namn: namnger BÅDA lagen + att den öppnas i ny flik (skärmläsar-vänligt).
+    // UTAN highlightsIsNew (default) är namnet OFÖRÄNDRAT (ingen "(ny funktion)"-inflätning),
+    // så ett anrops-ställe som inte bryr sig om NYTT är opåverkat.
     const link = screen.getByRole('link', {
       name: 'Se höjdpunkter för Mexiko mot Sydafrika på YouTube (öppnas i ny flik)',
     });
@@ -284,6 +286,42 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     // Den synliga texten bär betydelsen (pilen är dekorativ).
     expect(link).toHaveTextContent('Se höjdpunkter');
+    // Pillen bär den delade pill-klassen (.vm-highlights-pill), inte en mut text-länk.
+    expect(link).toHaveClass('vm-highlights-pill');
+    // Default (highlightsIsNew utelämnad): INGEN NYTT-badge.
+    expect(link).not.toHaveAttribute('data-highlights-new');
+    expect(within(link).queryByText('Nytt')).not.toBeInTheDocument();
+  });
+
+  it('VISAR NYTT-badgen + flätar in "(ny funktion)" i a11y-namnet när highlightsIsNew är satt', () => {
+    const finished = groupMatch({
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    });
+    renderCard(<MatchCard match={finished} teamsById={teamsById} highlightsIsNew />);
+
+    // A11y-namnet flätar IN "(ny funktion)" så en skärmläsare hör nyheten begripligt,
+    // i stället för en lös dekorativ "NYTT"-glyf.
+    const link = screen.getByRole('link', {
+      name: 'Se höjdpunkter (ny funktion) för Mexiko mot Sydafrika på YouTube (öppnas i ny flik)',
+    });
+    // Den synliga NYTT-badgen finns (dekorativ, aria-hidden) + data-haken är satt.
+    expect(link).toHaveAttribute('data-highlights-new', '');
+    expect(within(link).getByText('Nytt')).toBeInTheDocument();
+  });
+
+  it('VISAR INGEN NYTT-badge när highlightsIsNew är false (explicit), namnet oförändrat', () => {
+    const finished = groupMatch({
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    });
+    renderCard(<MatchCard match={finished} teamsById={teamsById} highlightsIsNew={false} />);
+
+    const link = screen.getByRole('link', {
+      name: 'Se höjdpunkter för Mexiko mot Sydafrika på YouTube (öppnas i ny flik)',
+    });
+    expect(link).not.toHaveAttribute('data-highlights-new');
+    expect(within(link).queryByText('Nytt')).not.toBeInTheDocument();
   });
 
   it('VISAR INTE "Se höjdpunkter" på en KOMMANDE match (inga höjdpunkter än)', () => {
