@@ -5,6 +5,25 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-18 , "Se höjdpunkter"-länk på färdigspelade matchkort (YouTube-sökning)
+
+**Beslut:** Ett färdigspelat matchkort (MatchCard, `isFinished(match)` true) får en diskret
+extern länk "Se höjdpunkter" som öppnar en YouTube-SÖKNING:
+`https://www.youtube.com/results?search_query=<enkodat>`, där söktermen är
+`"{hemma} {borta} VM 2026 höjdpunkter"` (lagnamnen från `teamDisplayName`, samma som kortet
+visar). En kommande/live-match får ingen länk. Länken är `target="_blank"` +
+`rel="noopener noreferrer"` med ett aria-label som namnger båda lagen + "öppnas i ny flik".
+URL:en byggs av en ren funktion `buildHighlightsSearchUrl` (match-display.ts) med
+`URLSearchParams` (korrekt enkodning av mellanslag + å/ä/ö).
+**Varför:** Daniels önskan, och Daniels VAL av approach = en YouTube-sökning, inte en ny
+klipp-API. En sökning behöver ingen ny dependency/nyckel/kostnad och funkar för VARJE match;
+officiella FIFA-/kanal-klipp ligger nästan alltid överst. `URLSearchParams` i stället för
+manuell sträng-konkat så enkodningen aldrig blir fel (en lättgissad yta: mellanslag och
+svenska diakriter måste UTF-8-procent-enkodas, ö blir t.ex. `%C3%B6`). Ren funktion + gate på
+`isFinished` håller MatchCard som en ren presentations-komponent utan ny data-/nät-kod.
+
+---
+
 ## 2026-06-17 , Diakritik-vakt: git-hook som blockerar ASCII-substitut i svensk text
 
 **Beslut:** En git-hook (`.githooks/` + `src/lib/diakritik-vakt.mjs`) blockerar commits där
