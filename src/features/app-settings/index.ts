@@ -41,6 +41,12 @@ export { useOnboarding } from './use-onboarding';
 export type { OnboardingApi } from './use-onboarding';
 export { OnboardingDialog } from './OnboardingDialog';
 
+// Höjdpunkter-sedd-flaggan (per enhet): driver att NYTT-badgen på höjdpunkts-pillen
+// försvinner efter att användaren öppnat en höjdpunkter-länk (DailyMatchesView wirar
+// in den + skickar markSeen som onHighlightsOpen ner till matchkorten).
+export { useHighlightsSeen } from './use-highlights-seen';
+export type { HighlightsSeenApi } from './use-highlights-seen';
+
 // Kom-igång-ytan (T54/#93): glasklar "installera ELLER använd direkt"-yta. Triggern
 // monteras i inställnings-portalen (alltid nåbar) + i onboardingens install-steg.
 export { GetStartedControl } from './GetStartedControl';
@@ -74,4 +80,4 @@ export type { RegisterAppSw, AppSwCallbacks } from './register-sw';
 
 // Persistens-nycklar (exporteras så App-/integrationstester kan sätta dem för
 // att försätta appen i ett känt läge, t.ex. onboarding redan sedd).
-export { ONBOARDING_DONE_KEY, HAPTICS_KEY, SOUND_KEY } from './storage-keys';
+export { ONBOARDING_DONE_KEY, HAPTICS_KEY, SOUND_KEY, HIGHLIGHTS_SEEN_KEY } from './storage-keys';

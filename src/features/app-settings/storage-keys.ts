@@ -13,3 +13,12 @@ export const HAPTICS_KEY = 'vm2026-haptics';
 
 /** Ljud-effekter påslagna. AV som standard (frånvaro = av). */
 export const SOUND_KEY = 'vm2026-sound';
+
+/**
+ * Användaren har öppnat en "Se höjdpunkter"-länk minst en gång (per enhet). Driver
+ * att NYTT-badgen på höjdpunkts-pillen FÖRSVINNER efter första klicket: NYTT visas
+ * bara så länge funktionen är ny (tidsfönstret) OCH användaren ännu inte klickat.
+ * Frånvaro = inte klickat = badgen får visas (inom fönstret). 14-dagars-auto-bort
+ * (isHighlightsFeatureNew) är kvar som backup för den som aldrig klickar.
+ */
+export const HIGHLIGHTS_SEEN_KEY = 'vm2026-highlights-seen';
