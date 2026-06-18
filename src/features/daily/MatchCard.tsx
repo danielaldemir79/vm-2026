@@ -111,6 +111,19 @@ export interface MatchCardProps {
    * osynlig och flaggan därmed betydelselös.
    */
   highlightsIsNew?: boolean;
+  /**
+   * Anropas när användaren KLICKAR på "Se höjdpunkter"-pillen. DailyMatchesView
+   * skickar ner markSeen (useHighlightsSeen), så det FÖRSTA klicket på valfritt kort
+   * markerar funktionen sedd (persisterat per enhet) och NYTT-badgen försvinner på
+   * ALLA kort. Default no-op, så ett anrops-ställe som inte bryr sig är opåverkat.
+   *
+   * VIKTIGT: detta BLOCKERAR INTE navigeringen. onClick anropar bara callbacken
+   * (registrerar klicket); länken har kvar sin href + target=_blank, så YouTube-
+   * sökningen öppnas som vanligt (ingen preventDefault). MatchCard förblir en ren
+   * presentations-komponent: den läser ingen localStorage/klocka själv, flaggan +
+   * callbacken kommer som props.
+   */
+  onHighlightsOpen?: () => void;
 }
 
 /** Landskoden för ett lag (för emblemet), eller null när laget ännu är okänt. */
@@ -215,6 +228,7 @@ export function MatchCard({
   now,
   detailAction = null,
   highlightsIsNew = false,
+  onHighlightsOpen,
 }: MatchCardProps) {
   const time = formatKickoffTime(match.kickoff);
   const home = teamDisplayName(match.homeTeamId, teamsById);
@@ -483,6 +497,10 @@ export function MatchCard({
                 aria-label={`Se höjdpunkter${
                   highlightsIsNew ? ' (ny funktion)' : ''
                 } för ${home} mot ${away} på YouTube (öppnas i ny flik)`}
+                // Registrera klicket (markera funktionen sedd -> NYTT-badgen försvinner på
+                // alla kort). Vi anropar BARA callbacken, ingen preventDefault: länken
+                // navigerar som vanligt (target=_blank öppnar YouTube-sökningen).
+                onClick={onHighlightsOpen}
                 className="vm-highlights-pill"
               >
                 <span

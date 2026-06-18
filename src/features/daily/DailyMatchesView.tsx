@@ -30,6 +30,7 @@ import { selectLiveFeed } from './live-feed';
 import { MatchReactions, MatchComments } from '../rooms';
 import { MatchDetailTrigger } from '../match-detail';
 import { useFavoriteTeam, matchHasFavorite, FavoriteTeamPicker } from '../favorite-team';
+import { useHighlightsSeen } from '../app-settings';
 import { formatDayHeading, formatDayHeadingNoYear, formatDayShort } from './format-datetime';
 import type { CountdownState } from './countdown';
 import { isHighlightsFeatureNew, stageLabel, teamDisplayName } from './match-display';
@@ -207,11 +208,17 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
   // ren presentations-komponent, "är ny" härleds RENT här och skickas in som prop).
   const { todayKey, nowMs } = useTodayKey();
 
-  // Är höjdpunkts-funktionen fortfarande NY (visa NYTT-badgen)? Ren härledning ur appens
-  // tidskälla (nowMs) + den fasta lanseringsdagen: true ~14 dygn efter lansering, sedan
-  // false för alltid, så badgen syns som nyhet nu men blir aldrig inaktuell. Beräknas EN
-  // gång per render och skickas till båda matchkorts-anropen.
-  const highlightsIsNew = isHighlightsFeatureNew(nowMs);
+  // HÖJDPUNKTER SEDD (per enhet, persisterat): har användaren öppnat en höjdpunkter-länk
+  // minst en gång? markHighlightsSeen skickas ner som onHighlightsOpen till matchkorten;
+  // första klicket på valfritt kort flippar flaggan -> badgen försvinner på ALLA kort.
+  const [highlightsSeen, markHighlightsSeen] = useHighlightsSeen();
+
+  // Visa NYTT-badgen? = funktionen är fortfarande NY (tidsfönstret) OCH användaren har
+  // inte klickat än. Tidsfönstret (isHighlightsFeatureNew: true ~14 dygn efter lansering,
+  // sedan false) är BACKUP för den som aldrig klickar; klicket är den primära väg som
+  // tar bort badgen. Ren härledning ur appens tidskälla (nowMs) + seen-flaggan, beräknad
+  // EN gång per render och skickad till båda matchkorts-anropen (MatchCard förblir ren).
+  const highlightsIsNew = isHighlightsFeatureNew(nowMs) && !highlightsSeen;
 
   // PINNAT FAVORITLAG (T23, #23): lyft favoritlagets matcher DISKRET i listan (+ hero:n
   // om dagens match rör laget). Tolerant hook (ingen provider -> null), så vyn fungerar
@@ -402,6 +409,7 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
                               highlight
                               highlightLabel={heroLabel}
                               highlightsIsNew={highlightsIsNew}
+                              onHighlightsOpen={markHighlightsSeen}
                               favorite={matchHasFavorite(
                                 favoriteTeamId,
                                 matchOfTheDay.homeTeamId,
@@ -520,6 +528,7 @@ export function DailyMatchesView({ showFavoritePicker = true }: DailyMatchesView
                       teamsById={teamsById}
                       liveData={liveByMatchId.get(match.id) ?? null}
                       highlightsIsNew={highlightsIsNew}
+                      onHighlightsOpen={markHighlightsSeen}
                       detailAction={
                         // DRILL-IN (T86, #178): tryck på matchen -> rik matchvy (tidslinje +
                         // statistik + laguppställning + vad alla tippade). En tydlig egen

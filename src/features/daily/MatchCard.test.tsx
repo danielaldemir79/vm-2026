@@ -1,6 +1,6 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Match, Team } from '../../domain/types';
 import { MatchCard } from './MatchCard';
 // Lagnamnen i kortet är klickbara (TeamNameButton -> useTeamProfile, T10), så
@@ -322,6 +322,63 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     });
     expect(link).not.toHaveAttribute('data-highlights-new');
     expect(within(link).queryByText('Nytt')).not.toBeInTheDocument();
+  });
+
+  it('KLICK på pillen anropar onHighlightsOpen (registrerar att höjdpunkter öppnats)', () => {
+    const finished = groupMatch({
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    });
+    const onHighlightsOpen = vi.fn();
+    renderCard(
+      <MatchCard match={finished} teamsById={teamsById} onHighlightsOpen={onHighlightsOpen} />
+    );
+
+    const link = screen.getByRole('link', { name: /Se höjdpunkter/ });
+    fireEvent.click(link);
+    expect(onHighlightsOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('KLICKET BLOCKERAR INTE navigeringen (href/target intakt, ingen preventDefault)', () => {
+    // Daniels krav: vi registrerar bara klicket, YouTube-länken (target=_blank) ska
+    // fortfarande öppnas. Vi bevisar att href/target/rel är orörda OCH att click-eventet
+    // INTE preventDefault:as (så webbläsaren navigerar som vanligt). dispatchEvent ger
+    // tillbaka false om någon kallade preventDefault; här ska den vara true (defaultPrevented
+    // = false). Ett onClick som kallar e.preventDefault() skulle rödna detta.
+    const finished = groupMatch({
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    });
+    const onHighlightsOpen = vi.fn();
+    renderCard(
+      <MatchCard match={finished} teamsById={teamsById} onHighlightsOpen={onHighlightsOpen} />
+    );
+
+    const link = screen.getByRole('link', { name: /Se höjdpunkter/ });
+    // Länkens navigerings-attribut är intakta (ren extern länk).
+    const href = link.getAttribute('href') ?? '';
+    expect(href.startsWith('https://www.youtube.com/results?')).toBe(true);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+
+    // Ett avbrytbart klick-event: returvärdet är false om default förhindrades.
+    const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    const notPrevented = link.dispatchEvent(clickEvent);
+    expect(notPrevented).toBe(true); // ingen preventDefault -> navigeringen släpps fram
+    expect(clickEvent.defaultPrevented).toBe(false);
+    expect(onHighlightsOpen).toHaveBeenCalled();
+  });
+
+  it('utan onHighlightsOpen (default no-op) kraschar ett klick inte', () => {
+    // Hero-kortet / enhetstester skickar ingen callback; pillens onClick blir undefined,
+    // ett klick ska då vara en ofarlig no-op (ingen krasch, länken navigerar ändå).
+    const finished = groupMatch({
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    });
+    renderCard(<MatchCard match={finished} teamsById={teamsById} />);
+    const link = screen.getByRole('link', { name: /Se höjdpunkter/ });
+    expect(() => fireEvent.click(link)).not.toThrow();
   });
 
   it('VISAR INTE "Se höjdpunkter" på en KOMMANDE match (inga höjdpunkter än)', () => {
