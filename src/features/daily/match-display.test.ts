@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Match, MatchResult, Team } from '../../domain/types';
 import {
+  buildHighlightsSearchUrl,
   formatPenalties,
   formatScore,
   isFinished,
@@ -130,6 +131,46 @@ describe('isVenuePlaceholder, känner igen "ej verifierad"-platshållaren (#35)'
 
   it('är false för en riktig arena (då ska den visas)', () => {
     expect(isVenuePlaceholder('MetLife Stadium, East Rutherford')).toBe(false);
+  });
+});
+
+describe('buildHighlightsSearchUrl, YouTube-söklänk för matchens höjdpunkter', () => {
+  it('pekar på YouTubes resultat-sida med sökningen i search_query', () => {
+    const url = buildHighlightsSearchUrl('Mexiko', 'Sydafrika');
+    expect(url.startsWith('https://www.youtube.com/results?')).toBe(true);
+    // Söktermen är "{hemma} {borta} VM 2026 höjdpunkter" (Daniels valda formulering).
+    // Vi avkodar search_query ur den byggda URL:en i stället för att binda assertionen
+    // till exakt vilket enkodnings-tecken (+/%20) URLSearchParams råkar välja, det är
+    // INNEHÅLLET som ska stämma. Roundtrip bevisar dessutom att enkodningen är reversibel.
+    const query = new URL(url).searchParams.get('search_query');
+    expect(query).toBe('Mexiko Sydafrika VM 2026 höjdpunkter');
+  });
+
+  it('URL-enkodar mellanslag (rå rårymd får aldrig läcka in i href:en)', () => {
+    const url = buildHighlightsSearchUrl('Mexiko', 'Sydafrika');
+    // Query-strängen får inte innehålla ett RÅTT mellanslag (det vore en ogiltig URL).
+    const queryString = url.slice(url.indexOf('?') + 1);
+    expect(queryString).not.toContain(' ');
+    // URLSearchParams enkodar mellanslag som '+' i en query-sträng.
+    expect(queryString).toContain('search_query=Mexiko+Sydafrika+VM+2026+');
+  });
+
+  it('enkodar å/ä/ö som UTF-8-procent-sekvenser (inte rått, inte ASCII-mangel)', () => {
+    // Diskriminerande lagnamn med alla tre svenska diakriterna i båda lägena.
+    const url = buildHighlightsSearchUrl('Åland', 'Österrike');
+    const queryString = url.slice(url.indexOf('?') + 1);
+    // KORREKT UTF-8-enkodning: Å=%C3%85, Ö=%C3%96, ö=%C3%B6 (för "höjdpunkter").
+    expect(queryString).toContain('%C3%85land'); // Åland
+    expect(queryString).toContain('%C3%96sterrike'); // Österrike
+    expect(queryString).toContain('h%C3%B6jdpunkter'); // höjdpunkter
+    // Diakriterna får ALDRIG smugit in som råa tecken eller ASCII-substitut.
+    expect(queryString).not.toMatch(/[åäöÅÄÖ]/);
+    expect(queryString).not.toContain('Aland'); // inte ASCII-mangel
+    expect(queryString).not.toContain('hojdpunkter');
+    // Och avkodningen ger tillbaka exakt ursprungstexten (reversibelt).
+    expect(new URL(url).searchParams.get('search_query')).toBe(
+      'Åland Österrike VM 2026 höjdpunkter'
+    );
   });
 });
 

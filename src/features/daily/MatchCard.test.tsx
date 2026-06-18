@@ -257,6 +257,50 @@ describe('MatchCard, tillgänglig struktur + innehåll', () => {
     expect(container.querySelector('[data-venue-capacity]')).toBeNull();
   });
 
+  // ----------------------------------------------------------------------------
+  // "Se höjdpunkter"-länk (YouTube-sökning) , BARA på en färdigspelad match.
+  // ----------------------------------------------------------------------------
+
+  it('VISAR "Se höjdpunkter"-länken på en färdigspelad match med rätt href + target/rel + a11y-namn', () => {
+    const finished = groupMatch({
+      status: 'finished',
+      result: { homeGoals: 2, awayGoals: 1 },
+    });
+    renderCard(<MatchCard match={finished} teamsById={teamsById} />);
+
+    // Tillgängligt namn: namnger BÅDA lagen + att den öppnas i ny flik (skärmläsar-vänligt).
+    const link = screen.getByRole('link', {
+      name: 'Se höjdpunkter för Mexiko mot Sydafrika på YouTube (öppnas i ny flik)',
+    });
+    // En YouTube-SÖKLÄNK med matchens lag + "VM 2026 höjdpunkter" i sökningen (samma
+    // visningsnamn kortet visar). Avkodar query ur href:en (inte exakt enkodnings-tecken).
+    const href = link.getAttribute('href') ?? '';
+    expect(href.startsWith('https://www.youtube.com/results?')).toBe(true);
+    expect(new URL(href).searchParams.get('search_query')).toBe(
+      'Mexiko Sydafrika VM 2026 höjdpunkter'
+    );
+    // Säker extern länk: ny flik + noopener noreferrer (appens konvention).
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    // Den synliga texten bär betydelsen (pilen är dekorativ).
+    expect(link).toHaveTextContent('Se höjdpunkter');
+  });
+
+  it('VISAR INTE "Se höjdpunkter" på en KOMMANDE match (inga höjdpunkter än)', () => {
+    // groupMatch default-status är 'scheduled' (ospelad).
+    renderCard(<MatchCard match={groupMatch()} teamsById={teamsById} />);
+    expect(screen.queryByRole('link', { name: /Se höjdpunkter/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Se höjdpunkter')).not.toBeInTheDocument();
+  });
+
+  it('VISAR INTE "Se höjdpunkter" på en PÅGÅENDE (live) match (inga höjdpunkter än)', () => {
+    // En live-match bär status 'live' + result null (diskriminerat unions-kontrakt).
+    const live = groupMatch({ status: 'live', result: null });
+    renderCard(<MatchCard match={live} teamsById={teamsById} />);
+    expect(screen.queryByRole('link', { name: /Se höjdpunkter/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Se höjdpunkter')).not.toBeInTheDocument();
+  });
+
   it('renderar drill-in-affordansen (detailAction-slot) BARA när den ges (T86, #178)', () => {
     // Utan slot: ingen drill-in-affordans (hero-kortet, default).
     const { container, rerender } = renderCard(

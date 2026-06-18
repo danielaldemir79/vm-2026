@@ -160,3 +160,23 @@ export function formatFifaRanking(team: Team | undefined): string | null {
   }
   return `FIFA-ranking #${team.fifaRanking}`;
 }
+
+/**
+ * Bygger en YouTube-SÖKLÄNK för en matchs höjdpunkter, t.ex.
+ * "Mexiko Sydafrika VM 2026 höjdpunkter". REN funktion, ingen IO/nät: returnerar bara
+ * sök-URL:en (en <a href> öppnar den), ingen ny API/nyckel/kostnad (Daniels val) , en
+ * sökning funkar för VARJE match utan en klipp-databas, och officiella FIFA-/kanal-klipp
+ * ligger nästan alltid överst i en sådan sökning.
+ *
+ * URL:en byggs mot YouTubes publika resultat-sida `/results` med sökningen i
+ * `search_query`. Den enda parametern är delning av en sökning, så vi formar den med
+ * URLSearchParams (korrekt URL-enkodning: mellanslag, å/ä/ö blir UTF-8-procent-enkodade),
+ * i stället för manuell sträng-konkat som lätt enkodar fel. Lagnamnen kommer från
+ * teamDisplayName (samma namn kortet redan visar), så sökningen matchar det användaren ser.
+ */
+export function buildHighlightsSearchUrl(homeName: string, awayName: string): string {
+  const params = new URLSearchParams({
+    search_query: `${homeName} ${awayName} VM 2026 höjdpunkter`,
+  });
+  return `https://www.youtube.com/results?${params.toString()}`;
+}
