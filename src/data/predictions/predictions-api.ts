@@ -20,6 +20,7 @@
 import type { VmSupabaseClient } from '../supabase-browser';
 import type { Database } from '../supabase-types';
 import { ensureSession } from '../rooms/auth';
+import { selectAllRows } from '../select-all-rows';
 
 type PredictionRow = Database['public']['Tables']['predictions']['Row'];
 
@@ -74,11 +75,19 @@ export async function listRoomPredictions(
   roomId: string
 ): Promise<Prediction[]> {
   await ensureSession(client);
-  const { data, error } = await client.from('predictions').select('*').eq('room_id', roomId);
-  if (error) {
-    fail('Hämta tips', error.message);
-  }
-  return (data ?? []).map(projectPrediction);
+  // PAGINERA (F1): Supabase cap:ar en rak .select() tyst till ~1000 rader. Ett rum med fler
+  // tips än så poängsattes mot en avkapad delmängd. Vi läser sidvis med stabil ORDER BY (PK
+  // room_id+match_id+user_id) + exact count, så hela rummet räknas (completeness fail-loud).
+  const rows = await selectAllRows<PredictionRow>('tips', (from, to) =>
+    client
+      .from('predictions')
+      .select('*', { count: 'exact' })
+      .eq('room_id', roomId)
+      .order('match_id', { ascending: true })
+      .order('user_id', { ascending: true })
+      .range(from, to)
+  );
+  return rows.map(projectPrediction);
 }
 
 /**

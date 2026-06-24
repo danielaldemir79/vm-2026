@@ -21,6 +21,7 @@
 import type { VmSupabaseClient } from '../supabase-browser';
 import type { Database } from '../supabase-types';
 import { ensureSession } from '../rooms/auth';
+import { selectAllRows } from '../select-all-rows';
 
 type RoomStatsRow = Database['public']['Functions']['admin_room_stats']['Returns'][number];
 type RevealedRow = Database['public']['Functions']['admin_revealed_predictions']['Returns'][number];
@@ -87,11 +88,6 @@ export type AdminRevealedPrediction =
       advancingTeamId: string;
     };
 
-/** Kasta ett begripligt fel ur ett Supabase-fel (fail loud, svensk text). */
-function fail(operation: string, message: string): never {
-  throw new Error(`[VM2026] ${operation} misslyckades: ${message}`);
-}
-
 /**
  * Hämta per-rum-statistiken (alla rum + medlemmar + engagemang). BARA en admin får
  * data , RPC:n (is_app_admin) returnerar tom mängd för en icke-admin, så listan blir
@@ -100,14 +96,25 @@ function fail(operation: string, message: string): never {
  *
  * RPC:n ger EN rad per (rum, medlem) med rummets aggregat upprepat; vi GRUPPERAR
  * tillbaka per room_id till ett AdminRoomStat med en medlemslista (en sanning per rum).
+ *
+ * PAGINERA (F1): en RPC-SETOF cap:as också tyst till ~1000 rader. Med många rum/medlemmar
+ * (botseedningen ensam ger hundratals) skulle medlemslistan/rummen tyst kapas. Vi läser
+ * sidvis med en STABIL total ORDER BY (room_created_at, room_id, member_joined_at,
+ * member_user_id , bevarar dagens visnings-ordning + unik tiebreaker) + exact count, så
+ * completeness-vakten fail-loud:ar på en avkapad läsning i stället för att gissa.
  */
 export async function fetchAdminRoomStats(client: VmSupabaseClient): Promise<AdminRoomStat[]> {
   await ensureSession(client);
-  const { data, error } = await client.rpc('admin_room_stats');
-  if (error) {
-    fail('Hämta admin-statistik', error.message);
-  }
-  return groupRoomStats(data ?? []);
+  const rows = await selectAllRows<RoomStatsRow>('admin-statistik', (from, to) =>
+    client
+      .rpc('admin_room_stats', undefined, { count: 'exact' })
+      .order('room_created_at', { ascending: true })
+      .order('room_id', { ascending: true })
+      .order('member_joined_at', { ascending: true })
+      .order('member_user_id', { ascending: true })
+      .range(from, to)
+  );
+  return groupRoomStats(rows);
 }
 
 /**
@@ -115,16 +122,26 @@ export async function fetchAdminRoomStats(client: VmSupabaseClient): Promise<Adm
  * data (RPC-gaten). Framtida/hemliga tips returneras ALDRIG (RPC-filtret now() >=
  * deadline). Konsumenten poängsätter dem mot det PUBLIKA globala facit via den
  * befintliga poäng-motorn (buildLeaderboard), så ingen poäng-logik dupliceras.
+ *
+ * PAGINERA (F1): detta var roten till att admin-vyns poäng skiljde sig från den globala
+ * (samma person, olika poäng) , RPC:n kapades tyst vid 1000 avslöjade tips, så "Vem tippar
+ * bäst" poängsattes mot en delmängd. Vi läser sidvis med en STABIL total ORDER BY på
+ * (room_id, user_id, kind, key , unik per rad) + exact count, så hela mängden räknas.
  */
 export async function fetchAdminRevealedPredictions(
   client: VmSupabaseClient
 ): Promise<AdminRevealedPrediction[]> {
   await ensureSession(client);
-  const { data, error } = await client.rpc('admin_revealed_predictions');
-  if (error) {
-    fail('Hämta avslöjade tips', error.message);
-  }
-  return (data ?? []).map(projectRevealed).filter((p): p is AdminRevealedPrediction => p !== null);
+  const rows = await selectAllRows<RevealedRow>('avslöjade tips', (from, to) =>
+    client
+      .rpc('admin_revealed_predictions', undefined, { count: 'exact' })
+      .order('room_id', { ascending: true })
+      .order('user_id', { ascending: true })
+      .order('kind', { ascending: true })
+      .order('key', { ascending: true })
+      .range(from, to)
+  );
+  return rows.map(projectRevealed).filter((p): p is AdminRevealedPrediction => p !== null);
 }
 
 /** Gruppera de platta RPC-raderna till ett AdminRoomStat per rum (med medlemslista). */

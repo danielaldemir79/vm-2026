@@ -40,9 +40,9 @@ import {
 /**
  * Hämta ALLA rader ur en tabell, sidindelat (Supabase cap:ar .select() till ~1000 rader/
  * anrop; predictions har ~18k rader = 19 sidor). DEN gissningskänsliga loop-/completeness-
- * logiken bor i den DELADE, TESTADE `selectAllPages` (src/data/global-leaderboard/
- * select-all-pages.ts, bundlad in via mirror:n) , den här funktionen är bara IO-wrappern
- * som bygger en page-fetcher per tabell.
+ * logiken bor i den DELADE, TESTADE `selectAllPages` (src/data/select-all-pages.ts,
+ * bundlad in via mirror:n) , den här funktionen är bara IO-wrappern som bygger en
+ * page-fetcher per tabell.
  *
  * STABIL ORDER BY (HARD, dataintegritet): PostgREST/Postgres garanterar INTE samma
  * radordning mellan två sidanrop UTAN en total ORDER BY. Utan den kan en rad hoppas över

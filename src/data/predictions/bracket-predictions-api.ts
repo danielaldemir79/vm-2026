@@ -13,6 +13,7 @@
 import type { VmSupabaseClient } from '../supabase-browser';
 import type { Database } from '../supabase-types';
 import { ensureSession } from '../rooms/auth';
+import { selectAllRows } from '../select-all-rows';
 import { asTeamCode, type TeamCode } from '../../domain/team-code';
 
 type BracketPredictionRow = Database['public']['Tables']['bracket_predictions']['Row'];
@@ -78,14 +79,18 @@ export async function listRoomBracketPredictions(
   roomId: string
 ): Promise<BracketPrediction[]> {
   await ensureSession(client);
-  const { data, error } = await client
-    .from('bracket_predictions')
-    .select('*')
-    .eq('room_id', roomId);
-  if (error) {
-    fail('Hämta bracket-tips', error.message);
-  }
-  return (data ?? []).map(projectBracketPrediction);
+  // PAGINERA (F1): se predictions-api.ts. Stabil ORDER BY på PK (room_id+slot_id+user_id)
+  // + exact count, så ett rum med >1000 bracket-tips räknas komplett (completeness fail-loud).
+  const rows = await selectAllRows<BracketPredictionRow>('bracket-tips', (from, to) =>
+    client
+      .from('bracket_predictions')
+      .select('*', { count: 'exact' })
+      .eq('room_id', roomId)
+      .order('slot_id', { ascending: true })
+      .order('user_id', { ascending: true })
+      .range(from, to)
+  );
+  return rows.map(projectBracketPrediction);
 }
 
 /** Lista BARA mina egna bracket-tips i ett rum (för inmatningsvyn). */
