@@ -1,15 +1,18 @@
 // SIDINDELAD FULL-LÄSNING med STABIL ordning + completeness-vakt (T90, #183, F1-fix).
 // REN funktion, ingen IO, ingen Supabase-/Deno-global , den gissningskänsliga loop-logiken
-// bor här (testbar i Vitest), edge-funktionen blir en tunn IO-wrapper som matar in en
-// page-fetcher (samma recept som resten av global-leaderboard-grafen: ren logik i src,
-// speglad till _shared-bundlen, se docs/patterns.md "ren-logik-i-src-speglad...").
+// bor här (testbar i Vitest). EN sanning för 1000-cap-skyddet, delad av BÅDA läs-vägarna:
+//   * edge-funktionen (global topplista) matar in en Deno-page-fetcher (selectAll),
+//   * klienten (rummets topplista + admin-vyn) matar in en browser-page-fetcher (selectAllRows).
+// Tidigare bodde filen under global-leaderboard/, men cap:en är en Supabase-bred sanning,
+// inte leaderboard-specifik, så den flyttades hit (neutral data-layer-primitiv) när klient-
+// läsarna (predictions/group/bracket + admin) behövde samma skydd (F1, 2026-06-24).
 //
 // ============================================================================
 // VARFÖR (DATAINTEGRITET, F1): pagineringen MÅSTE vara totalordnad
 // ============================================================================
-// Supabase/PostgREST cap:ar .select() till ~1000 rader/anrop, så hela tävlingen läses
-// sidvis (predictions ~18k = 19 sidor, bracket ~8k, group ~3k). PostgREST/Postgres
-// GARANTERAR INTE samma radordning mellan två anrop UTAN en total ORDER BY: under
+// Supabase/PostgREST cap:ar .select() (och RPC-SETOF) till ~1000 rader/anrop, så hela
+// mängden läses sidvis (predictions ~18k = 19 sidor, bracket ~8k, group ~3k). PostgREST/
+// Postgres GARANTERAR INTE samma radordning mellan två anrop UTAN en total ORDER BY: under
 // samtidiga skrivningar eller en annan query-plan kan en rad hoppas över (understruken
 // poäng) eller dubbleras (samma match räknas två gånger -> uppblåst poäng) vid sid-
 // gränsen , exakt den fairness-/integritets-bugg T90 skulle FIXA. Därför kräver vi att
