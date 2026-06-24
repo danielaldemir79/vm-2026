@@ -7072,3 +7072,18 @@ val), så Fas 1 byggs ordentligt, inte som en minimal snabb-deploy.
 från matchresultat + tips) + **fixtures-först** (typad fixtures-data, miljö-gating till live Supabase).
 **Varför:** Gör den kritiska FIFA-treeplats-seedningen (SPEC §5) testbar och säker, och låter hela
 appen byggas innan Supabase-kontot finns. Fixtures-mönstret är bevisat i Agent Kit-playbooken.
+
+## 2026-06-24 , F1: paginera ALLA läsvägar mot PostgRESTs tysta 1000-rad-cap (v2.3.1)
+
+**Beslut:** Den rena pagineringsloopen `selectAllPages` (completeness-vakt, stabil ORDER BY) bor
+numera i en neutral data-layer-rot (`src/data/select-all-pages.ts`) och delas av BÅDA läsvägarna,
+edge-funktionen (global topplista) OCH klienten via den nya tunna wrappern `selectAllRows`. Rummets
+tre tips-läsare (predictions/group/bracket) och båda admin-RPC:erna (`admin_revealed_predictions`,
+`admin_room_stats`) läser nu sidvis med `count: 'exact'`.
+
+**Varför:** PostgREST cap:ar en rak `.select()` och en RPC-SETOF tyst vid ~1000 rader. Den globala
+edge-vägen paginerade redan (T90), men klient- och admin-läsvägarna gjorde det inte, så ett rum med
+fler än 1000 tips poängsattes mot en avkapad delmängd, vilket gav fel poäng OCH fel ordning (samma
+person visade olika poäng i rum, admin och global). Cap:en är en Supabase-bred sanning, inte
+leaderboard-specifik, därför EN delad cap-skydds-loop i stället för en andra implementation som kan
+drifta. Fail-loud completeness-vakt: kastar hellre än returnerar avkapad eller dubblerad data.
