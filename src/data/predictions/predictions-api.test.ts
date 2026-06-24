@@ -13,17 +13,60 @@ vi.mock('../rooms/auth', () => ({
   ensureSession: vi.fn().mockResolvedValue({ userId: 'me', isAnonymous: true }),
 }));
 
-/** Liten thenable-builder (samma mönster som rooms-api.test.ts). */
-function builder(result: { data: unknown; error: unknown }) {
+/** Liten thenable-builder (samma mönster som rooms-api.test.ts). `count` defaultar till
+ * antalet rader, så den paginerade läsvägen (selectAllRows) ser ett completeness-sant svar. */
+function builder(result: { data: unknown; error: unknown; count?: number | null }) {
+  const resolved = {
+    ...result,
+    count: result.count ?? (Array.isArray(result.data) ? result.data.length : 0),
+  };
   const chain: Record<string, unknown> = {};
   const self = () => chain as never;
-  for (const m of ['select', 'eq', 'upsert', 'insert', 'delete', 'order']) {
+  for (const m of ['select', 'eq', 'upsert', 'insert', 'delete', 'order', 'range']) {
     chain[m] = vi.fn(self);
   }
-  chain.single = vi.fn().mockResolvedValue(result);
+  chain.single = vi.fn().mockResolvedValue(resolved);
   (chain as { then: unknown }).then = (onFulfilled: (v: unknown) => unknown) =>
-    Promise.resolve(result).then(onFulfilled);
+    Promise.resolve(resolved).then(onFulfilled);
   return chain;
+}
+
+/**
+ * En mock som MODELLERAR PostgREST-cap:en: en rak (opaginerad) await ger BARA de första
+ * `cap` raderna (precis som live-buggen), medan en `.range(from, to)` ger rätt sida med ett
+ * exact count. Det gör regressions-testet diskriminerande: den gamla raka koden får 1000,
+ * den nya paginerade koden får hela mängden.
+ */
+function cappingFrom<Row>(allRows: readonly Row[], cap = 1000) {
+  return vi.fn(() => {
+    const chain: Record<string, unknown> = {};
+    const self = () => chain as never;
+    for (const m of ['select', 'eq', 'order']) {
+      chain[m] = vi.fn(self);
+    }
+    chain.range = vi.fn((from: number, to: number) =>
+      Promise.resolve({ data: allRows.slice(from, to + 1), error: null, count: allRows.length })
+    );
+    // Rak await (gamla vägen) = tyst kapad till `cap` rader.
+    (chain as { then: unknown }).then = (onFulfilled: (v: unknown) => unknown) =>
+      Promise.resolve({ data: allRows.slice(0, cap), error: null, count: allRows.length }).then(
+        onFulfilled
+      );
+    return chain;
+  });
+}
+
+/** Bygg `n` syntetiska predictions-rader för ett rum (unika match/user, så dubbletter syns). */
+function predictionRows(roomId: string, n: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    room_id: roomId,
+    match_id: `m${i}`,
+    user_id: `u${i}`,
+    home_goals: 1,
+    away_goals: 0,
+    created_at: 't0',
+    updated_at: 't1',
+  }));
 }
 
 function mockClient(from: ReturnType<typeof vi.fn>): VmSupabaseClient {
@@ -86,6 +129,30 @@ describe('listRoomPredictions', () => {
   it('tom data -> tom lista (ingen krasch på null)', async () => {
     const from = vi.fn(() => builder({ data: null, error: null }));
     await expect(listRoomPredictions(mockClient(from), 'r1')).resolves.toEqual([]);
+  });
+
+  it('REGRESSION (F1): paginerar förbi 1000-cap, ett rum med >1000 tips läses KOMPLETT', async () => {
+    // Live-buggen: ett rum med 2851 matchtips poängsattes mot bara de första 1000 -> fel
+    // poäng + ordning. Mocken kapar en rak await till 1000 men ger rätt sidor via .range(),
+    // så detta failar på den gamla opaginerade koden och passerar först när vi paginerar.
+    const all = predictionRows('r1', 2500);
+    const from = cappingFrom(all);
+    const preds = await listRoomPredictions(mockClient(from), 'r1');
+    expect(preds).toHaveLength(2500);
+    // Sista raden (bortom 1000-cap:en) MÅSTE finnas med (annars är vi fortfarande kapade).
+    expect(preds[2499]).toMatchObject({ matchId: 'm2499', userId: 'u2499' });
+  });
+
+  it('läser med stabil total ORDER BY (PK) + exact count, så sid-gränsen är väldefinierad', async () => {
+    const chain = builder({ data: [], error: null, count: 0 });
+    const from = vi.fn(() => chain);
+    await listRoomPredictions(mockClient(from), 'r1');
+    // Exact count begärs (completeness-vakten), och PK-kolumnerna ordnas (stabil paginering).
+    expect(chain.select).toHaveBeenCalledWith('*', { count: 'exact' });
+    expect(chain.eq).toHaveBeenCalledWith('room_id', 'r1');
+    expect(chain.order).toHaveBeenCalledWith('match_id', { ascending: true });
+    expect(chain.order).toHaveBeenCalledWith('user_id', { ascending: true });
+    expect(chain.range).toHaveBeenCalledWith(0, 999);
   });
 });
 

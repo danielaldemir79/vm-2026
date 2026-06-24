@@ -18,6 +18,7 @@
 import type { VmSupabaseClient } from '../supabase-browser';
 import type { Database } from '../supabase-types';
 import { ensureSession } from '../rooms/auth';
+import { selectAllRows } from '../select-all-rows';
 import { asTeamCode, type TeamCode } from '../../domain/team-code';
 
 type GroupPredictionRow = Database['public']['Tables']['group_predictions']['Row'];
@@ -65,11 +66,18 @@ export async function listRoomGroupPredictions(
   roomId: string
 ): Promise<GroupPrediction[]> {
   await ensureSession(client);
-  const { data, error } = await client.from('group_predictions').select('*').eq('room_id', roomId);
-  if (error) {
-    fail('Hämta grupp-tips', error.message);
-  }
-  return (data ?? []).map(projectGroupPrediction);
+  // PAGINERA (F1): se predictions-api.ts. Stabil ORDER BY på PK (room_id+group_id+user_id)
+  // + exact count, så ett rum med >1000 grupp-tips räknas komplett (completeness fail-loud).
+  const rows = await selectAllRows<GroupPredictionRow>('grupp-tips', (from, to) =>
+    client
+      .from('group_predictions')
+      .select('*', { count: 'exact' })
+      .eq('room_id', roomId)
+      .order('group_id', { ascending: true })
+      .order('user_id', { ascending: true })
+      .range(from, to)
+  );
+  return rows.map(projectGroupPrediction);
 }
 
 /**

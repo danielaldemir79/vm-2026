@@ -14,16 +14,51 @@ vi.mock('../rooms/auth', () => ({
   ensureSession: vi.fn().mockResolvedValue({ userId: 'me', isAnonymous: true }),
 }));
 
-function builder(result: { data: unknown; error: unknown }) {
+function builder(result: { data: unknown; error: unknown; count?: number | null }) {
+  const resolved = {
+    ...result,
+    count: result.count ?? (Array.isArray(result.data) ? result.data.length : 0),
+  };
   const chain: Record<string, unknown> = {};
   const self = () => chain as never;
-  for (const m of ['select', 'eq', 'upsert', 'insert', 'delete', 'order']) {
+  for (const m of ['select', 'eq', 'upsert', 'insert', 'delete', 'order', 'range']) {
     chain[m] = vi.fn(self);
   }
-  chain.single = vi.fn().mockResolvedValue(result);
+  chain.single = vi.fn().mockResolvedValue(resolved);
   (chain as { then: unknown }).then = (onFulfilled: (v: unknown) => unknown) =>
-    Promise.resolve(result).then(onFulfilled);
+    Promise.resolve(resolved).then(onFulfilled);
   return chain;
+}
+
+/** Modellerar PostgREST-cap:en (rak await = kapad), men ger rätt sida via .range(). */
+function cappingFrom<Row>(allRows: readonly Row[], cap = 1000) {
+  return vi.fn(() => {
+    const chain: Record<string, unknown> = {};
+    const self = () => chain as never;
+    for (const m of ['select', 'eq', 'order']) {
+      chain[m] = vi.fn(self);
+    }
+    chain.range = vi.fn((from: number, to: number) =>
+      Promise.resolve({ data: allRows.slice(from, to + 1), error: null, count: allRows.length })
+    );
+    (chain as { then: unknown }).then = (onFulfilled: (v: unknown) => unknown) =>
+      Promise.resolve({ data: allRows.slice(0, cap), error: null, count: allRows.length }).then(
+        onFulfilled
+      );
+    return chain;
+  });
+}
+
+/** Bygg `n` syntetiska bracket-tips-rader för ett rum (unika slot/user, så dubbletter syns). */
+function bracketRows(roomId: string, n: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    room_id: roomId,
+    slot_id: `M${i}`,
+    user_id: `u${i}`,
+    advancing_team_id: 'BRA',
+    created_at: 't0',
+    updated_at: 't1',
+  }));
 }
 
 function mockClient(from: ReturnType<typeof vi.fn>): VmSupabaseClient {
@@ -79,6 +114,25 @@ describe('listRoomBracketPredictions', () => {
   it('tom data -> tom lista (ingen krasch på null)', async () => {
     const from = vi.fn(() => builder({ data: null, error: null }));
     await expect(listRoomBracketPredictions(mockClient(from), 'r1')).resolves.toEqual([]);
+  });
+
+  it('REGRESSION (F1): paginerar förbi 1000-cap, ett rum med >1000 bracket-tips läses KOMPLETT', async () => {
+    const all = bracketRows('r1', 2500);
+    const from = cappingFrom(all);
+    const preds = await listRoomBracketPredictions(mockClient(from), 'r1');
+    expect(preds).toHaveLength(2500);
+    expect(preds[2499]).toMatchObject({ slotId: 'M2499', userId: 'u2499' });
+  });
+
+  it('läser med stabil total ORDER BY (PK) + exact count', async () => {
+    const chain = builder({ data: [], error: null, count: 0 });
+    const from = vi.fn(() => chain);
+    await listRoomBracketPredictions(mockClient(from), 'r1');
+    expect(chain.select).toHaveBeenCalledWith('*', { count: 'exact' });
+    expect(chain.eq).toHaveBeenCalledWith('room_id', 'r1');
+    expect(chain.order).toHaveBeenCalledWith('slot_id', { ascending: true });
+    expect(chain.order).toHaveBeenCalledWith('user_id', { ascending: true });
+    expect(chain.range).toHaveBeenCalledWith(0, 999);
   });
 });
 
