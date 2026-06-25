@@ -185,3 +185,29 @@ describe('GroupPredictionForm', () => {
     expect(screen.queryByRole('button', { name: /Föreslå ur mina matchtips/ })).toBeNull();
   });
 });
+
+describe('GroupPredictionForm, resultat-panel (avgjord grupp man tippat)', () => {
+  it('låst + result + tippat: visar resultat-panelen (poäng + facit)', () => {
+    renderForm({
+      locked: true,
+      current: { winnerCode: 'MEX', runnerUpCode: 'KOR' },
+      result: {
+        groupId: 'A',
+        points: 3,
+        winnerCorrect: true,
+        runnerUpCorrect: false,
+        predictedWinnerCode: 'MEX',
+        predictedRunnerUpCode: 'KOR',
+        actualWinnerTeamId: 'mex',
+        actualRunnerUpTeamId: 'rsa',
+      },
+    });
+    expect(screen.getByText(/3 poäng/)).toBeInTheDocument();
+    expect(screen.getByText(/Så blev det/)).toBeInTheDocument();
+  });
+
+  it('utan result: ingen resultat-panel (oförändrad standard-väg)', () => {
+    renderForm({ locked: true, current: { winnerCode: 'MEX', runnerUpCode: 'KOR' } });
+    expect(screen.queryByText(/Så blev det/)).not.toBeInTheDocument();
+  });
+});

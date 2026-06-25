@@ -493,3 +493,47 @@ describe('robusthet: ospelad gruppmatch utan kända lag hoppas över i enumerati
     expect(s.decided).toBe(true);
   });
 });
+
+describe('remainingRounds (omgångar kvar, för badgen, 2 matcher = 1 omgång)', () => {
+  it('sista omgången: 2 samtidiga matcher kvar = 1 omgång', () => {
+    const matches: Match[] = [
+      fin('m1', 'A1', 'A2', 2, 0),
+      fin('m2', 'A3', 'A4', 1, 0),
+      fin('m3', 'A1', 'A3', 1, 0),
+      fin('m4', 'A2', 'A4', 0, 0),
+      sched('m5', 'A1', 'A4'),
+      sched('m6', 'A2', 'A3'),
+    ];
+    const s = computeGroupScenario(TEAMS, matches, GROUP);
+    expect(s.remainingMatches).toBe(2);
+    expect(s.remainingRounds).toBe(1);
+  });
+
+  it('två omgångar kvar: 4 matcher = 2 omgångar', () => {
+    const matches: Match[] = [
+      fin('m1', 'A1', 'A2', 2, 0),
+      fin('m2', 'A3', 'A4', 1, 0),
+      sched('m3', 'A1', 'A3'),
+      sched('m4', 'A2', 'A4'),
+      sched('m5', 'A1', 'A4'),
+      sched('m6', 'A2', 'A3'),
+    ];
+    const s = computeGroupScenario(TEAMS, matches, GROUP);
+    expect(s.remainingMatches).toBe(4);
+    expect(s.remainingRounds).toBe(2);
+  });
+
+  it('färdigspelad: 0 omgångar kvar', () => {
+    const matches: Match[] = [
+      fin('m1', 'A1', 'A2', 2, 0),
+      fin('m2', 'A3', 'A4', 1, 0),
+      fin('m3', 'A1', 'A3', 1, 0),
+      fin('m4', 'A2', 'A4', 0, 0),
+      fin('m5', 'A1', 'A4', 1, 0),
+      fin('m6', 'A2', 'A3', 2, 1),
+    ];
+    const s = computeGroupScenario(TEAMS, matches, GROUP);
+    expect(s.remainingMatches).toBe(0);
+    expect(s.remainingRounds).toBe(0);
+  });
+});

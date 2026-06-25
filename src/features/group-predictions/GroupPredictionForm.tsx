@@ -20,8 +20,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { GroupTeamOption } from './group-predictable-data';
 import type { GroupSuggestion } from '../simulation/derive-tipped-group-table';
+import type { GroupResultEntry } from '../groups/derive-group-prediction-results';
 import { TeamFlag } from '../daily/TeamFlag';
 import { DeadlineNotice } from '../predictions/DeadlineNotice';
+import { GroupResultPanel } from './GroupResultPanel';
 
 export interface GroupPredictionFormProps {
   groupId: string;
@@ -48,6 +50,12 @@ export interface GroupPredictionFormProps {
    * Utelämnad (undefined) -> ingen förslags-knapp alls (vyer utan match-tips-lager).
    */
   suggestion?: GroupSuggestion | null;
+  /**
+   * RESULTATET för en AVGJORD grupp man tippat på (poäng + per-pick rätt/fel + facit),
+   * eller null/undefined när gruppen inte är avgjord, man inte tippat, eller i what-if-
+   * läge. Satt -> resultat-panelen visas i det låsta kortet (under mitt podium).
+   */
+  result?: GroupResultEntry | null;
   /**
    * Spara mitt grupp-tips. Kastar vid fel (formuläret visar det inline). Returnerar
    * en Promise så formuläret kan visa "sparar..."/fel-tillstånd.
@@ -221,6 +229,7 @@ export function GroupPredictionForm({
   deadlineIso,
   now,
   suggestion,
+  result,
   onSubmit,
 }: GroupPredictionFormProps) {
   // Seeda väljarna från mitt nuvarande tips (redigera = se det jag tippat).
@@ -423,6 +432,9 @@ export function GroupPredictionForm({
             </div>
             {/* Mitt tips står kvar synligt som ett STOLT podium även när gruppen är låst. */}
             {podiumSummary}
+            {/* AVGJORD grupp man tippat på: resultat-panelen (poäng + rätt/fel + facit).
+                Bara när result finns (avgjord + tippad + ej what-if-läge, se vyn). */}
+            {result && hasPodium ? <GroupResultPanel result={result} teams={teams} /> : null}
           </div>
         ) : null}
 

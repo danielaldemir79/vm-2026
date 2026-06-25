@@ -131,6 +131,18 @@ export interface GroupScenario {
   decided: boolean;
   /** Antal återstående (ospelade) gruppmatcher med kända lag. */
   remainingMatches: number;
+  /**
+   * Antal återstående OMGÅNGAR (matchdagar), inte enskilda matcher. I VM-formatet
+   * spelas en omgångs två gruppmatcher SAMTIDIGT, så 2 kvarvarande matcher = 1
+   * omgång (Math.ceil(remainingMatches / 2)). Badgen visar omgångar, inte matcher,
+   * så "sista omgången" (2 samtidiga) inte läses som "2 matcher kvar".
+   */
+  remainingRounds: number;
+}
+
+/** Omgångar (matchdagar) ur antal matcher: 2 samtidiga matcher per omgång. */
+function roundsFromMatches(matchCount: number): number {
+  return Math.ceil(matchCount / 2);
 }
 
 /* ------------------------------------------------------------------ *
@@ -688,6 +700,7 @@ export function computeGroupScenario(
       phase: 'too-early',
       decided: false,
       remainingMatches: 0,
+      remainingRounds: 0,
       teams: currentStandings.map((row) => tooEarlyScenario(row.teamId, row.rank)),
     };
   }
@@ -702,6 +715,7 @@ export function computeGroupScenario(
       phase: 'decided',
       decided: true,
       remainingMatches: 0,
+      remainingRounds: 0,
       teams: currentStandings.map((row) => decidedScenario(row.teamId, row.rank)),
     };
   }
@@ -716,6 +730,7 @@ export function computeGroupScenario(
       phase: 'too-early',
       decided: false,
       remainingMatches: remaining.length,
+      remainingRounds: roundsFromMatches(remaining.length),
       teams: currentStandings.map((row) => tooEarlyScenario(row.teamId, row.rank)),
     };
   }
@@ -746,7 +761,14 @@ export function computeGroupScenario(
     };
   });
 
-  return { groupId, phase: 'scenarios', decided: false, remainingMatches: remaining.length, teams };
+  return {
+    groupId,
+    phase: 'scenarios',
+    decided: false,
+    remainingMatches: remaining.length,
+    remainingRounds: roundsFromMatches(remaining.length),
+    teams,
+  };
 }
 
 /** Härled status ur det aggregerade läget (konservativt, se modulhuvudet). */

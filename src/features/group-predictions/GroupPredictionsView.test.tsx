@@ -6,6 +6,7 @@ import {
   type GroupPredictionsStore,
 } from './group-predictions-context';
 import { PredictionsStoreContext, type PredictionsStore } from '../predictions/predictions-context';
+import { ResultsStoreContext, type ResultsStore } from '../results/results-context';
 import type { GroupPrediction, Prediction } from '../../data/predictions';
 import type { Group, Match, Team } from '../../domain/types';
 import { teamCode } from '../../domain/team-code';
@@ -250,5 +251,82 @@ describe('GroupPredictionsView', () => {
     const aForm = document.querySelector('[data-group-id="A"]')!;
     expect(aForm.querySelector('[data-group-prediction-lock]')).not.toBeNull();
     expect(aForm.querySelector('[data-group-prediction-suggest]')).toBeNull();
+  });
+});
+
+describe('GroupPredictionsView, resultat-panel (avgjord grupp man tippat, via results-storen)', () => {
+  // En results-store där grupp A är AVGJORD (mex vann mot rsa, 2-0). Bara fälten
+  // groupResults-memon läser behövs; resten castas (test-mock).
+  function resultsStore(over: Partial<ResultsStore>): ResultsStore {
+    const decidedA: Match = {
+      id: 'A-decided',
+      stage: 'group',
+      groupId: 'A',
+      homeTeamId: 'mex',
+      awayTeamId: 'rsa',
+      kickoff: '2026-06-11T19:00:00.000Z',
+      venue: 'x',
+      result: { homeGoals: 2, awayGoals: 0 },
+      status: 'finished',
+    };
+    return {
+      status: 'ready',
+      simulating: false,
+      groups: [{ id: 'A', teamIds: ['mex', 'rsa'] }],
+      matches: [decidedA],
+      teams: TEAMS,
+      mode: 'fixtures',
+      error: null,
+      ...over,
+    } as unknown as ResultsStore;
+  }
+
+  // Jag har tippat grupp A: 1:a MEX (rätt), 2:a RSA (rätt) -> 5 poäng.
+  const myPicks = new Map<string, GroupPrediction>([
+    [
+      'A',
+      {
+        groupId: 'A',
+        userId: 'me',
+        winnerTeamId: teamCode('MEX'),
+        runnerUpTeamId: teamCode('RSA'),
+        updatedAt: 't',
+      },
+    ],
+  ]);
+
+  function renderWithResults(rs: ResultsStore) {
+    return render(
+      <ResultsStoreContext.Provider value={rs}>
+        <PredictionsStoreContext.Provider value={matchStore()}>
+          <GroupPredictionsStoreContext.Provider value={store({ myGroupPredictions: myPicks })}>
+            {/* now efter den platta deadlinen -> grupperna låsta -> resultat-panelen visas. */}
+            <GroupPredictionsView now={new Date('2026-06-20T00:00:00Z')} />
+          </GroupPredictionsStoreContext.Provider>
+        </PredictionsStoreContext.Provider>
+      </ResultsStoreContext.Provider>
+    );
+  }
+
+  it('avgjord + tippad grupp: visar resultat-panelen med poäng + facit', () => {
+    renderWithResults(resultsStore({}));
+    const aForm = document.querySelector('[data-group-id="A"]')!;
+    const panel = aForm.querySelector('[data-group-result]');
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveTextContent(/5 poäng/);
+    expect(panel).toHaveTextContent(/Så blev det/);
+  });
+
+  it('what-if-läge: resultat-panelen döljs (simulerade placeringar är hypotetiska)', () => {
+    renderWithResults(resultsStore({ simulating: true }));
+    const aForm = document.querySelector('[data-group-id="A"]')!;
+    expect(aForm.querySelector('[data-group-result]')).toBeNull();
+  });
+
+  it('utan results-provider (tolerant): ingen panel, kraschar ej', () => {
+    // Standard renderView (ingen ResultsStoreContext) -> useContext ger null -> ingen panel.
+    renderView(store({ myGroupPredictions: myPicks }), new Date('2026-06-20T00:00:00Z'));
+    const aForm = document.querySelector('[data-group-id="A"]')!;
+    expect(aForm.querySelector('[data-group-result]')).toBeNull();
   });
 });

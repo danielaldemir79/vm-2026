@@ -18,12 +18,8 @@ import { GROUP_IDS } from '../../domain/types';
 import type { GroupTable as GroupTableData, Team } from '../../domain/types';
 import { Fade, Slide, transitions } from '../../motion';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
-import { useResultsStore } from '../results/results-context';
 import { useGroupData } from './use-group-data';
 import { GroupTable } from './GroupTable';
-import { useGroupPredictionResults } from './use-group-prediction-results';
-import { GroupPointsBadge, GroupPickSummary } from './GroupPredictionOverlay';
-import type { GroupResultEntry } from './derive-group-prediction-results';
 
 /**
  * Teckenförklaring för kolumn-förkortningarna, så de inte är kryptiska (a11y).
@@ -55,14 +51,10 @@ function GroupCard({
   table,
   teamsById,
   index,
-  result,
 }: {
   table: GroupTableData;
   teamsById: ReadonlyMap<string, Team>;
   index: number;
-  /** Grupp-tips-resultatet för den inloggades aktiva rum, om gruppen är avgjord
-   *  och man tippat på den. Saknas = kortet renderas utan tips-overlay. */
-  result?: GroupResultEntry;
 }) {
   // Stagger: varje kort glider in en aning efter det förra. Delay-taket håller
   // den sista gruppen från att kännas trög; reducerad rörelse nollar resan i
@@ -88,14 +80,12 @@ function GroupCard({
           >
             {table.groupId}
           </span>
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate font-display text-base font-bold">Grupp {table.groupId}</span>
-            <span className="truncate text-[0.6875rem] uppercase tracking-wide text-fg-muted">
+          <span className="flex flex-col leading-tight">
+            <span className="font-display text-base font-bold">Grupp {table.groupId}</span>
+            <span className="text-[0.6875rem] uppercase tracking-wide text-fg-muted">
               4 lag · 2 vidare
             </span>
           </span>
-          {/* Grupp-tips-poäng för avgjord grupp man tippat på (annars inget). */}
-          {result ? <GroupPointsBadge points={result.points} /> : null}
         </div>
 
         {/* Tabellen. Den responsiva kolumn-avslöjningen (GroupTable, T103) håller raden
@@ -103,18 +93,7 @@ function GroupCard({
             blir bara en sista skyddsnät-rem mot oväntat långa lag-namn (inget göms, P förblir
             synlig utan att skrolla eftersom de breda stöd-kolumnerna fälls bort först). */}
         <div className="overflow-x-auto px-3 py-2">
-          <GroupTable
-            groupId={table.groupId}
-            standings={table.standings}
-            teamsById={teamsById}
-            predictionMarks={
-              result
-                ? { winnerCorrect: result.winnerCorrect, runnerUpCorrect: result.runnerUpCorrect }
-                : undefined
-            }
-          />
-          {/* "Du tippade"-raden under tabellen för en avgjord grupp man tippat på. */}
-          {result ? <GroupPickSummary result={result} teamsById={teamsById} /> : null}
+          <GroupTable groupId={table.groupId} standings={table.standings} teamsById={teamsById} />
         </div>
       </article>
     </Slide>
@@ -152,14 +131,6 @@ export function GroupStageView() {
   // vyn är en ren konsument. Måste därför renderas inuti en ResultsProvider.
   const { status, tables, teams, mode, error } = useGroupData();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
-  // Grupp-tips-resultat per avgjord grupp för det aktiva rummet (tom utan rum/tips,
-  // då renderas korten utan overlay). Additiv ovanpå de härledda tabellerna.
-  const predictionResults = useGroupPredictionResults(tables);
-  // WHAT-IF-GRIND: tabellerna här är SIMULERINGS-påverkade (vyn bor i SimulationFrame).
-  // I sim-läge är "avgjord" + placeringar HYPOTETISKA, så vi döljer tips-overlayen,
-  // annars skulle poäng-pillen påstå intjänade poäng som inte är verkliga. Riktiga
-  // poäng visas igen så fort man avslutar simuleringen.
-  const { simulating } = useResultsStore();
 
   return (
     <section aria-labelledby="gruppspel-rubrik" className="flex flex-col gap-6">
@@ -260,13 +231,7 @@ export function GroupStageView() {
         {status === 'ready' && tables.length > 0 ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {tables.map((table, i) => (
-              <GroupCard
-                key={table.groupId}
-                table={table}
-                teamsById={teamsById}
-                index={i}
-                result={simulating ? undefined : predictionResults.get(table.groupId)}
-              />
+              <GroupCard key={table.groupId} table={table} teamsById={teamsById} index={i} />
             ))}
           </div>
         ) : null}
