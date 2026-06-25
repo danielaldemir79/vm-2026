@@ -55,6 +55,9 @@ describe('deriveGroupPredictionResults', () => {
       runnerUpCorrect: false,
       predictedWinnerCode: 'BRA',
       predictedRunnerUpCode: 'ESP',
+      // Faktiskt utfall (rank 1 + rank 2, Team.id ur standings), för "Så blev det"-raden.
+      actualWinnerTeamId: 'bra',
+      actualRunnerUpTeamId: 'arg',
     });
   });
 

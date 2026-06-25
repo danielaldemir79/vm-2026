@@ -57,8 +57,8 @@ describe('ScenarioView, rendering + a11y', () => {
 
   it('renderar fixtures-läget (alla grupper ospelade) UTAN att krascha (too-early)', async () => {
     // Regression: en helt ospelad grupp har 6 återstående matcher; motorn skulle
-    // kasta om vyn enumererade. Vyn ska i stället visa "Inför sista omgången" och
-    // inte falla med ett fel (fail-loud-vakten gatas i too-early-fasen).
+    // kasta om vyn enumererade. Vyn ska i stället visa "3 omgångar kvar" (6 matcher
+    // = 3 omgångar) och inte falla med ett fel (fail-loud-vakten gatas i too-early).
     render(
       <ResultsProvider env={fixturesEnv()}>
         <ScenarioView />
@@ -66,7 +66,7 @@ describe('ScenarioView, rendering + a11y', () => {
     );
     await waitFor(() => {
       // 12 grupp-kort renderas (en per grupp).
-      expect(screen.getAllByText(/Inför sista omgången/i).length).toBe(12);
+      expect(screen.getAllByText(/3 omgångar kvar/i).length).toBe(12);
     });
     // Inga fel-alerts (det är ett legitimt produkt-läge, inte ett fel).
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -81,7 +81,7 @@ describe('ScenarioView, komprimering (T68/#129)', () => {
       </ResultsProvider>
     );
     await waitFor(() => {
-      expect(screen.getAllByText(/Inför sista omgången/i).length).toBe(12);
+      expect(screen.getAllByText(/3 omgångar kvar/i).length).toBe(12);
     });
     // Rubriken alltid synlig; kroppen komprimerad som default.
     expect(screen.getByRole('heading', { level: 2, name: /Vad krävs/i })).toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('ScenarioView, LIVE: en ändrad matchlista räknar om scenarierna', () 
 
     // Vänta in seedningen (vyn visar fixtures-läget först).
     await waitFor(() => {
-      expect(screen.getAllByText(/Inför sista omgången/i).length).toBe(12);
+      expect(screen.getAllByText(/3 omgångar kvar/i).length).toBe(12);
     });
 
     // Ersätt matchlistan med ETT kontrollerat scenario för grupp A (de RIKTIGA
@@ -145,7 +145,7 @@ describe('ScenarioView, LIVE: en ändrad matchlista räknar om scenarierna', () 
     await waitFor(() => {
       const card = document.querySelector('[data-scenario-group="A"]') as HTMLElement | null;
       expect(card).not.toBeNull();
-      expect(within(card as HTMLElement).getByText(/2 matcher kvar/i)).toBeInTheDocument();
+      expect(within(card as HTMLElement).getByText(/Sista omgången/i)).toBeInTheDocument();
     });
 
     const card = document.querySelector('[data-scenario-group="A"]') as HTMLElement;

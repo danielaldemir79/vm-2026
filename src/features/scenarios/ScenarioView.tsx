@@ -136,13 +136,16 @@ function GroupScenarioCard({
             {/* Live-läget får en lugn andnings-prick (det här lever just nu), de
                 andra faserna en ren etikett. Pricken är dekorativ (aria-hidden). */}
             {isLive ? <span aria-hidden="true" className="vm-scenario-live-dot" /> : null}
-            {scenario.phase === 'decided'
+            {/* OMGÅNGAR, inte enskilda matcher: en gruppomgångs två matcher spelas
+                SAMTIDIGT, så sista omgången (2 matcher) = "Sista omgången", inte
+                "2 matcher kvar" (som lästes som att 2 omgångar återstod). */}
+            {scenario.decided
               ? 'Färdigspelad'
-              : scenario.phase === 'too-early'
-                ? 'Inför sista omgången'
-                : `${scenario.remainingMatches} ${
-                    scenario.remainingMatches === 1 ? 'match' : 'matcher'
-                  } kvar`}
+              : scenario.remainingRounds <= 0
+                ? 'Inte spelad än'
+                : scenario.remainingRounds === 1
+                  ? 'Sista omgången'
+                  : `${scenario.remainingRounds} omgångar kvar`}
           </span>
         </div>
         {scenario.phase === 'too-early' ? (
@@ -165,10 +168,9 @@ function GroupScenarioCard({
  * extra asset) + en kort, varm copy som FÖRKLARAR varför scenarierna inte visas än,
  * så det läser som "snart", inte som ett tomt fel.
  *
- * COPY-NOT: fasen "Inför sista omgången" står redan i kortets rubrik-etikett (en
- * sanning, och senior-devs test pinnar den texten EXAKT 12 gånger = en per grupp).
- * Body-copyn upprepar därför INTE den frasen, utan utvecklar vad som väntar, så
- * etikett-räkningen hålls intakt och budskapet inte dubbelt.
+ * COPY-NOT: kortets rubrik-etikett bär redan omgångs-räknaren ("N omgångar kvar" i
+ * den här fasen, dvs >3 matcher = >=2 omgångar kvar). Body-copyn upprepar därför INTE
+ * räknaren, utan utvecklar vad som väntar, så budskapet inte blir dubbelt.
  */
 function TooEarlyBody() {
   return (
