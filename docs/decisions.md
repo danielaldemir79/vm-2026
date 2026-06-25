@@ -7102,3 +7102,16 @@ poäng som inte är verkliga).
 kom. Att visa det PÅ gruppen, där utfallet syns, gör poängen begriplig utan att röra topplistan.
 Grön bock återanvänder den färg-oberoende, AA-mätta `vm-reveal-mark--exact` så "rätt"-språket är ETT
 i appen.
+
+## 2026-06-25 , grupp-tips-resultat FLYTTAT till Tippa grupperna + omgångar-badge (v2.3.3)
+
+**Beslut:** Tips-resultatet (poäng + rätt/fel + facit) bor nu i "Tippa grupperna"-vyn via
+`GroupResultPanel`, INTE som en overlay på Turnering-tabellerna. Turnering är ren standings igen.
+"Vad krävs"-badgen räknar OMGÅNGAR ("Sista omgången" / "N omgångar kvar"), inte enskilda matcher.
+
+**Varför (Daniels feedback på v2.3.2):** en grön bock bredvid ett lag PÅ en standings-tabell lästes
+som "laget gick vidare", inte "du tippade rätt". Klarheten om poäng + vad man tippat hör hemma där
+man SER sina tips (grupp-tips-vyn), inte på resultat-tabellen. Och sista gruppomgångens 2 SAMTIDIGA
+matcher är EN omgång, så "2 matcher kvar" missläste som att 2 omgångar återstod. Resultatpanelen
+läser de riktiga resultaten ur results-storen via en dokumenterad tolerant `useOptionalResultsStore`
+(samma mönster som rooms `useRoomsSync`), och döljs i what-if-läge (hypotetiska placeringar).
