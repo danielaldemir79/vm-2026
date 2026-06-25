@@ -17,9 +17,15 @@
 // "gå med i ett rum"-läget är en INBJUDANDE guld-tonad port (kupong-ikon + tydlig
 // väg framåt), inte en grå rad. Stabila roller + data-attribut bevaras.
 
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupPredictionsStore } from './group-predictions-context';
+import { ResultsStoreContext } from '../results/results-context';
+import { deriveGroupTables } from '../groups/derive-group-tables';
+import {
+  deriveGroupPredictionResults,
+  type GroupResultEntry,
+} from '../groups/derive-group-prediction-results';
 import { usePredictionsStore } from '../predictions/predictions-context';
 import { useGroupPredictableData } from './use-group-predictable-data';
 import { selectPredictableGroups } from './group-predictable-data';
@@ -102,6 +108,20 @@ export function GroupPredictionsView({
     }
     return byGroup;
   }, [status, predictableGroups, groups, teams, matches, matchTipsByMatchId]);
+
+  // RESULTAT per AVGJORD grupp man tippat på (poäng + rätt/fel + facit). Kräver de
+  // RIKTIGA (woven) resultaten ur results-storen , getDataSource-matcherna här saknar
+  // live-facit. Läses TOLERANT (null utan provider, t.ex. i isolerade tester -> inga
+  // resultat, formuläret visar bara tipset). Döljs i what-if-läge (placeringarna är
+  // hypotetiska där) och före storen är 'ready'.
+  const resultsStore = useContext(ResultsStoreContext);
+  const groupResults = useMemo<Map<GroupId, GroupResultEntry>>(() => {
+    if (!resultsStore || resultsStore.status !== 'ready' || resultsStore.simulating) {
+      return new Map();
+    }
+    const tables = deriveGroupTables(resultsStore.groups, resultsStore.matches);
+    return deriveGroupPredictionResults(tables, store.myGroupPredictions);
+  }, [resultsStore, store.myGroupPredictions]);
 
   const ready = store.enabled && status === 'ready' && store.status === 'ready';
 
@@ -236,6 +256,7 @@ export function GroupPredictionsView({
                     // ingen knapp). null = gruppens matcher inte alla tippade (ärligt
                     // inaktiverad). undefined = låst -> ingen knapp alls.
                     suggestion={locked ? undefined : (suggestionByGroup.get(groupId) ?? null)}
+                    result={groupResults.get(groupId) ?? null}
                     onSubmit={async (gid, winnerCode, runnerUpCode) => {
                       // Brandning vid UI-gränsen: formulärets värden kommer från
                       // <option value={t.code}> (versal FIFA-code). teamCode() validerar

@@ -1,11 +1,11 @@
 // HÄRLEDNING: knyt ihop de avgjorda grupptabellerna med användarens grupp-tips till
-// ett per-grupp-resultat som gruppspelsvyn kan visa (poäng-pill + grön bock + "Du
-// tippade"-rad). REN funktion, ingen IO, ingen React, testbar i isolation.
+// ett per-grupp-resultat som GroupResultPanel visar i "Tippa grupperna"-vyn (poäng +
+// per-pick rätt/fel + facit). REN funktion, ingen IO, ingen React, testbar i isolation.
 //
 // EN POST GES BARA NÄR: (1) gruppen är AVGJORD (alla lag har spelat alla sina
-// gruppmatcher) OCH (2) användaren har ett grupp-tips för gruppen. Annars ingen
-// overlay (vyn renderar den vanliga tabellen). Poäng + per-position-bockar härleds
-// via evaluateGroupPrediction (en sanning för poäng-seamen, code<->id hanterad där).
+// gruppmatcher) OCH (2) användaren har ett grupp-tips för gruppen. Annars ingen post
+// (panelen visas inte). Poäng + per-position-utfall härleds via evaluateGroupPrediction
+// (en sanning för poäng-seamen, code<->id hanterad där).
 
 import type { GroupId, GroupTable } from '../../domain/types';
 import { evaluateGroupPrediction, type GroupPrediction } from '../../data/predictions';
@@ -15,14 +15,18 @@ export interface GroupResultEntry {
   groupId: GroupId;
   /** Total gruppoäng (0/2/3/5). */
   points: number;
-  /** Tippade rätt gruppvinnare (grön bock rad 1). */
+  /** Tippade rätt gruppvinnare (1:a). */
   winnerCorrect: boolean;
-  /** Tippade rätt grupptvåa (grön bock rad 2). */
+  /** Tippade rätt grupptvåa (2:a). */
   runnerUpCorrect: boolean;
-  /** Tippad gruppvinnare (Team.code, versal), för "Du tippade"-raden. */
+  /** Tippad gruppvinnare (Team.code, versal). */
   predictedWinnerCode: string;
   /** Tippad grupptvåa (Team.code, versal). */
   predictedRunnerUpCode: string;
+  /** Faktisk gruppvinnare (Team.id ur den färdiga tabellen), för "Så blev det"-raden. */
+  actualWinnerTeamId: string;
+  /** Faktisk grupptvåa (Team.id ur den färdiga tabellen). */
+  actualRunnerUpTeamId: string;
 }
 
 /**
@@ -79,6 +83,8 @@ export function deriveGroupPredictionResults(
       runnerUpCorrect: evaluation.runnerUpCorrect,
       predictedWinnerCode: prediction.winnerTeamId,
       predictedRunnerUpCode: prediction.runnerUpTeamId,
+      actualWinnerTeamId: actualWinner.teamId,
+      actualRunnerUpTeamId: actualRunnerUp.teamId,
     });
   }
 
