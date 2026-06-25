@@ -260,3 +260,44 @@ describe('GroupTable, fel-väg: okänt lag-id maskeras inte', () => {
     expect(openProfile).toHaveBeenCalledWith('mex');
   });
 });
+
+describe('GroupTable, grupp-tips-overlay (grön bock på rätt tippad placering)', () => {
+  it('utan predictionMarks: ingen bock (oförändrad standard-väg)', () => {
+    const { container } = render(
+      <TeamProfileStub>
+        <GroupTable groupId="A" standings={standings} teamsById={teamsById} />
+      </TeamProfileStub>
+    );
+    expect(container.querySelector('.vm-reveal-mark')).toBeNull();
+  });
+
+  it('winnerCorrect: bock på etta-raden, inte på tvåan', () => {
+    render(
+      <TeamProfileStub>
+        <GroupTable
+          groupId="A"
+          standings={standings}
+          teamsById={teamsById}
+          predictionMarks={{ winnerCorrect: true, runnerUpCorrect: false }}
+        />
+      </TeamProfileStub>
+    );
+    expect(screen.getByText('Rätt tippad gruppvinnare')).toBeInTheDocument();
+    expect(screen.queryByText('Rätt tippad grupptvåa')).not.toBeInTheDocument();
+  });
+
+  it('runnerUpCorrect: bock på tvåan, inte på ettan', () => {
+    render(
+      <TeamProfileStub>
+        <GroupTable
+          groupId="A"
+          standings={standings}
+          teamsById={teamsById}
+          predictionMarks={{ winnerCorrect: false, runnerUpCorrect: true }}
+        />
+      </TeamProfileStub>
+    );
+    expect(screen.getByText('Rätt tippad grupptvåa')).toBeInTheDocument();
+    expect(screen.queryByText('Rätt tippad gruppvinnare')).not.toBeInTheDocument();
+  });
+});

@@ -112,6 +112,31 @@ export interface GroupTableProps {
   standings: readonly GroupStanding[];
   /** Lag-uppslag (teamId -> Team) för namn + landskod. */
   teamsById: ReadonlyMap<string, Team>;
+  /**
+   * VALFRI grupp-tips-overlay (avgjord grupp man tippat på): grön bock på den rad
+   * vars placering man tippade RÄTT. `winnerCorrect` -> bock på etta-raden,
+   * `runnerUpCorrect` -> bock på tvåa-raden. Utelämnad = tabellen renderas exakt
+   * som utan tips (standard-vägen oförändrad).
+   */
+  predictionMarks?: { winnerCorrect: boolean; runnerUpCorrect: boolean };
+}
+
+/**
+ * Grön "rätt tippad placering"-bock. Återanvänder den färg-OBEROENDE utfalls-
+ * markören (.vm-reveal-mark--exact: bock i en solid success-medalj, mörk/ljus ink
+ * på solid yta, AA-mätt) som tips-avslöjandet använder, så "rätt"-språket är ETT i
+ * appen. Glyfen är aria-hidden, betydelsen bärs av sr-only-texten.
+ */
+function CorrectPickMark({ label }: { label: string }) {
+  return (
+    <span
+      className="vm-reveal-mark vm-reveal-mark--exact h-5 w-5 shrink-0 text-[0.7rem]"
+      title={label}
+    >
+      <span aria-hidden="true">✓</span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
 }
 
 /** Visa ett lag med namn (+ landskod som diskret komplement). Fail-safe vid okänt id. */
@@ -175,7 +200,7 @@ function rankDiscStyle(rank: number): CSSProperties {
  * av computeStandings) och renderar dem tillgängligt. Ingen beräkning här, en
  * sanning bor i härledningen.
  */
-export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
+export function GroupTable({ groupId, standings, teamsById, predictionMarks }: GroupTableProps) {
   return (
     <table
       className="w-full border-collapse text-left text-sm"
@@ -273,6 +298,17 @@ export function GroupTable({ groupId, standings, teamsById }: GroupTableProps) {
                   >
                     {code}
                   </span>
+                  {/* Grupp-tips-overlay: grön bock på den placering man tippade rätt
+                      (etta -> winnerCorrect, tvåa -> runnerUpCorrect). Bara när
+                      predictionMarks finns (avgjord grupp man tippat på). */}
+                  {predictionMarks && row.rank === 1 && predictionMarks.winnerCorrect ? (
+                    <CorrectPickMark label="Rätt tippad gruppvinnare" />
+                  ) : null}
+                  {predictionMarks &&
+                  row.rank === DIRECT_ADVANCE_RANK &&
+                  predictionMarks.runnerUpCorrect ? (
+                    <CorrectPickMark label="Rätt tippad grupptvåa" />
+                  ) : null}
                 </span>
                 {qualified ? <span className="sr-only"> (kvalificerad till slutspel)</span> : null}
               </th>
