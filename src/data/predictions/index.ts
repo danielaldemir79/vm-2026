@@ -33,6 +33,7 @@ export { POOL_EXTENDED_DEADLINE_ISO, applyExtendedDeadline } from './prediction-
 // T16 (#16): pool-bonus-poängsättning (grupp- + bracket-tips).
 export {
   scoreGroupPrediction,
+  evaluateGroupPrediction,
   scoreBracketAdvance,
   scoreChampionPrediction,
   GROUP_PREDICTION_POINTS,
@@ -40,6 +41,7 @@ export {
   CHAMPION_PREDICTION_POINTS,
   type GroupOutcome,
   type GroupPredictionPick,
+  type GroupPredictionResult,
 } from './bonus-score';
 
 // T16 (#16): gruppvinnar-tips (gissad 1:a + 2:a per grupp).
