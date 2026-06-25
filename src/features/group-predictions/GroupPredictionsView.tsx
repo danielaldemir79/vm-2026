@@ -17,10 +17,10 @@
 // "gå med i ett rum"-läget är en INBJUDANDE guld-tonad port (kupong-ikon + tydlig
 // väg framåt), inte en grå rad. Stabila roller + data-attribut bevaras.
 
-import { useContext, useMemo } from 'react';
+import { useMemo } from 'react';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { useGroupPredictionsStore } from './group-predictions-context';
-import { ResultsStoreContext } from '../results/results-context';
+import { useOptionalResultsStore } from '../results/results-context';
 import { deriveGroupTables } from '../groups/derive-group-tables';
 import {
   deriveGroupPredictionResults,
@@ -114,7 +114,7 @@ export function GroupPredictionsView({
   // live-facit. Läses TOLERANT (null utan provider, t.ex. i isolerade tester -> inga
   // resultat, formuläret visar bara tipset). Döljs i what-if-läge (placeringarna är
   // hypotetiska där) och före storen är 'ready'.
-  const resultsStore = useContext(ResultsStoreContext);
+  const resultsStore = useOptionalResultsStore();
   const groupResults = useMemo<Map<GroupId, GroupResultEntry>>(() => {
     if (!resultsStore || resultsStore.status !== 'ready' || resultsStore.simulating) {
       return new Map();

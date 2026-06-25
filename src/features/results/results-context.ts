@@ -128,3 +128,16 @@ export function useResultsStore(): ResultsStore {
   }
   return store;
 }
+
+/**
+ * TOLERANT läsning av results-storen: returnerar null om ingen ResultsProvider finns
+ * (i stället för att kasta som useResultsStore). Samma tolerans-mönster som rooms-
+ * lagrets useRoomsSync, och bara för ADDITIVA konsumenter där storen är en bonus, inte
+ * ett krav: t.ex. grupp-tips-resultatpanelen, som bara är en extra klarhet ovanpå tips-
+ * vyn och ska degradera till "ingen panel" (aldrig krascha) om den någon gång renderas
+ * utan provider. Krävande konsumenter ska fortsatt använda det fail-loud:ande
+ * useResultsStore , den här är det MEDVETNA, dokumenterade undantaget.
+ */
+export function useOptionalResultsStore(): ResultsStore | null {
+  return useContext(ResultsStoreContext);
+}
