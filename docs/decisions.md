@@ -7087,3 +7087,18 @@ fler än 1000 tips poängsattes mot en avkapad delmängd, vilket gav fel poäng 
 person visade olika poäng i rum, admin och global). Cap:en är en Supabase-bred sanning, inte
 leaderboard-specifik, därför EN delad cap-skydds-loop i stället för en andra implementation som kan
 drifta. Fail-loud completeness-vakt: kastar hellre än returnerar avkapad eller dubblerad data.
+
+## 2026-06-25 , grupp-tips-resultat på avgjorda grupper i Turnering-fliken (v2.3.2)
+
+**Beslut:** På en AVGJORD grupp man tippat på (i det aktiva rummet) visar grupptabellen nu en
+poäng-pill, en grön bock på den placering man tippade rätt, och en "Du tippade"-rad. Per-position-
+utfallet härleds via en ny `evaluateGroupPrediction` (bonus-score) som `scoreGroupPrediction`
+delegerar till (EN sanning för poäng + code-id-seamen). Overlayen är ADDITIV (utan rum/tips, ej
+avgjord grupp eller demo-läge = oförändrad tabell) och DÖLJS i what-if-läge (vyn bor i
+SimulationFrame, så simulerade placeringar är hypotetiska , annars skulle pillen påstå intjänade
+poäng som inte är verkliga).
+
+**Varför:** Nu när grupp-tips ger poäng (3p rätt 1:a, 2p rätt 2:a) var det oklart varifrån poängen
+kom. Att visa det PÅ gruppen, där utfallet syns, gör poängen begriplig utan att röra topplistan.
+Grön bock återanvänder den färg-oberoende, AA-mätta `vm-reveal-mark--exact` så "rätt"-språket är ETT
+i appen.
