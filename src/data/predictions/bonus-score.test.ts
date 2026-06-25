@@ -10,6 +10,7 @@ import {
   scoreBracketAdvance,
   scoreChampionPrediction,
   scoreGroupPrediction,
+  evaluateGroupPrediction,
   type GroupOutcome,
 } from './bonus-score';
 import type { KnockoutStage } from '../../domain/bracket/bracket-structure';
@@ -48,6 +49,63 @@ describe('scoreGroupPrediction (gruppvinnare 3p + tvåa 2p, oberoende)', () => {
   it('poängkonstanterna är de dokumenterade (3 / 2)', () => {
     expect(GROUP_PREDICTION_POINTS.winner).toBe(3);
     expect(GROUP_PREDICTION_POINTS.runnerUp).toBe(2);
+  });
+});
+
+describe('evaluateGroupPrediction (per-position-uppdelning för UI: bock + poäng)', () => {
+  const actual: GroupOutcome = { winnerTeamId: 'BRA', runnerUpTeamId: 'ARG' };
+
+  it('båda rätt: winnerCorrect + runnerUpCorrect + 5p', () => {
+    expect(evaluateGroupPrediction({ winnerTeamId: 'BRA', runnerUpTeamId: 'ARG' }, actual)).toEqual(
+      {
+        winnerCorrect: true,
+        runnerUpCorrect: true,
+        points: 5,
+      }
+    );
+  });
+
+  it('bara vinnare rätt: winnerCorrect, ej runnerUp, 3p', () => {
+    expect(evaluateGroupPrediction({ winnerTeamId: 'BRA', runnerUpTeamId: 'ESP' }, actual)).toEqual(
+      {
+        winnerCorrect: true,
+        runnerUpCorrect: false,
+        points: 3,
+      }
+    );
+  });
+
+  it('bara tvåa rätt: runnerUpCorrect, ej winner, 2p', () => {
+    expect(evaluateGroupPrediction({ winnerTeamId: 'ESP', runnerUpTeamId: 'ARG' }, actual)).toEqual(
+      {
+        winnerCorrect: false,
+        runnerUpCorrect: true,
+        points: 2,
+      }
+    );
+  });
+
+  it('helt fel: ingen korrekt, 0p', () => {
+    expect(evaluateGroupPrediction({ winnerTeamId: 'ESP', runnerUpTeamId: 'FRA' }, actual)).toEqual(
+      {
+        winnerCorrect: false,
+        runnerUpCorrect: false,
+        points: 0,
+      }
+    );
+  });
+
+  it('identitets-seam: code-lagrat tips (versal) mot id-härlett facit (gemen) ger korrekt, inte tyst fel', () => {
+    // facit ur standings bär Team.id (gemen "bra"), tipset lagras som code ("BRA").
+    const idActual: GroupOutcome = { winnerTeamId: 'bra', runnerUpTeamId: 'arg' };
+    expect(
+      evaluateGroupPrediction({ winnerTeamId: 'BRA', runnerUpTeamId: 'ARG' }, idActual)
+    ).toEqual({ winnerCorrect: true, runnerUpCorrect: true, points: 5 });
+  });
+
+  it('points är konsistent med scoreGroupPrediction (en sanning)', () => {
+    const pick = { winnerTeamId: 'BRA', runnerUpTeamId: 'ESP' };
+    expect(evaluateGroupPrediction(pick, actual).points).toBe(scoreGroupPrediction(pick, actual));
   });
 });
 

@@ -90,6 +90,42 @@ export interface GroupOutcome {
 export type GroupPredictionPick = GroupOutcome;
 
 /**
+ * Per-position-uppdelningen av ett gruppvinnar-tips: vann/förlorade per slot PLUS
+ * total-poängen. UI:t (T-grupp-resultat) behöver veta VILKEN position som satt
+ * (grön bock på rätt rad + "Du tippade"-raden), inte bara summan, så detta är
+ * sanningen poäng-summan ska härledas ur (scoreGroupPrediction delegerar hit).
+ */
+export interface GroupPredictionResult {
+  /** Tippade rätt gruppvinnare (1:a). */
+  winnerCorrect: boolean;
+  /** Tippade rätt grupptvåa (2:a). */
+  runnerUpCorrect: boolean;
+  /** Total poäng (3 för rätt 1:a + 2 för rätt 2:a, oberoende). */
+  points: number;
+}
+
+/**
+ * Utvärdera ett gruppvinnar-tips per position mot det faktiska grupputfallet.
+ * Samma identitets-kontrakt + oberoende-positioner-regel som scoreGroupPrediction
+ * (se den), men returnerar uppdelningen UI:t behöver. scoreGroupPrediction är nu en
+ * tunn vy över denna (en sanning, ingen risk att poäng och bock säger olika saker).
+ *
+ * @param predicted  Det gissade grupputfallet (1:a + 2:a), code eller id.
+ * @param actual     Det faktiska grupputfallet (1:a + 2:a ur färdig tabell), code eller id.
+ */
+export function evaluateGroupPrediction(
+  predicted: GroupPredictionPick,
+  actual: GroupOutcome
+): GroupPredictionResult {
+  const winnerCorrect = sameTeam(predicted.winnerTeamId, actual.winnerTeamId);
+  const runnerUpCorrect = sameTeam(predicted.runnerUpTeamId, actual.runnerUpTeamId);
+  const points =
+    (winnerCorrect ? GROUP_PREDICTION_POINTS.winner : 0) +
+    (runnerUpCorrect ? GROUP_PREDICTION_POINTS.runnerUp : 0);
+  return { winnerCorrect, runnerUpCorrect, points };
+}
+
+/**
  * Poängsätt ett gruppvinnar-tips mot det faktiska grupputfallet.
  *
  * Positionerna poängsätts OBEROENDE: rätt 1:a ger 3, rätt 2:a ger 2, och ett
@@ -110,14 +146,7 @@ export type GroupPredictionPick = GroupOutcome;
  * @returns          0-5 poäng (3 för rätt 1:a, 2 för rätt 2:a, oberoende).
  */
 export function scoreGroupPrediction(predicted: GroupPredictionPick, actual: GroupOutcome): number {
-  let points = 0;
-  if (sameTeam(predicted.winnerTeamId, actual.winnerTeamId)) {
-    points += GROUP_PREDICTION_POINTS.winner;
-  }
-  if (sameTeam(predicted.runnerUpTeamId, actual.runnerUpTeamId)) {
-    points += GROUP_PREDICTION_POINTS.runnerUp;
-  }
-  return points;
+  return evaluateGroupPrediction(predicted, actual).points;
 }
 
 /* ------------------------------------------------------------------ *
