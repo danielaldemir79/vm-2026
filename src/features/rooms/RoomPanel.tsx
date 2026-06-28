@@ -4,7 +4,7 @@
 // medlemmar, dela koden, lämna. Senior-dev äger SEMANTIKEN + data-attributen
 // (rubriker, fält-etiketter, role/aria, data-rooms-*); det HÄR lagret lägger
 // premium-finishen ovanpå UTAN att röra logiken (samma seam-princip som
-// GroupTable/BracketView/ScenarioView). Stilen bor i `rooms.css`.
+// GroupTable/BracketView). Stilen bor i `rooms.css`.
 //
 // DELNINGS-ÖGONBLICKET (taskens kärna): "skapa ett rum, skicka koden till
 // kompisarna" ska kännas inbjudande och självklart. Därför är rumskoden en stor,

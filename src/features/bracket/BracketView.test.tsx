@@ -4,6 +4,7 @@ import { BracketView, SlotRow } from './BracketView';
 import { ResultsProvider } from '../results/ResultsProvider';
 import type { DataSource } from '../../data';
 import type { BracketSlotState } from './derive-bracket';
+import type { Team } from '../../domain/types';
 import { createFailingDataSource } from '../../test/failing-data-source';
 
 // Fixtures-miljö (ingen Supabase-env) => datakällan ger den verifierade VM 2026-
@@ -148,47 +149,99 @@ describe('BracketView, GRUPPSPEL PÅGÅR, PRELIMINÄRT levande läge (T56, fixtu
   });
 });
 
-// C10 (Copilot runda 3): möjliga-lag-chippets text/aria var alltid plural
-// ("möjliga"), så vid exakt 1 kandidat blev det grammatiskt fel ("1 möjliga
-// lag"). Böjs nu som matchCountLabel: "1 möjligt lag" / "n möjliga lag".
-describe('SlotRow, möjliga-lag-chippets böjning (C10)', () => {
-  // Bygg en 'possible'-slot med ett givet antal kandidater (bara fälten chippet
-  // läser; resten av BracketSlotState är irrelevant för den här raden).
+// 2026-06-28 (Daniels turnering-lyft): en obestämd slot visar nu sina ALTERNATIV
+// (kandidatlag som flagg+namn-chips) i stället för bara en räknare, så man ser vilka
+// lag som kan ta platsen hela vägen mot finalen. Räknar-böjningen (C10: "1 möjligt
+// lag" / "n möjliga lag") lever kvar i strip:ens aria-label (hela sanningen för
+// skärmläsaren även när chipsen i bild trunkeras till "+N").
+describe('SlotRow, alternativ + flagga + definitiv-markör', () => {
+  // Minimal Team-fixtur (bara fälten slot-raden läser: id/name/code; group krävs av typen).
+  function team(id: string, name: string, code: string): Team {
+    return { id, name, code, group: 'A' };
+  }
+  const teams = new Map<string, Team>([
+    ['BRA', team('BRA', 'Brasilien', 'BRA')],
+    ['ARG', team('ARG', 'Argentina', 'ARG')],
+  ]);
+
+  // En obestämd 'possible'-slot (inget fyllt lag) med ett givet antal kandidater.
   function possibleSlot(candidateTeamIds: string[]): BracketSlotState {
     return {
-      id: 'M73-home',
-      matchId: 'M73',
+      id: 'M89-home',
+      matchId: 'M89',
       side: 'home',
-      stage: 'round-of-32',
+      stage: 'round-of-16',
       nextSlotId: null,
       resolution: 'possible',
-      label: '2:a grupp A',
+      label: 'Vinnare M73',
       teamId: null,
       candidateTeamIds,
     };
   }
 
-  function renderSlot(slot: BracketSlotState) {
+  // En resolved (definitiv) slot med ett konkret lag.
+  function resolvedSlot(teamId: string): BracketSlotState {
+    return {
+      id: 'M73-home',
+      matchId: 'M73',
+      side: 'home',
+      stage: 'round-of-32',
+      nextSlotId: 'M89-home',
+      resolution: 'resolved',
+      label: '1:a grupp A',
+      teamId,
+      candidateTeamIds: [],
+    };
+  }
+
+  function renderSlot(
+    slot: BracketSlotState,
+    teamsById: ReadonlyMap<string, Team> = teams,
+    isWinner = false
+  ) {
     return render(
       <ul>
-        <SlotRow slot={slot} teamsById={new Map()} isWinner={false} />
+        <SlotRow slot={slot} teamsById={teamsById} isWinner={isWinner} />
       </ul>
     );
   }
 
-  it('SINGULAR: exakt 1 kandidat böjs "1 möjligt lag" (inte "1 möjliga lag")', () => {
-    renderSlot(possibleSlot(['A1']));
-    const chip = screen.getByText('1 möjligt lag');
-    expect(chip).toBeInTheDocument();
-    expect(chip).toHaveAttribute('aria-label', '1 möjligt lag');
-    expect(screen.queryByText('1 möjliga lag')).toBeNull();
+  it('visar kandidatlagen ("alternativen") som namn-chips, inte bara en räknare', () => {
+    renderSlot(possibleSlot(['BRA', 'ARG']));
+    expect(screen.getByText('Brasilien')).toBeInTheDocument();
+    expect(screen.getByText('Argentina')).toBeInTheDocument();
+    // Det gamla synliga räknar-chippet ("2 möjliga lag") finns inte längre.
+    expect(screen.queryByText('2 möjliga lag')).toBeNull();
   });
 
-  it('PLURAL: fler än 1 kandidat böjs "n möjliga lag"', () => {
-    renderSlot(possibleSlot(['A3', 'B3', 'C3', 'D3', 'F3']));
-    const chip = screen.getByText('5 möjliga lag');
-    expect(chip).toBeInTheDocument();
-    expect(chip).toHaveAttribute('aria-label', '5 möjliga lag');
+  it('faller till "+N" när kandidaterna är fler än MAX (smal cell svämmar inte)', () => {
+    // 6 kandidater -> 4 chips + "+2".
+    renderSlot(possibleSlot(['BRA', 'ARG', 'C3', 'D3', 'E3', 'F3']));
+    expect(screen.getByText('+2')).toBeInTheDocument();
+  });
+
+  it('bär hela sanningen i aria-label (alla namn + böjt antal, C10-böjningen bevarad)', () => {
+    const { container } = renderSlot(possibleSlot(['BRA']));
+    const alts = container.querySelector('[data-bracket-alts]');
+    // C10: exakt 1 kandidat böjs "1 möjligt lag" (inte "1 möjliga lag").
+    expect(alts?.getAttribute('aria-label')).toContain('1 möjligt lag');
+    expect(alts?.getAttribute('aria-label')).toContain('Brasilien');
+  });
+
+  it('en resolved icke-vinnare märks DEFINITIV ("Klar") + visar lag med flagga', () => {
+    const { container } = renderSlot(resolvedSlot('BRA'), teams, false);
+    expect(container.querySelector('[data-slot-definitiv]')).not.toBeNull();
+    expect(screen.getByText('Klar')).toBeInTheDocument();
+    // Laget syns med namn (full kontrast) + flagga (data-team-flag-seamen).
+    expect(screen.getByText('Brasilien')).toBeInTheDocument();
+    expect(container.querySelector('[data-team-flag]')).not.toBeNull();
+  });
+
+  it('en resolved VINNARE bär INTE "Klar" (vinnar-medaljen + "(vidare)" bär det i stället)', () => {
+    const { container } = renderSlot(resolvedSlot('BRA'), teams, true);
+    expect(container.querySelector('[data-slot-definitiv]')).toBeNull();
+    expect(screen.queryByText('Klar')).toBeNull();
+    expect(screen.getByText('(vidare)')).toBeInTheDocument();
   });
 });
 

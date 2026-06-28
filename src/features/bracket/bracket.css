@@ -587,3 +587,107 @@
     animation: none !important;
   }
 }
+
+/* =============================================================================
+   8. LAGEN SYNS BÄTTRE: flaggor, alternativ (möjliga lag), definitiv-markör,
+   progress + världsmästare (2026-06-28, Daniels turnering-lyft).
+   =============================================================================
+
+   Trädet bär nu KONKRETA lag hela vägen mot finalen: ett fyllt lag visar sin flagga
+   + namn, en obestämd plats visar sina ALTERNATIV (kandidatlag som flagg-chips), och
+   en DEFINITIV plats (resolved icke-vinnare) märks "Klar". Ovanför trädet ligger en
+   progress-bar (avgjorda slutspelsmatcher) som växlar till en guld-världsmästar-
+   spotlight när finalen är avgjord. Allt stylat via tema-token (color-mix / var(--*)),
+   troget BÅDA teman, och FÄRG-OBEROENDE signaler (form + glyf + text) bär betydelsen.
+   -------------------------------------------------------------------------- */
+
+/* PLATSHÅLLAR-DISC för en obestämd plats (inget lag än): samma diameter som flaggan så
+   radens vänster-rytm hålls lika med lag-raderna, men en STRECKAD neutral kant + "?"
+   (form) säger "öppen plats", tydligt skild från en fylld flagga utan att luta på färg. */
+.vm-bracket-slot-flag-empty {
+  border: 1.5px dashed color-mix(in srgb, var(--color-fg-muted) 40%, transparent);
+  background-color: color-mix(in srgb, var(--color-fg) 3%, transparent);
+}
+
+/* "KLAR"-BRICKAN (definitiv plats): en lugn, BEKRÄFTANDE neutral pill (fg-muted text på
+   en svag neutral tint, AA i båda teman) med en lås-glyf. Medvetet NEUTRAL, inte grön:
+   grönt är vinnar-medaljens språk (data-winner), och en definitiv plats är inte samma sak
+   som ett lag som gått vidare , den är bara LÅST. Formen (lås + ordet "Klar") bär läget
+   färg-oberoende. */
+.vm-bracket-definitiv {
+  border: 1px solid color-mix(in srgb, var(--color-fg-muted) 35%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-fg) 5%, transparent);
+  color: var(--color-fg-muted);
+}
+.vm-bracket-definitiv-glyph {
+  flex-shrink: 0;
+}
+
+/* ALTERNATIVEN (kandidatlag-chips) för en obestämd plats: små, lugna flagg+namn-chips
+   så man SER vilka lag som kan ta platsen i åttondel/kvart/semi/final, inte bara en
+   räknare. Subtil kant + svag tint så de läser som "möjliga", inte som ett valt/låst lag.
+   Texten är fg-muted (AA) på den opaka kort-ytan; chip-tinten är låg-alfa bakom texten. */
+.vm-bracket-slot-alts {
+  /* Radbryter snyggt i den smala cellen (flex-wrap sätts i markup). */
+  row-gap: 0.25rem;
+}
+.vm-bracket-candidate {
+  border: 1px solid var(--color-border);
+  background-color: color-mix(in srgb, var(--color-fg) 3%, transparent);
+}
+
+/* VÄRLDSMÄSTAR-SPOTLIGHT (bonus): trädets krona ovanför kolumnerna när finalen är avgjord.
+   Guld-signatur (samma färg-oberoende guld-språk som finalens matchkort, §3): guld-kant +
+   varm guld-tint + mjuk guld-glow. Trofé-glyfen sitter i en gold-disc med AA-säker
+   guld-text (--color-warning), aldrig rå --vm-gold som text (gold-on-tint-fällan). */
+.vm-bracket-champion {
+  border-color: color-mix(in srgb, var(--vm-gold) 55%, var(--color-border));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vm-gold) 14%, var(--color-surface-raised)),
+    var(--color-surface-raised)
+  );
+  box-shadow:
+    var(--vm-shadow-raised),
+    0 0 0 1px color-mix(in srgb, var(--vm-gold) 30%, transparent),
+    0 8px 32px color-mix(in srgb, var(--vm-gold) 22%, transparent);
+}
+.vm-bracket-champion-trophy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, var(--vm-gold) 22%, transparent);
+  color: var(--color-warning);
+}
+
+/* PROGRESS-BAREN (bonus): hur långt slutspelet avgjorts. Slank spår + accent-fyllning
+   (turneringens energi-färg). Fyllningens bredd sätts inline (andel avgjorda matcher);
+   den glider mjukt vid uppdatering, nollat vid reducerad rörelse. */
+.vm-bracket-progress-track {
+  position: relative;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, var(--color-fg) 8%, transparent);
+  overflow: hidden;
+}
+.vm-bracket-progress-fill {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: var(--radius-pill);
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--color-accent) 65%, transparent),
+    var(--color-accent)
+  );
+  transition: width 0.4s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vm-bracket-progress-fill {
+    transition: none;
+  }
+}

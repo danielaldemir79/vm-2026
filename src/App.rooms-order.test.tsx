@@ -12,13 +12,14 @@ import { ThemeProvider, THEME_ATTRIBUTE } from './theme';
 import { MotionProvider } from './motion';
 import { SettingsProvider, ONBOARDING_DONE_KEY } from './features/app-settings';
 
-// T96 (#193): bevisar att RoomSection ligger ÖVERST i Tips-fliken (inte sist), END-TO-END
-// genom hela app-trädet. ALLA tips-sektioner (RoomSection OCH PredictionSection m.fl.) gatar
-// på rooms.enabled och renderar NULL i fixtures-läge, så vi kan inte mäta deras position via
-// riktigt innehåll där. Därför MOCKAR vi de TVÅ sektioner vars inbördes ordning T96 ändrade
-// (RoomSection + PredictionSection) så de blir lätta stand-ins med STABILA markörer vi kan
-// ordnings-jämföra. Mocken ligger i en EGEN testfil (inte App.test.tsx) eftersom vi.mock
-// hissas till hela filen.
+// 2026-06-28 (vänder T96): bevisar att RoomSection ligger SIST i Tips-fliken (inte överst),
+// END-TO-END genom hela app-trädet. Daniels önskemål: din statistik + tippa matcherna är det
+// primära överst, skapa-rum är en sekundär yta längst ned. ALLA tips-sektioner (RoomSection OCH
+// PredictionSection m.fl.) gatar på rooms.enabled och renderar NULL i fixtures-läge, så vi kan
+// inte mäta deras position via riktigt innehåll där. Därför MOCKAR vi de TVÅ sektioner vars
+// inbördes ordning ändras (RoomSection + PredictionSection) så de blir lätta stand-ins med
+// STABILA markörer vi kan ordnings-jämföra. Mocken ligger i en EGEN testfil (inte App.test.tsx)
+// eftersom vi.mock hissas till hela filen.
 //
 // Vi spridar de FAKTISKA modulerna (importOriginal) så alla andra exporter (useRoomsSync,
 // RoomsProvider, PredictionsProvider, ...) är oförändrade och resten av App monterar precis
@@ -70,8 +71,8 @@ async function waitForAppSettled() {
   });
 }
 
-describe('App-skalet, RoomSection överst i Tips (T96, #193)', () => {
-  it('renderar RoomSection FÖRE prediction-vyn i Tips-panelen (rum-valet är primärt)', async () => {
+describe('App-skalet, RoomSection sist i Tips (2026-06-28, vänder T96)', () => {
+  it('renderar RoomSection EFTER prediction-vyn i Tips-panelen (statistik + tips primärt)', async () => {
     renderApp();
     await waitForAppSettled();
 
@@ -93,10 +94,10 @@ describe('App-skalet, RoomSection överst i Tips (T96, #193)', () => {
     expect(tipsPanel!.contains(roomMarker)).toBe(true);
     expect(tipsPanel!.contains(predictionMarker)).toBe(true);
 
-    // ORDNINGS-GARANTIN (taskens kärna): RoomSection ligger FÖRE prediction-sektionen i DOM.
-    // compareDocumentPosition: DOCUMENT_POSITION_FOLLOWING (4) betyder predictionMarker
-    // kommer EFTER roomMarker i dokument-ordning, dvs rummet är överst , kravet.
-    const relation = roomMarker.compareDocumentPosition(predictionMarker);
+    // ORDNINGS-GARANTIN (taskens kärna): RoomSection ligger SIST, dvs EFTER prediction-
+    // sektionen i DOM. compareDocumentPosition: DOCUMENT_POSITION_FOLLOWING (4) betyder
+    // roomMarker kommer EFTER predictionMarker i dokument-ordning, dvs rummet är längst ned.
+    const relation = predictionMarker.compareDocumentPosition(roomMarker);
     expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
