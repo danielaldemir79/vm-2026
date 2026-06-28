@@ -7115,3 +7115,51 @@ man SER sina tips (grupp-tips-vyn), inte på resultat-tabellen. Och sista gruppo
 matcher är EN omgång, så "2 matcher kvar" missläste som att 2 omgångar återstod. Resultatpanelen
 läser de riktiga resultaten ur results-storen via en dokumenterad tolerant `useOptionalResultsStore`
 (samma mönster som rooms `useRoomsSync`), och döljs i what-if-läge (hypotetiska placeringar).
+
+## 2026-06-28 , turnering-lyft: slutspelet leder, what-if + Vad krävs bort, tips-ordning (v2.4.0)
+
+**Beslut (Daniels 4 punkter + bonus, slutspelet är det som gäller nu):**
+
+1. **Slutspelsträdet leder Turnering, gruppspelet under.** I App.tsx Turnering-fliken
+   renderas nu `BracketView` FÖRST (id `turnering-slutspel`), `GroupStageView` under
+   (id `turnering-grupper`); sektions-navet (TURNERING_SECTIONS) i samma ordning.
+
+2. **Trädet visar lagen + alternativen hela vägen mot finalen.** `SlotRow` (BracketView.tsx)
+   bär nu lagets FLAGGA (TeamFlag) + namn för fyllda platser, och en obestämd plats
+   (possible/tbd) visar sina ALTERNATIV som kandidatlag-chips (flagg+namn, ny `CandidateChips`,
+   "+N" vid fler än 4) i stället för bara en räknare. Datamodellen bar redan `candidateTeamIds`
+   per slot, vyn visade dem bara inte. En DEFINITIV plats (resolution='resolved' icke-vinnare)
+   märks "Klar" (ny `DefinitivBadge`, lås-glyf + ord, NEUTRAL, inte grön , grönt är vinnar-
+   medaljens språk, data-winner). Räknar-böjningen (C10) lever kvar i alternativ-strip:ens
+   aria-label. TeamFlag fick en `xs`-storlek för de trånga kandidat-chipsen.
+
+3. **"Vad krävs" (ScenarioView) borttaget.** Gjorde sitt syfte under gruppspelet. Hela
+   `src/features/scenarios/` raderat (enda konsument var App.tsx). `demo-chip-aa-guard.test.ts`
+   globar nu 3 vy-filer (var 4).
+
+4. **"Starta simuleringen" (what-if) borttaget.** `SimulationBanner` + `SimulationFrame` +
+   den lokala `ResultEntryGate`/`GoalCelebrationOverlay` är ute ur App.tsx (daily + turnering
+   uppackade till rena barn). I live (=produktion) var den lokala inmatningen redan dold utan
+   sim, så ingen UX-förändring utöver att kontrollen försvinner. Officiella resultat matas
+   fortsatt in via AdminSection (Mer) och driver tabeller + träd live. OBS: simulation-mappens
+   TipsBracketView/deriveTipsBracket (tips-visualiseringen, EJ what-if) lämnades orörda. Sim-
+   storens vilande API i ResultsProvider rördes inte (lågrisk, ej användar-synligt).
+
+5. **Tips-ordning: din statistik + tippa matcherna överst, skapa-rum sist.** RoomSection
+   flyttad till BOTTEN av Tips (vänder T96). PredictionSection (som redan renderar
+   TipsScoreSummary + PersonalStatsSection överst, sen kupongen) leder fliken.
+   `App.rooms-order.test.tsx` uppdaterat till nya ordningen.
+
+6. **BONUS (wow inför slutspelet):** ovanför trädet en progress-bar ("X av Y slutspels-
+   matcher avgjorda", synlig när trädet är låst) som växlar till en guld-VÄRLDSMÄSTAR-
+   spotlight (trofé + flagga + lagnamn) när finalen är avgjord. Rena härledningar ur det
+   redan härledda trädet (winnerSlotId per match), ingen ny datakälla.
+
+**Varför:** slutspelet är nu det som gäller, så Turnering ska leda med det och avlastas
+från gruppspels-verktyg (Vad krävs) och utvecklings-/sandlåde-ytor (what-if-simulatorn) som
+gjort sitt. Trädet kändes dött i senare rundor (bara "Vinnare M89" / en räknare); nu bär det
+konkreta lag med flaggor och visar vilka som kan ta varje plats hela vägen mot finalen, med
+en tydlig definitiv-markering när en plats är låst , det matchar exakt när gruppspelet stänger
+och slutspelet seedas (slutet av juni). Tips-fliken leder med det personliga (din statistik +
+dina tips); rum-administrationen är sekundär och hör hemma sist. FÄRG-OBEROENDE genomgående
+(form + glyf + text bär betydelsen), troget båda teman, a11y + alla vakter gröna.

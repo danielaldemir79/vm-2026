@@ -14,8 +14,8 @@ import type { RoomMatchResult } from '../../data/rooms';
 // INTEGRATIONSTEST: T48 (#81) , FACIT-KÄLLAN FÖR LIVE-TRACKERN.
 //
 // Det STARKA invariantet (lessons uttommande-test-vaktar-svagare-invariant): i
-// LIVE-läge ska live-trackern (store.matches, som GroupStageView/BracketView/
-// ScenarioView härleder ur) drivas av de GLOBALA officiella resultaten
+// LIVE-läge ska live-trackern (store.matches, som GroupStageView/BracketView
+// härleder ur) drivas av de GLOBALA officiella resultaten
 // (official_match_results, admin-only) , och INTE av rummets delade resultat
 // (room_match_results, pre-share-blockeraren). Vi matar IN BÅDA källorna samtidigt,
 // med OLIKA värden för samma match, och bevisar att officiella vinner i live och
