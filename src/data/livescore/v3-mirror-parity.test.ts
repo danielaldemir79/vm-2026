@@ -28,12 +28,18 @@ import {
   buildPerMatchPollPlan as srcBuildPlan,
   type WindowMatchState as SrcWindowMatchState,
 } from './per-match-poll-plan';
-import type { MatchPlanEntry } from './fixture-map-resolver';
+import {
+  resolveFixtureToMatch as srcResolveFixture,
+  type LiveFixtureRef,
+  type MatchPlanEntry,
+} from './fixture-map-resolver';
+import { resolveApiTeamId } from './team-bridge';
 
 // Mirror-exporterna (laddas via esbuild-bundle i beforeAll, samma signaturer som src).
 interface MirrorModule {
   selectInWindowMatches: typeof srcSelectInWindow;
   buildPerMatchPollPlan: typeof srcBuildPlan;
+  resolveFixtureToMatch: typeof srcResolveFixture;
   LIVE_WINDOW_BEFORE_MS: number;
   LIVE_WINDOW_AFTER_MS: number;
   DEFAULT_DAILY_BUDGET: number;
@@ -141,6 +147,29 @@ describe('v3 mirror-paritet: src == _shared (Deno-mirror) för pollarens funktio
     const mir = mirror.buildPerMatchPollPlan(input);
     expect(mir).toEqual(src);
     expect(src.skipTick).toBe(true);
+  });
+
+  it('resolveFixtureToMatch: KNOCKOUT-FALLBACK identisk i src och mirror (oseedad bracket-plats)', () => {
+    // Det reala slutspels-fallet: en känd-lags fixture (ned/jpn finns i bryggan) mot en
+    // plan vars enda rad är OSEEDAD (null lag). Lag-paret matchar inget -> fallbacken
+    // mappar på unik kickoff. Bevisar att mirror:ns nya knockout-gren ger EXAKT samma
+    // resolution som src (annars driver edge-pollaren isär från klienten i prod).
+    const ned = resolveApiTeamId('ned') as number;
+    const jpn = resolveApiTeamId('jpn') as number;
+    const knockoutPlan: MatchPlanEntry[] = [
+      { matchId: 'M73', kickoffUtc: '2026-06-28T19:00:00.000Z', homeAppId: null, awayAppId: null },
+    ];
+    const fx: LiveFixtureRef = {
+      apiFixtureId: 5100073,
+      homeTeamApiId: ned,
+      awayTeamApiId: jpn,
+      kickoffUtc: '2026-06-28T19:00:00.000Z',
+    };
+    const src = srcResolveFixture(fx, knockoutPlan);
+    const mir = mirror.resolveFixtureToMatch(fx, knockoutPlan);
+    expect(mir).toEqual(src);
+    // sanity: fallbacken mappade verkligen (annars vore paritet trivialt unresolved==unresolved)
+    expect(src).toEqual({ kind: 'resolved', appMatchId: 'M73', apiFixtureId: 5100073 });
   });
 
   it('fail-loud-kontraktet är identiskt (samma kast på korrupt input)', () => {

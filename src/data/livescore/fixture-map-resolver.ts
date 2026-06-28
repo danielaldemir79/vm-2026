@@ -14,8 +14,12 @@
 //     bryggan (OMVÄNT), hitta schemarad vars {home,away} matchar PARET (oavsett
 //     hemma/borta-ordning) OCH vars kickoff ligger inom ett rimligt fönster. Exakt
 //     EN träff -> resolved. Noll/flera -> unresolved (hoppas + loggas).
-//   - SLUTSPELSMATCH (schemarad UTAN lag, null tills seedat): kan inte lag-matchas,
-//     matcha på EXAKT kickoff om den är UNIK i planen, annars unresolved.
+//   - SLUTSPELSMATCH (schemarad UTAN lag, null tills seedat): kan inte lag-matchas.
+//     En RIKTIG slutspelsmatch har dock KÄNDA lag (de spelade gruppspel), så den faller
+//     in i lag-par-grenen utan träff , då matchas den på sin UNIKA avsparkstid mot en
+//     oseedad slutspels-rad inom fönstret (slutspel ligger >=3,5 h isär, fönstret fångar
+//     som mest en). Är BÅDA lagen okända i bryggan matchas på EXAKT kickoff om den är unik.
+//     Noll/flera kandidater -> unresolved (gissa aldrig).
 //
 // Samma identitets-anda som resolveAppMatch (Bit 1), men driven av matchplanen
 // (match_id + kickoff + app-lag-id) i stället för hela Match-objektet, så den kan
@@ -113,10 +117,40 @@ export function resolveFixtureToMatch(
       };
     }
     if (candidates.length === 0) {
+      // FALLBACK , OSEEDAT SLUTSPEL: en känd-lags slutspelsmatch (båda lagen spelade
+      // gruppspel, så de finns i bryggan) vars bracket-plats ÄNNU är oseedad. M73-M104
+      // bär null lag tills seedningen fyllt dem, så lag-paret ovan kan aldrig matcha en
+      // null-lags-rad , men fixturens UNIKA avsparkstid identifierar slutspels-platsen
+      // entydigt. Slutspels-raderna ligger minst 3,5 h isär i planen (källa: matches.ts
+      // M73-M104, låst i invariant-testet), så ett 2h-fönster fångar som mest EN oseedad
+      // rad. Mappa på tid OM exakt en oseedad rad ligger i fönstret; 0 eller >1 -> gissa
+      // ALDRIG, behåll unresolved. Detta är den AVSEDDA "slutspel mappas på unik
+      // avsparkstid"-logiken (se modul-headern), bara felgrindad tidigare. Se docs/decisions.md.
+      const unseededKnockout = plan.filter((entry) => {
+        if (entry.homeAppId !== null || entry.awayAppId !== null) {
+          return false; // bara HELT oseedade slutspels-rader (grupprader har alltid lag)
+        }
+        const delta = kickoffDeltaMs(entry.kickoffUtc, fixture.kickoffUtc);
+        return delta !== null && delta <= windowMs;
+      });
+      if (unseededKnockout.length === 1) {
+        return {
+          kind: 'resolved',
+          appMatchId: unseededKnockout[0].matchId,
+          apiFixtureId: fixture.apiFixtureId,
+        };
+      }
+      if (unseededKnockout.length > 1) {
+        return {
+          kind: 'unresolved',
+          apiFixtureId: fixture.apiFixtureId,
+          reason: `tvetydigt: ${unseededKnockout.length} oseedade slutspels-rader inom kickoff-fönstret för lag ${appHome}/${appAway} (${fixture.kickoffUtc})`,
+        };
+      }
       return {
         kind: 'unresolved',
         apiFixtureId: fixture.apiFixtureId,
-        reason: `ingen schemarad med lag ${appHome}/${appAway} inom kickoff-fönstret (${fixture.kickoffUtc})`,
+        reason: `ingen schemarad med lag ${appHome}/${appAway} eller oseedad slutspels-plats inom kickoff-fönstret (${fixture.kickoffUtc})`,
       };
     }
     return {
