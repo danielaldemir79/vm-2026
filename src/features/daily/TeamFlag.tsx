@@ -24,7 +24,7 @@ export interface TeamFlagProps {
   /** FIFA:s trebokstavs-landskod, t.ex. "BRA". Driver färg + text. */
   code: string;
   /** Diameter via Tailwind-storleksklasser. Default = kort-storlek. */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 /**
@@ -36,13 +36,16 @@ export interface TeamFlagProps {
  */
 export function TeamFlag({ code, size = 'sm' }: TeamFlagProps) {
   const { from, to } = huesFor(code);
-  // lg = emblem-storlek för lag-profil-hero:n (T10), md = kort-rubrik, sm = matchkort.
+  // lg = emblem-storlek för lag-profil-hero:n (T10), md = kort-rubrik, sm = matchkort,
+  // xs = de TRÅNGA slutspels-kandidat-chipsen (BracketView "alternativen", flera per rad).
   const dimension =
     size === 'lg'
       ? 'h-14 w-14 text-[0.875rem]'
       : size === 'md'
         ? 'h-9 w-9 text-[0.625rem]'
-        : 'h-7 w-7 text-[0.5625rem]';
+        : size === 'xs'
+          ? 'h-5 w-5 text-[0.5rem]'
+          : 'h-7 w-7 text-[0.5625rem]';
   const style: CSSProperties = {
     backgroundImage: `linear-gradient(135deg, hsl(${from} 52% 42%), hsl(${to} 48% 34%))`,
   };

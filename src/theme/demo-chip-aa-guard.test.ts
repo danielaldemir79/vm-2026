@@ -1,7 +1,7 @@
 // DEMO-CHIP AA-VAKT, KÄLL-SCAN + KONTRAST-BEVIS (T29, issue #48 + T56-review F4).
 //
-// Det "Demo-data"-märke som fyra vyer (Gruppspelet, Slutspelsträdet, Dagens matcher,
-// Vad krävs) bär i fixtures-läge bar FÖRR rå --vm-gold som TEXT på en --vm-gold-12%-tint.
+// Det "Demo-data"-märke som tre vyer (Gruppspelet, Slutspelsträdet, Dagens matcher)
+// bär i fixtures-läge bar FÖRR rå --vm-gold som TEXT på en --vm-gold-12%-tint.
 // I LJUST tema (där --vm-gold är mörk amber #b07d10 men ytan nästan vit) föll guld-texten
 // under WCAG AA (uppmätt 3.17:1, contrast-t29.mjs), den kända gold-on-tint-fällan
 // (lessons: aa-kontrast-pastad-...-text-på-tint). T29 byter chippet till den färg-
@@ -24,9 +24,9 @@ import { describe, it, expect } from 'vitest';
 
 // --- 1) KÄLL-SCAN -------------------------------------------------------------
 
-/** De fyra vy-källfilerna som renderar demo-chippet, som rå text. */
+/** De tre vy-källfilerna som renderar demo-chippet, som rå text. */
 const VIEW_SOURCES = import.meta.glob(
-  '../features/{groups/GroupStageView,bracket/BracketView,daily/DailyMatchesView,scenarios/ScenarioView}.tsx',
+  '../features/{groups/GroupStageView,bracket/BracketView,daily/DailyMatchesView}.tsx',
   { query: '?raw', import: 'default', eager: true }
 ) as Record<string, string>;
 
@@ -41,11 +41,11 @@ const VIEW_SOURCES = import.meta.glob(
  */
 const GOLD_AS_TEXT = /(?<![\w-])color:\s*['"]?var\(--vm-gold\)/;
 
-describe('demo-chip AA-vakt: käll-scan (de fyra vyerna)', () => {
-  it('käll-scannen hittar faktiskt alla fyra vy-filer (annars vaktar den tomma luften)', () => {
+describe('demo-chip AA-vakt: käll-scan (de tre vyerna)', () => {
+  it('käll-scannen hittar faktiskt alla tre vy-filer (annars vaktar den tomma luften)', () => {
     // Förutsättning: glob:en plockade upp filerna. Skulle en sökväg glida (fil-flytt/
     // omdöpning) vill vi FAILA, inte tyst passera med färre filer att vakta.
-    expect(Object.keys(VIEW_SOURCES).length).toBe(4);
+    expect(Object.keys(VIEW_SOURCES).length).toBe(3);
   });
 
   it('varje vy renderar Demo-data-chippet via den delade klassen vm-demo-chip', () => {
