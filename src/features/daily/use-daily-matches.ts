@@ -20,6 +20,7 @@ import { useResultsStore } from '../results/results-context';
 import { groupMatchesByDay, localDateKey, type MatchDay } from './group-matches-by-day';
 import { computeCountdown, selectMatchOfTheDay, type CountdownState } from './countdown';
 import { useTodayKey } from './use-today-key';
+import { resolveKnockoutTeams } from './resolve-knockout-teams';
 
 /** Laddningstillstånd, samma vokabulär som resten av appen. */
 export type LoadStatus = 'loading' | 'ready' | 'error';
@@ -169,7 +170,16 @@ export function followDayIndex(
 }
 
 export function useDailyMatches(now: Date | number = Date.now()): DailyMatchesData {
-  const { status, matches, teams, mode, error } = useResultsStore();
+  const { status, matches: rawMatches, teams, groups, mode, error } = useResultsStore();
+
+  // LÖS KNOCKOUT-LAGEN (2026-06-28, Daniels "Ej klart"-fråga): slutspelsmatchernas lag
+  // är null i den seedade matchlistan tills seedningen fyllt dem. Vi lägger samma
+  // härledning som slutspelsträdet (deriveBracket) OVANPÅ listan, så Idag visar de
+  // RIKTIGA lagen (med flaggor) på en slutspelsmatch vars båda lag är slutgiltigt kända,
+  // i stället för "Ej klart". Bara 'resolved' (aldrig preliminära) , kräver inmatade
+  // gruppresultat. Identitet när inget kan lösas (gruppspel pågår). All härledning nedan
+  // (dagar, nedräkning, nästa match) använder dessa effektiva matcher oförändrat.
+  const matches = useMemo(() => resolveKnockoutTeams(groups, rawMatches), [groups, rawMatches]);
 
   // Härled speldagarna reaktivt ur den delade storen. Gata på ready (annars []):
   // under en omladdning ligger gamla matcher kvar i storen, en oavkortad

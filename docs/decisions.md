@@ -7163,3 +7163,67 @@ en tydlig definitiv-markering när en plats är låst , det matchar exakt när g
 och slutspelet seedas (slutet av juni). Tips-fliken leder med det personliga (din statistik +
 dina tips); rum-administrationen är sekundär och hör hemma sist. FÄRG-OBEROENDE genomgående
 (form + glyf + text bär betydelsen), troget båda teman, a11y + alla vakter gröna.
+
+## 2026-06-28 , slutspel live: knockout-lag i Idag, slutspels-tipset överst + öppet, startsides-notis (v2.4.1)
+
+**Beslut (Daniels uppföljning under slutspelet):**
+
+1. **"Ej klart" på slutspelsmatcher i Idag , FIXAT.** Daily-vyn läste matchlistan rakt av,
+   och slutspelsmatchernas lag (homeTeamId/awayTeamId) är null tills seedningen fyllt dem ,
+   bara slutspelsträdet (deriveBracket) löste dem, aldrig matchlistan daily läser. Ny REN
+   `resolveKnockoutTeams(groups, matches)` (src/features/daily) lägger samma härledning som
+   trädet OVANPÅ listan: en slutspelsmatch vars BÅDA lag är slutgiltigt `resolved` får sina
+   riktiga lag-id:n, så Idag visar de faktiska lagen (med flaggor) i stället för "Ej klart".
+   Wirad i use-daily-matches (rawMatches -> effektiva matches; dagar/nedräkning/nästa match
+   använder dem oförändrat). Bara 'resolved' (aldrig preliminära), så Idag aldrig påstår ett
+   icke-avgjort lag. **VIKTIGT:** kräver att gruppresultaten är inmatade i admin-facit , utan
+   dem kan inga knockout-lag lösas (samma rot gör slutspels-tipsets slots otippbara).
+
+2. **Slutspels-tipset (BracketPredictionsView) + slutspelsträdet (BracketView) EXPANDERADE
+   från start.** startExpanded på bägges CollapsibleBody (slutspelet är det som gäller nu, ska
+   synas/tippas direkt utan extra klick; komprimeringen finns kvar som möjlighet).
+
+3. **Slutspels-tipset ÖVERST i Tips.** BracketPredictionSection flyttad högst upp (knockouts
+   live = primärt). id=tips-slutspel = scroll-mål. Övriga (statistik+matcher, grupp-tips,
+   vad alla tippade, skapa-rum) följer under.
+
+4. **Startsides-notis (SlutspelReminder) på Idag.** Tydlig, dismissbar notis "Slutspelet är
+   live , glöm inte att tippa era slutspelsresultat" som leder till slutspels-tipset
+   (openBracketTips: byt flik + scrolla till #tips-slutspel). Gatad på live-läge + slutspels-
+   FÖNSTER (ren `knockoutWindowActive`: ~2 dagar före första slutspelsavspark till ~1 dygn
+   efter finalen) + inte bortstängd, så den dyker inte upp i gruppspelet och slocknar efter
+   mästerskapet, men "får ligga några dagar" genom slutspelet.
+
+**Varför:** slutspelet är live, så appen ska leda med det , trädet och tipset direkt synliga,
+en notis som påminner om att tippa, och knockout-matcherna ska visa de RIKTIGA lagen överallt
+(inte bara i trädet). Daily-luckan (matchlistan löste aldrig knockout-lagen) var den konkreta
+orsaken till "Ej klart". Allt färg-oberoende, a11y-vaktat, build/test grönt (3032 tester).
+
+## 2026-06-28 , runda-medveten slutspels-notis + inkrementell knockout-upplösning (v2.4.2)
+
+**Beslut (Daniels uppföljning, fälld in i samma PR som v2.4.1):**
+
+1. **Startsides-notisen (SlutspelReminder) är RUNDA-MEDVETEN.** Den byter innehåll OCH
+   färg per slutspelsrunda (sextondel -> åttondel -> kvart -> semi -> final) och är
+   ALLTID synlig under slutspelet (ingen permanent dismiss). Aktuell runda = rundan för
+   NÄSTA kommande slutspelsavspark (`currentKnockoutRound`, DATUM-baserad, så notisen
+   följer schemat oberoende av om resultat hunnit matas in; bronsmatchen utelämnad, så
+   finalen följer efter semifinalerna). Per-runda-innehåll i `ROUND_REMINDER`. Färgerna
+   (slutspel-reminder.css via data-round): metall-stege mot finalen , BRONS kvart, SILVER
+   semi, GULD final , egna toner (turkos sextondel, blå åttondel) innan. Färgen är
+   DEKORATIV (kant/tint/ikon/bricka); texten står i fg (AA båda teman). En "pop" spelas
+   vid runda-byte (komponenten remountar med key=runda), reduced-motion-nollad, så ögat
+   reagerar på att något ändrats.
+
+2. **"Ej klart" löses INKREMENTELLT för senare rundor.** resolveKnockoutTeams refaktorerad:
+   ren `overlayResolvedKnockoutTeams(matches, bracket)` fyller VARJE slutspelsmatch så
+   fort dess två lag är `resolved` , oberoende av övriga matcher i samma runda. En
+   åttondels-/kvarts-/semi-/final-match visar alltså rätt lag SÅ FORT dess feeders är
+   avgjorda, inte när hela rundan är klar (deriveBracket sätter en match-progressions-slot
+   till resolved i samma stund feeder-matchen fått ett utfall). Bevisat med test mot ett
+   handbyggt träd-tillstånd (åttondel + final fylls, en halv-känd kvart fylls inte).
+
+**Varför:** under slutspelet ska startsidan leva med turneringen , en notis som byter
+karaktär per runda fångar ögat och påminner om rätt sak just nu, och knockout-matcherna
+ska visa de riktiga lagen så fort de är kända i ALLA rundor (inte bara sextondelen, inte
+vänta på hela rundan). Allt färg-oberoende, a11y-vaktat, build/test grönt (3042 tester).

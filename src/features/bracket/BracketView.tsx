@@ -556,15 +556,16 @@ export function BracketView() {
         )
       ) : null}
 
-      {/* KOMPRIMERING (T68/#129): rubrik + beskrivning + progress alltid synliga; här under
-          komprimeras trädet så bara TOPP-DELEN syns som default (höjd-klipp + fade), en
-          tydlig expandera fäller ut hela trädet. Trädet scrollar i sidled, så ett höjd-klipp
-          visar de översta matchkorten per runda. Faden tonar mot app-bakgrunden. ~22rem visar
-          runda-rubrikerna + de första (nu flagg-bärande, högre) matchkorten. */}
+      {/* EXPANDERAT FRÅN START (2026-06-28, Daniels önskemål): slutspelet är det som gäller
+          nu, så hela trädet visas direkt (startExpanded) , man ska inte behöva fälla ut det.
+          Komprimeringen finns kvar som en MÖJLIGHET (en "Visa mindre"-toggel) för den som vill
+          fälla ihop; collapsedMaxHeight styr då hur stor toppen blir. Trädet scrollar i sidled,
+          faden tonar mot app-bakgrunden. */}
       <CollapsibleBody
         name="bracket"
         toggleLabels={{ expand: 'Visa hela slutspelsträdet', collapse: 'Visa mindre av trädet' }}
         collapsedMaxHeight="22rem"
+        startExpanded
         fadeTo="var(--color-bg)"
       >
         {status === 'loading' ? (
