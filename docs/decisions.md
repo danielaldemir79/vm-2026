@@ -5,6 +5,26 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-29 , slutspelsmatcher auto-mappas på unik avsparkstid när bracket-platsen är oseedad
+
+**Beslut:** I `resolveFixtureToMatch` (src/data/livescore/fixture-map-resolver.ts + dess Deno-spegel
+supabase/functions/_shared/livescore-core.ts) fick lag-par-grenens "0 kandidater"-fall en fallback:
+ligger fixturens kickoff inom kickoff-fönstret (2h) för EXAKT en OSEEDAD slutspels-rad
+(homeAppId === null && awayAppId === null) mappas fixturen dit; 0 eller >1 -> unresolved (gissa aldrig).
+
+**Varför:** en RIKTIG slutspelsmatch har båda lagen kända (de spelade gruppspel, finns i lag-bryggan),
+så den föll in i lag-par-grenen , men schemaraderna M73-M104 är oseedade (null lag) tills
+bracket-seedningen fyllt dem, så lag-paret matchade aldrig en null-lags-rad och HELA slutspelet
+(M73-M104) gick omappat (bekräftat i Supabase: 72 mappade = bara gruppspel). Fall 2 (matcha på enbart
+kickoff) körs bara när live-fixturens lag är OKÄNDA, vilket aldrig sker för en riktig match. Den
+unika avsparkstiden identifierar slutspels-platsen entydigt.
+
+**Unikhets-gard (källhänvisad, gissas ALDRIG):** slutspels-raderna ligger minst **3,5 h** isär i
+matchplanen (källa: src/data/wc2026/matches.ts, M73-M104; minsta avstånd uppmätt M76 17:00 -> M74
+20:30 = 3,5 h), så ett 2h-fönster fångar HÖGST en oseedad rad för en fixture som ligger på sin rad.
+Garden är låst i CI av ett invariant-test (fixture-map-resolver.test.ts: minsta avstånd mellan
+oseedade rader > AUTO_MAP_KICKOFF_WINDOW_MS) , bryts den av ett framtida schema-byte rödnar testet.
+
 ## 2026-06-18 , "Se höjdpunkter"-länk på färdigspelade matchkort (YouTube-sökning)
 
 **Beslut:** Ett färdigspelat matchkort (MatchCard, `isFinished(match)` true) får en diskret

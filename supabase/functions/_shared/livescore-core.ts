@@ -282,10 +282,40 @@ export function resolveFixtureToMatch(
       };
     }
     if (candidates.length === 0) {
+      // FALLBACK , OSEEDAT SLUTSPEL: en känd-lags slutspelsmatch (båda lagen spelade
+      // gruppspel, så de finns i bryggan) vars bracket-plats ÄNNU är oseedad. M73-M104
+      // bär null lag tills seedningen fyllt dem, så lag-paret ovan kan aldrig matcha en
+      // null-lags-rad , men fixturens UNIKA avsparkstid identifierar slutspels-platsen
+      // entydigt. Slutspels-raderna ligger minst 3,5 h isär i planen (källa: matches.ts
+      // M73-M104, låst i invariant-testet), så ett 2h-fönster fångar som mest EN oseedad
+      // rad. Mappa på tid OM exakt en oseedad rad ligger i fönstret; 0 eller >1 -> gissa
+      // ALDRIG, behåll unresolved. Detta är den AVSEDDA "slutspel mappas på unik
+      // avsparkstid"-logiken, bara felgrindad tidigare. Synk-märkt mot fixture-map-resolver.ts.
+      const unseededKnockout = plan.filter((entry) => {
+        if (entry.homeAppId !== null || entry.awayAppId !== null) {
+          return false; // bara HELT oseedade slutspels-rader (grupprader har alltid lag)
+        }
+        const delta = kickoffDeltaMs(entry.kickoffUtc, fixture.kickoffUtc);
+        return delta !== null && delta <= windowMs;
+      });
+      if (unseededKnockout.length === 1) {
+        return {
+          kind: 'resolved',
+          appMatchId: unseededKnockout[0].matchId,
+          apiFixtureId: fixture.apiFixtureId,
+        };
+      }
+      if (unseededKnockout.length > 1) {
+        return {
+          kind: 'unresolved',
+          apiFixtureId: fixture.apiFixtureId,
+          reason: `tvetydigt: ${unseededKnockout.length} oseedade slutspels-rader inom kickoff-fönstret för lag ${appHome}/${appAway} (${fixture.kickoffUtc})`,
+        };
+      }
       return {
         kind: 'unresolved',
         apiFixtureId: fixture.apiFixtureId,
-        reason: `ingen schemarad med lag ${appHome}/${appAway} inom kickoff-fönstret (${fixture.kickoffUtc})`,
+        reason: `ingen schemarad med lag ${appHome}/${appAway} eller oseedad slutspels-plats inom kickoff-fönstret (${fixture.kickoffUtc})`,
       };
     }
     return {
