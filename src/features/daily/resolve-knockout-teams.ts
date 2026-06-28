@@ -24,23 +24,24 @@
 
 import type { Group, Match } from '../../domain/types';
 import { deriveGroupTables } from '../groups/derive-group-tables';
-import { deriveBracket } from '../bracket/derive-bracket';
+import { deriveBracket, type BracketState } from '../bracket/derive-bracket';
 
 /**
- * Returnerar matchlistan där slutspelsmatcher med BÅDA lag slutgiltigt kända har fått
- * sina riktiga lag-id:n ifyllda (annars oförändrade). Gruppmatcher och redan ifyllda
- * matcher rörs aldrig. Returnerar samma referens när inget kunde lösas (vanligt under
- * gruppspelet), så React-memoisering inte triggar i onödan.
+ * REN overlay: givet matchlistan + ett HÄRLETT slutspelsträd, fyll i lag-id:n på de
+ * slutspelsmatcher vars BÅDA slots är slutgiltigt RESOLVED. Skild från härledningen så
+ * den kan testas med ett handbyggt träd-tillstånd (bevisar att SENARE rundor fylls).
+ *
+ * INKREMENTELLT (Daniels krav 2026-06-28): varje match behandlas FÖR SIG , en
+ * åttondels-/kvarts-/semi-/final-match fylls SÅ FORT dess två lag är kända (dess feeders
+ * avgjorda), oberoende av om andra matcher i samma runda är klara. Vi väntar alltså
+ * ALDRIG på att hela rundan ska bli klar. (deriveBracket sätter en match-progressions-
+ * slot till 'resolved' i samma stund dess feeder-match fått ett utfall, så kedjan
+ * r32 -> r16 -> kvart -> semi -> final löses match för match.)
  */
-export function resolveKnockoutTeams(
-  groups: readonly Group[],
-  matches: readonly Match[]
+export function overlayResolvedKnockoutTeams(
+  matches: readonly Match[],
+  bracket: BracketState
 ): readonly Match[] {
-  // Härled trädet (samma sanning som Turnering-vyn) och plocka de slutspelsmatcher
-  // vars BÅDA lag är slutgiltigt kända (resolved).
-  const tables = deriveGroupTables(groups, matches);
-  const bracket = deriveBracket(tables, matches);
-
   const resolvedById = new Map<string, { home: string; away: string }>();
   for (const m of bracket.matches) {
     if (
@@ -69,4 +70,21 @@ export function resolveKnockoutTeams(
     }
     return { ...match, homeTeamId: resolved.home, awayTeamId: resolved.away };
   });
+}
+
+/**
+ * Returnerar matchlistan där slutspelsmatcher med BÅDA lag slutgiltigt kända har fått
+ * sina riktiga lag-id:n ifyllda (annars oförändrade). Gruppmatcher och redan ifyllda
+ * matcher rörs aldrig. Returnerar samma referens när inget kunde lösas (vanligt under
+ * gruppspelet), så React-memoisering inte triggar i onödan.
+ */
+export function resolveKnockoutTeams(
+  groups: readonly Group[],
+  matches: readonly Match[]
+): readonly Match[] {
+  // Härled trädet (samma sanning som Turnering-vyn), lägg sedan dess resolved-lag
+  // ovanpå matchlistan via den rena overlayn ovan.
+  const tables = deriveGroupTables(groups, matches);
+  const bracket = deriveBracket(tables, matches);
+  return overlayResolvedKnockoutTeams(matches, bracket);
 }

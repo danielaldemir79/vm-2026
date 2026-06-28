@@ -1,0 +1,72 @@
+/* =============================================================================
+   STARTSIDANS SLUTSPELS-PÅMINNELSE , PER-RUNDA-FÄRG (2026-06-28, Daniels önskemål).
+   =============================================================================
+
+   Notisen byter färg/utseende per runda så ögat reagerar på att något ändrats:
+   metall-stege mot finalen (BRONS kvart -> SILVER semi -> GULD final) och egna toner
+   för rundorna innan (turkos sextondel, blå åttondel). Allt här är DEKORATIVT
+   (kant/tint/ikon-disc/bricka) , det bär ALDRIG text-läsbarhet: notis-texten står i
+   fg/fg-muted (AA i båda teman), accenten ramar bara in. Metall-/runda-tonerna har
+   inga tema-token (de finns inte i paletten), så de sätts som råa värden HÄR , aldrig
+   som text-färg, så gold-on-tint-fällan (AA) inte kan uppstå.
+   ========================================================================== */
+
+.vm-slutspel-reminder {
+  --rem-accent: var(--color-accent); /* fallback (turneringens accent) */
+  background-color: color-mix(in srgb, var(--rem-accent) 9%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--rem-accent) 45%, var(--color-border));
+}
+
+/* Mjuk färg-övergång + en engångs "pop" när rundan byts (komponenten remountar med
+   key=runda), så ögat fångar att notisen uppdaterats. Helt nollad vid reducerad rörelse
+   (läget är ändå tydligt via färg + innehåll). */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-slutspel-reminder {
+    transition:
+      background-color 0.4s ease,
+      border-color 0.4s ease;
+    animation: vm-reminder-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1;
+  }
+}
+@keyframes vm-reminder-pop {
+  0% {
+    transform: translateY(4px) scale(0.992);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* RUNDORNAS ACCENT: egna toner för sextondel/åttondel, sedan metall-stegen mot finalen.
+   Dekorativa råvärden (kant/tint/ikon), aldrig text. Mid-tonade så de läser i BÅDA teman. */
+.vm-slutspel-reminder[data-round='round-of-32'] {
+  --rem-accent: #1aa3b5; /* turkos */
+}
+.vm-slutspel-reminder[data-round='round-of-16'] {
+  --rem-accent: #5274f0; /* blå */
+}
+.vm-slutspel-reminder[data-round='quarter-final'] {
+  --rem-accent: #c1803b; /* brons */
+}
+.vm-slutspel-reminder[data-round='semi-final'] {
+  --rem-accent: #9aa6b4; /* silver */
+}
+.vm-slutspel-reminder[data-round='final'] {
+  --rem-accent: var(--vm-gold); /* guld , mästerskapets ton */
+}
+
+/* Ikon-discen: accent-tint bakgrund + ikon i en läsbar accent-ton (blandad MOT fg, så
+   den får kontrast i både ljust och mörkt tema , 70 % accent + 30 % fg). */
+.vm-slutspel-reminder-disc {
+  background-color: color-mix(in srgb, var(--rem-accent) 22%, transparent);
+  color: color-mix(in srgb, var(--rem-accent) 70%, var(--color-fg));
+}
+
+/* Runda-brickan (namnet, t.ex. "Final"): accent-tint + accent-kant. Texten är fg (AA),
+   accenten ramar bara , så brickan byter färg per runda utan att läsbarheten rörs. */
+.vm-slutspel-reminder-badge {
+  background-color: color-mix(in srgb, var(--rem-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--rem-accent) 45%, var(--color-border));
+}

@@ -1,65 +1,60 @@
 // STARTSIDANS SLUTSPELS-PÅMINNELSE (2026-06-28, Daniels önskemål): en tydlig notis på
-// Idag som påminner om att tippa slutspelsträdet medan slutspelet är LIVE. "Får ligga
-// några dagar" -> den visas genom hela slutspels-fönstret (slutspel-reminder-window.ts)
-// och går att STÄNGA (dismiss persisteras), så den aldrig blir tjatig.
+// Idag som påminner om att tippa slutspelet , och som BYTER innehåll OCH färg per runda
+// (sextondel -> åttondel -> kvart -> semi -> final), så ögat reagerar på att något
+// ändrats vid varje ny runda. Metall-stege mot finalen: brons kvart, silver semi, guld
+// final; egna toner (turkos/blå) för rundorna innan (per-runda-färgen bor i
+// slutspel-reminder.css via data-round).
 //
-// GATE: bara i live-läge (rooms.enabled , annars finns ingen tips-funktion att leda
-// till), när datan är redo, när slutspels-fönstret är aktivt (datum), och inte
-// bortstängd. I fixtures-/lokalt läge renderas inget (App-/daily-testerna opåverkade).
+// ALLTID SYNLIG under slutspelet (Daniels krav): den gatas bara på live-läge + att vi är
+// i slutspels-fönstret + att det finns en kommande runda att påminna om , ingen
+// permanent dismiss (innehålls-/färg-bytet per runda håller den levande, inte tjatig).
+// I fixtures-/lokalt läge renderas inget (App-/daily-testerna opåverkade).
 //
-// FÄRG-OBEROENDE: ikon (pokal) + rubrik-text + knapp-text bär budskapet; accent-tonen
-// förstärker bara. Knappen leder till Tips + slutspels-tipset (onTip, App äger
-// navigeringen: byt flik + scrolla till #tips-slutspel).
+// FÄRG-OBEROENDE: pokal-ikon + runda-bricka (namn) + mening + knapp-text bär budskapet;
+// per-runda-tonen förstärker bara. Knappen leder till Tips + slutspels-tipset (onTip, App
+// äger navigeringen: byt flik + scrolla till #tips-slutspel) och behåller appens accent
+// (konsekvent, AA-säker affordans) , runda-färgen ligger i ramen, inte i knappen.
 
-import { useState } from 'react';
 import { useRoomsStore } from '../rooms';
 import { useResultsStore } from '../results/results-context';
-import { readStoredFlag, writeStoredFlag } from '../../lib/safe-storage';
 import { knockoutWindowActive } from './slutspel-reminder-window';
-
-/** localStorage-flagga: användaren har stängt påminnelsen (per enhet). */
-const DISMISS_KEY = 'vm-slutspel-reminder-dismissed';
+import { currentKnockoutRound, ROUND_REMINDER } from './slutspel-reminder-round';
+import './slutspel-reminder.css';
 
 export function SlutspelReminder({ onTip }: { onTip: () => void }) {
   const rooms = useRoomsStore();
   const { status, matches } = useResultsStore();
-  // Initieras EN gång ur lagrad flagga (per enhet). Stänger man, persisteras det.
-  const [dismissed, setDismissed] = useState(() => readStoredFlag(DISMISS_KEY));
+  const now = Date.now();
 
-  // Visa bara i live-läge, när datan är redo, i slutspels-fönstret, och inte bortstängd.
-  if (!rooms.enabled || status !== 'ready' || dismissed) {
+  // Visa bara i live-läge, när datan är redo, i slutspels-fönstret, och när det finns en
+  // kommande runda att påminna om (currentKnockoutRound null = inga slutspelsmatcher kvar).
+  if (!rooms.enabled || status !== 'ready') {
     return null;
   }
-  if (!knockoutWindowActive(matches, Date.now())) {
+  if (!knockoutWindowActive(matches, now)) {
     return null;
   }
-
-  const dismiss = () => {
-    setDismissed(true);
-    writeStoredFlag(DISMISS_KEY, true);
-  };
+  const round = currentKnockoutRound(matches, now);
+  if (round === null) {
+    return null;
+  }
+  const info = ROUND_REMINDER[round];
 
   return (
     <aside
+      // key=runda: vid runda-byte remountas notisen, så "pop"-animationen (CSS) spelar om
+      // och ögat fångar att den uppdaterats.
+      key={round}
       data-slutspel-reminder=""
+      data-round={round}
       role="note"
-      aria-label="Slutspelet är live"
-      className="flex flex-wrap items-center gap-3 rounded-card border px-4 py-3"
-      style={{
-        // Lugn accent-tint + accent-kant (turneringens energi-färg), troget båda teman.
-        // Texten står på den opaka surface-blandade tinten (AA), inte på rå accent.
-        backgroundColor: 'color-mix(in srgb, var(--color-accent) 8%, var(--color-surface))',
-        borderColor: 'color-mix(in srgb, var(--color-accent) 35%, var(--color-border))',
-      }}
+      aria-label={`Slutspelet: ${info.name}, påminnelse om att tippa`}
+      className="vm-slutspel-reminder flex flex-wrap items-center gap-3 rounded-card border px-4 py-3"
     >
-      {/* Pokal-glyf i en accent-disc (form-signal, färg-oberoende). */}
+      {/* Pokal-glyf i en per-runda-färgad disc (form + färg-signal). */}
       <span
         aria-hidden="true"
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-pill"
-        style={{
-          backgroundColor: 'color-mix(in srgb, var(--color-accent) 18%, transparent)',
-          color: 'var(--color-accent)',
-        }}
+        className="vm-slutspel-reminder-disc inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-pill"
       >
         <svg
           width="20"
@@ -80,13 +75,12 @@ export function SlutspelReminder({ onTip }: { onTip: () => void }) {
         </svg>
       </span>
 
-      <div className="flex min-w-0 flex-1 basis-48 flex-col gap-0.5">
-        <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-accent">
-          Slutspelet är live
-        </p>
-        <p className="text-sm text-fg">
-          Glöm inte att tippa era slutspelsresultat , vem går vidare och vem tar bucklan?
-        </p>
+      <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
+        {/* Runda-brickan: byter namn OCH färg per runda (data-round -> CSS). */}
+        <span className="vm-slutspel-reminder-badge w-fit rounded-pill border px-2 py-0.5 font-display text-[0.625rem] font-bold uppercase tracking-[0.18em] text-fg">
+          {info.name}
+        </span>
+        <p className="text-sm text-fg">{info.line}</p>
       </div>
 
       {/* CTA: leder till Tips + slutspels-tipset. Accent-fylld pill (AA: accent-fg på accent). */}
@@ -99,30 +93,7 @@ export function SlutspelReminder({ onTip }: { onTip: () => void }) {
           color: 'var(--color-accent-fg)',
         }}
       >
-        Tippa slutspelet
-      </button>
-
-      {/* Stäng (dismiss): persisteras, så den inte återkommer. */}
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label="Dölj påminnelsen"
-        className="shrink-0 rounded-pill p-1.5 text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-      >
-        <svg
-          aria-hidden="true"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M18 6 6 18" />
-          <path d="m6 6 12 12" />
-        </svg>
+        {info.cta}
       </button>
     </aside>
   );

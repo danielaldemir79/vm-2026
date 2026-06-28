@@ -7198,3 +7198,32 @@ dina tips); rum-administrationen är sekundär och hör hemma sist. FÄRG-OBEROE
 en notis som påminner om att tippa, och knockout-matcherna ska visa de RIKTIGA lagen överallt
 (inte bara i trädet). Daily-luckan (matchlistan löste aldrig knockout-lagen) var den konkreta
 orsaken till "Ej klart". Allt färg-oberoende, a11y-vaktat, build/test grönt (3032 tester).
+
+## 2026-06-28 , runda-medveten slutspels-notis + inkrementell knockout-upplösning (v2.4.2)
+
+**Beslut (Daniels uppföljning, fälld in i samma PR som v2.4.1):**
+
+1. **Startsides-notisen (SlutspelReminder) är RUNDA-MEDVETEN.** Den byter innehåll OCH
+   färg per slutspelsrunda (sextondel -> åttondel -> kvart -> semi -> final) och är
+   ALLTID synlig under slutspelet (ingen permanent dismiss). Aktuell runda = rundan för
+   NÄSTA kommande slutspelsavspark (`currentKnockoutRound`, DATUM-baserad, så notisen
+   följer schemat oberoende av om resultat hunnit matas in; bronsmatchen utelämnad, så
+   finalen följer efter semifinalerna). Per-runda-innehåll i `ROUND_REMINDER`. Färgerna
+   (slutspel-reminder.css via data-round): metall-stege mot finalen , BRONS kvart, SILVER
+   semi, GULD final , egna toner (turkos sextondel, blå åttondel) innan. Färgen är
+   DEKORATIV (kant/tint/ikon/bricka); texten står i fg (AA båda teman). En "pop" spelas
+   vid runda-byte (komponenten remountar med key=runda), reduced-motion-nollad, så ögat
+   reagerar på att något ändrats.
+
+2. **"Ej klart" löses INKREMENTELLT för senare rundor.** resolveKnockoutTeams refaktorerad:
+   ren `overlayResolvedKnockoutTeams(matches, bracket)` fyller VARJE slutspelsmatch så
+   fort dess två lag är `resolved` , oberoende av övriga matcher i samma runda. En
+   åttondels-/kvarts-/semi-/final-match visar alltså rätt lag SÅ FORT dess feeders är
+   avgjorda, inte när hela rundan är klar (deriveBracket sätter en match-progressions-slot
+   till resolved i samma stund feeder-matchen fått ett utfall). Bevisat med test mot ett
+   handbyggt träd-tillstånd (åttondel + final fylls, en halv-känd kvart fylls inte).
+
+**Varför:** under slutspelet ska startsidan leva med turneringen , en notis som byter
+karaktär per runda fångar ögat och påminner om rätt sak just nu, och knockout-matcherna
+ska visa de riktiga lagen så fort de är kända i ALLA rundor (inte bara sextondelen, inte
+vänta på hela rundan). Allt färg-oberoende, a11y-vaktat, build/test grönt (3042 tester).
