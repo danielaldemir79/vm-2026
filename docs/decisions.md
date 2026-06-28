@@ -7227,3 +7227,38 @@ orsaken till "Ej klart". Allt färg-oberoende, a11y-vaktat, build/test grönt (3
 karaktär per runda fångar ögat och påminner om rätt sak just nu, och knockout-matcherna
 ska visa de riktiga lagen så fort de är kända i ALLA rundor (inte bara sextondelen, inte
 vänta på hela rundan). Allt färg-oberoende, a11y-vaktat, build/test grönt (3042 tester).
+
+## 2026-06-28 , BUGGFIX: slutspels-tipsen seedades aldrig (läste rå matchplan, inte facit) (v2.4.3)
+
+**Symptom (Daniel):** slutspels-tipsens slots stod stängda ("Lagen avgörs av tidigare
+resultat") trots att resultaten matas in autonomt via live-API och facit var komplett ,
+TRÄDET i Turnering seedades korrekt, men TIPSEN gjorde det aldrig. Förvirrande: notisen
+ledde dit men man kunde inte tippa.
+
+**Rotorsak:** `useBracketPredictableData` (slutspels-tipsen) härledde trädet ur
+`getDataSource().getMatches()`, som i BÅDE fixtures och live returnerar den STATISKA
+matchplanen UTAN resultat (supabase-client.ts:47 `getMatches: () => fixtureMatches`). De
+officiella facit-resultaten vävs in i RESULTS-STOREN (ResultsProvider), inte i datakällan.
+Slutspelsträdet (useBracketData) läser storen och seedas; tipsen läste råa planen, så
+deriveGroupTables såg alla gruppmatcher som 'scheduled' -> isGroupStageComplete=false ->
+trädet seedades aldrig -> slot-tipsen förblev otippbara. Buggen var DORMANT under gruppspelet
+(slots otippbara ändå) och slog till FÖRST när gruppspelet avgjordes (knockout-fasen).
+Kommentaren "I appen är båda källorna samma fixtures/live-data" var fel , storen väver facit,
+datakällan gör inte det.
+
+**Fix:** `useBracketPredictableData` läser nu I FÖRSTA HAND den delade results-storen
+(`useOptionalResultsStore`) , SAMMA matcher (med invävt facit) som Turnering-trädet , så
+tipsen seedas i exakt samma stund trädet får sina riktiga lag. getDataSource-laddningen
+behålls som FALLBACK när ingen ResultsProvider finns (fristående render / enhetstester; då
+finns inget facit ändå). Bracket-tips-sektionen ligger alltid inuti ResultsProvider i appen.
+Regressionstest (use-bracket-predictable-data.test.tsx) vaktar att storen är källan.
+
+**Varför så:** EN sanning för slutspels-strukturen , trädet och tipsen ska aldrig divergera.
+Tidigare divergens (två datakällor) var just det som bröt. Tip-poängsättningen rörs INTE
+(scoras fortsatt mot officiellt facit). Build/test grönt.
+
+**Kvar (data, ej kod):** seedningen kräver att ALLA gruppresultat ligger i
+official_match_results (allt-eller-inget; FIFA-seedningen behöver alla grupper + 8 bästa
+treor). Live-API:t fyller official via auto-facit-pollaren (supabase/functions/livescore-
+poller) när matcher blir 'finished'. Saknas några gruppresultat där seedas inget , kontrollera
+att pollaren/facit är komplett (admin i Mer visar facit-raderna).
