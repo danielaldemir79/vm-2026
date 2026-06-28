@@ -25,7 +25,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
 import { Surface } from './components/Surface';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DailyMatchesView } from './features/daily';
+import { DailyMatchesView, SlutspelReminder } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { ResultsProvider } from './features/results';
@@ -177,6 +177,23 @@ function AppShell() {
     [selectTab]
   );
 
+  // GENVÄG TILL SLUTSPELS-TIPSET (2026-06-28): startsidans SlutspelReminder leder hit ,
+  // byt till Tips och scrolla till slutspels-tipset (#tips-slutspel, överst i Tips). Samma
+  // dubbel-rAF som openRooms: Tips-panelen får layout först efter flik-bytets commit + paint,
+  // så vi väntar två frames innan vi scrollar (annars är målet ännu utan layout = no-op).
+  const openBracketTips = useCallback(() => {
+    selectTab('tips');
+    const scrollToTips = () => {
+      const el = typeof document !== 'undefined' ? document.getElementById('tips-slutspel') : null;
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(scrollToTips));
+    } else {
+      scrollToTips();
+    }
+  }, [selectTab]);
+
   return (
     <>
       {/* min-h-dvh + overflow-x-clip = aldrig horisontell scroll på någon skärm.
@@ -281,6 +298,15 @@ function AppShell() {
                           </div>
                         </Fade>
 
+                        {/* SLUTSPELS-PÅMINNELSE (2026-06-28, Daniels önskemål): en tydlig notis
+                        högst upp på startsidan medan slutspelet är live , "glöm inte att tippa era
+                        slutspelsresultat". Gatar sig själv (live-läge + slutspels-fönster + inte
+                        bortstängd) och leder till slutspels-tipset (openBracketTips: Tips +
+                        scrolla till #tips-slutspel). Dismissbar, får ligga genom hela slutspelet. */}
+                        <Slide direction="up">
+                          <SlutspelReminder onTip={openBracketTips} />
+                        </Slide>
+
                         {/* Daglig matchvy (T7) , Idag-flikens hjärta: dagens matcher +
                         LIVE-matchen (LiveNowSection åker med) + nedräkning. ReactionsProvider +
                         MatchCommentsProvider omsluter bara dagens-vyn (de enda ytorna med
@@ -307,11 +333,22 @@ function AppShell() {
                           tips-/rums-vyerna degraderar fliken lugnt, övriga flikar lever vidare. */}
                       <ErrorBoundary label="tips-fliken" resetKey={activeTab}>
                         <div className="flex flex-col gap-12">
-                          {/* DIN STATISTIK + TIPPA MATCHERNA ÖVERST (2026-06-28, Daniels önskemål):
-                          PredictionSection leder Tips , den renderar din poäng-summering + personliga
-                          statistik HÖGST UPP (TipsScoreSummary + PersonalStatsSection) och därunder
-                          själva match-kupongen. ScoreGuide (poäng-förklaringen) renderas inuti
-                          PredictionsView, så den följer Tips-fliken. */}
+                          {/* TIPPA SLUTSPELET ÖVERST (2026-06-28, Daniels önskemål): slutspelet är
+                          LIVE nu, så slutspels-tipset (VM-vinnaren + vem går vidare per slot, T16b)
+                          LEDER Tips och är expanderat från start (startExpanded i vyn). id=tips-slutspel
+                          = scroll-mål för startsidans slutspels-notis (SlutspelReminder i Idag). */}
+                          <div id="tips-slutspel" className="scroll-mt-28">
+                            <Slide direction="up">
+                              <BracketPredictionSection
+                                surface={(children) => <Panel>{children}</Panel>}
+                              />
+                            </Slide>
+                          </div>
+
+                          {/* Din statistik + tippa matcherna (T15): PredictionSection renderar din
+                          poäng-summering + personliga statistik högst upp (TipsScoreSummary +
+                          PersonalStatsSection) och därunder själva match-kupongen. ScoreGuide
+                          (poäng-förklaringen) renderas inuti PredictionsView. */}
                           <Slide direction="up">
                             <PredictionSection surface={(children) => <Panel>{children}</Panel>} />
                           </Slide>
@@ -319,13 +356,6 @@ function AppShell() {
                           {/* Gruppvinnar-tipsen (T16): tippa 1:an + 2:an i varje grupp. */}
                           <Slide direction="up">
                             <GroupPredictionSection
-                              surface={(children) => <Panel>{children}</Panel>}
-                            />
-                          </Slide>
-
-                          {/* Bracket-/slutspels-tipsen (T16b, #59): VM-vinnaren + slot-vinnare. */}
-                          <Slide direction="up">
-                            <BracketPredictionSection
                               surface={(children) => <Panel>{children}</Panel>}
                             />
                           </Slide>

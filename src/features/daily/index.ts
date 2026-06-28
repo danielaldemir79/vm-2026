@@ -2,6 +2,7 @@
 // importerar härifrån så intern filstruktur kan ändras utan att bryta call-sites.
 
 export { DailyMatchesView } from './DailyMatchesView';
+export { SlutspelReminder } from './SlutspelReminder';
 export { MatchCard } from './MatchCard';
 export type { MatchCardProps } from './MatchCard';
 export { LiveMatchCard } from './LiveMatchCard';

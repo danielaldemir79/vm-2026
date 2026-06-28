@@ -157,15 +157,16 @@ export function BracketPredictionsView({
         </p>
       </header>
 
-      {/* KOMPRIMERING (T68/#129 punkt 9): sektionen är väldigt lång (champion-hero + 32
-          slot-kuponger rund-grupperade). Rubrik + beskrivning ovan ALLTID synliga; här
-          under komprimeras innehållet så bara TOPPEN (champion-väljaren) syns som default,
-          en tydlig expandera fäller ut hela vägen till bucklan. Faden tonar mot surface
-          (sektionen ligger på en Panel). ~16rem visar champion-hjälte-toppen. */}
+      {/* EXPANDERAT FRÅN START (2026-06-28, Daniels önskemål): slutspelet är live, så hela
+          slutspels-tipset (champion + alla slot-kuponger) visas direkt , man ska inte behöva
+          fälla ut det för att tippa knockout-resultaten. Komprimeringen finns kvar som en
+          MÖJLIGHET ("Visa färre"); collapsedMaxHeight styr då toppens storlek. Faden tonar
+          mot surface (sektionen ligger på en Panel). */}
       <CollapsibleBody
         name="bracket-predictions"
         toggleLabels={{ expand: 'Visa hela slutspels-tipset', collapse: 'Visa färre' }}
         collapsedMaxHeight="16rem"
+        startExpanded
       >
         {/* UTAN aktivt rum (taskens punkt 3): bracket-tips är per rum. En INBJUDANDE
           guld-tonad port med en pokal-ikon + tydlig väg framåt, inte en grå rad, den

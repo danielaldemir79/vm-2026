@@ -71,23 +71,24 @@ describe('BracketView, rendering + a11y', () => {
     expect(round.querySelectorAll('[data-bracket-match]')).toHaveLength(16);
   });
 
-  it('komprimerad som default: rubrik + beskrivning synliga, trädet höjd-klippt (toppen)', async () => {
+  it('EXPANDERAD som default (startExpanded): hela trädet syns direkt, kan fällas ihop', async () => {
     renderView(fixturesEnv());
     await waitFor(() => {
       expect(screen.getByRole('region', { name: /Sextondelsfinaler/i })).toBeInTheDocument();
     });
-    // Rubriken alltid synlig; kroppen komprimerad som default (bara toppen av trädet).
+    // Rubriken alltid synlig; kroppen UTFÄLLD som default (2026-06-28: slutspelet är det
+    // som gäller nu, trädet ska synas direkt utan att fällas ut).
     expect(screen.getByRole('heading', { level: 2, name: /Slutspelsträdet/i })).toBeInTheDocument();
     const body = document.querySelector('[data-collapsible-body]') as HTMLElement;
-    expect(body).toHaveAttribute('data-collapsed', 'true');
-    // Hela trädet finns kvar i DOM (höjd-klipp döljer inte innehåll): alla rundor kvar.
-    expect(body.querySelectorAll('[data-bracket-round]')).toHaveLength(6);
-    // Expandera (namnrymd 'bracket') -> komprimera tillbaka.
-    fireEvent.click(screen.getByRole('button', { name: /Visa hela slutspelsträdet/i }));
     expect(body).toHaveAttribute('data-collapsed', 'false');
+    // Hela trädet finns i DOM: alla rundor kvar.
+    expect(body.querySelectorAll('[data-bracket-round]')).toHaveLength(6);
+    // Komprimera (möjligheten finns kvar) -> expandera tillbaka.
     const [topCollapse] = screen.getAllByRole('button', { name: /Visa mindre av trädet/i });
     fireEvent.click(topCollapse);
     expect(body).toHaveAttribute('data-collapsed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /Visa hela slutspelsträdet/i }));
+    expect(body).toHaveAttribute('data-collapsed', 'false');
   });
 });
 
