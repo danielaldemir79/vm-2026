@@ -5,6 +5,97 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-29 , v2.4.4: slutspelet lika rikt + tydligt som gruppspelet (data + klient)
+
+**Bakgrund:** När VM-slutspelet drog igång strulade knockout live , matchsidor visade "Ej klart"
+mot "Ej klart", inga resultat/stats, och bot-tipsen var skräp. Rotorsak-kedjan: (1) data-lagret
+(M73 facit + live-data skrevs aldrig , pollaren v5 deployades EFTER att M73 spelats, utanför 4h-
+skyddsnätet), (2) klienten saknade tydlig knockout-presentation, (3) develop:s CI var röd sedan
+#251 (datum-kopplade tester knäcktes när "nu" blev slutspel).
+
+**Beslut + åtgärder:**
+- **Data:** M73 (Sydafrika-Kanada) facit + live-data backfillade manuellt (engångs, M73 var enda
+  matchen utanför pollarens fönster). Pollaren v5 verifierad: self-mappar + faciterar alla
+  kommande knockout-matcher autonomt (cron var 30:e sek, grön).
+- **Test-stabilitet (#253):** datum-kopplade daily-tester pinnades till premiärdagen
+  (vi.useFakeTimers + setSystemTime) , en "följ-verklig-dag"-vy får aldrig testas mot riktigt nu.
+- **Fas 1 (#252):** matchvyn löser upp knockout-lag via resolveKnockoutTeams (återanvänd).
+- **Fas 2 (#255):** slutspelsträdet visar resultat på avgjorda matcher (guld "Avgjord"-pill +
+  slutställning + straffar), tydligt avancemang ("Vidare"/"Klar" med glyf, utslagen dämpad +
+  sr-only), drill-in till matchvyn (stretched-button a11y), slot rätt/fel + poäng (BracketResultPanel,
+  speglar grupp-panelen v2.3.3), och RevealView-källfix (resolveKnockoutTeams i LeaderboardProvider
+  = EN sanning, matchvyns lokala patch borttagen). Slutspel = BARA slot-tips, ingen matchresultat-
+  tippning (Daniels beslut , predictions har 0 M-matcher, avsiktligt).
+
+**Varför:** slutspelet är "det roliga" i VM , klarhet om resultat, avancemang och egna poäng på
+ett ställe (utan att bläddra mellan sidor) lyfter appen. Allt återanvänder beprövade motorer
+(deriveBracket, scoreBracketAdvance, derivePoolFacit, Modal) , inga andra-sanningar.
+
+## 2026-06-29 , autonom bot-SLUTSPELSTIPS-seedning (bot-bracket-seeder, Fas 3)
+
+**Beslut:** Botarna ska ha RIMLIGA slutspelstips (bracket_predictions) för varje slot som blivit
+tippbar, fyllt AUTONOMT och ÅTERKOMMANDE per runda (sextondel -> åttondel -> kvart -> semi ->
+final) av en edge-funktion (supabase/functions/bot-bracket-seeder) som ett lågfrekvent pg_cron-
+jobb anropar. Ren + testad logik bor i src/data/bots/seed-bracket-slots.ts +
+bracket-seed-edge-entry.ts och speglas till Deno via esbuild-bundle (samma genererad-mirror-
+mönster som T90 global-leaderboard / T89 goal-push, patterns.md "ren-logik-i-src-speglad..."),
+vaktad av bot-bracket-mirror-parity.test.ts.
+
+**Tippbar-regeln (gissas INTE, källa = bracket-predictable-slots.ts selectPredictableBracket):**
+en match-slot (M73-M104) är seedbar när BÅDA lagen är `resolved` (teamsKnown, härlett ur
+deriveBracket på official_match_results) OCH slottens egen avspark inte passerat (`!locked`, now <
+kickoff). En låst slot seedas ALDRIG (en riktig spelare kan inte tippa efter avspark , RLS nekar ,
+så en bot ska inte "tippa i efterhand" på ett känt/pågående utfall). Slot-urvalet är paritets-
+testat mot selectPredictableBracket (bracket-seed-edge-entry.test.ts). Champion-slotten hanteras
+inte (tippas bland alla 48, låstes vid turneringsstart).
+
+**Val-modellen (källa = FIFA-ranking som styrke-signal):** advancing_team_id = ett val mellan
+slottens TVÅ lag, viktat på skill_tier. p(favorit) = 0.5 + skill_tier * (favoriteCap - 0.5),
+favoriteCap default 0.85 (skill 0 -> slantsing, skill 1 -> 0.85). Favorit = laget med LÄGRE
+FIFA-ranking (team-profiles.ts fifaRanking, samma signal profil-vyn redan använder, se
+team-profiles-parser.ts). Taket < 1 så även en vass bot tippar ibland skräll (samma motiv som
+predict.ts capAccuracy). Deterministisk per bot+slot (createRng ur persona_key + slot_id), så
+dry-run == senare live-körning.
+
+**KRITISK UPPTÄCKT (verifierad mot prod 2026-06-29, INTE gissad):** botarna hade REDAN
+bracket_predictions-rader för ALLA slutspelsslots (M73-M104 + champion, 240/slot). De seedades vid
+den URSPRUNGLIGA bot-seedningen (predict.ts buildBracketPredictions), då inga slutspelslag var
+kända, med ett SLUMP-lag bland ALLA 48 (M73 har 47 distinkta värden hos botarna). Ett sådant tips
+kan i princip aldrig ge poäng (det avancerande laget måste vara ett av slottens två) och ser
+trasigt ut i tips-vyn. Därför är "fyll bara saknade rader" en no-op här (alla rader finns).
+Default replaceInvalid=true ersätter därför ett bot-tips som INTE är ett av slottens två lag med
+ett FIFA-viktat val; ett redan GILTIGT bot-tips rörs ALDRIG (idempotens). replaceInvalid=false ger
+ren "fyll bara saknade" (här = 0).
+
+**Bot-isolering (HARD):** seedaren rör BARA user_id i bot_accounts; icke-bot-rader räknas
+före/efter en live-skrivning och en ändring fail-loud:ar (jfr seed-bots.ts skydds-räkning).
+**Dry-run-default (HARD):** edge-funktionen skriver INGET utan ett explicit {"dryRun": false}.
+
+**Dry-run-preview @ 2026-06-29 03:26Z (replaceInvalid=true):** 15 seedbara slots (M74-M88; M73
+redan spelad/låst). 240 botar x 15 = 3600 bot-rader i seedbara slots, varav 3456 ogiltiga (ersätts)
++ 144 redan giltiga (orörda) + 0 saknade. 22 rum berörs. Cron-SQL (oregistrerad, körs av dirigenten
+efter verifiering): supabase/functions/bot-bracket-seeder/CRON_SETUP.sql, var 30:e min.
+
+## 2026-06-29 , slutspelsmatcher auto-mappas på unik avsparkstid när bracket-platsen är oseedad
+
+**Beslut:** I `resolveFixtureToMatch` (src/data/livescore/fixture-map-resolver.ts + dess Deno-spegel
+supabase/functions/_shared/livescore-core.ts) fick lag-par-grenens "0 kandidater"-fall en fallback:
+ligger fixturens kickoff inom kickoff-fönstret (2h) för EXAKT en OSEEDAD slutspels-rad
+(homeAppId === null && awayAppId === null) mappas fixturen dit; 0 eller >1 -> unresolved (gissa aldrig).
+
+**Varför:** en RIKTIG slutspelsmatch har båda lagen kända (de spelade gruppspel, finns i lag-bryggan),
+så den föll in i lag-par-grenen , men schemaraderna M73-M104 är oseedade (null lag) tills
+bracket-seedningen fyllt dem, så lag-paret matchade aldrig en null-lags-rad och HELA slutspelet
+(M73-M104) gick omappat (bekräftat i Supabase: 72 mappade = bara gruppspel). Fall 2 (matcha på enbart
+kickoff) körs bara när live-fixturens lag är OKÄNDA, vilket aldrig sker för en riktig match. Den
+unika avsparkstiden identifierar slutspels-platsen entydigt.
+
+**Unikhets-gard (källhänvisad, gissas ALDRIG):** slutspels-raderna ligger minst **3,5 h** isär i
+matchplanen (källa: src/data/wc2026/matches.ts, M73-M104; minsta avstånd uppmätt M76 17:00 -> M74
+20:30 = 3,5 h), så ett 2h-fönster fångar HÖGST en oseedad rad för en fixture som ligger på sin rad.
+Garden är låst i CI av ett invariant-test (fixture-map-resolver.test.ts: minsta avstånd mellan
+oseedade rader > AUTO_MAP_KICKOFF_WINDOW_MS) , bryts den av ett framtida schema-byte rödnar testet.
+
 ## 2026-06-18 , "Se höjdpunkter"-länk på färdigspelade matchkort (YouTube-sökning)
 
 **Beslut:** Ett färdigspelat matchkort (MatchCard, `isFinished(match)` true) får en diskret

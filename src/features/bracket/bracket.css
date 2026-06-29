@@ -691,3 +691,66 @@
     transition: none;
   }
 }
+
+/* =============================================================================
+   9. AVGJORD MATCH: RESULTAT PÅ NODEN, AVANCEMANG, UTSLAGEN + DRILL-IN
+   (2026-06-29, Daniels turnering-lyft, del A). [designen, ovanpå senior-devs seam:
+   data-bracket-match-state, data-bracket-decided, data-slot-advance,
+   data-slot-eliminated, data-bracket-slot-score, data-bracket-match-open]
+   =============================================================================
+
+   Slutspelet ska kännas lika rikt + tydligt som gruppspelet: varje avgjord match
+   visar sitt RESULTAT (mål per slot-rad + ev. straffar), avancemanget syns TYDLIGT
+   (vinnaren lyfts med medalj + "Vidare", förloraren dämpas, nästa rundas plats blir
+   "Klar"), och man kan ÖPPNA noden för den rika matchvyn. FÄRG-SPRÅK (samma som resten
+   av appen): GULD = avgjort/facit ("domen är fälld", reveal-facit), GRÖN accent =
+   avancemang/energi (vinnar-medaljen, "Vidare"). Alla signaler är FÄRG-OBEROENDE
+   (glyf + form + vikt), tonen förstärker bara, AA-mätt i båda teman.
+   -------------------------------------------------------------------------- */
+
+/* "AVGJORD"-statusen i match-huvudet (facit-språk = guld): lugn guld-tonad pill med en
+   check-glyf. --color-warning är den AA-mätta guld-text-tonen (aldrig rå --vm-gold som
+   text, guld-på-tint-fällan, lessons aa-kontrast). Formen (check + ordet) bär läget. */
+.vm-bracket-decided {
+  border: 1px solid color-mix(in srgb, var(--vm-gold) 35%, var(--color-border));
+  /* Gold 10% över surface + --color-warning: EXAKT samma AA-mätta recept som final-rund-
+     markören (.vm-tips-bracket-marker[data-round='final']), så guld-texten håller AA i båda teman. */
+  background-color: color-mix(in srgb, var(--vm-gold) 10%, var(--color-surface));
+  color: var(--color-warning);
+}
+
+/* "VIDARE"-pillen på vinnar-raden (avancemang = accent, turneringens framåt-energi, samma
+   språk som vinnar-medaljen §4). AA: accent-text på en 9%-accent-tint över kort-ytan
+   (samma mätta recept som .vm-bracket-prelim-pill, accent-text-på-låg-accent-tint). Pilen
+   + ordet bär avancemanget färg-oberoende. */
+.vm-bracket-advance-badge {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  /* Accent 9% över surface + accent-text: EXAKT samma AA-mätta recept som .vm-bracket-prelim-pill
+     (8.10:1 mörkt / 4.77:1 ljust), så accent-texten håller AA i båda teman (inte 12% som tunnar ut). */
+  background-color: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+  color: var(--color-accent);
+}
+
+/* RESULTAT-MÅLEN på slot-raden (tabular, så hemma/borta-talen linjerar). Vinnaren bär
+   font-bold + text-fg, förloraren font-semibold + text-fg-muted (komponenten sätter tonen),
+   så slutställningen + vem som vann läses på en blink. */
+.vm-bracket-slot-score {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  line-height: 1.15;
+}
+/* Straff-siffrorna ("(4)") är ett litet, dämpat tillägg bredvid ordinarie mål. */
+.vm-bracket-slot-pens {
+  font-variant-numeric: tabular-nums;
+}
+
+/* DRILL-IN-AFFORDANS: en klickbar match-nod (båda lag kända) får cursor-pointer + en lugn
+   hover-kant-höjning, så det syns att noden öppnar den rika matchvyn. Overlay-knappen
+   (markup) bär fokus-ringen för tangentbord; detta är bara kort-affordansen. Kant-bytet är
+   ingen rörelse, så det gäller även vid reducerad rörelse (kort-LYFTET §3 är motion-gatat). */
+.vm-bracket-match--clickable {
+  cursor: pointer;
+}
+.vm-bracket-match--clickable:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+}

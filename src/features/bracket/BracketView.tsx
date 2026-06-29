@@ -23,8 +23,12 @@ import { Fade } from '../../motion';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { teamDisplayName } from '../daily/match-display';
 import { TeamFlag } from '../daily/TeamFlag';
-import { groupByRound, type BracketSlotState } from './derive-bracket';
+import { groupByRound, type BracketSlotState, type BracketMatchResult } from './derive-bracket';
 import { useBracketData } from './use-bracket-data';
+// Drill-in-seamen (T86): en match-nod kan öppna den DELADE rika matchvyn (stats/tidslinje/
+// laguppställning). TOLERANT hook -> null utan provider (fristående/test), då degraderar
+// noderna tyst till statiska (ingen ny modal byggs, vi återbrukar openMatch-seamen).
+import { useOptionalMatchDetail } from '../match-detail/match-detail-context';
 // Premium-trädets visuella lager (kopplings-affordans, vinnar-framhävning,
 // avancerings-animation, scroll-edges). Stylas ENBART via seamens data-attribut
 // + klass-hakar nedan, så senior-devs semantik + alla tester står kvar.
@@ -154,6 +158,93 @@ function DefinitivBadge() {
   );
 }
 
+/**
+ * "Vidare"-brickan på vinnar-raden i en AVGJORD match (Daniels önskemål: avancemang ska
+ * synas TYDLIGT, inte bara den diskreta medaljen). FÄRG-OBEROENDE: en pil-glyf (form) +
+ * ordet "Vidare". aria-hidden, eftersom slot-radens sr-only "(vidare)" redan läses upp
+ * (ingen dubbel-uppläsning). Accent-ton = turneringens framåt-energi (samma språk som
+ * vinnar-medaljen), AA-mätt recept i bracket.css.
+ */
+function AdvanceBadge() {
+  return (
+    <span
+      data-slot-advance=""
+      aria-hidden="true"
+      className="vm-bracket-advance-badge inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide"
+    >
+      <svg
+        width="9"
+        height="9"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M5 12h14" />
+        <path d="m13 6 6 6-6 6" />
+      </svg>
+      Vidare
+    </span>
+  );
+}
+
+/**
+ * "Avgjord"-statusen i en avgjord matchs huvud: matchen är spelad, facit finns. FACIT-
+ * SPRÅK = GULD (samma som reveal-facit: "domen är fälld"), skilt från den GRÖNA accenten
+ * (= live/pågår). FÄRG-OBEROENDE: en check-glyf (form) + ordet "Avgjord", LÄSBAR (ej
+ * aria-hidden) så skärmläsaren får match-statusen. --color-warning är den AA-mätta guld-
+ * texten (aldrig rå --vm-gold som text, guld-på-tint-fällan).
+ */
+function DecidedBadge() {
+  return (
+    <span
+      data-bracket-decided=""
+      className="vm-bracket-decided inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide"
+    >
+      <svg
+        aria-hidden="true"
+        width="9"
+        height="9"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+      Avgjord
+    </span>
+  );
+}
+
+/**
+ * Drill-in-affordansen i en klickbar match-nods huvud: en diskret chevron som signalerar
+ * "tryck för att öppna matchvyn". Ren dekoration (aria-hidden); overlay-knappens aria-label
+ * bär den tillgängliga beskrivningen av åtgärden.
+ */
+function OpenHintIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0 text-fg-muted"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
 /** Hur många kandidat-chips som visas innan resten fälls till "+N" (smal cell). */
 const MAX_CANDIDATE_CHIPS = 4;
 
@@ -236,10 +327,19 @@ export function SlotRow({
   slot,
   teamsById,
   isWinner,
+  isLoser = false,
+  goals = null,
+  penaltyGoals = null,
 }: {
   slot: BracketSlotState;
   teamsById: ReadonlyMap<string, Team>;
   isWinner: boolean;
+  /** Slogs denna slot ut (resolved icke-vinnare i en AVGJORD match)? Då dämpas raden. */
+  isLoser?: boolean;
+  /** Lagets mål (ordinarie) när matchen är spelad, annars null (visa ingen siffra). */
+  goals?: number | null;
+  /** Lagets straffmål om matchen avgjordes på straffar, annars null. */
+  penaltyGoals?: number | null;
 }) {
   const text = slotText(slot, teamsById);
   const isResolved = slot.resolution === 'resolved';
@@ -249,34 +349,50 @@ export function SlotRow({
   const hasTeam = (isResolved || isPreliminary) && slot.teamId !== null;
   const code = hasTeam ? teamCodeOf(slot.teamId, teamsById) : null;
   const candidates = hasTeam ? [] : slot.candidateTeamIds;
+  // "Klar" (definitiv plats) BARA på en resolved plats vars match ÄNNU inte avgjorts: laget
+  // har seedats/avancerat HIT och platsen är låst (Daniels "deras plats är klar"). En LOSER
+  // (resolved men utslagen) ska INTE märkas "Klar", och en WINNER bär vinnar-medaljen.
+  const showDefinitiv = isResolved && !isWinner && !isLoser;
+  const hasGoals = goals !== null;
+  // Lagnamnets ton: vinnare/resolved i full kontrast + fet; en utslagen resolved-rad dämpas
+  // (medium + muted) så vinnaren tydligt sticker ut; obestämd/preliminär dämpad som förut.
+  const nameTone = isLoser
+    ? 'font-medium text-fg-muted'
+    : isResolved
+      ? 'font-semibold text-fg'
+      : 'text-fg-muted';
 
   return (
     <li
       data-bracket-slot=""
       data-slot-resolution={slot.resolution}
       data-winner={isWinner ? '' : undefined}
-      data-slot-definitiv={isResolved && !isWinner ? '' : undefined}
+      data-slot-eliminated={isLoser ? '' : undefined}
+      data-slot-definitiv={showDefinitiv ? '' : undefined}
       className="vm-bracket-slot flex items-start gap-2 px-2.5 py-1.5"
     >
       {/* FLAGGA (eller platshållare): lyfter lag-igenkänningen, vänsterställd som ett ankare. */}
       <SlotFlag code={code} />
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="flex min-w-0 items-center gap-1.5">
-          {/* En resolved slot bär lagnamnet i full kontrast; en obestämd/preliminär slot
-              bär sin etikett/lagnamn dämpat, så hierarkin syns utan färg-beroende.
+          {/* En resolved slot bär lagnamnet i full kontrast; en obestämd/preliminär/utslagen
+              slot bär sitt namn dämpat, så hierarkin syns utan färg-beroende.
               .vm-bracket-slot-name bär den FÄRG-OBEROENDE vinnar-medaljens glyf (CSS-pseudo
               ::after), så bocken syns i gråskala/för färgblinda. */}
           <span
-            className={`vm-bracket-slot-name min-w-0 truncate text-[0.8125rem] ${
-              isResolved ? 'font-semibold text-fg' : 'text-fg-muted'
-            }`}
+            className={`vm-bracket-slot-name min-w-0 truncate text-[0.8125rem] ${nameTone}`}
             title={text}
           >
             {text}
           </span>
           {isWinner ? <span className="sr-only"> (vidare)</span> : null}
-          {/* DEFINITIV-markör: en resolved icke-vinnare = platsen är klar/låst (Klar-bricka). */}
-          {isResolved && !isWinner ? <DefinitivBadge /> : null}
+          {/* En utslagen rad får en FÄRG-OBEROENDE sr-only-etikett (skärmläsare hör "utslagen"),
+              den visuella dämpningen + vinnarens lyft bär det för seende. */}
+          {isLoser ? <span className="sr-only"> (utslagen)</span> : null}
+          {/* AVANCEMANG: vinnaren bär en tydlig "Vidare"-pill (utöver medaljen). */}
+          {isWinner ? <AdvanceBadge /> : null}
+          {/* DEFINITIV-markör: en resolved icke-utslagen icke-vinnare = platsen är klar/låst. */}
+          {showDefinitiv ? <DefinitivBadge /> : null}
         </span>
         {isPreliminary ? (
           // Under lagnamnet: dess NUVARANDE position ("1:a grupp E") + att det är
@@ -295,46 +411,133 @@ export function SlotRow({
           <CandidateChips candidateTeamIds={candidates} teamsById={teamsById} />
         ) : null}
       </span>
+      {/* RESULTATET PÅ NODEN (Daniels önskemål): lagets mål när matchen är spelad. Vinnaren
+          i full kontrast + fet, förloraren dämpad, så slutställningen läses på en blink.
+          Straffsiffror i parentes ("1 (4)") när matchen avgjordes på straffar (FIFA Art. 14). */}
+      {hasGoals ? (
+        <span
+          data-bracket-slot-score=""
+          className={`vm-bracket-slot-score shrink-0 self-center text-right ${
+            isWinner ? 'font-bold text-fg' : 'font-semibold text-fg-muted'
+          }`}
+        >
+          {goals}
+          {penaltyGoals !== null ? (
+            <span className="vm-bracket-slot-pens ml-0.5 text-[0.625rem] font-semibold text-fg-muted">
+              ({penaltyGoals})
+            </span>
+          ) : null}
+        </span>
+      ) : null}
     </li>
   );
 }
 
+/** Är BÅDA en slutspels-slots lag slutgiltigt kända (resolved)? Då kan matchen öppnas. */
+function bothTeamsResolved(home: BracketSlotState, away: BracketSlotState): boolean {
+  return (
+    home.resolution === 'resolved' &&
+    home.teamId !== null &&
+    away.resolution === 'resolved' &&
+    away.teamId !== null
+  );
+}
+
 /**
- * Ett match-kort i trädet: dess två slots (hemma/borta) med en avdelare. Bär
- * matchnumret som dämpad etikett. data-bracket-match + matchId ger design-seamen
- * en stabil hake per match (kopplingslinjer, animation).
+ * Ett match-kort i trädet: dess två slots (hemma/borta) med en avdelare + matchnummer-
+ * huvud. Bär nu TRE avläsbara tillstånd (Daniels turnering-lyft):
+ *   - AVGJORD (winnerSlotId satt): match-huvudet visar "Avgjord", varje slot-rad bär sitt
+ *     RESULTAT (mål, + ev. straffar), vinnaren lyfts (medalj + "Vidare") och förloraren
+ *     dämpas, så avgjort resultat + avancemang syns på en blick.
+ *   - KOMMANDE (båda lag kända, ej spelad): noden är klickbar -> rik matchvy (drill-in).
+ *   - VÄNTAR (lagen ej avgjorda): positions-etiketter/alternativ, ingen drill-in.
+ *
+ * DRILL-IN (T86-seamen, återbrukad): en nod med båda lag kända blir en klickbar yta som
+ * öppnar den DELADE rika matchvyn (stats/tidslinje/laguppställning) via openMatch(matchId).
+ * En riktig <button> (overlay), inte en klickbar div, så den nås med tangentbord + har rätt
+ * roll (samma princip som MatchDetailTrigger). `onOpen` null -> ingen drill-in (degraderar
+ * tyst, t.ex. utan MatchDetailProvider i enhetstest).
  */
 function MatchCard({
   matchId,
   home,
   away,
   winnerSlotId,
+  result,
   teamsById,
+  onOpen,
 }: {
   matchId: string;
   home: BracketSlotState;
   away: BracketSlotState;
   winnerSlotId: string | null;
+  result: BracketMatchResult | null;
   teamsById: ReadonlyMap<string, Team>;
+  onOpen: ((matchId: string) => void) | null;
 }) {
+  const decided = winnerSlotId !== null;
+  const homeWinner = winnerSlotId === home.id;
+  const awayWinner = winnerSlotId === away.id;
+  const teamsKnown = bothTeamsResolved(home, away);
+  const canOpen = onOpen !== null && teamsKnown;
+  // data-bracket-match-state: ett stabilt avläsbart tillstånd för design + test.
+  const matchState = decided ? 'decided' : teamsKnown ? 'ready' : 'pending';
+
   return (
     <article
       data-bracket-match={matchId}
-      className="vm-bracket-match overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)]"
+      data-bracket-match-state={matchState}
+      className={`vm-bracket-match relative overflow-hidden rounded-card border border-border bg-surface shadow-[var(--vm-shadow-card)] ${
+        canOpen ? 'vm-bracket-match--clickable' : ''
+      }`}
     >
-      {/* Match-nummer-cap: en diskret etikett (M73 ...) så ett kort kan placeras i
-          trädet med blicken (vilken match det är). aria-hidden: matchnumret är
-          orienterings-dekoration, slot-raderna nedan bär den tillgängliga datan. */}
-      <p
-        aria-hidden="true"
-        className="border-b border-border/60 px-2.5 py-1 font-display text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
-      >
-        {matchId}
-      </p>
+      {/* MATCH-HUVUD: matchnummer (orienterings-dekor, aria-hidden) + status. "Avgjord"-
+          brickan är LÄSBAR (skärmläsaren får match-statusen). Chevron = drill-in-affordans. */}
+      <header className="flex items-center justify-between gap-2 border-b border-border/60 px-2.5 py-1">
+        <span
+          aria-hidden="true"
+          className="font-display text-[0.625rem] font-semibold uppercase tracking-wide text-fg-muted"
+        >
+          {matchId}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {decided ? <DecidedBadge /> : null}
+          {canOpen ? <OpenHintIcon /> : null}
+        </span>
+      </header>
       <ul className="m-0 flex list-none flex-col divide-y divide-border p-0">
-        <SlotRow slot={home} teamsById={teamsById} isWinner={winnerSlotId === home.id} />
-        <SlotRow slot={away} teamsById={teamsById} isWinner={winnerSlotId === away.id} />
+        <SlotRow
+          slot={home}
+          teamsById={teamsById}
+          isWinner={homeWinner}
+          isLoser={decided && !homeWinner}
+          goals={result ? result.homeGoals : null}
+          penaltyGoals={result?.penalties ? result.penalties.homeGoals : null}
+        />
+        <SlotRow
+          slot={away}
+          teamsById={teamsById}
+          isWinner={awayWinner}
+          isLoser={decided && !awayWinner}
+          goals={result ? result.awayGoals : null}
+          penaltyGoals={result?.penalties ? result.penalties.awayGoals : null}
+        />
       </ul>
+      {/* DRILL-IN-OVERLAY: en stretchad knapp som täcker noden (stretched-link-mönstret), så
+          hela kortet öppnar matchvyn med EN tydlig knapp i stället för nästlade interaktiva
+          element. Slot-raderna är icke-interaktiva (spans), så ingen klick-konflikt. */}
+      {canOpen ? (
+        <button
+          type="button"
+          data-bracket-match-open=""
+          onClick={() => onOpen(matchId)}
+          aria-label={`Öppna matchvy: ${teamDisplayName(home.teamId, teamsById)} mot ${teamDisplayName(
+            away.teamId,
+            teamsById
+          )}`}
+          className="absolute inset-0 z-10 rounded-card outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-accent)_60%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg)]"
+        />
+      ) : null}
     </article>
   );
 }
@@ -399,6 +602,10 @@ export function BracketView() {
   const { status, bracket, teams, mode, error } = useBracketData();
   const teamsById = useMemo(() => indexTeams(teams), [teams]);
   const rounds = useMemo(() => (bracket ? groupByRound(bracket) : []), [bracket]);
+  // Drill-in: finns MatchDetailProvider (appen) blir match-noderna klickbara -> rik matchvy.
+  // Saknas den (fristående/test) är seamen null och noderna är statiska (ingen krasch).
+  const matchDetail = useOptionalMatchDetail();
+  const openMatch = matchDetail?.openMatch ?? null;
 
   // BONUS-STAT (wow inför slutspelet): hur långt trädet har avgjorts. Ren härledning
   // ur det redan härledda trädet (winnerSlotId per match), ingen ny datakälla.
@@ -640,7 +847,9 @@ export function BracketView() {
                         home={match.home}
                         away={match.away}
                         winnerSlotId={match.winnerSlotId}
+                        result={match.result}
                         teamsById={teamsById}
+                        onOpen={openMatch}
                       />
                     ))}
                   </RoundColumn>

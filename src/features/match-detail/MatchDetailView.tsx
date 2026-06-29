@@ -28,6 +28,7 @@ import {
   buildStatRows,
   formatEventMinute,
   pairLineups,
+  resolveKnockoutTeams,
   teamDisplayName,
   useLiveData,
   useLiveClock,
@@ -87,15 +88,28 @@ function MatchDetailContent({
   titleId: string;
   closeRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { matches, teams } = useResultsStore();
+  const { matches, teams, groups } = useResultsStore();
   const leaderboard = useLeaderboardStore();
   const { byMatchId } = useLiveData();
 
   const teamsById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
-  const match = useMemo(() => matches.find((m) => m.id === matchId) ?? null, [matches, matchId]);
+  // LÖS KNOCKOUT-LAGEN (bugg 2026-06-29, Daniels skärmdump): en slutspelsmatch (M73-M104)
+  // bär null-lag i den seedade matchplanen tills den seedas, så matchvyn visade "Ej klart"
+  // (rubrik) / "Okänt lag" (reveal) FAST matchen var seedbar/avgjord. Idag-vyn löser redan
+  // lagen via samma rena upplösning; vi ÅTERANVÄNDER den (en sanning, ingen parallell
+  // härledning) i stället för att läsa matchplanen rakt av. Faller upplösningen tillbaka
+  // (matchen inte seedbar än) lämnas matchen orörd -> platshållaren visas (gissa aldrig).
+  const resolvedMatches = useMemo(() => resolveKnockoutTeams(groups, matches), [groups, matches]);
+  const match = useMemo(
+    () => resolvedMatches.find((m) => m.id === matchId) ?? null,
+    [resolvedMatches, matchId]
+  );
   const live = byMatchId.get(matchId) ?? null;
 
   // Reveal SCOPAT till denna match (en sanning: samma reveal-rad topplistan visar i listan).
+  // Reveal-radens lag-id är redan UPPLÖSTA vid källan (LeaderboardProvider kör nu
+  // buildMatchReveal på resolveKnockoutTeams-matcherna, reviewer-fynd F1 #252), så en
+  // knockout-rad bär riktiga lag, inte "Okänt lag". Ingen lokal patch här längre, EN sanning.
   const reveal = useMemo(
     () => leaderboard.reveal.find((r) => r.matchId === matchId) ?? null,
     [leaderboard.reveal, matchId]
@@ -150,7 +164,8 @@ function MatchDetailContent({
           <SectionHeading id={`${titleId}-reveal`}>Vad alla tippade</SectionHeading>
           {/* Återanvänder reveal-kortet (en sanning för facit-/pågår-markup:en), men bara
               för DENNA match , drill-in-innehållet per Daniels feedback. <ol> matchar
-              reveal-kortets <li>-rot (semantisk lista). */}
+              reveal-kortets <li>-rot (semantisk lista). reveal-raden bär de upplösta
+              knockout-lagen redan vid källan (se ovan), så kortets rubrik visar riktiga lag. */}
           <ol className="m-0 flex list-none flex-col gap-4 p-0">
             <RevealMatchCard match={reveal} nameOf={nameOf} />
           </ol>

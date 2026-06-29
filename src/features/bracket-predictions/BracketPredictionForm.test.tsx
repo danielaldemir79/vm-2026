@@ -122,4 +122,76 @@ describe('BracketPredictionForm', () => {
     // "Ändra tips" när ett tips redan finns.
     expect(screen.getByRole('button', { name: /Ändra tips/ })).toBeInTheDocument();
   });
+
+  // DEL B (2026-06-29): en AVGJORD slot man tippat visar rätt/fel + poäng + facit.
+  it('AVGJORD slot med rätt tips: visar resultat-panel (poäng + "rätt" + vem som gick vidare)', () => {
+    render(
+      <BracketPredictionForm
+        slotId="M73"
+        label="Sextondelsfinal M73"
+        teams={TWO_TEAMS}
+        teamsKnown
+        current="BRA"
+        locked
+        result={{
+          slotId: 'M73',
+          correct: true,
+          points: 1,
+          maxPoints: 1,
+          predictedCode: 'BRA',
+          actualCode: 'BRA',
+        }}
+        onSubmit={vi.fn()}
+      />
+    );
+    const panel = document.querySelector('[data-bracket-result]')!;
+    expect(panel).not.toBeNull();
+    expect(panel).toHaveTextContent(/Du fick 1 poäng/);
+    // Färg-OBEROENDE status: sr-only "rätt" + poäng-delta +1.
+    expect(panel).toHaveTextContent('rätt');
+    expect(panel).toHaveTextContent('+1');
+    // Facit-raden: vem som faktiskt gick vidare.
+    expect(panel).toHaveTextContent(/Gick vidare:\s*Brasilien/);
+  });
+
+  it('AVGJORD slot med fel tips: 0 poäng + "fel" + facit-laget skiljer sig från mitt tips', () => {
+    render(
+      <BracketPredictionForm
+        slotId="M73"
+        label="Sextondelsfinal M73"
+        teams={TWO_TEAMS}
+        teamsKnown
+        current="ARG"
+        locked
+        result={{
+          slotId: 'M73',
+          correct: false,
+          points: 0,
+          maxPoints: 1,
+          predictedCode: 'ARG',
+          actualCode: 'BRA',
+        }}
+        onSubmit={vi.fn()}
+      />
+    );
+    const panel = document.querySelector('[data-bracket-result]')!;
+    expect(panel).toHaveTextContent(/Du fick 0 poäng/);
+    expect(panel).toHaveTextContent('fel');
+    expect(panel).toHaveTextContent(/Gick vidare:\s*Brasilien/);
+  });
+
+  it('utan result (slot ej avgjord) visas INGEN resultat-panel, även låst', () => {
+    render(
+      <BracketPredictionForm
+        slotId="M73"
+        label="Sextondelsfinal M73"
+        teams={TWO_TEAMS}
+        teamsKnown
+        current="BRA"
+        locked
+        onSubmit={vi.fn()}
+      />
+    );
+    expect(document.querySelector('[data-bracket-result]')).toBeNull();
+  });
 });

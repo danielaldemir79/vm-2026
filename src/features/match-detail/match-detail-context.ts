@@ -45,3 +45,15 @@ export function useMatchDetail(): MatchDetailContextValue {
   }
   return ctx;
 }
+
+/**
+ * TOLERANT variant: returnerar drill-in-seamen om en provider finns, annars `null` (samma
+ * mönster som useOptionalResultsStore). Används av en vy som KAN drillas in men också
+ * renderas fristående (t.ex. slutspelsträdet i enhetstester utan MatchDetailProvider):
+ * finns seamen blir match-noderna klickbara, annars degraderar vyn tyst till en statisk
+ * vy utan drill-in (ingen krasch). Ett klickbart element som KRÄVER seamen ska däremot
+ * använda useMatchDetail (fail loud, ett saknat wiring är ett fel där).
+ */
+export function useOptionalMatchDetail(): MatchDetailContextValue | null {
+  return useContext(MatchDetailContext);
+}

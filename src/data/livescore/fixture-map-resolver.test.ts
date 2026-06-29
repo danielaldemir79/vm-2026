@@ -161,6 +161,121 @@ describe('resolveFixtureToMatch: SLUTSPEL (oseedade lag -> unik exakt kickoff)',
   });
 });
 
+describe('resolveFixtureToMatch: SLUTSPEL (känd-lags fixture, oseedad bracket-plats)', () => {
+  // DET REALA M73-SCENARIOT (buggen som gick omappat): en riktig slutspelsmatch har
+  // BÅDA lagen kända (de spelade gruppspel, finns i bryggan), men schemaraden M73-M104
+  // är oseedad (null lag) tills bracket-seedningen fyllt den. Lag-paret kan då aldrig
+  // matcha en null-lags-rad , fallbacken mappar i stället på den UNIKA avsparkstiden.
+  const RSA = resolveApiTeamId('rsa') as number; // 1531
+  const CAN = resolveApiTeamId('can') as number; // 5529
+  const M73 = PLAN.find((e) => e.matchId === 'M73');
+
+  it('löser en känd-lags slutspelsmatch till den oseedade M73-raden via unik kickoff', () => {
+    // rsa + can är KÄNDA i bryggan men spelar inte varandra i gruppspel (grupp A vs B),
+    // så inget seedat lag-par matchar. M73 är oseedad (null) och unik på sin kickoff i
+    // den riktiga planen -> fallbacken mappar fixturen dit. Detta är exakt det fall som
+    // tidigare gick unresolved (hela M73-M104 omappat). Diskriminerande: utan fallbacken
+    // returnerar grenen unresolved (ANNAT svar än resolved->M73), se negativ-kontrollen.
+    expect(M73).toBeDefined();
+    const res = resolveFixtureToMatch(
+      {
+        apiFixtureId: 5100073,
+        homeTeamApiId: RSA,
+        awayTeamApiId: CAN,
+        kickoffUtc: M73!.kickoffUtc,
+      },
+      PLAN
+    );
+    expect(res.kind).toBe('resolved');
+    if (res.kind === 'resolved') {
+      expect(res.appMatchId).toBe('M73');
+      expect(res.apiFixtureId).toBe(5100073);
+    }
+  });
+
+  it('tål rimlig minut-drift mot M73:s kickoff (inom 2h-fönstret)', () => {
+    expect(M73).toBeDefined();
+    const drifted = new Date(Date.parse(M73!.kickoffUtc) + 40 * 60 * 1000).toISOString();
+    const res = resolveFixtureToMatch(
+      { apiFixtureId: 5100073, homeTeamApiId: RSA, awayTeamApiId: CAN, kickoffUtc: drifted },
+      PLAN
+    );
+    expect(res.kind).toBe('resolved');
+    if (res.kind === 'resolved') expect(res.appMatchId).toBe('M73');
+  });
+
+  it('UNRESOLVED (tvetydigt) när TVÅ oseedade slutspels-rader ligger inom fönstret', () => {
+    // Syntetisk plan: två null-lags-rader 1 h isär (inom 2h). Känd-lags-fixturen (rsa/can,
+    // paret saknas i planen) får då två fallback-kandidater -> vägrar gissa.
+    const ambiguousKnockout: MatchPlanEntry[] = [
+      { matchId: 'M73', kickoffUtc: '2026-06-28T19:00:00.000Z', homeAppId: null, awayAppId: null },
+      { matchId: 'M74', kickoffUtc: '2026-06-28T20:00:00.000Z', homeAppId: null, awayAppId: null },
+    ];
+    const res = resolveFixtureToMatch(
+      {
+        apiFixtureId: 5100074,
+        homeTeamApiId: RSA,
+        awayTeamApiId: CAN,
+        kickoffUtc: '2026-06-28T19:00:00.000Z',
+      },
+      ambiguousKnockout
+    );
+    expect(res.kind).toBe('unresolved');
+    if (res.kind === 'unresolved') expect(res.reason).toMatch(/tvetydigt.*oseedade slutspels/);
+  });
+
+  it('UNRESOLVED när ingen oseedad slutspels-rad ligger nära kickoff (gissar aldrig)', () => {
+    // Känd-lags-fixture, men kickoffen ligger långt från varje oseedad rad i planen.
+    const res = resolveFixtureToMatch(
+      {
+        apiFixtureId: 5100075,
+        homeTeamApiId: RSA,
+        awayTeamApiId: CAN,
+        kickoffUtc: '2030-01-01T00:00:00.000Z',
+      },
+      PLAN
+    );
+    expect(res.kind).toBe('unresolved');
+    if (res.kind === 'unresolved') {
+      expect(res.reason).toMatch(/oseedad slutspels-plats inom kickoff-fönstret/);
+    }
+  });
+
+  it('REGRESSION: ett känt + ett okänt lag -> fortfarande unresolved (ingen fallback)', () => {
+    // Fallbacken får BARA trigga när BÅDA lagen är kända (Fall 1, candidates tomt). Ett
+    // okänt lag dirigeras till ena-laget-okänt-grenen och ska aldrig nå tid-fallbacken.
+    expect(M73).toBeDefined();
+    const res = resolveFixtureToMatch(
+      {
+        apiFixtureId: 5100076,
+        homeTeamApiId: RSA,
+        awayTeamApiId: 999999,
+        kickoffUtc: M73!.kickoffUtc,
+      },
+      PLAN
+    );
+    expect(res.kind).toBe('unresolved');
+    if (res.kind === 'unresolved') expect(res.reason).toMatch(/ett lag känt|kan inte bekräfta/);
+  });
+
+  it('INVARIANT (unikhets-gard): oseedade slutspels-rader ligger > fönstret isär i riktiga planen', () => {
+    // Fallbackens säkerhet vilar på att ett 2h-fönster fångar HÖGST en oseedad rad. Lås
+    // det mot källan (matches.ts M73-M104): minsta avstånd mellan två oseedade rader ska
+    // vara STÖRRE än AUTO_MAP_KICKOFF_WINDOW_MS, annars kan en känd-lags-fixture som
+    // ligger på sin rad fånga två -> ambiguöst. Bryts detta av ett framtida schema-byte
+    // rödnar testet och varnar att garden kan brista.
+    const unseeded = PLAN.filter((e) => e.homeAppId === null && e.awayAppId === null)
+      .map((e) => Date.parse(e.kickoffUtc))
+      .sort((a, b) => a - b);
+    expect(unseeded.length).toBe(32); // M73-M104, hela slutspelet oseedat i planen
+    let minGap = Infinity;
+    for (let i = 1; i < unseeded.length; i++) {
+      minGap = Math.min(minGap, unseeded[i] - unseeded[i - 1]);
+    }
+    expect(minGap).toBeGreaterThan(AUTO_MAP_KICKOFF_WINDOW_MS);
+  });
+});
+
 describe('resolveFixtureToMatch: edge', () => {
   it('UNRESOLVED mot en tom plan (inget att matcha mot)', () => {
     expect(resolveFixtureToMatch(fixture(), []).kind).toBe('unresolved');

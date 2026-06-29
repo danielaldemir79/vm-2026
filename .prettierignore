@@ -28,6 +28,12 @@ supabase/functions/_shared/global-leaderboard-core.ts
 # formaterings-churn vore brus på ett artefakt ingen redigerar för hand.
 supabase/functions/_shared/goal-push-core.ts
 
+# Bot-slutspelstips-mirror:n är GENERERAD (esbuild-bundle av src-grafen,
+# scripts/generate-bot-bracket-core.ts, Fas 3). Prettier får inte röra den: den
+# regenereras ur src och vaktas av bot-bracket-mirror-parity.test.ts; en
+# formaterings-churn vore brus på ett artefakt ingen redigerar för hand.
+supabase/functions/_shared/bot-bracket-core.ts
+
 # Livescore-feature: de fångade API-Football-svaren är test-guld, committade
 # OFÖRÄNDRADE I FORM (exakt som API:t levererade dem, en rad per svar). Prettier
 # får inte röra dem: parsern (parse-live.ts) bevisas mot den FAKTISKA käll-formen,

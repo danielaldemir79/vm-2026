@@ -30,7 +30,13 @@ import { useBracketPredictionsStore } from './bracket-predictions-context';
 import { useBracketPredictableData } from './use-bracket-predictable-data';
 import { selectPredictableBracket } from './bracket-predictable-slots';
 import { BracketPredictionForm } from './BracketPredictionForm';
+import {
+  deriveBracketPredictionResults,
+  type BracketSlotResult,
+} from './derive-bracket-prediction-results';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
+import { useOptionalResultsStore } from '../results/results-context';
+import { derivePoolFacit } from '../leaderboard';
 import { teamCode } from '../../domain/team-code';
 import type { BracketSlotState } from '../bracket';
 
@@ -109,6 +115,25 @@ export function BracketPredictionsView({
     const championOpen = predictable.champion.locked ? 0 : 1;
     return openSlots + championOpen;
   }, [predictable]);
+
+  // RESULTAT per AVGJORD slot man tippat på (Del B): rätt/fel + poäng + vem som gick vidare.
+  // Kräver de RIKTIGA (woven) resultaten ur results-storen (use-bracket-predictable-data:s
+  // matcher saknar inte facit i appen, men facit-härledningen är EN sanning via derivePoolFacit,
+  // samma som topplistan). Läses TOLERANT (null utan provider, t.ex. isolerade tester ->
+  // inga resultat, formuläret visar bara tipset). Döljs i what-if-läge (placeringarna är
+  // hypotetiska där) och före storen är 'ready'. Speglar GroupPredictionsView:s groupResults.
+  const resultsStore = useOptionalResultsStore();
+  const bracketResults = useMemo<Map<string, BracketSlotResult>>(() => {
+    if (!resultsStore || resultsStore.status !== 'ready' || resultsStore.simulating) {
+      return new Map();
+    }
+    const facit = derivePoolFacit(resultsStore.teams, resultsStore.groups, resultsStore.matches);
+    return deriveBracketPredictionResults(
+      facit.bracketSlots,
+      facit.champion,
+      store.myBracketPredictions
+    );
+  }, [resultsStore, store.myBracketPredictions]);
 
   const ready = store.enabled && status === 'ready' && store.status === 'ready';
 
@@ -251,6 +276,7 @@ export function BracketPredictionsView({
                 deadlineIso={champion.deadlineIso}
                 now={evalNow}
                 variant="champion"
+                result={bracketResults.get(champion.slotId) ?? null}
                 onSubmit={handleSave}
               />
             </div>
@@ -290,6 +316,7 @@ export function BracketPredictionsView({
                           locked={slot.locked}
                           deadlineIso={slot.deadlineIso}
                           now={evalNow}
+                          result={bracketResults.get(slot.slotId) ?? null}
                           onSubmit={handleSave}
                         />
                       </li>

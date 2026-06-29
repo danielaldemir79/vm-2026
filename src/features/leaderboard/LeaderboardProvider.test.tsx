@@ -8,6 +8,8 @@ import type { VmSupabaseClient } from '../../data/supabase-browser';
 import type { Group, Match, Team } from '../../domain/types';
 import type { RoomMember } from '../../data/rooms';
 import { WC2026_GROUPS, WC2026_TEAM_BASES } from '../../data/wc2026/team-refs';
+import { WC2026_MATCHES } from '../../data/wc2026';
+import { resolveKnockoutTeams } from '../daily/resolve-knockout-teams';
 import { asTeamCode } from '../../domain/team-code';
 
 // Mocka de tre list-API:erna (vi testar provider-AGGREGERINGEN, inte Supabase-anropen).
@@ -128,6 +130,33 @@ function matchAt(id: string, kickoff: string, status: Match['status'] = 'live'):
   return status === 'finished'
     ? { ...base, status: 'finished', result: { homeGoals: 1, awayGoals: 0 } }
     : { ...base, status, result: null };
+}
+
+/**
+ * Ett FULLSTÄNDIGT gruppspel ovanpå den verifierade VM 2026-planen (samma deterministiska
+ * recept som bracket-live.integration.test): varje grupp får en entydig rank 1/2/3/4, så
+ * slutspelsträdet seedas och knockout-matcherna (M73-M104) får riktiga lag. Slutspels-
+ * matcherna lämnas scheduled (deras lag seedas av härledningen). Driver Del C-testet.
+ */
+function completedGroupStage(): Match[] {
+  const rankByTeam = new Map<string, number>();
+  const groupOrderIndex = new Map<string, number>();
+  WC2026_GROUPS.forEach((group, gi) => {
+    groupOrderIndex.set(group.id, gi);
+    group.teamIds.forEach((teamId, idx) => rankByTeam.set(teamId, idx + 1));
+  });
+  return WC2026_MATCHES.map((m): Match => {
+    if (m.stage !== 'group' || m.homeTeamId === null || m.awayTeamId === null) {
+      return m;
+    }
+    const homeRank = rankByTeam.get(m.homeTeamId)!;
+    const awayRank = rankByTeam.get(m.awayTeamId)!;
+    const gi = groupOrderIndex.get(m.groupId!)!;
+    const winnerGoals = 2 + Math.floor(Math.max(0, 12 - gi) / 3);
+    return homeRank < awayRank
+      ? { ...m, status: 'finished', result: { homeGoals: winnerGoals, awayGoals: 0 } }
+      : { ...m, status: 'finished', result: { homeGoals: 0, awayGoals: winnerGoals } };
+  });
 }
 
 function Probe() {
@@ -764,5 +793,55 @@ describe('LeaderboardProvider, T84 (#176): preliminär (live) topplista under ma
     expect(screen.getByTestId('board').textContent).toBe(preliminaryBoard);
     expect(screen.getByTestId('board')).toHaveTextContent('Anna:3:1');
     expect(screen.getByTestId('live-preliminary')).toHaveTextContent('false');
+  });
+});
+
+describe('LeaderboardProvider, Del C (#252 F1): RevealView-källan löser knockout-lagen', () => {
+  // ROTORSAK: reveal byggdes ur den RÅA matchplanen (buildMatchReveal(data.matches, ...)),
+  // där en seedad slutspels-slot (M73-M104) bär null-lag, så topplistans "Vad alla tippade"
+  // visade "Okänt lag" för knockout. FIX: bygg reveal ur resolveKnockoutTeams(groups, matches),
+  // så slutspelsraderna bär riktiga lag-id:n. RevealView läser store.reveal, så detta är
+  // RevealView-källans bevis (utan att rendera hela vyn).
+
+  /** Probe som exponerar M73-avslöjandets lag-id:n (knockout-radens upplösta lag). */
+  function KnockoutRevealProbe() {
+    const store = useLeaderboardStore();
+    const m73 = store.reveal.find((r) => r.matchId === 'M73');
+    return (
+      <div>
+        <span data-testid="status">{store.status}</span>
+        <span data-testid="m73-home">{m73 ? String(m73.homeTeamId) : 'no-row'}</span>
+        <span data-testid="m73-away">{m73 ? String(m73.awayTeamId) : 'no-row'}</span>
+      </div>
+    );
+  }
+
+  it('en seedad knockout-match (M73) avslöjas med UPPLÖSTA lag-id:n, inte null ("Okänt lag")', async () => {
+    const completed = completedGroupStage();
+    dataState.matches = completed;
+    dataState.groups = WC2026_GROUPS;
+    roomsState.members = [{ userId: 'u1', displayName: 'Anna' }];
+
+    // De FÖRVÄNTADE lagen ur SAMMA rena upplösning provider:n nu använder (en sanning).
+    const expected = resolveKnockoutTeams(WC2026_GROUPS, completed).find((m) => m.id === 'M73')!;
+    expect(expected.homeTeamId).not.toBeNull(); // sanity: gruppspelet seedar M73:s lag
+
+    // now efter M73:s avspark (2026-06-28T19:00Z) så raden är låst och avslöjas.
+    render(
+      <LeaderboardProvider
+        env={env}
+        client={fakeClient}
+        activeRoomId="r1"
+        now={new Date('2026-06-29T12:00:00Z')}
+      >
+        <KnockoutRevealProbe />
+      </LeaderboardProvider>
+    );
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('ready'));
+
+    // KÄRNAN (F1): reveal-raden bär de upplösta lag-id:na, inte 'null'.
+    expect(screen.getByTestId('m73-home')).toHaveTextContent(String(expected.homeTeamId));
+    expect(screen.getByTestId('m73-away')).toHaveTextContent(String(expected.awayTeamId));
+    expect(screen.getByTestId('m73-home')).not.toHaveTextContent('null');
   });
 });

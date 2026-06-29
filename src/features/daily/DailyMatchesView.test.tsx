@@ -201,6 +201,23 @@ describe('DailyMatchesView, favoritlags-väljarens synlighet (U2)', () => {
 });
 
 describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
+  // DATUM-STABILT (annars datum-kopplat): vyn väljer dagen ur det VERKLIGA "nu"
+  // (followDayIndex), så utan en pinnad klocka SKIFTAR "vald dag" med kalendern. Under
+  // slutspelet blir dagens matcher knockout-platser vars lag är null tills bracket-
+  // seedningen löst dem (resolveKnockoutTeams kräver inmatade gruppresultat, som
+  // fixtures-läget saknar), och temat faller då till 'date' i stället för 'teams'. Vi
+  // pinnar därför klockan till premiärdagen (11 juni 2026), en GRUPPDAG med kända lag, så
+  // testet deterministiskt får en dag MED lag och bevisar 'teams'-temat oavsett verkligt
+  // datum. Bara Date fejkas (toFake: ['Date']) så providerns async-seedning + waitFor kör
+  // på riktiga timers (samma mönster som hero-etikett-blocket nedan).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-11T08:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('hero:n bär dags-temats data-attribut + en --vm-day-hue när en dag har lag', async () => {
     const { container } = renderView(fixturesEnv(), <DailyMatchesView />);
     await waitSettled();
@@ -210,8 +227,8 @@ describe('DailyMatchesView, dynamiskt dags-tema (T8)', () => {
     expect(hero).not.toBeNull();
     // Seamen är på plats: stabilt data-attribut för designen/test.
     expect(hero?.getAttribute('data-day-theme')).not.toBeNull();
-    // Fixtures startar på premiärdagen (matcher med kända lag) -> aktivt tema med
-    // en hue satt som inline CSS-variabel på hero:ns dekor-yta.
+    // Premiärdagen (11 juni 2026, pinnad klocka ovan) är en gruppdag med kända lag ->
+    // aktivt tema med en hue satt som inline CSS-variabel på hero:ns dekor-yta.
     expect(hero?.getAttribute('data-day-theme')).toBe('active');
     expect(hero?.getAttribute('data-day-theme-source')).toBe('teams');
     const hue = hero?.style.getPropertyValue('--vm-day-hue');
