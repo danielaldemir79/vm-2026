@@ -117,6 +117,14 @@ export interface BracketMatchState {
    * önskemål) visar resultatet på den avgjorda match-noden.
    */
   result: BracketMatchResult | null;
+  /**
+   * Matchens AVSPARKSTID i ISO 8601 (UTC), ur matchplanen (Match.kickoff), eller null
+   * om matchen saknas i listan (robust). UI:t formaterar den till en kort svensk dag
+   * (formatKickoffDateShort) och visar NÄR en KOMMANDE match (båda lag kända, ospelad)
+   * spelas, i stället för en tvetydig "klar"-markör (Daniels önskemål). Härleds som allt
+   * annat (en ren funktion av matchen), lagras inte separat.
+   */
+  kickoff: string | null;
 }
 
 /** Hela det härledda slutspelsträdet, i officiell match-ordning (M73 -> M104). */
@@ -504,6 +512,9 @@ export function deriveBracket(
       away: awayState,
       winnerSlotId,
       result,
+      // Avsparkstiden ur matchplanen (UTC), null om matchen saknas i listan (robust):
+      // UI:t visar den som "spelas <dag>" på en KOMMANDE nod (båda lag kända, ospelad).
+      kickoff: match?.kickoff ?? null,
     });
   }
 

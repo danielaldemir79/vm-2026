@@ -3,6 +3,7 @@ import {
   formatDayHeading,
   formatDayHeadingNoYear,
   formatDayShort,
+  formatKickoffDateShort,
   formatKickoffTime,
 } from './format-datetime';
 
@@ -15,6 +16,23 @@ describe('formatKickoffTime, UTC-instant -> svensk klockslagstid', () => {
   it('hanterar en avspark som i svensk tid landar på 00:00 (midnatt)', () => {
     // 22:00 UTC = 00:00 svensk tid nästa dag.
     expect(formatKickoffTime('2026-06-13T22:00:00.000Z')).toBe('00:00');
+  });
+});
+
+describe('formatKickoffDateShort, UTC-instant -> kort svensk avsparksdag (slutspelsträdet)', () => {
+  it('ger dag + kort månad i svensk tid, t.ex. "28 juni" (M73:s avspark)', () => {
+    // 2026-06-28T19:00Z = 21:00 svensk tid samma dag -> "28 juni".
+    expect(formatKickoffDateShort('2026-06-28T19:00:00.000Z')).toBe('28 juni');
+  });
+
+  it('ger "5 juli" för en avspark som landar 5 juli i svensk tid', () => {
+    expect(formatKickoffDateShort('2026-07-05T20:00:00.000Z')).toBe('5 juli');
+  });
+
+  it('formaterar i SVENSK tidszon, inte rått UTC-datum (off-by-one-vakt)', () => {
+    // 2026-07-02T23:00Z = 01:00 svensk tid NÄSTA dag -> "3 juli", inte "2 juli".
+    // Beviset att vi formaterar via Europe/Stockholm och inte klipper ISO-datumet rakt av.
+    expect(formatKickoffDateShort('2026-07-02T23:00:00.000Z')).toBe('3 juli');
   });
 });
 

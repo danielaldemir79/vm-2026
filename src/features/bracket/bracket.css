@@ -589,13 +589,14 @@
 }
 
 /* =============================================================================
-   8. LAGEN SYNS BÄTTRE: flaggor, alternativ (möjliga lag), definitiv-markör,
+   8. LAGEN SYNS BÄTTRE: flaggor, alternativ (möjliga lag), datum + säkrad-markör,
    progress + världsmästare (2026-06-28, Daniels turnering-lyft).
    =============================================================================
 
    Trädet bär nu KONKRETA lag hela vägen mot finalen: ett fyllt lag visar sin flagga
    + namn, en obestämd plats visar sina ALTERNATIV (kandidatlag som flagg-chips), och
-   en DEFINITIV plats (resolved icke-vinnare) märks "Klar". Ovanför trädet ligger en
+   en KOMMANDE match (kända lag, ospelad) visar sitt avsparksdatum, och ett lag som SÄKRAT
+   sin plats i nästa runda lyfts ("Säkrad"). Ovanför trädet ligger en
    progress-bar (avgjorda slutspelsmatcher) som växlar till en guld-världsmästar-
    spotlight när finalen är avgjord. Allt stylat via tema-token (color-mix / var(--*)),
    troget BÅDA teman, och FÄRG-OBEROENDE signaler (form + glyf + text) bär betydelsen.
@@ -609,18 +610,43 @@
   background-color: color-mix(in srgb, var(--color-fg) 3%, transparent);
 }
 
-/* "KLAR"-BRICKAN (definitiv plats): en lugn, BEKRÄFTANDE neutral pill (fg-muted text på
-   en svag neutral tint, AA i båda teman) med en lås-glyf. Medvetet NEUTRAL, inte grön:
-   grönt är vinnar-medaljens språk (data-winner), och en definitiv plats är inte samma sak
-   som ett lag som gått vidare , den är bara LÅST. Formen (lås + ordet "Klar") bär läget
-   färg-oberoende. */
-.vm-bracket-definitiv {
+/* SÄKRAD PLATS (Daniels önskemål #2): ett lag som AVANCERAT in i sin nästa rundas slot lyfts
+   över ALLA rundor (R16 -> kvart -> semi -> final), så avancemanget syns men inte skriker.
+   Ersätter den gamla "Klar"-markören (som lästes som "matchen spelad"). FÄRG-OBEROENDE i flera
+   lager (samma princip som vinnar-framhävningen §4, men LUGNARE så hierarkin håller: avgjord
+   vinnare > säkrad plats > preliminärt lag):
+     - en MELLAN-stark accent-vänsterbar (form), starkare än preliminärt (45%) men mjukare än
+       vinnarens SOLIDA bar, så de tre lägena skiljs på en blick,
+     - en hårfin accent-yt-tint (yta),
+     - lagnamnet bär redan font-semibold + text-fg (seamen), tinten förstärker bara.
+   KONTRAST-VAKT: tinten är en LÅG-alfa accent-mix BAKOM lagnamnet (text-fg, full kontrast),
+   den bär aldrig läsbarhet själv (samma vakt som §4/§6/§7). */
+.vm-bracket-slot[data-slot-secured] {
+  background-color: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  box-shadow: inset 3px 0 0 0 color-mix(in srgb, var(--color-accent) 62%, transparent);
+}
+
+/* "SÄKRAD"-BRICKAN: en lugn accent-pill (avancemang = accent, turneringens framåt-energi,
+   samma familj som "Vidare"/vinnar-medaljen men på en KOMMANDE plats). AA: accent-text på en
+   9%-accent-tint ÖVER kort-ytan + accent-kant, EXAKT samma uppmätta recept som
+   .vm-bracket-advance-badge / .vm-bracket-prelim-pill (8.10:1 mörkt / 4.77:1 ljust), så
+   accent-texten håller AA i båda teman. Dubbel-chevron-glyfen (markup) skiljer den från
+   "Vidare"-pilens enkla pil, färg-oberoende. */
+.vm-bracket-secured-badge {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
+  background-color: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+  color: var(--color-accent);
+}
+
+/* AVSPARKSDAG-BRICKAN (Daniels önskemål #1): visar NÄR en kommande match spelas, neutralt.
+   Lugn, INFORMATIV neutral pill (fg-muted text på en svag neutral tint + fg-muted-kant, AA i
+   båda teman, exakt det recept den gamla "Klar"-pillen bar). Medvetet NEUTRAL: datumet är
+   schema-fakta, varken facit (guld) eller avancemang (accent). Kalender-glyfen (markup) bär
+   "datum" färg-oberoende. */
+.vm-bracket-date {
   border: 1px solid color-mix(in srgb, var(--color-fg-muted) 35%, var(--color-border));
   background-color: color-mix(in srgb, var(--color-fg) 5%, transparent);
   color: var(--color-fg-muted);
-}
-.vm-bracket-definitiv-glyph {
-  flex-shrink: 0;
 }
 
 /* ALTERNATIVEN (kandidatlag-chips) för en obestämd plats: små, lugna flagg+namn-chips
@@ -701,8 +727,9 @@
 
    Slutspelet ska kännas lika rikt + tydligt som gruppspelet: varje avgjord match
    visar sitt RESULTAT (mål per slot-rad + ev. straffar), avancemanget syns TYDLIGT
-   (vinnaren lyfts med medalj + "Vidare", förloraren dämpas, nästa rundas plats blir
-   "Klar"), och man kan ÖPPNA noden för den rika matchvyn. FÄRG-SPRÅK (samma som resten
+   (vinnaren lyfts med medalj + "Vidare", förloraren dämpas, ett lag som säkrat nästa
+   rundas plats lyfts "Säkrad", och en kommande match visar sitt avsparksdatum), och man
+   kan ÖPPNA noden för den rika matchvyn. FÄRG-SPRÅK (samma som resten
    av appen): GULD = avgjort/facit ("domen är fälld", reveal-facit), GRÖN accent =
    avancemang/energi (vinnar-medaljen, "Vidare"). Alla signaler är FÄRG-OBEROENDE
    (glyf + form + vikt), tonen förstärker bara, AA-mätt i båda teman.
@@ -753,4 +780,32 @@
 }
 .vm-bracket-match--clickable:hover {
   border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+}
+
+/* "MATCHFAKTA"-CUE (Daniels önskemål #3): en ALLTID synlig drill-in-affordans i match-huvudet,
+   så man vet att noden går att öppna även utan hover (mobil). Den gamla lösningen var bara en
+   diskret 12px-chevron som många missade. Accent-tonad (läses som interaktiv, samma konvention
+   som länkar) men lugn. AA: accent-text på en 9%-accent-tint över kort-ytan + accent-kant, samma
+   uppmätta recept som .vm-bracket-advance-badge (8.10:1 mörkt / 4.77:1 ljust). Glyf (stapel) +
+   ord + chevron bär affordansen färg-oberoende; ren dekor (aria-hidden, overlay-knappen bär
+   etiketten). */
+.vm-bracket-open-cue {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
+  background-color: color-mix(in srgb, var(--color-accent) 9%, var(--color-surface));
+  color: var(--color-accent);
+  transition: background-color 0.2s ease;
+}
+/* På desktop fördjupas cue:n när hela kortet hovras, så det känns klickbart (en lugn
+   förstärkning, inte rörelse, så den gäller även vid reducerad rörelse). Mobil saknar hover,
+   därför bär bas-tinten redan tillräcklig synlighet (cue:n är aldrig hover-gömd). */
+.vm-bracket-match--clickable:hover .vm-bracket-open-cue {
+  background-color: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+/* Chevronen i cue:n nudgar lugnt i sidled (förstärker "öppnar"), nollad vid reducerad rörelse. */
+@media (prefers-reduced-motion: no-preference) {
+  .vm-bracket-match--clickable:hover .vm-bracket-open-cue-chevron {
+    transform: translateX(1.5px);
+    transition: transform 0.2s ease;
+  }
 }
