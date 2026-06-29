@@ -480,12 +480,25 @@ describe('TeamProfilePanel, navigering: öppnas från tabell och matchkort', () 
   });
 
   it('öppnas när man klickar ett lagnamn i ett matchkort (daglig vy)', async () => {
-    renderWithProviders(<DailyMatchesView />);
-    // Vänta in seedningen: minst en lagprofil-trigger finns i ett matchkort.
-    const triggers = await screen.findAllByRole('button', { name: /Visa lagprofil för/i });
-    expect(triggers.length).toBeGreaterThan(0);
-    fireEvent.click(triggers[0]);
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    // DATUM-STABILT (annars datum-kopplat): den dagliga vyn väljer dagen ur det VERKLIGA
+    // "nu". Under slutspelet är dagens matcher knockout-platser med null-lag (löses först
+    // när bracket-seedningen körts mot inmatade gruppresultat, som fixtures-läget saknar),
+    // och då saknar matchkorten lagnamns-knappar. Vi pinnar klockan till premiärdagen
+    // (11 juni 2026, en gruppdag med kända lag) så ett matchkort deterministiskt bär en
+    // "Visa lagprofil för ..."-knapp oavsett verkligt datum. Bara Date fejkas
+    // (toFake: ['Date']) så providerns async-seedning + findBy kör på riktiga timers.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-11T08:00:00.000Z'));
+    try {
+      renderWithProviders(<DailyMatchesView />);
+      // Vänta in seedningen: minst en lagprofil-trigger finns i ett matchkort.
+      const triggers = await screen.findAllByRole('button', { name: /Visa lagprofil för/i });
+      expect(triggers.length).toBeGreaterThan(0);
+      fireEvent.click(triggers[0]);
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
