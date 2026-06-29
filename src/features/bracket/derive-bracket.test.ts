@@ -200,6 +200,22 @@ describe('deriveBracket, GRUPPSPEL PÅGÅR, PRELIMINÄRT levande läge (T56, #10
     expect(m89.home.teamId).toBeNull();
     expect(m89.home.candidateTeamIds.length).toBe(2);
   });
+
+  // Avsparkstiden (Daniels önskemål, #1): varje härledd match bär matchplanens kickoff,
+  // så UI:t kan visa "spelas <dag>" på en KOMMANDE nod i stället för en tvetydig markör.
+  it('varje match bär matchplanens AVSPARKSTID (kickoff) ur Match-listan', () => {
+    const m73 = state.matches.find((m) => m.matchId === 'M73')!;
+    // knockoutMatch sätter kickoff 2026-07-01T19:00:00Z för alla R32-matcher här.
+    expect(m73.kickoff).toBe('2026-07-01T19:00:00Z');
+  });
+
+  it('kickoff är null när matchen saknas i Match-listan (robust, ingen gissad tid)', () => {
+    // Härled med en TOM match-lista: slotarna fylls ur tabellerna, men ingen match
+    // finns att hämta kickoff ur, så fältet är null (gissar aldrig en avsparkstid).
+    const stateNoMatches = deriveBracket(GROUP_IDS.map(inProgressTable), []);
+    const m73 = stateNoMatches.matches.find((m) => m.matchId === 'M73')!;
+    expect(m73.kickoff).toBeNull();
+  });
 });
 
 describe('deriveBracket, GRUPPSPEL PÅGÅR, ÄRLIG GRÄNS (ingen preliminär seedning på ofullständig data)', () => {

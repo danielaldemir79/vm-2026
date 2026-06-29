@@ -97,6 +97,7 @@ describe('overlayResolvedKnockoutTeams , senare rundor fylls inkrementellt', () 
       away,
       winnerSlotId: null,
       result: null,
+      kickoff: null,
     };
   }
   function ko(id: string, stage: MatchStage): Match {

@@ -22,6 +22,30 @@ export function formatKickoffTime(isoInstant: string, timeZone: string = DISPLAY
 }
 
 /**
+ * Kort svensk avsparksDAG ur en UTC-instant, t.ex. "5 juli" eller "28 juni"
+ * (dag + kort månad, utan veckodag och årtal). Används där en kompakt
+ * avsparksdag ska visas utan klockslag, t.ex. på slutspelsträdets KOMMANDE
+ * matchnoder (båda lag kända, ännu ospelad), så ögat ser NÄR matchen spelas
+ * i stället för en tvetydig "klar"-markör.
+ *
+ * KRITISKT (off-by-one-fällan, senior-developer lessons): kickoff är en UTC-
+ * instant, så vi formaterar via Europe/Stockholm med Intl, vi klipper ALDRIG
+ * ISO-datumet rakt av. En avspark sent på kvällen UTC kan annars landa på FEL
+ * svensk dag (t.ex. 23:00Z = 01:00 svensk tid nästa dag), och då skulle ett
+ * rått datum-klipp visa gårdagens datum.
+ */
+export function formatKickoffDateShort(
+  isoInstant: string,
+  timeZone: string = DISPLAY_TIMEZONE
+): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone,
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(isoInstant));
+}
+
+/**
  * En läsbar svensk dag-rubrik ur en dag-nyckel ("YYYY-MM-DD"), t.ex.
  * "torsdag 11 juni 2026". Dag-nyckeln är redan ett LOKALT svenskt datum
  * (härlett i DISPLAY_TIMEZONE av groupMatchesByDay), så vi tolkar den som

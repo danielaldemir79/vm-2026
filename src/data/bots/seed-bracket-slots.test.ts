@@ -55,6 +55,7 @@ function bracketMatch(
     away: slot(matchId, 'away', awayTeamId),
     winnerSlotId: null,
     result: null,
+    kickoff: null,
   };
 }
 

@@ -287,8 +287,8 @@ describe('slutspelsträdet LIVE: gruppspel klart -> låst -> vinnaren förs fram
   });
 
   // DEL A (2026-06-29): en avgjord match-nod visar RESULTATET + status, och nästa rundas
-  // plats blir tydligt "Klar" (avancemanget syns), allt end-to-end genom storen.
-  it('en avgjord match visar resultat (mål per rad) + "Avgjord"-status, och nästa slot blir "Klar"', async () => {
+  // plats lyfts tydligt som SÄKRAD (avancemanget syns), allt end-to-end genom storen.
+  it('en avgjord match visar resultat (mål per rad) + "Avgjord"-status, och nästa slot blir SÄKRAD', async () => {
     const matches = completedGroupStage().map((m): Match => {
       if (m.id === 'M73') {
         return { ...m, status: 'finished', result: { homeGoals: 2, awayGoals: 0 } };
@@ -315,11 +315,40 @@ describe('slutspelsträdet LIVE: gruppspel klart -> låst -> vinnaren förs fram
     expect(scores).toEqual(['2', '0']);
     // Vinnar-raden bär "Vidare"-markören (avancemang TYDLIGT).
     expect(m73.querySelector('[data-slot-advance]')).not.toBeNull();
-    // AVANCEMANG i nästa runda: M90-home (Winner M73) är nu en resolved plats som märks "Klar".
+    // AVANCEMANG i nästa runda: M90-home (Winner M73) är nu en SÄKRAD plats. Den gamla
+    // tvetydiga "Klar"-markören är borta (den lästes som "matchen spelad").
     const m90Home = document
       .querySelector('[data-bracket-match="M90"]')!
       .querySelector('[data-bracket-slot]')!;
-    expect(m90Home.querySelector('[data-slot-definitiv]')).not.toBeNull();
+    expect(m90Home.hasAttribute('data-slot-secured')).toBe(true);
+    expect(m90Home.querySelector('[data-slot-definitiv]')).toBeNull();
+    // M90 väntar fortfarande på sitt andra lag (motståndaren), så den SÄKRADE platsen
+    // bär "Säkrad"-brickan (förtydligar "laget är inne, motståndaren ej klar än").
+    expect(m90Home.textContent).toContain('Säkrad');
+  });
+
+  // DATUM PÅ KOMMANDE NOD (Daniels önskemål #1): en match med BÅDA lag kända men ospelad
+  // (ready) visar sin AVSPARKSDAG i huvudet, inte en tvetydig "klar"-markör. Efter att
+  // gruppspelet låsts är R32-matcherna ready (båda grupp-seedade lagen kända, ospelade).
+  it('en KOMMANDE match (båda lag kända, ospelad) visar avsparksdagen i huvudet', async () => {
+    render(
+      <ResultsProvider env={fixturesEnv()}>
+        <Harness matches={completedGroupStage()} />
+      </ResultsProvider>
+    );
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-bracket-match="M73"][data-bracket-match-state="ready"]')
+      ).not.toBeNull();
+    });
+    const m73 = document.querySelector('[data-bracket-match="M73"]')!;
+    // Datum-brickan finns och bär M73:s avsparksdag (2026-06-28T19:00Z = 28 juni svensk tid).
+    const dateBadge = m73.querySelector('[data-bracket-date]');
+    expect(dateBadge).not.toBeNull();
+    expect(dateBadge!.textContent).toContain('28 juni');
+    // Ingen gammal "Klar"-markör och ingen "Avgjord" (matchen är inte spelad).
+    expect(m73.querySelector('[data-slot-definitiv]')).toBeNull();
+    expect(m73.querySelector('[data-bracket-decided]')).toBeNull();
   });
 
   // DRILL-IN (T86-seamen återbrukad): en nod med båda lag kända öppnar den rika matchvyn
@@ -345,5 +374,34 @@ describe('slutspelsträdet LIVE: gruppspel klart -> låst -> vinnaren förs fram
     ) as HTMLButtonElement;
     fireEvent.click(openButton);
     expect(openMatch).toHaveBeenCalledWith('M73');
+  });
+
+  // UPPTÄCKBARHET (Daniels önskemål #3): en öppningsbar nod ska ALLTID (även utan hover,
+  // dvs. på mobil) bära en tydlig "öppna"-affordans, så man vet att kortet går att öppna.
+  it('en öppningsbar nod bär en ALLTID-synlig drill-in-affordans (cue), pending-noder gör inte det', async () => {
+    render(
+      <MatchDetailContext.Provider
+        value={{ openMatchId: null, openMatch: vi.fn(), closeMatch: vi.fn() }}
+      >
+        <ResultsProvider env={fixturesEnv()}>
+          <Harness matches={completedGroupStage()} />
+        </ResultsProvider>
+      </MatchDetailContext.Provider>
+    );
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-bracket-match="M73"] [data-bracket-match-open]')
+      ).not.toBeNull();
+    });
+    // M73 (R32, båda lag kända) bär den synliga affordansen.
+    const m73 = document.querySelector('[data-bracket-match="M73"]')!;
+    expect(m73.querySelector('[data-bracket-open-cue]')).not.toBeNull();
+    // En PENDING nod (t.ex. en finalslot utan kända lag) är inte öppningsbar och bär
+    // därför INGEN cue (affordansen finns bara där den faktiskt öppnar).
+    const pending = document.querySelector(
+      '[data-bracket-match][data-bracket-match-state="pending"]'
+    );
+    expect(pending).not.toBeNull();
+    expect(pending!.querySelector('[data-bracket-open-cue]')).toBeNull();
   });
 });
