@@ -168,17 +168,17 @@ function SecuredBadge() {
  * kända men ospelad), i match-huvudet, i stället för den tvetydiga "klar"-markören. En lugn,
  * INFORMATIV neutral pill (fg-muted på svag neutral tint, AA i båda teman) med en kalender-
  * glyf. Medvetet NEUTRAL: datumet är fakta om schemat, varken facit (guld) eller avancemang
- * (accent). Texten är LÄSBAR för skärmläsare via aria-label ("Spelas <dag>"), kalender-glyfen
- * är ren dekor.
+ * (accent). Texten är LÄSBAR för skärmläsare via en sr-only-text ("Spelas <dag>", samma
+ * konvention som "(utslagen)"/"(vidare)" i filen); den synliga texten + kalender-glyfen är dekor.
  */
 function DateBadge({ kickoff }: { kickoff: string }) {
   const day = formatKickoffDateShort(kickoff);
   return (
     <span
       data-bracket-date=""
-      aria-label={`Spelas ${day}`}
       className="vm-bracket-date inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide"
     >
+      <span className="sr-only">Spelas {day}</span>
       <svg
         aria-hidden="true"
         width="9"

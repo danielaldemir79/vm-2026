@@ -589,13 +589,14 @@
 }
 
 /* =============================================================================
-   8. LAGEN SYNS BÄTTRE: flaggor, alternativ (möjliga lag), definitiv-markör,
+   8. LAGEN SYNS BÄTTRE: flaggor, alternativ (möjliga lag), datum + säkrad-markör,
    progress + världsmästare (2026-06-28, Daniels turnering-lyft).
    =============================================================================
 
    Trädet bär nu KONKRETA lag hela vägen mot finalen: ett fyllt lag visar sin flagga
    + namn, en obestämd plats visar sina ALTERNATIV (kandidatlag som flagg-chips), och
-   en DEFINITIV plats (resolved icke-vinnare) märks "Klar". Ovanför trädet ligger en
+   en KOMMANDE match (kända lag, ospelad) visar sitt avsparksdatum, och ett lag som SÄKRAT
+   sin plats i nästa runda lyfts ("Säkrad"). Ovanför trädet ligger en
    progress-bar (avgjorda slutspelsmatcher) som växlar till en guld-världsmästar-
    spotlight när finalen är avgjord. Allt stylat via tema-token (color-mix / var(--*)),
    troget BÅDA teman, och FÄRG-OBEROENDE signaler (form + glyf + text) bär betydelsen.
@@ -726,8 +727,9 @@
 
    Slutspelet ska kännas lika rikt + tydligt som gruppspelet: varje avgjord match
    visar sitt RESULTAT (mål per slot-rad + ev. straffar), avancemanget syns TYDLIGT
-   (vinnaren lyfts med medalj + "Vidare", förloraren dämpas, nästa rundas plats blir
-   "Klar"), och man kan ÖPPNA noden för den rika matchvyn. FÄRG-SPRÅK (samma som resten
+   (vinnaren lyfts med medalj + "Vidare", förloraren dämpas, ett lag som säkrat nästa
+   rundas plats lyfts "Säkrad", och en kommande match visar sitt avsparksdatum), och man
+   kan ÖPPNA noden för den rika matchvyn. FÄRG-SPRÅK (samma som resten
    av appen): GULD = avgjort/facit ("domen är fälld", reveal-facit), GRÖN accent =
    avancemang/energi (vinnar-medaljen, "Vidare"). Alla signaler är FÄRG-OBEROENDE
    (glyf + form + vikt), tonen förstärker bara, AA-mätt i båda teman.
