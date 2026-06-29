@@ -5,6 +5,23 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-29 , v2.4.5: slutspelsträdet förfinat (Daniels feedback på v2.4.4)
+
+**Beslut (3 förfiningar, en sammanhållen design med tre distinkta matchtillstånd):**
+- **"Klar" -> DATUM:** den gamla "Klar"-markören lästes som "matchen spelad". En kommande match
+  (kända lag, ospelad) visar nu sitt avsparksdatum ("📅 5 jul", neutral pill), pending visar inget.
+  Tre lägen kan aldrig läsas som varandra: avgjord (resultat) / kommande (datum) / väntar (neutralt).
+- **"Säkrad plats":** ett lag som AVANCERAT in i nästa rundas slot lyfts (accent-bar + bold + "Säkrad"-
+  bricka när motståndaren ännu saknas), skalbart R32->...->final. Grupp-seedad R32-slot räknas EJ
+  som säkrad (annars markerings-hav). Vinnare/förlorare i egen match undantagna (egna markörer).
+- **Drill-in-affordans:** alltid synlig "📊 Matchfakta ›"-cue på öppningsbara noder (mobil-vänlig),
+  ersätter den diskreta chevronen man missade.
+- Nits från review (#258): datum-brickan läses via sr-only-text (ej aria-label på roll-löst span,
+  garanterad uppläsning), + stale "Klar"/definitiv-kommentarer uppdaterade.
+
+**Varför:** v2.4.4 gjorde slutspelet rikt, men "Klar" var tvetydigt, avancemang syntes svagt i nästa
+gren, och drill-in var inte upptäckbar. AA-mätt på faktiskt renderad yta (canvas) i båda teman.
+
 ## 2026-06-29 , v2.4.4: slutspelet lika rikt + tydligt som gruppspelet (data + klient)
 
 **Bakgrund:** När VM-slutspelet drog igång strulade knockout live , matchsidor visade "Ej klart"
