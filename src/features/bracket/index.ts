@@ -11,6 +11,7 @@ export {
   ROUND_LABELS,
   type BracketState,
   type BracketMatchState,
+  type BracketMatchResult,
   type BracketSlotState,
   type BracketRound,
   type SlotResolution,

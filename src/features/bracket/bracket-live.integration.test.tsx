@@ -1,10 +1,11 @@
-import { render, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
 import type { Match } from '../../domain/types';
 import { WC2026_GROUPS, WC2026_MATCHES, WC2026_TEAMS } from '../../data/wc2026';
 import { ResultsProvider } from '../results/ResultsProvider';
 import { useResultsStore } from '../results/results-context';
+import { MatchDetailContext } from '../match-detail/match-detail-context';
 import { BracketView } from './BracketView';
 import { deriveGroupTables } from '../groups/derive-group-tables';
 import { computeThirdPlaceRanking } from '../../domain/bracket/rank-third-places';
@@ -283,5 +284,66 @@ describe('slutspelsträdet LIVE: gruppspel klart -> låst -> vinnaren förs fram
     expect(m90Home.textContent).not.toContain('Vinnare M73');
     expect(groupARunnerUp).toBeTruthy();
     expect(m73Home.result).not.toBeNull();
+  });
+
+  // DEL A (2026-06-29): en avgjord match-nod visar RESULTATET + status, och nästa rundas
+  // plats blir tydligt "Klar" (avancemanget syns), allt end-to-end genom storen.
+  it('en avgjord match visar resultat (mål per rad) + "Avgjord"-status, och nästa slot blir "Klar"', async () => {
+    const matches = completedGroupStage().map((m): Match => {
+      if (m.id === 'M73') {
+        return { ...m, status: 'finished', result: { homeGoals: 2, awayGoals: 0 } };
+      }
+      return m;
+    });
+    render(
+      <ResultsProvider env={fixturesEnv()}>
+        <Harness matches={matches} />
+      </ResultsProvider>
+    );
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-bracket-match="M73"][data-bracket-match-state="decided"]')
+      ).not.toBeNull();
+    });
+    const m73 = document.querySelector('[data-bracket-match="M73"]')!;
+    // Match-huvudet bär "Avgjord"-status.
+    expect(m73.querySelector('[data-bracket-decided]')).not.toBeNull();
+    // Båda slot-raderna bär sitt resultat-mål (2 resp. 0), slutställningen på noden.
+    const scores = Array.from(m73.querySelectorAll('[data-bracket-slot-score]')).map(
+      (n) => n.textContent
+    );
+    expect(scores).toEqual(['2', '0']);
+    // Vinnar-raden bär "Vidare"-markören (avancemang TYDLIGT).
+    expect(m73.querySelector('[data-slot-advance]')).not.toBeNull();
+    // AVANCEMANG i nästa runda: M90-home (Winner M73) är nu en resolved plats som märks "Klar".
+    const m90Home = document
+      .querySelector('[data-bracket-match="M90"]')!
+      .querySelector('[data-bracket-slot]')!;
+    expect(m90Home.querySelector('[data-slot-definitiv]')).not.toBeNull();
+  });
+
+  // DRILL-IN (T86-seamen återbrukad): en nod med båda lag kända öppnar den rika matchvyn
+  // via openMatch(matchId). Vi injicerar seamen (mock) och bevisar att klick anropar den
+  // med rätt match-id, UTAN att bygga en ny modal (seamen är den enda kopplingen).
+  it('en klickbar match-nod öppnar den delade matchvyn via openMatch(matchId)', async () => {
+    const openMatch = vi.fn();
+    render(
+      <MatchDetailContext.Provider value={{ openMatchId: null, openMatch, closeMatch: vi.fn() }}>
+        <ResultsProvider env={fixturesEnv()}>
+          <Harness matches={completedGroupStage()} />
+        </ResultsProvider>
+      </MatchDetailContext.Provider>
+    );
+    // Gruppspelet klart -> R32-noderna har riktiga lag -> de blir klickbara (drill-in).
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-bracket-match="M73"] [data-bracket-match-open]')
+      ).not.toBeNull();
+    });
+    const openButton = document.querySelector(
+      '[data-bracket-match="M73"] [data-bracket-match-open]'
+    ) as HTMLButtonElement;
+    fireEvent.click(openButton);
+    expect(openMatch).toHaveBeenCalledWith('M73');
   });
 });

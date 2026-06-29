@@ -376,6 +376,33 @@ describe('deriveBracket, SLUTSPELSRESULTAT propagerar vinnaren', () => {
     const m90 = state.matches.find((m) => m.matchId === 'M90')!;
     expect(m90.home.teamId).toBeNull();
   });
+
+  // RESULTATET PÅ NODEN (2026-06-29, Daniels turnering-lyft, del A1): en avgjord
+  // slutspelsmatch ska bära sitt FAKTISKA resultat (slutställning + ev. straffar),
+  // så vyn kan visa det på matchkortet. Hemma-/borta-målen följer trädets
+  // home-/away-slot (samma kontrakt som outcomeOf läser match.result mot).
+  it('en avgjord match bär sitt resultat (slutställning) på match-noden', () => {
+    const state = deriveBracket(tables, matchesWithM73Result(2, 0));
+    const m73 = state.matches.find((m) => m.matchId === 'M73')!;
+    expect(m73.result).toEqual({ homeGoals: 2, awayGoals: 0, penalties: null });
+  });
+
+  it('ett straff-avgjort resultat bär ÄVEN straffsiffrorna på noden', () => {
+    const state = deriveBracket(tables, matchesWithM73Result(1, 1, { homeGoals: 2, awayGoals: 4 }));
+    const m73 = state.matches.find((m) => m.matchId === 'M73')!;
+    expect(m73.result).toEqual({
+      homeGoals: 1,
+      awayGoals: 1,
+      penalties: { homeGoals: 2, awayGoals: 4 },
+    });
+  });
+
+  it('en ICKE-spelad match har inget resultat på noden (result === null)', () => {
+    const state = deriveBracket(tables, matchesWithM73Result(2, 0));
+    // M90 är schemalagd (inget resultat inmatat) -> result null, gissas aldrig.
+    const m90 = state.matches.find((m) => m.matchId === 'M90')!;
+    expect(m90.result).toBeNull();
+  });
 });
 
 describe('deriveBracket, struktur + bronsmatch/final', () => {

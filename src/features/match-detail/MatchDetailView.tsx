@@ -23,7 +23,7 @@ import { resolveApiTeamId } from '../../data/livescore';
 import { Modal } from '../../components/Modal';
 import { Surface } from '../../components/Surface';
 import { useResultsStore } from '../results';
-import { useLeaderboardStore, RevealMatchCard, type RevealedMatch } from '../leaderboard';
+import { useLeaderboardStore, RevealMatchCard } from '../leaderboard';
 import {
   buildStatRows,
   formatEventMinute,
@@ -107,24 +107,13 @@ function MatchDetailContent({
   const live = byMatchId.get(matchId) ?? null;
 
   // Reveal SCOPAT till denna match (en sanning: samma reveal-rad topplistan visar i listan).
+  // Reveal-radens lag-id är redan UPPLÖSTA vid källan (LeaderboardProvider kör nu
+  // buildMatchReveal på resolveKnockoutTeams-matcherna, reviewer-fynd F1 #252), så en
+  // knockout-rad bär riktiga lag, inte "Okänt lag". Ingen lokal patch här längre, EN sanning.
   const reveal = useMemo(
     () => leaderboard.reveal.find((r) => r.matchId === matchId) ?? null,
     [leaderboard.reveal, matchId]
   );
-  // Reveal-datan bär den RÅA matchplanens lag-id (null för en oseedad knockout-slot,
-  // buildMatchReveal läser planen). För en UPPLÖST knockout-match patchar vi reveal-radens
-  // lag-id med de upplösta (SAMMA sanning som rubriken ovan), så "Vad alla tippade"-kortet
-  // visar de riktiga lagen i stället för "Okänt lag". Har reveal redan kända lag
-  // (gruppmatch, eller redan seedad) ELLER finns matchen inte att lösa -> lämnas orörd.
-  const resolvedReveal = useMemo<RevealedMatch | null>(() => {
-    if (reveal === null) {
-      return null;
-    }
-    if (match === null || (reveal.homeTeamId !== null && reveal.awayTeamId !== null)) {
-      return reveal;
-    }
-    return { ...reveal, homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId };
-  }, [reveal, match]);
   // Lagnamn-uppslag för reveal-kortet (samma fallback-form som RevealView använder).
   const nameOf = useMemo(
     () => (teamId: string | null) =>
@@ -166,7 +155,7 @@ function MatchDetailContent({
         </p>
       )}
 
-      {resolvedReveal ? (
+      {reveal ? (
         <section
           data-match-detail-reveal=""
           aria-labelledby={`${titleId}-reveal`}
@@ -175,10 +164,10 @@ function MatchDetailContent({
           <SectionHeading id={`${titleId}-reveal`}>Vad alla tippade</SectionHeading>
           {/* Återanvänder reveal-kortet (en sanning för facit-/pågår-markup:en), men bara
               för DENNA match , drill-in-innehållet per Daniels feedback. <ol> matchar
-              reveal-kortets <li>-rot (semantisk lista). resolvedReveal bär de upplösta
-              knockout-lagen (se ovan) så kortets rubrik visar riktiga lag, inte "Okänt lag". */}
+              reveal-kortets <li>-rot (semantisk lista). reveal-raden bär de upplösta
+              knockout-lagen redan vid källan (se ovan), så kortets rubrik visar riktiga lag. */}
           <ol className="m-0 flex list-none flex-col gap-4 p-0">
-            <RevealMatchCard match={resolvedReveal} nameOf={nameOf} />
+            <RevealMatchCard match={reveal} nameOf={nameOf} />
           </ol>
         </section>
       ) : null}

@@ -244,6 +244,59 @@ describe('SlotRow, alternativ + flagga + definitiv-markör', () => {
     expect(screen.queryByText('Klar')).toBeNull();
     expect(screen.getByText('(vidare)')).toBeInTheDocument();
   });
+
+  // RESULTAT PÅ NODEN + AVANCEMANG/UTSLAGEN (2026-06-29, Daniels turnering-lyft, del A):
+  // en avgjord match-rad bär lagets mål, vinnaren lyfts ("Vidare"), förloraren dämpas
+  // (data-slot-eliminated) och bär INTE "Klar" (den slogs ju ut, inte "platsen klar").
+  it('VINNAR-raden visar sitt resultat (mål) + en tydlig "Vidare"-markör', () => {
+    const { container } = render(
+      <ul>
+        <SlotRow slot={resolvedSlot('BRA')} teamsById={teams} isWinner goals={2} />
+      </ul>
+    );
+    const score = container.querySelector('[data-bracket-slot-score]');
+    expect(score).not.toBeNull();
+    expect(score).toHaveTextContent('2');
+    // "Vidare"-pillen (avancemang TYDLIGT, utöver medaljen) + sr-only "(vidare)".
+    expect(container.querySelector('[data-slot-advance]')).not.toBeNull();
+    expect(screen.getByText('Vidare')).toBeInTheDocument();
+    expect(screen.getByText('(vidare)')).toBeInTheDocument();
+  });
+
+  it('FÖRLORAR-raden (isLoser) visar sitt resultat + märks utslagen, INTE "Klar"', () => {
+    const { container } = render(
+      <ul>
+        <SlotRow slot={resolvedSlot('ARG')} teamsById={teams} isWinner={false} isLoser goals={0} />
+      </ul>
+    );
+    expect(container.querySelector('[data-slot-eliminated]')).not.toBeNull();
+    // En utslagen rad är resolved, men ska INTE märkas "Klar" (den gamla felaktiga märkningen).
+    expect(container.querySelector('[data-slot-definitiv]')).toBeNull();
+    expect(screen.queryByText('Klar')).toBeNull();
+    expect(screen.getByText('(utslagen)')).toBeInTheDocument();
+    expect(container.querySelector('[data-bracket-slot-score]')).toHaveTextContent('0');
+  });
+
+  it('en straff-avgjord rad visar straffsiffran i parentes bredvid ordinarie mål', () => {
+    const { container } = render(
+      <ul>
+        <SlotRow slot={resolvedSlot('BRA')} teamsById={teams} isWinner goals={1} penaltyGoals={4} />
+      </ul>
+    );
+    const score = container.querySelector('[data-bracket-slot-score]');
+    // Slutställning "1" + straffar "(4)" på samma rad (slutställning + ev. straffar).
+    expect(score).toHaveTextContent('1');
+    expect(score).toHaveTextContent('(4)');
+  });
+
+  it('en o-spelad rad (goals=null) visar ingen resultat-siffra', () => {
+    const { container } = render(
+      <ul>
+        <SlotRow slot={resolvedSlot('BRA')} teamsById={teams} isWinner={false} />
+      </ul>
+    );
+    expect(container.querySelector('[data-bracket-slot-score]')).toBeNull();
+  });
 });
 
 describe('BracketView, fel-väg (fail loud)', () => {

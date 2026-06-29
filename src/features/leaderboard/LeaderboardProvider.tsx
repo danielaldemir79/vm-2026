@@ -30,6 +30,7 @@ import { isSupabaseConfigured, LIVE_READY } from '../../data';
 import { useRoomsStore } from '../rooms';
 import { useDeadlineTick } from '../predictions/use-deadline-tick';
 import { useLiveData } from '../daily/use-live-data';
+import { resolveKnockoutTeams } from '../daily/resolve-knockout-teams';
 import { useLeaderboardData } from './use-leaderboard-data';
 import { applyLiveResults, hasLivePreliminaryMatch } from './apply-live-results';
 import { derivePoolFacit } from './derive-facit';
@@ -284,11 +285,24 @@ export function LeaderboardProvider({
     [rooms.members, predictionsByUser, preliminaryFacit]
   );
 
-  // Bygg avslöjandet (per avgjord+låst match), med medlemmarnas namn.
+  // LÖS KNOCKOUT-LAGEN i matchlistan FÖRE avslöjandet byggs (reviewer-fynd F1, #252): en
+  // seedad/avgjord slutspelsmatch (M73-M104) bär null-lag i den RÅA matchplanen, så
+  // buildMatchReveal:s rad fick "Okänt lag" i topplistans "Vad alla tippade". Vi lägger
+  // samma rena upplösning som Idag-vyn/matchvyn (deriveBracket-overlay) ovanpå matchlistan,
+  // så reveal-raden bär de riktiga lagen. EN SANNING: matchvyns lokala reveal-patch (#252)
+  // är därmed borttagen, källan är fixad här. Returnerar samma referens när inget kunde lösas
+  // (vanligt under gruppspelet), så memo:t inte triggar i onödan.
+  const resolvedMatches = useMemo(
+    () => resolveKnockoutTeams(data.groups, data.matches),
+    [data.groups, data.matches]
+  );
+
+  // Bygg avslöjandet (per avgjord+låst match), med medlemmarnas namn. Lag-id:na kommer ur
+  // de UPPLÖSTA matcherna (knockout-lagen ifyllda), så även slutspelsraderna visar riktiga lag.
   const reveal = useMemo(() => {
     const names = new Map(rooms.members.map((m) => [m.userId, m.displayName]));
-    return buildMatchReveal(data.matches, facit.matches, predictions.match, names, evalNow);
-  }, [rooms.members, data.matches, facit.matches, predictions.match, evalNow]);
+    return buildMatchReveal(resolvedMatches, facit.matches, predictions.match, names, evalNow);
+  }, [rooms.members, resolvedMatches, facit.matches, predictions.match, evalNow]);
 
   // AKTUELL användares poäng UPPDELAD per källa (T58, #99): härledd ur SAMMA
   // scoreMember-väg som topplistan (scoreMemberBreakdown), inte en omräkning. null tills

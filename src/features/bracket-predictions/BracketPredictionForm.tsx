@@ -35,6 +35,8 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import type { SlotTeamOption } from './bracket-predictable-slots';
+import type { BracketSlotResult } from './derive-bracket-prediction-results';
+import { BracketResultPanel } from './BracketResultPanel';
 import { TeamFlag } from '../daily/TeamFlag';
 import { DeadlineNotice } from '../predictions/DeadlineNotice';
 
@@ -64,6 +66,13 @@ export interface BracketPredictionFormProps {
    * Default 'slot' (de flesta slotsen). Påverkar BARA presentationen, inte semantiken.
    */
   variant?: 'champion' | 'slot';
+  /**
+   * RESULTAT för en AVGJORD slot man tippat på (Del B): rätt/fel + poäng + facit. Satt ->
+   * resultat-panelen visas i den låsta kupongen (under mitt tips). null/undefined annars
+   * (slotten inte avgjord, eller what-if-läge, se vyn). En avgjord slot är alltid låst, så
+   * panelen visas bara i låst läge.
+   */
+  result?: BracketSlotResult | null;
   /**
    * Spara mitt bracket-tips. Kastar vid fel (formuläret visar det inline). Returnerar
    * en Promise så formuläret kan visa "sparar..."/fel-tillstånd.
@@ -205,6 +214,7 @@ export function BracketPredictionForm({
   deadlineIso = null,
   now,
   variant = 'slot',
+  result = null,
   onSubmit,
 }: BracketPredictionFormProps) {
   // Seeda väljaren från mitt nuvarande tips (redigera = se det jag tippat).
@@ -378,6 +388,8 @@ export function BracketPredictionForm({
                 </p>
               </div>
               {pickSummary}
+              {/* AVGJORD final + tippat: mästar-tipsets resultat (rätt/fel + poäng + facit). */}
+              {result ? <BracketResultPanel result={result} teams={teams} isChampion /> : null}
             </div>
           ) : null}
 
@@ -535,6 +547,8 @@ export function BracketPredictionForm({
               </p>
             </div>
             {pickSummary}
+            {/* AVGJORD slot + tippat: slot-tipsets resultat (rätt/fel + poäng + vem som gick vidare). */}
+            {result ? <BracketResultPanel result={result} teams={teams} /> : null}
           </div>
         ) : null}
 

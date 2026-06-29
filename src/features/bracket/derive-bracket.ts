@@ -85,6 +85,19 @@ export interface BracketSlotState {
   candidateTeamIds: string[];
 }
 
+/**
+ * Det FAKTISKA resultatet på en spelad slutspelsmatch (slutställning + ev. straffar),
+ * justerat mot trädets home-/away-slot. `homeGoals`/`awayGoals` hör till `home`- resp.
+ * `away`-slotens lag (samma kontrakt som outcomeOf läser ur match.result), så UI:t kan
+ * visa rätt mål på rätt slot-rad. `penalties` är satt bara i ett straff-avgjort slutspel
+ * (oavgjort ordinarie), annars null. Härleds, lagras inte (en ren funktion av matchen).
+ */
+export interface BracketMatchResult {
+  homeGoals: number;
+  awayGoals: number;
+  penalties: { homeGoals: number; awayGoals: number } | null;
+}
+
 /** En slutspelsmatch i det härledda trädet: dess två slots + ev. utfall. */
 export interface BracketMatchState {
   matchId: string;
@@ -97,6 +110,13 @@ export interface BracketMatchState {
    * låter UI:t markera/animera fram vinnaren.
    */
   winnerSlotId: string | null;
+  /**
+   * Det faktiska resultatet (slutställning + ev. straffar) när matchen är FÄRDIGSPELAD,
+   * annars null. Skilt från winnerSlotId: en oavgjord match utan avgörande straffar
+   * (fail-safe) saknar vinnare men kan ändå ha ett inmatat resultat. UI:t (Daniels
+   * önskemål) visar resultatet på den avgjorda match-noden.
+   */
+  result: BracketMatchResult | null;
 }
 
 /** Hela det härledda slutspelsträdet, i officiell match-ordning (M73 -> M104). */
@@ -457,11 +477,23 @@ export function deriveBracket(
     // progressions-slots kan slå upp det i samma passering.
     const match = matchById.get(matchId);
     let winnerSlotId: string | null = null;
+    let result: BracketMatchResult | null = null;
     if (match) {
       const outcome = outcomeOf(match, homeState.teamId, awayState.teamId);
       if (outcome) {
         outcomeByMatchId.set(matchId, outcome);
         winnerSlotId = outcome.winnerTeamId === homeState.teamId ? homeState.id : awayState.id;
+      }
+      // Resultatet (slutställning) bärs av varje FÄRDIGSPELAD match, oberoende av om en
+      // vinnare kunde härledas (en oavgjord utan straffar saknar vinnare men har ett
+      // resultat). homeGoals/awayGoals följer trädets home-/away-slot, exakt som
+      // outcomeOf läser dem, så UI:t visar rätt mål på rätt rad.
+      if (match.status === 'finished') {
+        result = {
+          homeGoals: match.result.homeGoals,
+          awayGoals: match.result.awayGoals,
+          penalties: match.result.penalties ?? null,
+        };
       }
     }
 
@@ -471,6 +503,7 @@ export function deriveBracket(
       home: homeState,
       away: awayState,
       winnerSlotId,
+      result,
     });
   }
 
