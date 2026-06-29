@@ -181,6 +181,21 @@ Deno.serve(async (req) => {
         throw new Error(`AVBRYTER live-skriv: rad pekar på icke-bot-id ${row.userId}.`);
       }
     }
+
+    // No-op-tick (vanligast efter att en runda redan seedats): inget att skriva. Hoppa skriv
+    // OCH efter-läsningen helt , annars läser cronen hela bracket_predictions i onödan var 30:e
+    // min OCH öppnar ett onödigt falsklarm-fönster (en riktig spelare kan hinna tippa mellan
+    // före/efter-läsningen). Idempotensen gör att de flesta tickar är no-ops.
+    if (plan.rows.length === 0) {
+      return json({
+        ok: true,
+        dryRun: false,
+        written: 0,
+        nonBotBefore: plan.nonBotExistingCount,
+        nonBotAfter: plan.nonBotExistingCount,
+        ...report,
+      });
+    }
     const nonBotBefore = plan.nonBotExistingCount;
 
     let written = 0;
@@ -209,9 +224,11 @@ Deno.serve(async (req) => {
       ['room_id', 'slot_id', 'user_id']
     );
     const nonBotAfter = countNonBot(afterRows, botSet);
-    if (nonBotAfter !== nonBotBefore) {
+    // Larma BARA på en MINSKNING (en äkta isoleringsbrott , en riktig rad försvann). En ÖKNING
+    // = en riktig spelare hann tippa samtidigt mellan före/efter-läsningen , ofarligt, inget vi rört.
+    if (nonBotAfter < nonBotBefore) {
       throw new Error(
-        `ISOLERINGSBROTT: icke-bot bracket-rader ändrades (${nonBotBefore} -> ${nonBotAfter}). ` +
+        `ISOLERINGSBROTT: icke-bot bracket-rader MINSKADE (${nonBotBefore} -> ${nonBotAfter}). ` +
           `Detta får ALDRIG hända , riktig data ska vara orörd.`
       );
     }
