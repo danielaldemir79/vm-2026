@@ -5,6 +5,32 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-29 , v2.4.4: slutspelet lika rikt + tydligt som gruppspelet (data + klient)
+
+**Bakgrund:** När VM-slutspelet drog igång strulade knockout live , matchsidor visade "Ej klart"
+mot "Ej klart", inga resultat/stats, och bot-tipsen var skräp. Rotorsak-kedjan: (1) data-lagret
+(M73 facit + live-data skrevs aldrig , pollaren v5 deployades EFTER att M73 spelats, utanför 4h-
+skyddsnätet), (2) klienten saknade tydlig knockout-presentation, (3) develop:s CI var röd sedan
+#251 (datum-kopplade tester knäcktes när "nu" blev slutspel).
+
+**Beslut + åtgärder:**
+- **Data:** M73 (Sydafrika-Kanada) facit + live-data backfillade manuellt (engångs, M73 var enda
+  matchen utanför pollarens fönster). Pollaren v5 verifierad: self-mappar + faciterar alla
+  kommande knockout-matcher autonomt (cron var 30:e sek, grön).
+- **Test-stabilitet (#253):** datum-kopplade daily-tester pinnades till premiärdagen
+  (vi.useFakeTimers + setSystemTime) , en "följ-verklig-dag"-vy får aldrig testas mot riktigt nu.
+- **Fas 1 (#252):** matchvyn löser upp knockout-lag via resolveKnockoutTeams (återanvänd).
+- **Fas 2 (#255):** slutspelsträdet visar resultat på avgjorda matcher (guld "Avgjord"-pill +
+  slutställning + straffar), tydligt avancemang ("Vidare"/"Klar" med glyf, utslagen dämpad +
+  sr-only), drill-in till matchvyn (stretched-button a11y), slot rätt/fel + poäng (BracketResultPanel,
+  speglar grupp-panelen v2.3.3), och RevealView-källfix (resolveKnockoutTeams i LeaderboardProvider
+  = EN sanning, matchvyns lokala patch borttagen). Slutspel = BARA slot-tips, ingen matchresultat-
+  tippning (Daniels beslut , predictions har 0 M-matcher, avsiktligt).
+
+**Varför:** slutspelet är "det roliga" i VM , klarhet om resultat, avancemang och egna poäng på
+ett ställe (utan att bläddra mellan sidor) lyfter appen. Allt återanvänder beprövade motorer
+(deriveBracket, scoreBracketAdvance, derivePoolFacit, Modal) , inga andra-sanningar.
+
 ## 2026-06-29 , autonom bot-SLUTSPELSTIPS-seedning (bot-bracket-seeder, Fas 3)
 
 **Beslut:** Botarna ska ha RIMLIGA slutspelstips (bracket_predictions) för varje slot som blivit
