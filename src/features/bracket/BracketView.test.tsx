@@ -155,7 +155,7 @@ describe('BracketView, GRUPPSPEL PÅGÅR, PRELIMINÄRT levande läge (T56, fixtu
 // lag som kan ta platsen hela vägen mot finalen. Räknar-böjningen (C10: "1 möjligt
 // lag" / "n möjliga lag") lever kvar i strip:ens aria-label (hela sanningen för
 // skärmläsaren även när chipsen i bild trunkeras till "+N").
-describe('SlotRow, alternativ + flagga + definitiv-markör', () => {
+describe('SlotRow, alternativ + flagga + säkrad-plats-markör', () => {
   // Minimal Team-fixtur (bara fälten slot-raden läser: id/name/code; group krävs av typen).
   function team(id: string, name: string, code: string): Team {
     return { id, name, code, group: 'A' };
@@ -180,7 +180,8 @@ describe('SlotRow, alternativ + flagga + definitiv-markör', () => {
     };
   }
 
-  // En resolved (definitiv) slot med ett konkret lag.
+  // En resolved sextondels-slot (R32) med ett konkret lag: ett GRUPP-SEEDAT lag
+  // (inträdet i slutspelet), INTE ett lag som avancerat via en slutspelsvinst.
   function resolvedSlot(teamId: string): BracketSlotState {
     return {
       id: 'M73-home',
@@ -190,6 +191,22 @@ describe('SlotRow, alternativ + flagga + definitiv-markör', () => {
       nextSlotId: 'M89-home',
       resolution: 'resolved',
       label: '1:a grupp A',
+      teamId,
+      candidateTeamIds: [],
+    };
+  }
+
+  // En resolved åttondels-slot (R16) med ett konkret lag: ett lag som AVANCERAT
+  // hit genom en slutspelsvinst (källa = match-winner), alltså en "säkrad plats".
+  function advancedSlotR16(teamId: string): BracketSlotState {
+    return {
+      id: 'M89-home',
+      matchId: 'M89',
+      side: 'home',
+      stage: 'round-of-16',
+      nextSlotId: 'M101-home',
+      resolution: 'resolved',
+      label: 'Vinnare M73',
       teamId,
       candidateTeamIds: [],
     };
@@ -229,25 +246,73 @@ describe('SlotRow, alternativ + flagga + definitiv-markör', () => {
     expect(alts?.getAttribute('aria-label')).toContain('Brasilien');
   });
 
-  it('en resolved icke-vinnare märks DEFINITIV ("Klar") + visar lag med flagga', () => {
-    const { container } = renderSlot(resolvedSlot('BRA'), teams, false);
-    expect(container.querySelector('[data-slot-definitiv]')).not.toBeNull();
-    expect(screen.getByText('Klar')).toBeInTheDocument();
+  // SÄKRAD PLATS (Daniels önskemål #2, ersätter den tvetydiga "Klar"-markören): ett lag
+  // som AVANCERAT till sin nästa rundas slot (R16+ resolved, ej vinnare/förlorare) lyfts
+  // som "säkrad plats". data-slot-secured bär den FÄRG-OBEROENDE accent-behandlingen.
+  it('en resolved icke-vinnare i en SENARE runda (R16+) märks SÄKRAD + visar lag med flagga', () => {
+    const { container } = render(
+      <ul>
+        <SlotRow slot={advancedSlotR16('BRA')} teamsById={teams} isWinner={false} matchPending />
+      </ul>
+    );
+    // Den gamla "Klar"/definitiv-markören är BORTA (den lästes som "matchen spelad").
+    expect(container.querySelector('[data-slot-definitiv]')).toBeNull();
+    expect(screen.queryByText('Klar')).toBeNull();
+    // I stället: säkrad-plats-behandlingen (accent-seam) + en "Säkrad"-bricka.
+    expect(container.querySelector('[data-slot-secured]')).not.toBeNull();
+    expect(screen.getByText('Säkrad')).toBeInTheDocument();
     // Laget syns med namn (full kontrast) + flagga (data-team-flag-seamen).
     expect(screen.getByText('Brasilien')).toBeInTheDocument();
     expect(container.querySelector('[data-team-flag]')).not.toBeNull();
   });
 
-  it('en resolved VINNARE bär INTE "Klar" (vinnar-medaljen + "(vidare)" bär det i stället)', () => {
-    const { container } = renderSlot(resolvedSlot('BRA'), teams, true);
+  it('en säkrad plats bär accent-behandlingen men INTE "Säkrad"-brickan när matchen är klar att spelas (båda lag kända)', () => {
+    // matchPending=false (ready: motståndaren är också känd) -> datumet i match-huvudet
+    // bär "när", så slot-raden behöver inte upprepa "Säkrad" (lugnare, mindre rörigt).
+    const { container } = render(
+      <ul>
+        <SlotRow
+          slot={advancedSlotR16('BRA')}
+          teamsById={teams}
+          isWinner={false}
+          matchPending={false}
+        />
+      </ul>
+    );
+    expect(container.querySelector('[data-slot-secured]')).not.toBeNull();
+    expect(screen.queryByText('Säkrad')).toBeNull();
+  });
+
+  it('en GRUPP-SEEDAD sextondels-slot (R32) är INTE "säkrad" (inträde, inte avancemang) och bär ingen "Klar"', () => {
+    // En R32-slot fylls av grupp-seedningen, inte av en slutspelsvinst, så den ska INTE
+    // bära säkrad-plats-lyftet (det skulle bli brus, alla 32 lagen vore "säkrade").
+    const { container } = render(
+      <ul>
+        <SlotRow slot={resolvedSlot('BRA')} teamsById={teams} isWinner={false} matchPending />
+      </ul>
+    );
+    expect(container.querySelector('[data-slot-secured]')).toBeNull();
+    expect(screen.queryByText('Säkrad')).toBeNull();
     expect(container.querySelector('[data-slot-definitiv]')).toBeNull();
     expect(screen.queryByText('Klar')).toBeNull();
+    // Laget syns ändå med namn + flagga (inträdet är konkret).
+    expect(screen.getByText('Brasilien')).toBeInTheDocument();
+  });
+
+  it('en resolved VINNARE bär INTE säkrad-markören (vinnar-medaljen + "(vidare)" bär det i stället)', () => {
+    const { container } = render(
+      <ul>
+        <SlotRow slot={advancedSlotR16('BRA')} teamsById={teams} isWinner matchPending />
+      </ul>
+    );
+    expect(container.querySelector('[data-slot-secured]')).toBeNull();
+    expect(screen.queryByText('Säkrad')).toBeNull();
     expect(screen.getByText('(vidare)')).toBeInTheDocument();
   });
 
   // RESULTAT PÅ NODEN + AVANCEMANG/UTSLAGEN (2026-06-29, Daniels turnering-lyft, del A):
   // en avgjord match-rad bär lagets mål, vinnaren lyfts ("Vidare"), förloraren dämpas
-  // (data-slot-eliminated) och bär INTE "Klar" (den slogs ju ut, inte "platsen klar").
+  // (data-slot-eliminated) och bär INTE säkrad-markören (den slogs ju ut).
   it('VINNAR-raden visar sitt resultat (mål) + en tydlig "Vidare"-markör', () => {
     const { container } = render(
       <ul>
@@ -263,16 +328,23 @@ describe('SlotRow, alternativ + flagga + definitiv-markör', () => {
     expect(screen.getByText('(vidare)')).toBeInTheDocument();
   });
 
-  it('FÖRLORAR-raden (isLoser) visar sitt resultat + märks utslagen, INTE "Klar"', () => {
+  it('FÖRLORAR-raden (isLoser) visar sitt resultat + märks utslagen, INTE säkrad', () => {
     const { container } = render(
       <ul>
-        <SlotRow slot={resolvedSlot('ARG')} teamsById={teams} isWinner={false} isLoser goals={0} />
+        <SlotRow
+          slot={advancedSlotR16('ARG')}
+          teamsById={teams}
+          isWinner={false}
+          isLoser
+          goals={0}
+          matchPending={false}
+        />
       </ul>
     );
     expect(container.querySelector('[data-slot-eliminated]')).not.toBeNull();
-    // En utslagen rad är resolved, men ska INTE märkas "Klar" (den gamla felaktiga märkningen).
-    expect(container.querySelector('[data-slot-definitiv]')).toBeNull();
-    expect(screen.queryByText('Klar')).toBeNull();
+    // En utslagen rad är resolved, men ska INTE märkas säkrad (den slogs ut, inte "platsen klar").
+    expect(container.querySelector('[data-slot-secured]')).toBeNull();
+    expect(screen.queryByText('Säkrad')).toBeNull();
     expect(screen.getByText('(utslagen)')).toBeInTheDocument();
     expect(container.querySelector('[data-bracket-slot-score]')).toHaveTextContent('0');
   });

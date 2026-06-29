@@ -49,6 +49,7 @@ function bracketMatch(
     away: slot(matchId, 'away', stage, away),
     winnerSlotId: null,
     result: null,
+    kickoff: null,
   };
 }
 

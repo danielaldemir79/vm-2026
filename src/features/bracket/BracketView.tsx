@@ -22,6 +22,7 @@ import type { Team } from '../../domain/types';
 import { Fade } from '../../motion';
 import { CollapsibleBody } from '../../components/CollapsibleSection';
 import { teamDisplayName } from '../daily/match-display';
+import { formatKickoffDateShort } from '../daily/format-datetime';
 import { TeamFlag } from '../daily/TeamFlag';
 import { groupByRound, type BracketSlotState, type BracketMatchResult } from './derive-bracket';
 import { useBracketData } from './use-bracket-data';
@@ -125,18 +126,23 @@ function SlotFlag({ code }: { code: string | null }) {
 }
 
 /**
- * "Klar"-brickan: markerar en DEFINITIV plats (resolution='resolved' men ännu inte
- * vidare-vinnare), Daniels önskemål: "när platsen är definitivt klar ska den markeras".
- * FÄRG-OBEROENDE: en lås-glyf (form) + ordet "Klar" (text), lugn och bekräftande. Den
- * VINNANDE slot:en bär redan vinnar-medaljen (data-winner, ✓ i bracket.css) + "(vidare)",
- * så vi visar "Klar" bara på en resolved ICKE-vinnare, annars vore platsen dubbel-märkt
- * (en vinnare ÄR definitiv på köpet). Lås-glyfen skiljer den tydligt från vinnar-bocken.
+ * "Säkrad"-brickan: lyfter en SÄKRAD PLATS, ett lag som AVANCERAT in i sin nästa rundas slot
+ * (resolution='resolved' i en runda EFTER sextondelen, ännu inte vidare-vinnare härifrån).
+ * Daniels önskemål #2: ett lag som säkrat sin plats i nästa fas (t.ex. Kanada i åttondelen)
+ * ska sticka ut, över ALLA rundor. Ersätter den gamla "Klar"-markören, som lästes som att
+ * MATCHEN var spelad.
+ *
+ * FÄRG-OBEROENDE: en dubbel-chevron-glyf (form, "avancerat framåt i trädet") + ordet "Säkrad"
+ * (text). ACCENT-ton (turneringens framåt-energi, samma familj som vinnar-medaljen/"Vidare",
+ * men lugnare), så avancemanget syns men inte skriker. AA-mätt recept i bracket.css. Den
+ * dubbla chevronen skiljs medvetet från "Vidare"-pilens ENKLA pil (olika form) så de inte
+ * förväxlas: "Vidare" = lämnade en spelad match, "Säkrad" = kom in i en kommande match.
  */
-function DefinitivBadge() {
+function SecuredBadge() {
   return (
     <span
-      data-slot-definitiv=""
-      className="vm-bracket-definitiv inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide"
+      data-slot-secured-badge=""
+      className="vm-bracket-secured-badge inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide"
     >
       <svg
         aria-hidden="true"
@@ -145,15 +151,49 @@ function DefinitivBadge() {
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.5"
+        strokeWidth="2.75"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="vm-bracket-definitiv-glyph"
       >
-        <rect x="3" y="11" width="18" height="11" rx="2" />
-        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        <path d="m6 17 5-5-5-5" />
+        <path d="m13 17 5-5-5-5" />
       </svg>
-      Klar
+      Säkrad
+    </span>
+  );
+}
+
+/**
+ * Avsparksdag-brickan (Daniels önskemål #1): visar NÄR en KOMMANDE match spelas (båda lag
+ * kända men ospelad), i match-huvudet, i stället för den tvetydiga "klar"-markören. En lugn,
+ * INFORMATIV neutral pill (fg-muted på svag neutral tint, AA i båda teman) med en kalender-
+ * glyf. Medvetet NEUTRAL: datumet är fakta om schemat, varken facit (guld) eller avancemang
+ * (accent). Texten är LÄSBAR för skärmläsare via aria-label ("Spelas <dag>"), kalender-glyfen
+ * är ren dekor.
+ */
+function DateBadge({ kickoff }: { kickoff: string }) {
+  const day = formatKickoffDateShort(kickoff);
+  return (
+    <span
+      data-bracket-date=""
+      aria-label={`Spelas ${day}`}
+      className="vm-bracket-date inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide"
+    >
+      <svg
+        aria-hidden="true"
+        width="9"
+        height="9"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+      <span aria-hidden="true">{day}</span>
     </span>
   );
 }
@@ -222,26 +262,51 @@ function DecidedBadge() {
 }
 
 /**
- * Drill-in-affordansen i en klickbar match-nods huvud: en diskret chevron som signalerar
- * "tryck för att öppna matchvyn". Ren dekoration (aria-hidden); overlay-knappens aria-label
- * bär den tillgängliga beskrivningen av åtgärden.
+ * Drill-in-affordansen i en klickbar match-nods huvud (Daniels önskemål #3): en TYDLIG,
+ * ALLTID synlig "öppna matchfakta"-cue, så man vet att noden går att öppna även utan hover
+ * (funkar på mobil). Den gamla lösningen var bara en diskret 12px-chevron som många missade.
+ *
+ * En liten pill-formad cue: ett stapel-/statistik-glyf (antyder den rika matchvyns innehåll)
+ * + texten "Matchfakta" + en chevron (universell "öppna"-signal). ACCENT-tonad så den läser
+ * som interaktiv (samma konvention som länkar), men lugn. Ren dekoration (aria-hidden):
+ * overlay-knappens aria-label bär den tillgängliga beskrivningen av åtgärden, så cue:n inte
+ * dubbel-läses. data-bracket-open-cue är design/test-seam.
  */
-function OpenHintIcon() {
+function OpenCue() {
   return (
-    <svg
+    <span
+      data-bracket-open-cue=""
       aria-hidden="true"
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="shrink-0 text-fg-muted"
+      className="vm-bracket-open-cue inline-flex shrink-0 items-center gap-1 rounded-pill px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide"
     >
-      <path d="m9 18 6-6-6-6" />
-    </svg>
+      <svg
+        width="9"
+        height="9"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 3v18h18" />
+        <path d="M7 15l3-4 3 2 4-6" />
+      </svg>
+      Matchfakta
+      <svg
+        width="9"
+        height="9"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="vm-bracket-open-cue-chevron"
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </span>
   );
 }
 
@@ -314,7 +379,8 @@ export function CandidateChips({
  *   - data-bracket-slot: hakar varje slot.
  *   - data-slot-resolution: resolved | preliminary | possible | tbd (design tonsätter).
  *   - data-winner: satt på den slot vars lag vann matchen (vinnar-framhävning).
- *   - data-slot-definitiv: en DEFINITIV plats (resolved icke-vinnare), "Klar"-märkt.
+ *   - data-slot-secured: en SÄKRAD PLATS (ett lag som avancerat in i sin nästa rundas slot),
+ *     accent-lyft över alla rundor (Daniels önskemål #2).
  *   - data-bracket-alts: "alternativen" (möjliga lag) för en obestämd slot.
  *
  * LAGEN SYNS BÄTTRE (Daniels önskemål): ett fyllt lag (resolved/preliminary) bär nu
@@ -330,6 +396,7 @@ export function SlotRow({
   isLoser = false,
   goals = null,
   penaltyGoals = null,
+  matchPending = false,
 }: {
   slot: BracketSlotState;
   teamsById: ReadonlyMap<string, Team>;
@@ -340,6 +407,13 @@ export function SlotRow({
   goals?: number | null;
   /** Lagets straffmål om matchen avgjordes på straffar, annars null. */
   penaltyGoals?: number | null;
+  /**
+   * Väntar den containande matchen ÄNNU på sitt andra lag (motståndaren ej känd)? Då bär en
+   * SÄKRAD plats även en "Säkrad"-bricka (förtydligar "laget är inne, matchen ej satt än").
+   * När matchen är KLAR att spelas (båda lag kända) bär datum-brickan i huvudet "när", så
+   * raden behöver inte upprepa texten, bara accent-lyftet (lugnare, mindre rörigt).
+   */
+  matchPending?: boolean;
 }) {
   const text = slotText(slot, teamsById);
   const isResolved = slot.resolution === 'resolved';
@@ -349,10 +423,15 @@ export function SlotRow({
   const hasTeam = (isResolved || isPreliminary) && slot.teamId !== null;
   const code = hasTeam ? teamCodeOf(slot.teamId, teamsById) : null;
   const candidates = hasTeam ? [] : slot.candidateTeamIds;
-  // "Klar" (definitiv plats) BARA på en resolved plats vars match ÄNNU inte avgjorts: laget
-  // har seedats/avancerat HIT och platsen är låst (Daniels "deras plats är klar"). En LOSER
-  // (resolved men utslagen) ska INTE märkas "Klar", och en WINNER bär vinnar-medaljen.
-  const showDefinitiv = isResolved && !isWinner && !isLoser;
+  // SÄKRAD PLATS (Daniels #2): ett lag som AVANCERAT in i sin nästa rundas slot, resolved
+  // men matchen härifrån ännu ospelad (varken vinnare eller utslagen). Bara i rundor EFTER
+  // sextondelen (round-of-32): en R32-slot fylls av GRUPP-seedningen (inträdet i slutspelet),
+  // inte av en slutspelsvinst, så att märka alla 32 som "säkrade" vore brus, det meningsfulla
+  // är att lyfta dem som tagit sig VIDARE via en vinst. Strukturen garanterar att R16+-slots
+  // alltid kommer från en match-progression (vinnare/förlorare av Mxx), R32 alltid från grupp.
+  const secured = isResolved && !isWinner && !isLoser && slot.stage !== 'round-of-32';
+  // "Säkrad"-brickan visas bara när matchen ännu väntar på motståndaren (se matchPending).
+  const showSecuredBadge = secured && matchPending;
   const hasGoals = goals !== null;
   // Lagnamnets ton: vinnare/resolved i full kontrast + fet; en utslagen resolved-rad dämpas
   // (medium + muted) så vinnaren tydligt sticker ut; obestämd/preliminär dämpad som förut.
@@ -368,7 +447,7 @@ export function SlotRow({
       data-slot-resolution={slot.resolution}
       data-winner={isWinner ? '' : undefined}
       data-slot-eliminated={isLoser ? '' : undefined}
-      data-slot-definitiv={showDefinitiv ? '' : undefined}
+      data-slot-secured={secured ? '' : undefined}
       className="vm-bracket-slot flex items-start gap-2 px-2.5 py-1.5"
     >
       {/* FLAGGA (eller platshållare): lyfter lag-igenkänningen, vänsterställd som ett ankare. */}
@@ -391,8 +470,8 @@ export function SlotRow({
           {isLoser ? <span className="sr-only"> (utslagen)</span> : null}
           {/* AVANCEMANG: vinnaren bär en tydlig "Vidare"-pill (utöver medaljen). */}
           {isWinner ? <AdvanceBadge /> : null}
-          {/* DEFINITIV-markör: en resolved icke-utslagen icke-vinnare = platsen är klar/låst. */}
-          {showDefinitiv ? <DefinitivBadge /> : null}
+          {/* SÄKRAD PLATS: ett lag som avancerat hit och väntar på sin motståndare (#2). */}
+          {showSecuredBadge ? <SecuredBadge /> : null}
         </span>
         {isPreliminary ? (
           // Under lagnamnet: dess NUVARANDE position ("1:a grupp E") + att det är
@@ -445,18 +524,24 @@ function bothTeamsResolved(home: BracketSlotState, away: BracketSlotState): bool
 
 /**
  * Ett match-kort i trädet: dess två slots (hemma/borta) med en avdelare + matchnummer-
- * huvud. Bär nu TRE avläsbara tillstånd (Daniels turnering-lyft):
+ * huvud. Bär TRE TYDLIGT ÅTSKILDA tillstånd (Daniels turnering-lyft, inget får läsas som
+ * ett annat):
  *   - AVGJORD (winnerSlotId satt): match-huvudet visar "Avgjord", varje slot-rad bär sitt
  *     RESULTAT (mål, + ev. straffar), vinnaren lyfts (medalj + "Vidare") och förloraren
  *     dämpas, så avgjort resultat + avancemang syns på en blick.
- *   - KOMMANDE (båda lag kända, ej spelad): noden är klickbar -> rik matchvy (drill-in).
- *   - VÄNTAR (lagen ej avgjorda): positions-etiketter/alternativ, ingen drill-in.
+ *   - KOMMANDE / ready (båda lag kända, ej spelad): match-huvudet visar AVSPARKSDAGEN
+ *     ("spelas 5 juli", #1), så man ser NÄR matchen spelas. Ett lag som avancerat hit bär
+ *     säkrad-plats-lyftet (#2). Noden är klickbar -> rik matchvy (drill-in).
+ *   - VÄNTAR / pending (minst ett lag ej känt): neutralt, positions-etiketter/alternativ
+ *     på de obestämda raderna. Ett redan AVANCERAT lag (känt) bär säkrad-plats-lyftet +
+ *     "Säkrad"-brickan (det är inne, motståndaren ej klar än). Ingen drill-in.
  *
  * DRILL-IN (T86-seamen, återbrukad): en nod med båda lag kända blir en klickbar yta som
  * öppnar den DELADE rika matchvyn (stats/tidslinje/laguppställning) via openMatch(matchId).
  * En riktig <button> (overlay), inte en klickbar div, så den nås med tangentbord + har rätt
  * roll (samma princip som MatchDetailTrigger). `onOpen` null -> ingen drill-in (degraderar
- * tyst, t.ex. utan MatchDetailProvider i enhetstest).
+ * tyst, t.ex. utan MatchDetailProvider i enhetstest). En ALLTID synlig "Matchfakta"-cue (#3)
+ * gör drill-in upptäckbar även utan hover (mobil).
  */
 function MatchCard({
   matchId,
@@ -464,6 +549,7 @@ function MatchCard({
   away,
   winnerSlotId,
   result,
+  kickoff,
   teamsById,
   onOpen,
 }: {
@@ -472,6 +558,7 @@ function MatchCard({
   away: BracketSlotState;
   winnerSlotId: string | null;
   result: BracketMatchResult | null;
+  kickoff: string | null;
   teamsById: ReadonlyMap<string, Team>;
   onOpen: ((matchId: string) => void) | null;
 }) {
@@ -482,6 +569,10 @@ function MatchCard({
   const canOpen = onOpen !== null && teamsKnown;
   // data-bracket-match-state: ett stabilt avläsbart tillstånd för design + test.
   const matchState = decided ? 'decided' : teamsKnown ? 'ready' : 'pending';
+  // KOMMANDE match (båda lag kända, ospelad) med känd avsparkstid -> visa dagen i huvudet.
+  const showDate = matchState === 'ready' && kickoff !== null;
+  // Väntar matchen på sitt andra lag? Då bär en säkrad plats även "Säkrad"-brickan (se SlotRow).
+  const matchPending = matchState === 'pending';
 
   return (
     <article
@@ -491,8 +582,9 @@ function MatchCard({
         canOpen ? 'vm-bracket-match--clickable' : ''
       }`}
     >
-      {/* MATCH-HUVUD: matchnummer (orienterings-dekor, aria-hidden) + status. "Avgjord"-
-          brickan är LÄSBAR (skärmläsaren får match-statusen). Chevron = drill-in-affordans. */}
+      {/* MATCH-HUVUD: matchnummer (orienterings-dekor, aria-hidden) + status. "Avgjord" (facit)
+          och datum-brickan ("spelas <dag>") är LÄSBARA för skärmläsare; "Matchfakta"-cue:n är
+          den alltid synliga drill-in-affordansen (aria-hidden, overlay-knappen bär etiketten). */}
       <header className="flex items-center justify-between gap-2 border-b border-border/60 px-2.5 py-1">
         <span
           aria-hidden="true"
@@ -502,7 +594,8 @@ function MatchCard({
         </span>
         <span className="flex items-center gap-1.5">
           {decided ? <DecidedBadge /> : null}
-          {canOpen ? <OpenHintIcon /> : null}
+          {showDate ? <DateBadge kickoff={kickoff} /> : null}
+          {canOpen ? <OpenCue /> : null}
         </span>
       </header>
       <ul className="m-0 flex list-none flex-col divide-y divide-border p-0">
@@ -513,6 +606,7 @@ function MatchCard({
           isLoser={decided && !homeWinner}
           goals={result ? result.homeGoals : null}
           penaltyGoals={result?.penalties ? result.penalties.homeGoals : null}
+          matchPending={matchPending}
         />
         <SlotRow
           slot={away}
@@ -521,6 +615,7 @@ function MatchCard({
           isLoser={decided && !awayWinner}
           goals={result ? result.awayGoals : null}
           penaltyGoals={result?.penalties ? result.penalties.awayGoals : null}
+          matchPending={matchPending}
         />
       </ul>
       {/* DRILL-IN-OVERLAY: en stretchad knapp som täcker noden (stretched-link-mönstret), så
@@ -531,7 +626,7 @@ function MatchCard({
           type="button"
           data-bracket-match-open=""
           onClick={() => onOpen(matchId)}
-          aria-label={`Öppna matchvy: ${teamDisplayName(home.teamId, teamsById)} mot ${teamDisplayName(
+          aria-label={`Öppna matchfakta: ${teamDisplayName(home.teamId, teamsById)} mot ${teamDisplayName(
             away.teamId,
             teamsById
           )}`}
@@ -848,6 +943,7 @@ export function BracketView() {
                         away={match.away}
                         winnerSlotId={match.winnerSlotId}
                         result={match.result}
+                        kickoff={match.kickoff}
                         teamsById={teamsById}
                         onOpen={openMatch}
                       />
