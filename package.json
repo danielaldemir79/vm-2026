@@ -24,6 +24,7 @@
     "gen:embedded-match-plan": "vite-node scripts/generate-embedded-match-plan.ts",
     "gen:global-leaderboard-core": "vite-node scripts/generate-global-leaderboard-core.ts",
     "gen:goal-push-core": "vite-node scripts/generate-goal-push-core.ts",
+    "gen:bot-bracket-core": "vite-node scripts/generate-bot-bracket-core.ts",
     "seed:bots": "vite-node scripts/seed-bots.ts"
   },
   "dependencies": {
