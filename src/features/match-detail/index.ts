@@ -5,6 +5,7 @@ export { MatchDetailProvider } from './MatchDetailProvider';
 export { MatchDetailView, MatchDetailTrigger } from './MatchDetailView';
 export {
   useMatchDetail,
+  useOptionalMatchDetail,
   MatchDetailContext,
   type MatchDetailContextValue,
 } from './match-detail-context';

@@ -6,6 +6,11 @@ export {
 } from './BracketPredictionsProvider';
 export { BracketPredictionsView, type BracketPredictionsViewProps } from './BracketPredictionsView';
 export { BracketPredictionForm, type BracketPredictionFormProps } from './BracketPredictionForm';
+export { BracketResultPanel } from './BracketResultPanel';
+export {
+  deriveBracketPredictionResults,
+  type BracketSlotResult,
+} from './derive-bracket-prediction-results';
 export { BracketPredictionSection } from './BracketPredictionSection';
 export {
   useBracketPredictionsStore,

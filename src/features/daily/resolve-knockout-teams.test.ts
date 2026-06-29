@@ -90,7 +90,14 @@ describe('overlayResolvedKnockoutTeams , senare rundor fylls inkrementellt', () 
     home: BracketSlotState,
     away: BracketSlotState
   ): BracketMatchState {
-    return { matchId, stage: stage as BracketMatchState['stage'], home, away, winnerSlotId: null };
+    return {
+      matchId,
+      stage: stage as BracketMatchState['stage'],
+      home,
+      away,
+      winnerSlotId: null,
+      result: null,
+    };
   }
   function ko(id: string, stage: MatchStage): Match {
     return {

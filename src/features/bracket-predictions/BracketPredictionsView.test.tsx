@@ -48,6 +48,7 @@ function bracketMatch(
     home: slot(matchId, 'home', stage, home),
     away: slot(matchId, 'away', stage, away),
     winnerSlotId: null,
+    result: null,
   };
 }
 

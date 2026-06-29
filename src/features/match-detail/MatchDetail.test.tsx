@@ -329,14 +329,18 @@ describe('MatchDetailView , slutspelsmatchens lag löses (bracket-seedning)', ()
     const homeFull = WC2026_TEAMS.find((t) => t.id === m73.homeTeamId)!.name;
     const awayFull = WC2026_TEAMS.find((t) => t.id === m73.awayTeamId)!.name;
 
-    // Reveal-raden bär RÅA (null) knockout-lag, precis som leaderboard-storen ger den
-    // (buildMatchReveal läser den oseedade matchplanen).
+    // EN SANNING (Del C, #252 F1): reveal-raden bär nu de UPPLÖSTA knockout-lagen redan vid
+    // KÄLLAN (LeaderboardProvider kör buildMatchReveal på resolveKnockoutTeams-matcherna), så
+    // storen levererar riktiga lag-id:n hit. Den gamla lokala patchen i MatchDetailView är
+    // borttagen; matchvyn renderar bara storens (redan upplösta) rad troget. Källans upplösning
+    // bevisas separat i LeaderboardProvider.test.tsx (Del C). Här matar vi därför reveal-raden
+    // med de upplösta id:na (precis det fixade storen ger) och bevisar att kortet visar dem.
     const reveal: RevealedMatch[] = [
       {
         matchId: 'M73',
         status: 'finished',
-        homeTeamId: null,
-        awayTeamId: null,
+        homeTeamId: m73.homeTeamId,
+        awayTeamId: m73.awayTeamId,
         kickoff: '2026-07-01T19:00:00Z',
         actual: { homeGoals: 0, awayGoals: 1 },
         picks: [
