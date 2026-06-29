@@ -23,11 +23,12 @@ import { resolveApiTeamId } from '../../data/livescore';
 import { Modal } from '../../components/Modal';
 import { Surface } from '../../components/Surface';
 import { useResultsStore } from '../results';
-import { useLeaderboardStore, RevealMatchCard } from '../leaderboard';
+import { useLeaderboardStore, RevealMatchCard, type RevealedMatch } from '../leaderboard';
 import {
   buildStatRows,
   formatEventMinute,
   pairLineups,
+  resolveKnockoutTeams,
   teamDisplayName,
   useLiveData,
   useLiveClock,
@@ -87,12 +88,22 @@ function MatchDetailContent({
   titleId: string;
   closeRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { matches, teams } = useResultsStore();
+  const { matches, teams, groups } = useResultsStore();
   const leaderboard = useLeaderboardStore();
   const { byMatchId } = useLiveData();
 
   const teamsById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
-  const match = useMemo(() => matches.find((m) => m.id === matchId) ?? null, [matches, matchId]);
+  // LÖS KNOCKOUT-LAGEN (bugg 2026-06-29, Daniels skärmdump): en slutspelsmatch (M73-M104)
+  // bär null-lag i den seedade matchplanen tills den seedas, så matchvyn visade "Ej klart"
+  // (rubrik) / "Okänt lag" (reveal) FAST matchen var seedbar/avgjord. Idag-vyn löser redan
+  // lagen via samma rena upplösning; vi ÅTERANVÄNDER den (en sanning, ingen parallell
+  // härledning) i stället för att läsa matchplanen rakt av. Faller upplösningen tillbaka
+  // (matchen inte seedbar än) lämnas matchen orörd -> platshållaren visas (gissa aldrig).
+  const resolvedMatches = useMemo(() => resolveKnockoutTeams(groups, matches), [groups, matches]);
+  const match = useMemo(
+    () => resolvedMatches.find((m) => m.id === matchId) ?? null,
+    [resolvedMatches, matchId]
+  );
   const live = byMatchId.get(matchId) ?? null;
 
   // Reveal SCOPAT till denna match (en sanning: samma reveal-rad topplistan visar i listan).
@@ -100,6 +111,20 @@ function MatchDetailContent({
     () => leaderboard.reveal.find((r) => r.matchId === matchId) ?? null,
     [leaderboard.reveal, matchId]
   );
+  // Reveal-datan bär den RÅA matchplanens lag-id (null för en oseedad knockout-slot,
+  // buildMatchReveal läser planen). För en UPPLÖST knockout-match patchar vi reveal-radens
+  // lag-id med de upplösta (SAMMA sanning som rubriken ovan), så "Vad alla tippade"-kortet
+  // visar de riktiga lagen i stället för "Okänt lag". Har reveal redan kända lag
+  // (gruppmatch, eller redan seedad) ELLER finns matchen inte att lösa -> lämnas orörd.
+  const resolvedReveal = useMemo<RevealedMatch | null>(() => {
+    if (reveal === null) {
+      return null;
+    }
+    if (match === null || (reveal.homeTeamId !== null && reveal.awayTeamId !== null)) {
+      return reveal;
+    }
+    return { ...reveal, homeTeamId: match.homeTeamId, awayTeamId: match.awayTeamId };
+  }, [reveal, match]);
   // Lagnamn-uppslag för reveal-kortet (samma fallback-form som RevealView använder).
   const nameOf = useMemo(
     () => (teamId: string | null) =>
@@ -141,7 +166,7 @@ function MatchDetailContent({
         </p>
       )}
 
-      {reveal ? (
+      {resolvedReveal ? (
         <section
           data-match-detail-reveal=""
           aria-labelledby={`${titleId}-reveal`}
@@ -150,9 +175,10 @@ function MatchDetailContent({
           <SectionHeading id={`${titleId}-reveal`}>Vad alla tippade</SectionHeading>
           {/* Återanvänder reveal-kortet (en sanning för facit-/pågår-markup:en), men bara
               för DENNA match , drill-in-innehållet per Daniels feedback. <ol> matchar
-              reveal-kortets <li>-rot (semantisk lista). */}
+              reveal-kortets <li>-rot (semantisk lista). resolvedReveal bär de upplösta
+              knockout-lagen (se ovan) så kortets rubrik visar riktiga lag, inte "Okänt lag". */}
           <ol className="m-0 flex list-none flex-col gap-4 p-0">
-            <RevealMatchCard match={reveal} nameOf={nameOf} />
+            <RevealMatchCard match={resolvedReveal} nameOf={nameOf} />
           </ol>
         </section>
       ) : null}
