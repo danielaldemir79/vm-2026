@@ -29,6 +29,7 @@ export {
 } from './live-card-model';
 export { useDailyMatches, initialDayIndex, followDayIndex } from './use-daily-matches';
 export type { DailyMatchesData } from './use-daily-matches';
+export { resolveKnockoutTeams, overlayResolvedKnockoutTeams } from './resolve-knockout-teams';
 export { useTodayKey, type TodayKey } from './use-today-key';
 export {
   groupMatchesByDay,
