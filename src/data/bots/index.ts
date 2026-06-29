@@ -52,3 +52,23 @@ export {
 } from './comment';
 
 export { moodFromScoreline, type MatchMood } from './match-mood';
+
+export {
+  planBotBracketSeeding,
+  selectSeedableSlots,
+  pickAdvancingTeam,
+  DEFAULT_SEED_BRACKET_CONFIG,
+  type SeedBracketConfig,
+  type SeedableSlot,
+  type BotForSeeding,
+  type ExistingBracketRow,
+  type PlannedBracketRow,
+  type BotBracketSeedPlan,
+  type BotBracketSeedSummary,
+} from './seed-bracket-slots';
+
+export {
+  planBotBracketSeedingFromDb,
+  EMBEDDED_BRACKET_PLAN,
+  type BracketSeedDbInput,
+} from './bracket-seed-edge-entry';

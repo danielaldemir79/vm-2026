@@ -5,6 +5,51 @@ skriv mer bara när "varför" är icke-uppenbart. Knyter till tasks/SPEC där de
 
 ---
 
+## 2026-06-29 , autonom bot-SLUTSPELSTIPS-seedning (bot-bracket-seeder, Fas 3)
+
+**Beslut:** Botarna ska ha RIMLIGA slutspelstips (bracket_predictions) för varje slot som blivit
+tippbar, fyllt AUTONOMT och ÅTERKOMMANDE per runda (sextondel -> åttondel -> kvart -> semi ->
+final) av en edge-funktion (supabase/functions/bot-bracket-seeder) som ett lågfrekvent pg_cron-
+jobb anropar. Ren + testad logik bor i src/data/bots/seed-bracket-slots.ts +
+bracket-seed-edge-entry.ts och speglas till Deno via esbuild-bundle (samma genererad-mirror-
+mönster som T90 global-leaderboard / T89 goal-push, patterns.md "ren-logik-i-src-speglad..."),
+vaktad av bot-bracket-mirror-parity.test.ts.
+
+**Tippbar-regeln (gissas INTE, källa = bracket-predictable-slots.ts selectPredictableBracket):**
+en match-slot (M73-M104) är seedbar när BÅDA lagen är `resolved` (teamsKnown, härlett ur
+deriveBracket på official_match_results) OCH slottens egen avspark inte passerat (`!locked`, now <
+kickoff). En låst slot seedas ALDRIG (en riktig spelare kan inte tippa efter avspark , RLS nekar ,
+så en bot ska inte "tippa i efterhand" på ett känt/pågående utfall). Slot-urvalet är paritets-
+testat mot selectPredictableBracket (bracket-seed-edge-entry.test.ts). Champion-slotten hanteras
+inte (tippas bland alla 48, låstes vid turneringsstart).
+
+**Val-modellen (källa = FIFA-ranking som styrke-signal):** advancing_team_id = ett val mellan
+slottens TVÅ lag, viktat på skill_tier. p(favorit) = 0.5 + skill_tier * (favoriteCap - 0.5),
+favoriteCap default 0.85 (skill 0 -> slantsing, skill 1 -> 0.85). Favorit = laget med LÄGRE
+FIFA-ranking (team-profiles.ts fifaRanking, samma signal profil-vyn redan använder, se
+team-profiles-parser.ts). Taket < 1 så även en vass bot tippar ibland skräll (samma motiv som
+predict.ts capAccuracy). Deterministisk per bot+slot (createRng ur persona_key + slot_id), så
+dry-run == senare live-körning.
+
+**KRITISK UPPTÄCKT (verifierad mot prod 2026-06-29, INTE gissad):** botarna hade REDAN
+bracket_predictions-rader för ALLA slutspelsslots (M73-M104 + champion, 240/slot). De seedades vid
+den URSPRUNGLIGA bot-seedningen (predict.ts buildBracketPredictions), då inga slutspelslag var
+kända, med ett SLUMP-lag bland ALLA 48 (M73 har 47 distinkta värden hos botarna). Ett sådant tips
+kan i princip aldrig ge poäng (det avancerande laget måste vara ett av slottens två) och ser
+trasigt ut i tips-vyn. Därför är "fyll bara saknade rader" en no-op här (alla rader finns).
+Default replaceInvalid=true ersätter därför ett bot-tips som INTE är ett av slottens två lag med
+ett FIFA-viktat val; ett redan GILTIGT bot-tips rörs ALDRIG (idempotens). replaceInvalid=false ger
+ren "fyll bara saknade" (här = 0).
+
+**Bot-isolering (HARD):** seedaren rör BARA user_id i bot_accounts; icke-bot-rader räknas
+före/efter en live-skrivning och en ändring fail-loud:ar (jfr seed-bots.ts skydds-räkning).
+**Dry-run-default (HARD):** edge-funktionen skriver INGET utan ett explicit {"dryRun": false}.
+
+**Dry-run-preview @ 2026-06-29 03:26Z (replaceInvalid=true):** 15 seedbara slots (M74-M88; M73
+redan spelad/låst). 240 botar x 15 = 3600 bot-rader i seedbara slots, varav 3456 ogiltiga (ersätts)
++ 144 redan giltiga (orörda) + 0 saknade. 22 rum berörs. Cron-SQL (oregistrerad, körs av dirigenten
+efter verifiering): supabase/functions/bot-bracket-seeder/CRON_SETUP.sql, var 30:e min.
+
 ## 2026-06-29 , slutspelsmatcher auto-mappas på unik avsparkstid när bracket-platsen är oseedad
 
 **Beslut:** I `resolveFixtureToMatch` (src/data/livescore/fixture-map-resolver.ts + dess Deno-spegel
