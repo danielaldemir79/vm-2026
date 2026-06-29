@@ -18,8 +18,11 @@ import { MatchDetailTrigger } from './MatchDetailView';
 import { useMatchDetail } from './match-detail-context';
 import { ResultsStoreContext, type ResultsStore } from '../results/results-context';
 import { LeaderboardStoreContext, type LeaderboardStore } from '../leaderboard/leaderboard-context';
-import type { Match, Team } from '../../domain/types';
+import type { Group, Match, Team } from '../../domain/types';
 import type { RevealedMatch } from '../leaderboard';
+import { resolveKnockoutTeams } from '../daily';
+import { teamShortName } from '../../domain';
+import { WC2026_GROUPS, WC2026_MATCHES, WC2026_TEAMS } from '../../data/wc2026';
 
 // Den committade demo-matchen (g-F-1) är Nederländerna-Japan. Vi bygger en results-store där
 // g-F-1 finns med rätt lag-id, så hemma/borta-sidningen + namnen stämmer i vyn.
@@ -49,12 +52,12 @@ function scheduledMatch(over: Partial<Match> = {}): Match {
 
 const DEMO_MATCH: Match = scheduledMatch();
 
-function resultsStore(matches: Match[]): ResultsStore {
+function resultsStore(matches: Match[], teams: Team[] = TEAMS, groups: Group[] = []): ResultsStore {
   return {
     status: 'ready',
     matches,
-    teams: TEAMS,
-    groups: [],
+    teams,
+    groups,
     mode: 'fixtures',
     error: null,
     setMatches: () => {},
@@ -66,7 +69,7 @@ function resultsStore(matches: Match[]): ResultsStore {
   };
 }
 
-function leaderboardStore(reveal: RevealedMatch[]): LeaderboardStore {
+function leaderboardStore(reveal: RevealedMatch[], teams: Team[] = TEAMS): LeaderboardStore {
   return {
     enabled: true,
     status: 'ready',
@@ -75,7 +78,7 @@ function leaderboardStore(reveal: RevealedMatch[]): LeaderboardStore {
     leaderboard: [],
     livePreliminary: false,
     reveal,
-    teams: TEAMS,
+    teams,
     currentUserId: null,
     selfBreakdown: null,
     selfBadges: null,
@@ -84,14 +87,53 @@ function leaderboardStore(reveal: RevealedMatch[]): LeaderboardStore {
 }
 
 /** Montera providern + stubbade storar runt valfritt innehåll. */
-function harness(ui: ReactNode, { matches = [DEMO_MATCH], reveal = [] as RevealedMatch[] } = {}) {
+function harness(
+  ui: ReactNode,
+  {
+    matches = [DEMO_MATCH],
+    reveal = [] as RevealedMatch[],
+    teams = TEAMS,
+    groups = [] as Group[],
+  } = {}
+) {
   return render(
-    <ResultsStoreContext.Provider value={resultsStore(matches)}>
-      <LeaderboardStoreContext.Provider value={leaderboardStore(reveal)}>
+    <ResultsStoreContext.Provider value={resultsStore(matches, teams, groups)}>
+      <LeaderboardStoreContext.Provider value={leaderboardStore(reveal, teams)}>
         <MatchDetailProvider>{ui}</MatchDetailProvider>
       </LeaderboardStoreContext.Provider>
     </ResultsStoreContext.Provider>
   );
+}
+
+/**
+ * Bygg en FÄRDIGSPELAD version av VM 2026:s gruppspel (samma deterministiska mönster som
+ * bracket-live.integration.test.tsx) så slutspelsträdet kan SEEDA knockout-matchernas lag.
+ * Slutspelsmatcherna (M73-M104) lämnas orörda (null-lag) , deras lag härleds av
+ * resolveKnockoutTeams. Varje grupp får en entydig rank 1/2/3/4; tidigare grupper
+ * (alfabetiskt) får sina lag fler mål så de 8 bästa treorna blir förutsägbara (A-H).
+ */
+function completedGroupStage(): Match[] {
+  const rankByTeam = new Map<string, number>();
+  const groupOrderIndex = new Map<string, number>();
+  WC2026_GROUPS.forEach((group, gi) => {
+    groupOrderIndex.set(group.id, gi);
+    group.teamIds.forEach((teamId, idx) => rankByTeam.set(teamId, idx + 1));
+  });
+
+  return WC2026_MATCHES.map((m): Match => {
+    if (m.stage !== 'group' || m.homeTeamId === null || m.awayTeamId === null) {
+      return m;
+    }
+    const homeRank = rankByTeam.get(m.homeTeamId)!;
+    const awayRank = rankByTeam.get(m.awayTeamId)!;
+    const gi = groupOrderIndex.get(m.groupId!)!;
+    const bonus = Math.max(0, 12 - gi);
+    const winnerGoals = 2 + Math.floor(bonus / 3);
+    if (homeRank < awayRank) {
+      return { ...m, status: 'finished', result: { homeGoals: winnerGoals, awayGoals: 0 } };
+    }
+    return { ...m, status: 'finished', result: { homeGoals: 0, awayGoals: winnerGoals } };
+  });
 }
 
 describe('MatchDetailTrigger + Provider', () => {
@@ -246,5 +288,111 @@ describe('MatchDetailView ur fixtures (skarven)', () => {
     );
     // Ingen tidslinje/statistik (det finns ingen live-data), men ingen krasch.
     expect(dialog.querySelector('[data-match-detail-timeline]')).not.toBeInTheDocument();
+  });
+});
+
+// SLUTSPELSMATCHENS LAG (bugg 2026-06-29, Daniels skärmdump): matchvyn för en
+// knockout-match (M73-M104) visade "Ej klart mot Ej klart" i rubriken och "Okänt lag mot
+// Okänt lag" i reveal-kortet, FAST matchen var seedbar/avgjord. Idag-vyn löste redan
+// lagen via resolveKnockoutTeams; matchvyn läste matchplanen rakt av (null-lag). Dessa
+// tester bevisar att matchvyn nu ÅTERANVÄNDER samma upplösning (rubrik + reveal), och
+// graciöst faller tillbaka på platshållaren när matchen ännu inte är seedbar.
+describe('MatchDetailView , slutspelsmatchens lag löses (bracket-seedning)', () => {
+  it('rubriken visar de RIKTIGA lagen för en seedad slutspelsmatch (M73), inte "Ej klart"', async () => {
+    const completed = completedGroupStage();
+    // Härled de förväntade lagen ur SAMMA rena upplösning vyn använder (en sanning).
+    const m73 = resolveKnockoutTeams(WC2026_GROUPS, completed).find((m) => m.id === 'M73')!;
+    // Sanity: scenariot är giltigt , ett klart gruppspel seedar M73:s BÅDA lag.
+    expect(m73.homeTeamId).not.toBeNull();
+    expect(m73.awayTeamId).not.toBeNull();
+    const homeShort = teamShortName(WC2026_TEAMS.find((t) => t.id === m73.homeTeamId)!);
+    const awayShort = teamShortName(WC2026_TEAMS.find((t) => t.id === m73.awayTeamId)!);
+
+    harness(
+      <MatchDetailTrigger matchId="M73" ariaLabel="Öppna">
+        Öppna
+      </MatchDetailTrigger>,
+      { matches: completed, teams: WC2026_TEAMS, groups: WC2026_GROUPS }
+    );
+    fireEvent.click(screen.getByText('Öppna'));
+    const dialog = await screen.findByRole('dialog');
+
+    const heading = within(dialog).getByRole('heading', { level: 2 });
+    expect(heading).toHaveTextContent(homeShort);
+    expect(heading).toHaveTextContent(awayShort);
+    expect(heading).not.toHaveTextContent('Ej klart');
+  });
+
+  it('"vad alla tippade"-reveal visar de upplösta lagen, inte "Okänt lag"', async () => {
+    const completed = completedGroupStage();
+    const m73 = resolveKnockoutTeams(WC2026_GROUPS, completed).find((m) => m.id === 'M73')!;
+    const homeFull = WC2026_TEAMS.find((t) => t.id === m73.homeTeamId)!.name;
+    const awayFull = WC2026_TEAMS.find((t) => t.id === m73.awayTeamId)!.name;
+
+    // Reveal-raden bär RÅA (null) knockout-lag, precis som leaderboard-storen ger den
+    // (buildMatchReveal läser den oseedade matchplanen).
+    const reveal: RevealedMatch[] = [
+      {
+        matchId: 'M73',
+        status: 'finished',
+        homeTeamId: null,
+        awayTeamId: null,
+        kickoff: '2026-07-01T19:00:00Z',
+        actual: { homeGoals: 0, awayGoals: 1 },
+        picks: [
+          {
+            userId: 'u1',
+            displayName: 'Anna',
+            predicted: { homeGoals: 0, awayGoals: 1 },
+            points: 3,
+            pointType: 'exact',
+          },
+        ],
+      },
+    ];
+
+    harness(
+      <MatchDetailTrigger matchId="M73" ariaLabel="Öppna">
+        Öppna
+      </MatchDetailTrigger>,
+      { matches: completed, teams: WC2026_TEAMS, groups: WC2026_GROUPS, reveal }
+    );
+    fireEvent.click(screen.getByText('Öppna'));
+    const dialog = await screen.findByRole('dialog');
+
+    const revealSection = await waitFor(() => {
+      const el = dialog.querySelector('[data-match-detail-reveal]');
+      expect(el).toBeInTheDocument();
+      return el as HTMLElement;
+    });
+    const revealCard = revealSection.querySelector('[data-reveal-match]') as HTMLElement;
+    // Reveal-kortets match-rubrik visar de RIKTIGA lagen, inte platshållaren.
+    expect(revealCard).toHaveTextContent(homeFull);
+    expect(revealCard).toHaveTextContent(awayFull);
+    expect(revealCard).not.toHaveTextContent('Okänt lag');
+    // Pick:en (Anna) finns kvar , vi rör bara lag-namnen, inte resten av kortet.
+    expect(within(revealCard).getByText('Anna')).toBeInTheDocument();
+  });
+
+  it('graciös fallback: en EJ seedbar slutspelsmatch visar "Ej klart" utan krasch', async () => {
+    // Knockout-match med null-lag + INGET klart gruppspel (tomma grupper) -> ingen
+    // upplösning möjlig -> platshållaren visas (gissa aldrig ett lag), ingen krasch.
+    const ko = scheduledMatch({
+      id: 'M73',
+      stage: 'round-of-32',
+      groupId: null,
+      homeTeamId: null,
+      awayTeamId: null,
+    });
+    harness(
+      <MatchDetailTrigger matchId="M73" ariaLabel="Öppna">
+        Öppna
+      </MatchDetailTrigger>,
+      { matches: [ko], teams: WC2026_TEAMS, groups: [] }
+    );
+    fireEvent.click(screen.getByText('Öppna'));
+    const dialog = await screen.findByRole('dialog');
+    const heading = within(dialog).getByRole('heading', { level: 2 });
+    expect(heading).toHaveTextContent('Ej klart');
   });
 });
