@@ -55,6 +55,7 @@ import {
   selectCards,
   selectGoals,
   selectShootout,
+  shootoutWinnerName,
   selectSubs,
   type CardEntry,
   type GoalEntry,
@@ -463,8 +464,7 @@ function ShootoutBlock({
   /** true när matchen är AVGJORD (status finished). Styr om "vann"-etiketten får visas. */
   decided: boolean;
 }) {
-  const winnerName =
-    shootout.winner === 'home' ? homeName : shootout.winner === 'away' ? awayName : null;
+  const winnerName = shootoutWinnerName(shootout, homeName, awayName);
   return (
     <section
       data-live-shootout=""

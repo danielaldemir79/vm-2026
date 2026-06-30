@@ -11,6 +11,7 @@ import {
   selectCards,
   selectGoals,
   selectShootout,
+  shootoutWinnerName,
   selectSubs,
 } from './live-card-model';
 import type { LiveEvent, LiveLineup, LiveTeamStatistics } from '../../data/livescore';
@@ -168,6 +169,15 @@ describe('selectShootout', () => {
   it('saknat skytt-namn -> neutral platshållare (gissa aldrig en spelare)', () => {
     const model = selectShootout([kick(1, true, { playerName: null })], HOME);
     expect(model?.kicks[0].player).toBe('Okänd spelare');
+  });
+
+  it('shootoutWinnerName mappar ledande sida -> namn, null vid lika', () => {
+    const home = { kicks: [], homeScore: 4, awayScore: 2, winner: 'home' as const };
+    const away = { kicks: [], homeScore: 2, awayScore: 4, winner: 'away' as const };
+    const tie = { kicks: [], homeScore: 3, awayScore: 3, winner: null };
+    expect(shootoutWinnerName(home, 'Hemma', 'Borta')).toBe('Hemma');
+    expect(shootoutWinnerName(away, 'Hemma', 'Borta')).toBe('Borta');
+    expect(shootoutWinnerName(tie, 'Hemma', 'Borta')).toBeNull();
   });
 });
 

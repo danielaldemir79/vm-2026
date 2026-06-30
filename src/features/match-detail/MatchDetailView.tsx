@@ -30,6 +30,7 @@ import {
   pairLineups,
   resolveKnockoutTeams,
   selectShootout,
+  shootoutWinnerName,
   teamDisplayName,
   useLiveData,
   useLiveClock,
@@ -472,8 +473,7 @@ function ShootoutSection({
   decided: boolean;
 }) {
   const headingId = useId();
-  const winnerName =
-    shootout.winner === 'home' ? homeName : shootout.winner === 'away' ? awayName : null;
+  const winnerName = shootoutWinnerName(shootout, homeName, awayName);
   return (
     <section
       aria-labelledby={headingId}

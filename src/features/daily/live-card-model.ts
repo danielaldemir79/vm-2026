@@ -170,6 +170,20 @@ export function selectShootout(
   return { kicks, homeScore, awayScore, winner };
 }
 
+/**
+ * Den ledande sidans VISNINGSNAMN ur en straffmodell (winner-sidan -> homeName/awayName),
+ * null vid lika. EN sanning för "vems namn" , delad av livekortet och matchvyn så de inte
+ * härleder namnet på var sitt håll. OBS: detta är LEDAREN; vyn avgör på matchstatus (decided)
+ * om serien är avgjord innan den visar en "vann"-etikett , en pågående ledning är inget facit.
+ */
+export function shootoutWinnerName(
+  shootout: ShootoutModel,
+  homeName: string,
+  awayName: string
+): string | null {
+  return shootout.winner === 'home' ? homeName : shootout.winner === 'away' ? awayName : null;
+}
+
 /** Plocka ut korten (gula/röda), kronologiskt. Färgen kommer redan normaliserad. */
 export function selectCards(events: readonly LiveEvent[], homeApiId: number | null): CardEntry[] {
   return events

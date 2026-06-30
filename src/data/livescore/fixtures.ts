@@ -30,6 +30,7 @@ import {
   parseLiveFixtures,
   parseStatistics,
 } from './parse-live';
+import { wrapApiEnvelope, type RichFixtureInline } from './freeze-shape';
 
 import liveAllRaw from './__fixtures__/live-all.json?raw';
 import eventsRaw from './__fixtures__/events-rich.json?raw';
@@ -67,13 +68,14 @@ export const aetPenResponse = parseRaw<RawFixtureResponse>(aetPenRaw);
  * fixtures?id-svar (event:en ligger i response[0].events), så vi sveper dem i ett events-kuvert
  * och kör parseEvents , samma form parsern producerar live.
  */
-const aetPenRawEvents = (aetPenResponse.response[0] as unknown as { events: RawEvent[] }).events;
-export const fixtureShootoutEvents: LiveEvent[] = parseEvents({
-  get: 'fixtures/events',
-  results: aetPenRawEvents.length,
-  errors: [],
-  response: aetPenRawEvents,
-} as RawApiResponse<RawEvent>);
+// Svaret är ett fixtures?id-svar (event:en ligger INLINE i response[0].events). Vi modellerar
+// det med den befintliga RichFixtureInline-typen och sveper event:en i ett events-kuvert via
+// wrapApiEnvelope , den ENDA seamen som bygger API-kuvert (freeze-shape.ts), så vi inte hand-
+// rullar en parallell kuvert-form. Sedan kör parseEvents, samma form parsern producerar live.
+const aetPenInline = aetPenResponse.response[0] as unknown as RichFixtureInline;
+export const fixtureShootoutEvents: LiveEvent[] = parseEvents(
+  wrapApiEnvelope((aetPenInline.events ?? []) as readonly RawEvent[], 'fixtures/events')
+);
 
 /** Live-ögonblicksbilder för fixtures-läget (Nederländerna-Japan, en pågående VM-match). */
 export const fixtureLiveSnapshots: LiveMatchSnapshot[] = parseLiveFixtures(liveAllResponse);

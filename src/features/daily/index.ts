@@ -16,6 +16,7 @@ export { useLiveClock } from './use-live-clock';
 export {
   selectGoals,
   selectShootout,
+  shootoutWinnerName,
   selectCards,
   selectSubs,
   buildStatRows,
