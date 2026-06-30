@@ -241,6 +241,9 @@ function toEvent(e: RawEvent): LiveEvent {
     assistId: e.assist?.id ?? null,
     assistName: cleanName(e.assist?.name ?? null),
     cardColor: readCardColor(kind, e.detail),
+    // Bär API:ts comments vidare oförändrat (null när saknat). Markören "Penalty Shootout"
+    // läses senare i projektionen (match-stats) för att skilja straffserie från riktiga mål.
+    comments: e.comments ?? null,
   };
 }
 

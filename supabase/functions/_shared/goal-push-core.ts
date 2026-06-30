@@ -84,7 +84,10 @@ function toEvent(e) {
     playerName: cleanName(e.player?.name ?? null),
     assistId: e.assist?.id ?? null,
     assistName: cleanName(e.assist?.name ?? null),
-    cardColor: readCardColor(kind, e.detail)
+    cardColor: readCardColor(kind, e.detail),
+    // Bär API:ts comments vidare oförändrat (null när saknat). Markören "Penalty Shootout"
+    // läses senare i projektionen (match-stats) för att skilja straffserie från riktiga mål.
+    comments: e.comments ?? null
   };
 }
 function parseEvents(payload) {
@@ -95,11 +98,20 @@ function parseEvents(payload) {
 function isPenaltyGoal(detail) {
   return /penalty/i.test(detail);
 }
+function isShootoutKick(e) {
+  return e.comments !== null && /penalty shootout/i.test(e.comments);
+}
+function isMissedPenalty(detail) {
+  return /missed penalty/i.test(detail);
+}
+function isRealGoalEvent(e) {
+  return e.kind === "goal" && !isShootoutKick(e) && !isMissedPenalty(e.detail);
+}
 function isOwnGoalDetail(detail) {
   return /own goal/i.test(detail);
 }
 function extractGoals(events) {
-  return events.filter((e) => e.kind === "goal").map(
+  return events.filter(isRealGoalEvent).map(
     (e) => ({
       minute: e.minute,
       extra: e.extra,

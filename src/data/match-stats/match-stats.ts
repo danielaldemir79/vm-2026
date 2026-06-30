@@ -22,6 +22,7 @@ import type {
   MatchGoal,
   MatchOtherEvent,
   MatchSub,
+  ShootoutKick,
   TeamLineupInfo,
   TeamMatchStats,
   TeamStatKey,
@@ -31,12 +32,42 @@ import type {
 /**
  * Detektera straffmål ur ett måls detail. KÄLLHÄNVISAD text (gissas aldrig): API-Football
  * sätter detail "Penalty" på ett straffmål-event (samma sträng live-card-model.ts redan
- * matchar mot, och samma som den fångade fixturen events-rich.json bär). Ett missat straff
- * är ett "Missed Penalty"-event (type "Var"/"Missed Penalty"), INTE ett mål, så det fastnar
- * aldrig i extractGoals (vi filtrerar på kind 'goal' först).
+ * matchar mot, och samma som den fångade fixturen events-rich.json bär).
  */
 function isPenaltyGoal(detail: string): boolean {
   return /penalty/i.test(detail);
+}
+
+/**
+ * Är detta en STRAFFLÄGGNINGS-spark (straffserie efter oavgjort slutspel), inte ett mål?
+ *
+ * KÄLLHÄNVISAT (fixture-aet-pen.json, KORRIGERAD mot riktig data , den tidigare antagandet
+ * "ett missat straff är type Var" stämde INTE): varje straffserie-spark anländer som type
+ * "Goal" (alltså kind 'goal') med comments "Penalty Shootout". En vanlig straff i matchen har
+ * comments null. comments är därför den ENDA tillförlitliga markören som skiljer en serie-
+ * spark (avgör bara vinnaren, räknas aldrig som mål) från ett riktigt straffmål i spelet.
+ */
+function isShootoutKick(e: LiveEvent): boolean {
+  return e.comments !== null && /penalty shootout/i.test(e.comments);
+}
+
+/**
+ * Är detta en MISSAD straff (detail "Missed Penalty")? En miss är ALDRIG ett mål , varken i
+ * en straffserie eller (ovanligt) i spelet , så den filtreras bort ur extractGoals. Utan det
+ * filtret räknades en missad serie-spark som mål (den bär ju type "Goal"), buggen Daniel såg.
+ */
+function isMissedPenalty(detail: string): boolean {
+  return /missed penalty/i.test(detail);
+}
+
+/**
+ * EN SANNING FÖR "ÄR DETTA EVENT ETT RIKTIGT MÅL": ett kind 'goal'-event som varken är en
+ * straffläggnings-spark (avgör bara vinnaren) eller en missad straff (aldrig ett mål). Delas
+ * av extractGoals (skytteliga + mål-notiser) och livekortets selectGoals (sid-vyn), så de två
+ * parallella projektionerna ALDRIG kan dra isär om vad som räknas som mål.
+ */
+export function isRealGoalEvent(e: LiveEvent): boolean {
+  return e.kind === 'goal' && !isShootoutKick(e) && !isMissedPenalty(e.detail);
 }
 
 /**
@@ -55,10 +86,17 @@ function isOwnGoalDetail(detail: string): boolean {
  * Plocka ut MÅLEN ur en matchs händelser, kronologiskt (minut, sedan tillägg). Bevarar
  * teamApiId + scorerId/assistId exakt som API:t gav dem (för cross-match-aggregering).
  * Egenmål flaggas (isOwnGoal) men teamApiId tolkas INTE om (se isOwnGoalDetail).
+ *
+ * EN SANNING FÖR "VAD ÄR ETT MÅL" (delas av skytteliga, mål-notiser, matchvy + livekort): ett
+ * mål är ett kind 'goal'-event som VARKEN är en straffläggnings-spark (comments "Penalty
+ * Shootout", avgör bara vinnaren) ELLER en missad straff (detail "Missed Penalty", aldrig ett
+ * mål). Straffserien plockas separat av extractShootout, så ingen konsument räknar en spark
+ * som mål (FIFA: straffserie-mål räknas inte i skytteligan, och en notis ska inte ropa "MÅL"
+ * för varje spark , allra minst för en miss).
  */
 export function extractGoals(events: readonly LiveEvent[]): MatchGoal[] {
   return events
-    .filter((e) => e.kind === 'goal')
+    .filter(isRealGoalEvent)
     .map(
       (e): MatchGoal => ({
         minute: e.minute,
@@ -74,6 +112,32 @@ export function extractGoals(events: readonly LiveEvent[]): MatchGoal[] {
       })
     )
     .sort(byTime);
+}
+
+/**
+ * Plocka ut STRAFFLÄGGNINGEN (straffserien efter oavgjort slutspel) ur händelserna, i
+ * sparkordning (event.extra: 1,2,3...). En spark = ett event med comments "Penalty Shootout".
+ * `scored` härleds ur detail ("Penalty" = satt, "Missed Penalty" = missad). teamApiId/spelar-id
+ * bevaras exakt (samma princip som extractGoals), så en sid-vy kan para sparkarna hemma/borta.
+ *
+ * SKILJD FRÅN extractGoals MED FLIT: en serie-spark är ingen MatchGoal (den räknas aldrig som
+ * mål), så den får en egen, ärligare typ , ingen konsument kan av misstag räkna en spark (eller
+ * en miss) som mål.
+ */
+export function extractShootout(events: readonly LiveEvent[]): ShootoutKick[] {
+  return events
+    .filter(isShootoutKick)
+    .map(
+      (e): ShootoutKick => ({
+        order: e.extra ?? 0,
+        teamApiId: e.teamApiId,
+        teamName: e.teamName,
+        playerId: e.playerId,
+        playerName: e.playerName,
+        scored: !isMissedPenalty(e.detail),
+      })
+    )
+    .sort((a, b) => a.order - b.order);
 }
 
 /**

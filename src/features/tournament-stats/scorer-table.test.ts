@@ -29,6 +29,7 @@ function goal(over: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: null,
+    comments: null,
     ...over,
   };
 }
@@ -189,6 +190,7 @@ describe('aggregateScoring , edge', () => {
       assistId: null,
       assistName: null,
       cardColor: 'yellow',
+      comments: null,
     };
     const { scorers, assisters } = aggregateScoring([match('m1', [card]), match('m2', [])]);
     expect(scorers).toHaveLength(0);

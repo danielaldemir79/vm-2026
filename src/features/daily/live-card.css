@@ -99,6 +99,26 @@
   border: 1px solid var(--vm-card-red-edge);
 }
 
+/* STRAFFLÄGGNINGS-BLOCKET: en EGEN, tydligt avgränsad yta (egen inramning + svag botten-
+ * ton), så straffserien läses som ett separat skeende , aldrig sammanblandat med mål-listan
+ * ovan (Daniels feedback: serie-sparkarna får inte se ut som riktiga mål). En lugn neutral
+ * ram (matchen är avgjord = historik, inte "live nu"). */
+[data-live-card] [data-live-shootout] {
+  border: 1px solid color-mix(in srgb, var(--color-fg) 14%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-fg) 4%, var(--color-surface));
+}
+
+/* SATT straff: accent (samma mästerskaps-grön som målen/ja-tonen). MISSAD: danger-röd.
+ * FÄRGEN är bara en förstärkning , ✓/✗-glyfen + den dolda "satt"/"missad"-etiketten bär
+ * utfallet (WCAG 1.4.1, inte enbart färg). Glyferna når >= 3:1 mot kort-ytan i båda teman. */
+[data-live-card] .vm-live-pen-scored {
+  color: var(--color-accent);
+}
+
+[data-live-card] .vm-live-pen-missed {
+  color: var(--color-danger);
+}
+
 /* BYTES-PILARNA: in = accent (spelaren som kom in), ut = dämpad fg-ton. aria-hidden:
  * orden (in-/ut-spelaren) bär betydelsen, pilen är en riktnings-cue. */
 [data-live-card] .vm-live-sub-arrow {

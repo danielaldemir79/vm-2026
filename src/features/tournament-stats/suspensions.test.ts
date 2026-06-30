@@ -75,6 +75,7 @@ function card(color: 'yellow' | 'red', over: Partial<LiveEvent> = {}): LiveEvent
     assistId: null,
     assistName: null,
     cardColor: color,
+    comments: null,
     ...over,
   };
 }

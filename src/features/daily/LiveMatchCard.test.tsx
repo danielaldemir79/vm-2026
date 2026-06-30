@@ -29,6 +29,7 @@ function goalEvent(over: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: 'Gakpo',
     cardColor: null,
+    comments: null,
     ...over,
   };
 }
@@ -662,5 +663,77 @@ describe('LiveMatchCard, finlinjerat förlopp (namn-block, ellipsis, centrerad k
     // Både in- och ut-raden kapas med ellipsis (konsekvent radhöjd).
     expect(sub.querySelector('[data-live-sub-in]')?.className).toContain('truncate');
     expect(sub.querySelector('[data-live-sub-out]')?.className).toContain('truncate');
+  });
+});
+
+describe('LiveMatchCard, straffläggning (avgjord på straffar)', () => {
+  /** En straffläggnings-spark (comments-markören + ordning + satt/missad ur detail). */
+  function kick(order: number, scored: boolean, over: Partial<LiveEvent> = {}): LiveEvent {
+    return goalEvent({
+      minute: 120,
+      extra: order,
+      detail: scored ? 'Penalty' : 'Missed Penalty',
+      comments: 'Penalty Shootout',
+      ...over,
+    });
+  }
+
+  /** Avgjord 1-1, borta vinner straffarna 3-2 (hemma missar sin 3:e). */
+  function penaltyMatch(): Partial<LiveData> {
+    return {
+      status: 'finished',
+      homeGoals: 1,
+      awayGoals: 1,
+      events: [
+        goalEvent({ minute: 72, playerName: 'Gakpo', teamApiId: HOME }),
+        goalEvent({ minute: 90, playerName: 'Diop', teamApiId: AWAY, assistName: null }),
+        kick(1, true, { teamApiId: HOME, playerName: 'Koopmeiners' }),
+        kick(1, true, { teamApiId: AWAY, playerName: 'El Aynaoui' }),
+        kick(2, true, { teamApiId: HOME, playerName: 'Kluivert' }),
+        kick(2, true, { teamApiId: AWAY, playerName: 'Rahimi' }),
+        kick(3, false, { teamApiId: HOME, playerName: 'Weghorst' }),
+        kick(3, true, { teamApiId: AWAY, playerName: 'Talbi' }),
+      ],
+    };
+  }
+
+  it('visar en EGEN straffsektion med slutresultat + vinnare', () => {
+    renderCard(penaltyMatch());
+    const block = screen.getByRole('region').querySelector('[data-live-shootout]') as HTMLElement;
+    expect(block).not.toBeNull();
+    // Slutsiffran (hemma 2, borta 3) + vinnaren syns tydligt.
+    expect(block.querySelector('[data-live-shootout-score]')?.textContent).toContain('2');
+    expect(block.querySelector('[data-live-shootout-score]')?.textContent).toContain('3');
+    expect(within(block).getByText(/Japan vann straffläggningen/)).toBeInTheDocument();
+  });
+
+  it('EXKLUDERAR straffsparkarna ur mål-listan (ser inte ut som riktiga mål)', () => {
+    renderCard(penaltyMatch());
+    const card = screen.getByRole('region');
+    // Bara de TVÅ riktiga målen i mål-listan, inte de 6 straffsparkarna.
+    expect(card.querySelectorAll('[data-live-goal]')).toHaveLength(2);
+    // En straffskytt syns i straffsektionen, INTE som ett mål.
+    const goalList = card.querySelector('[data-live-goals]') as HTMLElement;
+    expect(within(goalList).queryByText('Kluivert')).toBeNull();
+  });
+
+  it('markerar satt vs missad spark (färg-oberoende: utfall i data-hak + dold text)', () => {
+    renderCard(penaltyMatch());
+    const block = screen.getByRole('region').querySelector('[data-live-shootout]') as HTMLElement;
+    const missed = within(block)
+      .getByText('Weghorst')
+      .closest('[data-live-shootout-kick]') as HTMLElement;
+    expect(missed.getAttribute('data-live-shootout-outcome')).toBe('missed');
+    expect(within(missed).getByText('missad')).toBeInTheDocument(); // sr-only-etikett
+    const scored = within(block)
+      .getByText('Kluivert')
+      .closest('[data-live-shootout-kick]') as HTMLElement;
+    expect(scored.getAttribute('data-live-shootout-outcome')).toBe('scored');
+    expect(within(scored).getByText('satt')).toBeInTheDocument();
+  });
+
+  it('ingen straffsektion när matchen inte avgjordes på straffar', () => {
+    renderCard(); // standard-matchen (inga straffsparkar)
+    expect(screen.getByRole('region').querySelector('[data-live-shootout]')).toBeNull();
   });
 });

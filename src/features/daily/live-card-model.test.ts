@@ -10,6 +10,7 @@ import {
   pairStatistics,
   selectCards,
   selectGoals,
+  selectShootout,
   selectSubs,
 } from './live-card-model';
 import type { LiveEvent, LiveLineup, LiveTeamStatistics } from '../../data/livescore';
@@ -32,6 +33,7 @@ function ev(overrides: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: null,
+    comments: null,
     ...overrides,
   };
 }
@@ -73,6 +75,76 @@ describe('selectGoals', () => {
   it('homeApiId null -> allt blir away (ingen falsk hemma-roll utan känt id)', () => {
     const goals = selectGoals([ev({ teamApiId: HOME })], null);
     expect(goals[0].side).toBe('away');
+  });
+
+  it('EXKLUDERAR straffläggning + missade straffar (de är inte mål i ställningen)', () => {
+    const goals = selectGoals(
+      [
+        ev({ minute: 70, playerName: 'Riktigt mål' }),
+        ev({
+          minute: 120,
+          extra: 1,
+          detail: 'Penalty',
+          playerName: 'Seriestraff satt',
+          comments: 'Penalty Shootout',
+        }),
+        ev({
+          minute: 120,
+          extra: 2,
+          detail: 'Missed Penalty',
+          playerName: 'Seriestraff missad',
+          comments: 'Penalty Shootout',
+        }),
+      ],
+      HOME
+    );
+    expect(goals.map((g) => g.scorer)).toEqual(['Riktigt mål']);
+  });
+});
+
+describe('selectShootout', () => {
+  /** Bygg en straffläggnings-spark (comments-markör + ordning + satt/missad ur detail). */
+  function kick(order: number, scored: boolean, over: Partial<LiveEvent> = {}): LiveEvent {
+    return ev({
+      minute: 120,
+      extra: order,
+      detail: scored ? 'Penalty' : 'Missed Penalty',
+      comments: 'Penalty Shootout',
+      ...over,
+    });
+  }
+
+  it('sidar sparkarna, räknar satta per sida och utser vinnaren', () => {
+    // Hemma sätter 1, missar 1 (1 satt). Borta sätter 2 (2 satta). Borta vinner.
+    const model = selectShootout(
+      [
+        kick(1, true, { teamApiId: HOME, playerName: 'H1' }),
+        kick(1, true, { teamApiId: AWAY, playerName: 'B1' }),
+        kick(2, false, { teamApiId: HOME, playerName: 'H2' }),
+        kick(2, true, { teamApiId: AWAY, playerName: 'B2' }),
+      ],
+      HOME
+    );
+    expect(model).not.toBeNull();
+    expect(model?.homeScore).toBe(1);
+    expect(model?.awayScore).toBe(2);
+    expect(model?.winner).toBe('away');
+    // Sparkarna bär sida + satt/missad + namn, i sparkordning.
+    expect(model?.kicks.map((k) => `${k.side}:${k.player}:${k.scored}`)).toEqual([
+      'home:H1:true',
+      'away:B1:true',
+      'home:H2:false',
+      'away:B2:true',
+    ]);
+  });
+
+  it('ingen straffläggning -> null (sektionen ska inte renderas)', () => {
+    expect(selectShootout([ev({ minute: 70, detail: 'Normal Goal' })], HOME)).toBeNull();
+  });
+
+  it('saknat skytt-namn -> neutral platshållare (gissa aldrig en spelare)', () => {
+    const model = selectShootout([kick(1, true, { playerName: null })], HOME);
+    expect(model?.kicks[0].player).toBe('Okänd spelare');
   });
 });
 

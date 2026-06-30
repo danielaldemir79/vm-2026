@@ -4,6 +4,8 @@
 
 export {
   extractGoals,
+  extractShootout,
+  isRealGoalEvent,
   extractCards,
   extractSubs,
   extractOtherEvents,
@@ -14,6 +16,7 @@ export {
 
 export type {
   MatchGoal,
+  ShootoutKick,
   MatchCardEvent,
   MatchSub,
   MatchOtherEvent,

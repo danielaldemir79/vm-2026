@@ -54,10 +54,12 @@ import {
   pairLineups,
   selectCards,
   selectGoals,
+  selectShootout,
   selectSubs,
   type CardEntry,
   type GoalEntry,
   type MatchSide,
+  type ShootoutModel,
   type StatRow,
   type SubEntry,
 } from './live-card-model';
@@ -96,6 +98,7 @@ export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: Live
 
   // Rena härledningar ur model-lagret (memoiserade per data/id, inte per render).
   const goals = useMemo(() => selectGoals(data.events, homeApiId), [data.events, homeApiId]);
+  const shootout = useMemo(() => selectShootout(data.events, homeApiId), [data.events, homeApiId]);
   const cards = useMemo(() => selectCards(data.events, homeApiId), [data.events, homeApiId]);
   const subs = useMemo(() => selectSubs(data.events, homeApiId), [data.events, homeApiId]);
   const statRows = useMemo(
@@ -204,6 +207,12 @@ export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: Live
           är alltid mål -> kort, så strukturen är enhetlig. */}
       {goals.length > 0 ? <GoalList goals={goals} /> : null}
       {cards.length > 0 ? <CardList cards={cards} /> : null}
+      {/* STRAFFLÄGGNING (om matchen avgjordes på straffar): en EGEN, tydligt avskild
+          sektion , aldrig sammanblandad med målen ovan. Visar slutresultatet stort +
+          varje spark satt/missad, så man direkt ser vilka som satte och vilka som missade. */}
+      {shootout ? (
+        <ShootoutBlock shootout={shootout} homeName={homeName} awayName={awayName} />
+      ) : null}
 
       {/* "VISA MER": återbrukar den delade ExpandToggle (aria-expanded/-controls,
           fokus, chevron). Visas bara när det FINNS detaljer att fälla ut (ärligt
@@ -276,14 +285,13 @@ export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: Live
  */
 function MirroredEventRow({
   side,
-  minute,
-  extra,
+  spine,
   icon,
   children,
 }: {
   side: MatchSide;
-  minute: number;
-  extra: number | null;
+  /** Innehållet i den centrala spinen (minut för mål/kort/byte, sparkordning för straffar). */
+  spine: ReactNode;
   /** Den sid-flankerande ikonen (boll/kort/byte), placeras INNERST mot minut-spinen. */
   icon: ReactNode;
   /** Text-blockets rader (namn + ev. underrad), placeras tätt intill ikonen, kapas med ellipsis. */
@@ -319,9 +327,10 @@ function MirroredEventRow({
       ) : (
         <div aria-hidden="true" />
       )}
-      {/* MINUT-SPINEN: alltid centrerad mellan sidorna, i linje med ikon + namn-rad (h-5). */}
+      {/* SPINEN: alltid centrerad mellan sidorna, i linje med ikon + namn-rad (h-5). Bär
+          minuten för mål/kort/byten, sparkens ordningsnummer för straffläggningen. */}
       <span className="flex h-5 shrink-0 items-center justify-center px-1 font-display text-xs font-bold tabular-nums text-fg-muted">
-        {formatEventMinute(minute, extra)}
+        {spine}
       </span>
       {/* BORTA-cellen (kolumn 3): innehåll bara på borta-sidan, annars tom platshållare. */}
       {isHome ? (
@@ -354,8 +363,7 @@ function GoalList({ goals }: { goals: readonly GoalEntry[] }) {
         <li key={`${g.minute}-${g.scorer}-${i}`} data-live-goal="" data-live-goal-side={g.side}>
           <MirroredEventRow
             side={g.side}
-            minute={g.minute}
-            extra={g.extra}
+            spine={formatEventMinute(g.minute, g.extra)}
             icon={
               <span
                 aria-hidden="true"
@@ -405,8 +413,7 @@ function CardList({ cards }: { cards: readonly CardEntry[] }) {
         >
           <MirroredEventRow
             side={c.side}
-            minute={c.minute}
-            extra={c.extra}
+            spine={formatEventMinute(c.minute, c.extra)}
             icon={
               // Den färgade kort-ikonen. Färgen ÄR informationen (gul/röd); den dolda
               // etiketten ger samma besked till en skärmläsare (WCAG: inte enbart färg).
@@ -425,6 +432,86 @@ function CardList({ cards }: { cards: readonly CardEntry[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * STRAFFLÄGGNINGS-BLOCKET: en EGEN, tydligt avskild sektion (egen yta + rubrik) som visas BARA
+ * när matchen avgjordes på straffar. Hela poängen (Daniels feedback): straffserie-sparkarna får
+ * ALDRIG se ut som riktiga mål , de bor i sin egen ruta, separerade från mål-listan.
+ *
+ *   - RESULTAT-RUBRIKEN överst: slutsiffran stor + vinnaren, så utfallet syns på en blick.
+ *   - En SPEGLAD rad per spark (samma geometri som mål/kort: hemma vänster | borta höger), med
+ *     en ✓ (satt) eller ✗ (missad) innerst + skyttens namn. Sparkens ordningsnummer i spinen.
+ *   - FÄRG-OBEROENDE: ✓/✗-glyfen + en dold (sr-only) "satt"/"missad" bär utfallet, färgen är
+ *     bara en förstärkning (WCAG 1.4.1), så man ser direkt vilka som satte och vilka som missade.
+ */
+function ShootoutBlock({
+  shootout,
+  homeName,
+  awayName,
+}: {
+  shootout: ShootoutModel;
+  homeName: string;
+  awayName: string;
+}) {
+  const winnerName =
+    shootout.winner === 'home' ? homeName : shootout.winner === 'away' ? awayName : null;
+  return (
+    <section
+      data-live-shootout=""
+      className="vm-live-shootout flex flex-col gap-2.5 rounded-card p-3"
+    >
+      <h4 className="font-display text-xs font-bold uppercase tracking-[0.14em] text-fg-muted">
+        Straffläggning
+      </h4>
+      {/* RESULTAT-RUBRIKEN: slutsiffran stor + vinnaren (om serien är avgjord). */}
+      <p
+        data-live-shootout-result=""
+        className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-0.5 text-center"
+      >
+        <span
+          data-live-shootout-score=""
+          className="font-display text-xl font-bold tabular-nums leading-none"
+        >
+          {shootout.homeScore}
+          <span className="px-1 text-fg-muted">-</span>
+          {shootout.awayScore}
+        </span>
+        {winnerName !== null ? (
+          <span className="text-sm font-semibold">{winnerName} vann straffläggningen</span>
+        ) : null}
+      </p>
+      {/* SPARKARNA: speglade (hemma vänster | borta höger), ✓/✗ innerst, namn intill,
+          sparkordning i spinen. Samma MirroredEventRow-geometri som mål/kort/byten. */}
+      <ul data-live-shootout-kicks="" className="flex flex-col gap-2">
+        {shootout.kicks.map((k, i) => (
+          <li
+            key={`${k.side}-${k.order}-${i}`}
+            data-live-shootout-kick=""
+            data-live-shootout-outcome={k.scored ? 'scored' : 'missed'}
+            data-live-event-side={k.side}
+          >
+            <MirroredEventRow
+              side={k.side}
+              spine={k.order}
+              icon={
+                <span
+                  className={`vm-live-pen-mark shrink-0 text-base font-bold leading-none ${
+                    k.scored ? 'vm-live-pen-scored' : 'vm-live-pen-missed'
+                  }`}
+                >
+                  <span aria-hidden="true">{k.scored ? '✓' : '✗'}</span>
+                  <span className="sr-only">{k.scored ? 'satt' : 'missad'}</span>
+                </span>
+              }
+            >
+              <span className="truncate font-medium">{k.player}</span>
+            </MirroredEventRow>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -451,8 +538,7 @@ function SubBlock({ subs }: { subs: readonly SubEntry[] }) {
           <li key={`${s.minute}-${s.playerIn}-${i}`} data-live-sub="" data-live-sub-side={s.side}>
             <MirroredEventRow
               side={s.side}
-              minute={s.minute}
-              extra={s.extra}
+              spine={formatEventMinute(s.minute, s.extra)}
               icon={
                 <span aria-hidden="true" className="shrink-0 text-sm leading-none">
                   🔁
