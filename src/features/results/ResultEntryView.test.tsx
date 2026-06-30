@@ -43,6 +43,20 @@ function visibleFormCount(): number {
 }
 
 describe('ResultEntryView, rendering + a11y', () => {
+  // TIDS-ANKARE (samma rot-orsak + fix som blocket nedan, rad ~114): ResultEntryView:s
+  // 3-dagars-fönster DÖLJER (hidden) matcher utanför fönstret, och visibleFormCount() hoppar
+  // över hidden-subträd. Med verklig väggklocka glider fönstret förbi alla seedade matcher när
+  // körningsdagen passerat VM-fönstret (juni 2026), så "minst ett formulär syns" rödnade (0 > 0).
+  // Det här blocket missade pinningen som syster-blocken redan har. Vi fryser klockan till
+  // premiärdagen så fönstret ankrar på 11-13 juni, deterministiskt oavsett körningsdag.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-11T08:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renderar i ett etiketterat section-landmark', async () => {
     render(
       <ResultsProvider env={fixturesEnv()}>
