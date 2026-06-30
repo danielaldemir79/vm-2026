@@ -25,6 +25,7 @@ import type {
   LiveStatisticValue,
   LiveTeamStatistics,
 } from '../../data/livescore';
+import { extractShootout, isRealGoalEvent } from '../../data/match-stats';
 
 /** Ena sidan (hemma/borta) i en par-uppdelning. */
 export type MatchSide = 'home' | 'away';
@@ -81,15 +82,17 @@ function sideForTeam(teamApiId: number, homeApiId: number | null): MatchSide {
 
 /**
  * Plocka ut målen ur händelse-listan, i kronologisk ordning (minut, sedan tillägg).
- * Ett mål = kind 'goal'. Straff/självmål härleds ur detail (källhänvisad text), så
- * kortet kan markera dem utan att gissa.
+ * Ett mål = ett RIKTIGT mål (isRealGoalEvent, en delad sanning med skytteligan): kind 'goal'
+ * som varken är en straffläggnings-spark eller en missad straff, så straffserien aldrig
+ * förorenar mål-listan (den ritas separat via selectShootout). Straff/självmål härleds ur
+ * detail (källhänvisad text), så kortet kan markera dem utan att gissa.
  *
  * @param events    de parsade händelserna (LiveData.events).
  * @param homeApiId hemmalagets API-id (ur raden/snapshotten), null i fixtures utan match.
  */
 export function selectGoals(events: readonly LiveEvent[], homeApiId: number | null): GoalEntry[] {
   return events
-    .filter((e) => e.kind === 'goal')
+    .filter(isRealGoalEvent)
     .map((e) => ({
       side: sideForTeam(e.teamApiId, homeApiId),
       minute: e.minute,
@@ -100,6 +103,85 @@ export function selectGoals(events: readonly LiveEvent[], homeApiId: number | nu
       ownGoal: /own goal/i.test(e.detail),
     }))
     .sort(byTime);
+}
+
+/** En straffläggnings-spark så kortet ritar den: sida, ordning, skytt, satt/missad. */
+export interface ShootoutKickEntry {
+  side: MatchSide;
+  /** Sparkens ordning i serien (1,2,3...). */
+  order: number;
+  /** Skyttens namn, eller en neutral platshållare när API:t saknade det. */
+  player: string;
+  /** true = satt straff, false = missad. */
+  scored: boolean;
+}
+
+/**
+ * Hela straffläggningen så kortet ritar den: sparkarna (sidade, i ordning) + den löpande
+ * ställningen (satta per sida) + vinnaren. Ställningen räknas ur SPARKARNA själva (inte ur ett
+ * separat fält), så det kortet visar per spark och slutsiffran ALLTID stämmer överens.
+ */
+export interface ShootoutModel {
+  kicks: ShootoutKickEntry[];
+  /** Antal SATTA straffar för hemmalaget (avgörande-siffran). */
+  homeScore: number;
+  /** Antal SATTA straffar för bortalaget. */
+  awayScore: number;
+  /**
+   * Sidan som satt FLEST straffar hittills (ledaren), null vid lika. Detta är "vem leder",
+   * INTE "vem vann" , modellen vet inte om serien är avgjord (den ser bara sparkarna). Vyn
+   * avgör om matchen är AVGJORD (status finished) innan den visar en "vann"-etikett, så en
+   * pågående serie aldrig felaktigt utropar en vinnare på en tillfällig ledning.
+   */
+  winner: MatchSide | null;
+}
+
+/**
+ * Forma straffläggningen för livekortet: sida varje spark (samma hemma/borta-regel som målen),
+ * räkna satta per sida och utse vinnaren. Returnerar null när matchen INTE hade en straff-
+ * läggning (vanligast), så kortet bara ritar sektionen när den finns (ärligt löfte).
+ *
+ * VINNAREN ur sparkarna, inte ur ett facit-fält: kortets per-spark-vy och slutsiffran kommer
+ * då ur EN källa (sparkarna), så de aldrig kan säga olika saker. En jämn serie (skulle inte
+ * stå sig i ett avgjort slutspel, men kan vara mitt i serien) ger winner null, inte en gissad.
+ *
+ * @param events    de parsade händelserna (LiveData.events).
+ * @param homeApiId hemmalagets API-id, null -> allt blir away (samma fallback som selectGoals).
+ */
+export function selectShootout(
+  events: readonly LiveEvent[],
+  homeApiId: number | null
+): ShootoutModel | null {
+  const kicks = extractShootout(events).map(
+    (k): ShootoutKickEntry => ({
+      side: sideForTeam(k.teamApiId, homeApiId),
+      order: k.order,
+      player: k.playerName ?? UNKNOWN_PLAYER,
+      scored: k.scored,
+    })
+  );
+  if (kicks.length === 0) {
+    return null;
+  }
+  const homeScore = kicks.filter((k) => k.side === 'home' && k.scored).length;
+  const awayScore = kicks.filter((k) => k.side === 'away' && k.scored).length;
+  const winner: MatchSide | null =
+    homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : null;
+  return { kicks, homeScore, awayScore, winner };
+}
+
+/**
+ * Den ledande sidans VISNINGSNAMN ur en straffmodell (winner-sidan -> homeName/awayName),
+ * null vid lika. EN sanning för "vems namn" , delad av livekortet och matchvyn så de inte
+ * härleder namnet på var sitt håll. OBS: detta är LEDAREN; vyn avgör på matchstatus (decided)
+ * om serien är avgjord innan den visar en "vann"-etikett , en pågående ledning är inget facit.
+ */
+export function shootoutWinnerName(
+  shootout: ShootoutModel,
+  homeName: string,
+  awayName: string
+): string | null {
+  return shootout.winner === 'home' ? homeName : shootout.winner === 'away' ? awayName : null;
 }
 
 /** Plocka ut korten (gula/röda), kronologiskt. Färgen kommer redan normaliserad. */

@@ -15,6 +15,8 @@ export type { LiveDataResult, LiveDataStatus } from './use-live-data';
 export { useLiveClock } from './use-live-clock';
 export {
   selectGoals,
+  selectShootout,
+  shootoutWinnerName,
   selectCards,
   selectSubs,
   buildStatRows,
@@ -22,6 +24,8 @@ export {
   pairLineups,
   formatEventMinute,
   type GoalEntry,
+  type ShootoutKickEntry,
+  type ShootoutModel,
   type CardEntry,
   type SubEntry,
   type StatRow,

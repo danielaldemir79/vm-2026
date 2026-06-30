@@ -17,6 +17,7 @@ import {
   extractGoals,
   extractLineup,
   extractOtherEvents,
+  extractShootout,
   extractSubs,
   normalizeMatchStats,
   normalizeTeamStats,
@@ -25,6 +26,7 @@ import {
   fixtureLiveEvents,
   fixtureLiveLineups,
   fixtureLiveStatistics,
+  fixtureShootoutEvents,
   parseEvents,
 } from '../livescore';
 import type { LiveEvent, LiveLineup, LiveTeamStatistics } from '../livescore';
@@ -48,6 +50,7 @@ function ev(over: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: null,
+    comments: null,
     ...over,
   };
 }
@@ -105,6 +108,38 @@ describe('extractGoals', () => {
     expect(extractGoals([])).toEqual([]);
   });
 
+  it('EXKLUDERAR straffläggnings-sparkar (comments "Penalty Shootout") , de är inte mål', () => {
+    // En straffserie-spark anländer som type "Goal" (kind 'goal') men avgör BARA vinnaren,
+    // den ska aldrig räknas som mål (ställning/skytteliga/notis). Markören är comments.
+    const goals = extractGoals([
+      ev({ minute: 23, detail: 'Penalty', playerName: 'Riktig straff', comments: null }),
+      ev({
+        minute: 120,
+        extra: 1,
+        detail: 'Penalty',
+        playerName: 'Seriestraff',
+        comments: 'Penalty Shootout',
+      }),
+    ]);
+    expect(goals.map((g) => g.scorerName)).toEqual(['Riktig straff']);
+    expect(goals[0].isPenalty).toBe(true); // den riktiga straffen är fortfarande ett (straff)mål
+  });
+
+  it('EXKLUDERAR en missad straff (detail "Missed Penalty") , en miss är aldrig ett mål', () => {
+    // En missad straffserie-spark är ÄVEN den type "Goal" i API:t. Utan detta filter räknades
+    // en MISS som ett mål (buggen Daniel såg: alla straffar såg satta ut).
+    const goals = extractGoals([
+      ev({
+        minute: 120,
+        extra: 3,
+        detail: 'Missed Penalty',
+        playerName: 'Missade',
+        comments: 'Penalty Shootout',
+      }),
+    ]);
+    expect(goals).toEqual([]);
+  });
+
   it('kör mot den RIKTIGA fångade events-blobben (skarven): hittar mål med stabila id', () => {
     const goals = extractGoals(fixtureLiveEvents);
     expect(goals.length).toBeGreaterThan(0);
@@ -114,6 +149,57 @@ describe('extractGoals', () => {
     // Straffmålet (M. Taremi) ska vara flaggat isPenalty i den riktiga datan.
     const penalty = goals.find((g) => g.isPenalty);
     expect(penalty?.scorerName).toBe('M. Taremi');
+  });
+});
+
+describe('extractShootout', () => {
+  /** Bygg en straffläggnings-spark (comments-markören + ordning + satt/missad ur detail). */
+  function kick(order: number, scored: boolean, over: Partial<LiveEvent> = {}): LiveEvent {
+    return ev({
+      minute: 120,
+      extra: order,
+      kind: 'goal',
+      rawType: 'Goal',
+      detail: scored ? 'Penalty' : 'Missed Penalty',
+      comments: 'Penalty Shootout',
+      ...over,
+    });
+  }
+
+  it('plockar bara straffserie-sparkar, i sparkordning, med satt/missad ur detail', () => {
+    const shootout = extractShootout([
+      ev({ minute: 23, detail: 'Penalty', comments: null }), // riktig straff i matchen, EJ med
+      ev({ minute: 70, detail: 'Normal Goal' }), // vanligt mål, EJ med
+      kick(2, false, { playerId: 9, playerName: 'Miss', teamApiId: AWAY, teamName: 'Iran' }),
+      kick(1, true, { playerId: 8, playerName: 'Satt' }),
+    ]);
+    expect(shootout.map((k) => k.playerName)).toEqual(['Satt', 'Miss']); // sorterat på ordning
+    expect(shootout[0]).toMatchObject({ order: 1, scored: true, teamApiId: HOME, playerId: 8 });
+    expect(shootout[1]).toMatchObject({ order: 2, scored: false, teamApiId: AWAY, playerId: 9 });
+  });
+
+  it('ingen straffläggning -> tom lista', () => {
+    expect(
+      extractShootout([ev({ detail: 'Penalty', comments: null }), ev({ detail: 'Normal Goal' })])
+    ).toEqual([]);
+  });
+
+  it('tom events-lista -> tom lista', () => {
+    expect(extractShootout([])).toEqual([]);
+  });
+
+  it('SKARVEN mot RIKTIG straffläggning (Argentina-Frankrike 2022): 8 sparkar, 2 missade, 4-2', () => {
+    // Kör extractShootout över de RIKTIGA parsade shootout-event:en (inte handgjorda literaler),
+    // så straff-regeln bevisas mot verklig data. Facit: Argentina (26) satte 4, Frankrike (2)
+    // satte 2 (Coman + Tchouaméni missade), straffresultat 4-2, sparkordning extra 1..8.
+    const kicks = extractShootout(fixtureShootoutEvents);
+    const ARGENTINA = 26;
+    const FRANCE = 2;
+    expect(kicks).toHaveLength(8);
+    expect(kicks.filter((k) => !k.scored)).toHaveLength(2);
+    expect(kicks.filter((k) => k.teamApiId === ARGENTINA && k.scored)).toHaveLength(4);
+    expect(kicks.filter((k) => k.teamApiId === FRANCE && k.scored)).toHaveLength(2);
+    expect(kicks.map((k) => k.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]); // sorterat på ordning
   });
 });
 

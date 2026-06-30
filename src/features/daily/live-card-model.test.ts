@@ -10,6 +10,8 @@ import {
   pairStatistics,
   selectCards,
   selectGoals,
+  selectShootout,
+  shootoutWinnerName,
   selectSubs,
 } from './live-card-model';
 import type { LiveEvent, LiveLineup, LiveTeamStatistics } from '../../data/livescore';
@@ -32,6 +34,7 @@ function ev(overrides: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: null,
+    comments: null,
     ...overrides,
   };
 }
@@ -73,6 +76,108 @@ describe('selectGoals', () => {
   it('homeApiId null -> allt blir away (ingen falsk hemma-roll utan känt id)', () => {
     const goals = selectGoals([ev({ teamApiId: HOME })], null);
     expect(goals[0].side).toBe('away');
+  });
+
+  it('EXKLUDERAR straffläggning + missade straffar (de är inte mål i ställningen)', () => {
+    const goals = selectGoals(
+      [
+        ev({ minute: 70, playerName: 'Riktigt mål' }),
+        ev({
+          minute: 120,
+          extra: 1,
+          detail: 'Penalty',
+          playerName: 'Seriestraff satt',
+          comments: 'Penalty Shootout',
+        }),
+        ev({
+          minute: 120,
+          extra: 2,
+          detail: 'Missed Penalty',
+          playerName: 'Seriestraff missad',
+          comments: 'Penalty Shootout',
+        }),
+      ],
+      HOME
+    );
+    expect(goals.map((g) => g.scorer)).toEqual(['Riktigt mål']);
+  });
+});
+
+describe('selectShootout', () => {
+  /** Bygg en straffläggnings-spark (comments-markör + ordning + satt/missad ur detail). */
+  function kick(order: number, scored: boolean, over: Partial<LiveEvent> = {}): LiveEvent {
+    return ev({
+      minute: 120,
+      extra: order,
+      detail: scored ? 'Penalty' : 'Missed Penalty',
+      comments: 'Penalty Shootout',
+      ...over,
+    });
+  }
+
+  it('sidar sparkarna, räknar satta per sida och utser vinnaren', () => {
+    // Hemma sätter 1, missar 1 (1 satt). Borta sätter 2 (2 satta). Borta vinner.
+    const model = selectShootout(
+      [
+        // GLOBAL sparkordning (extra 1..4 unika, alternerande lag), precis som API:t (inte
+        // per-runda dubbletter): hemma sätter 1, missar 1; borta sätter 2 -> borta vinner.
+        kick(1, true, { teamApiId: HOME, playerName: 'H1' }),
+        kick(2, true, { teamApiId: AWAY, playerName: 'B1' }),
+        kick(3, false, { teamApiId: HOME, playerName: 'H2' }),
+        kick(4, true, { teamApiId: AWAY, playerName: 'B2' }),
+      ],
+      HOME
+    );
+    expect(model).not.toBeNull();
+    expect(model?.homeScore).toBe(1);
+    expect(model?.awayScore).toBe(2);
+    expect(model?.winner).toBe('away');
+    // Sparkarna bär sida + satt/missad + namn, i sparkordning.
+    expect(model?.kicks.map((k) => `${k.side}:${k.player}:${k.scored}`)).toEqual([
+      'home:H1:true',
+      'away:B1:true',
+      'home:H2:false',
+      'away:B2:true',
+    ]);
+  });
+
+  it('lika satta straffar -> winner null (ledaren är inte utsedd), men sektionen finns', () => {
+    // En jämn ställning mitt i serien: modellen utser INGEN vinnare (winner null). Vyn avgör
+    // sedan på matchstatus om en "vann"-etikett får visas (en pågående serie ska inte det).
+    const model = selectShootout(
+      [
+        kick(1, true, { teamApiId: HOME, playerName: 'H1' }),
+        kick(2, true, { teamApiId: AWAY, playerName: 'B1' }),
+      ],
+      HOME
+    );
+    expect(model).not.toBeNull();
+    expect(model?.homeScore).toBe(1);
+    expect(model?.awayScore).toBe(1);
+    expect(model?.winner).toBeNull();
+  });
+
+  it('homeApiId null -> alla sparkar blir away (ingen falsk hemma-roll utan känt id)', () => {
+    const model = selectShootout([kick(1, true, { teamApiId: HOME })], null);
+    expect(model?.kicks[0].side).toBe('away');
+  });
+
+  it('ingen straffläggning -> null (sektionen ska inte renderas)', () => {
+    expect(selectShootout([ev({ minute: 70, detail: 'Normal Goal' })], HOME)).toBeNull();
+  });
+
+  it('saknat skytt-namn -> neutral platshållare (gissa aldrig en spelare)', () => {
+    const model = selectShootout([kick(1, true, { playerName: null })], HOME);
+    expect(model?.kicks[0].player).toBe('Okänd spelare');
+  });
+
+  it('shootoutWinnerName mappar ledande sida -> namn, null vid lika', () => {
+    const home = { kicks: [], homeScore: 4, awayScore: 2, winner: 'home' as const };
+    const away = { kicks: [], homeScore: 2, awayScore: 4, winner: 'away' as const };
+    const tie = { kicks: [], homeScore: 3, awayScore: 3, winner: null };
+    expect(shootoutWinnerName(home, 'Hemma', 'Borta')).toBe('Hemma');
+    expect(shootoutWinnerName(away, 'Hemma', 'Borta')).toBe('Borta');
+    expect(shootoutWinnerName(tie, 'Hemma', 'Borta')).toBeNull();
   });
 });
 

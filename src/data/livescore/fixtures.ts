@@ -30,6 +30,7 @@ import {
   parseLiveFixtures,
   parseStatistics,
 } from './parse-live';
+import { wrapApiEnvelope, type RichFixtureInline } from './freeze-shape';
 
 import liveAllRaw from './__fixtures__/live-all.json?raw';
 import eventsRaw from './__fixtures__/events-rich.json?raw';
@@ -57,6 +58,22 @@ export const finishedResponse = parseRaw<RawFixtureResponse>(finishedRaw);
  * kommer ur `goals` (3-3), inte ur `score.extratime` (1-1).
  */
 export const aetPenResponse = parseRaw<RawFixtureResponse>(aetPenRaw);
+
+/**
+ * De parsade matchhändelserna ur det straffavgjorda slutspelssvaret (Argentina-Frankrike
+ * 2022), inklusive 8 straffläggnings-sparkar (comments "Penalty Shootout"), varav 2 MISSADE
+ * (detail "Missed Penalty"), straffresultat 4-2. KÄLLHÄNVISAD seam-data för straff-extraktionen
+ * (extractShootout/selectShootout): kör den RIKTIGA parsern över de RIKTIGA shootout-event:en,
+ * så straff-regeln bevisas mot verklig data, inte mot handgjorda literaler.
+ */
+// Svaret är ett fixtures?id-svar (event:en ligger INLINE i response[0].events). Vi modellerar
+// det med den befintliga RichFixtureInline-typen och sveper event:en i ett events-kuvert via
+// wrapApiEnvelope , den ENDA seamen som bygger API-kuvert (freeze-shape.ts), så vi inte hand-
+// rullar en parallell kuvert-form. Sedan kör parseEvents, samma form parsern producerar live.
+const aetPenInline = aetPenResponse.response[0] as unknown as RichFixtureInline;
+export const fixtureShootoutEvents: LiveEvent[] = parseEvents(
+  wrapApiEnvelope((aetPenInline.events ?? []) as readonly RawEvent[], 'fixtures/events')
+);
 
 /** Live-ögonblicksbilder för fixtures-läget (Nederländerna-Japan, en pågående VM-match). */
 export const fixtureLiveSnapshots: LiveMatchSnapshot[] = parseLiveFixtures(liveAllResponse);

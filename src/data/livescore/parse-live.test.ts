@@ -279,6 +279,40 @@ describe('parseEvents: rika 2022-events (smutsig verklig data)', () => {
     expect(e.kind).toBe('other');
     expect(e.rawType).toBe('Penalty Missed');
   });
+
+  it('bär event.comments vidare (markören för straffläggning: "Penalty Shootout")', () => {
+    // KÄLLHÄNVISAT (fixture-aet-pen.json): en straffläggnings-spark är ett event med
+    // comments "Penalty Shootout". En vanlig straff i matchen har comments null. Utan
+    // att bära comments går de två inte att skilja, så vi bevisar att fältet flödar.
+    const shootout = {
+      get: 'fixtures/events',
+      results: 2,
+      errors: [],
+      response: [
+        {
+          time: { elapsed: 120, extra: 1 },
+          team: { id: 1, name: 'X' },
+          player: { id: 5, name: 'Skytt' },
+          assist: { id: null, name: null },
+          type: 'Goal',
+          detail: 'Penalty',
+          comments: 'Penalty Shootout',
+        },
+        {
+          time: { elapsed: 23, extra: null },
+          team: { id: 1, name: 'X' },
+          player: { id: 6, name: 'Ordinarie' },
+          assist: { id: null, name: null },
+          type: 'Goal',
+          detail: 'Penalty',
+          comments: null,
+        },
+      ],
+    } as unknown as RawApiResponse<RawEvent>;
+    const [kick, regular] = parseEvents(shootout);
+    expect(kick.comments).toBe('Penalty Shootout');
+    expect(regular.comments).toBeNull();
+  });
 });
 
 describe('parseStatistics: per-lags-statistik (number/%-sträng/null)', () => {

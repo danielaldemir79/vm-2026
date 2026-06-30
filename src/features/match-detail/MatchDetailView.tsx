@@ -29,9 +29,13 @@ import {
   formatEventMinute,
   pairLineups,
   resolveKnockoutTeams,
+  selectShootout,
+  shootoutWinnerName,
   teamDisplayName,
   useLiveData,
   useLiveClock,
+  type ShootoutKickEntry,
+  type ShootoutModel,
   type StatRow,
 } from '../daily';
 import { extractLineup } from '../../data/match-stats';
@@ -256,6 +260,7 @@ function LiveSections({
   awayName: string;
 }) {
   const timeline = useMemo(() => buildTimeline(live.events, homeApiId), [live.events, homeApiId]);
+  const shootout = useMemo(() => selectShootout(live.events, homeApiId), [live.events, homeApiId]);
   const statRows = useMemo(
     () => buildStatRows(live.statistics, homeApiId),
     [live.statistics, homeApiId]
@@ -266,6 +271,16 @@ function LiveSections({
     <>
       {timeline.length > 0 ? (
         <TimelineSection timeline={timeline} homeName={homeName} awayName={awayName} />
+      ) : null}
+      {/* STRAFFLÄGGNING: en EGEN sektion (när matchen avgjordes på straffar), tydligt skild
+          från tidslinjen ovan , straffserie-sparkarna räknas aldrig som mål i förloppet. */}
+      {shootout ? (
+        <ShootoutSection
+          shootout={shootout}
+          homeName={homeName}
+          awayName={awayName}
+          decided={live.status === 'finished'}
+        />
       ) : null}
       {statRows.length > 0 ? (
         <StatsSection rows={statRows} homeName={homeName} awayName={awayName} />
@@ -437,6 +452,116 @@ function TimelineContent({ entry, side }: { entry: TimelineEntry; side: Timeline
         </span>
       );
   }
+}
+
+/**
+ * STRAFFLÄGGNINGS-SEKTIONEN: en EGEN sektion (visas bara när matchen avgjordes på straffar),
+ * tydligt skild från tidslinjen. Överst slutresultatet + vinnaren (stort), sedan en SPEGLAD rad
+ * per spark (samma hemma/borta-spine som tidslinjen) med ✓ (satt) / ✗ (missad) + skytt och
+ * sparkens ordningsnummer i spinen. Färg-oberoende: ✓/✗ + dold "satt"/"missad" bär utfallet.
+ */
+function ShootoutSection({
+  shootout,
+  homeName,
+  awayName,
+  decided,
+}: {
+  shootout: ShootoutModel;
+  homeName: string;
+  awayName: string;
+  /** true när matchen är AVGJORD (status finished). Styr om "vann"-etiketten får visas. */
+  decided: boolean;
+}) {
+  const headingId = useId();
+  const winnerName = shootoutWinnerName(shootout, homeName, awayName);
+  return (
+    <section
+      aria-labelledby={headingId}
+      data-match-detail-shootout=""
+      className="flex flex-col gap-3"
+    >
+      <SectionHeading id={headingId}>
+        Straffläggning
+        {/* Samma dolda sid-karta som tidslinje-rubriken (hemma vänster | borta höger), så en
+            skärmläsare vet vilket lag varje spark tillhör (sidan bär laget visuellt). */}
+        <span className="sr-only">
+          , {homeName} till vänster, {awayName} till höger
+        </span>
+      </SectionHeading>
+      <p
+        data-shootout-result=""
+        className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-0.5 text-center"
+      >
+        <span
+          data-shootout-score=""
+          className="font-display text-xl font-bold tabular-nums leading-none"
+        >
+          {shootout.homeScore}
+          <span className="px-1 text-fg-muted">-</span>
+          {shootout.awayScore}
+        </span>
+        {/* "Vann" BARA när serien är avgjord, annars är ledningen inte ett facit (visa "pågår"). */}
+        {decided && winnerName !== null ? (
+          <span className="text-sm font-semibold">{winnerName} vann straffläggningen</span>
+        ) : !decided ? (
+          <span data-shootout-ongoing="" className="text-sm font-semibold text-fg-muted">
+            pågår
+          </span>
+        ) : null}
+      </p>
+      <ol className="m-0 flex list-none flex-col gap-2 p-0">
+        {shootout.kicks.map((k, i) => (
+          <li
+            key={`${k.side}-${k.order}-${i}`}
+            data-shootout-kick=""
+            data-shootout-outcome={k.scored ? 'scored' : 'missed'}
+            data-shootout-side={k.side}
+          >
+            <ShootoutRow kick={k} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** En spegel-rad i straffsektionen: [hemma | ordningsnr | borta], ✓/✗ + skytt på lagets sida. */
+function ShootoutRow({ kick }: { kick: ShootoutKickEntry }) {
+  const isHome = kick.side === 'home';
+  const content = (
+    <span
+      className={`flex min-w-0 items-start gap-2 text-sm ${
+        isHome ? 'flex-row-reverse' : 'flex-row'
+      }`}
+    >
+      <span
+        className={`flex h-5 shrink-0 items-center text-base font-bold leading-none ${
+          kick.scored ? 'text-accent' : 'text-danger'
+        }`}
+      >
+        <span aria-hidden="true">{kick.scored ? '✓' : '✗'}</span>
+        <span className="sr-only">{kick.scored ? 'satt' : 'missad'}</span>
+      </span>
+      <span className="truncate font-medium">{kick.player}</span>
+    </span>
+  );
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-x-2">
+      {isHome ? (
+        <div className="flex min-w-0 justify-end text-right">{content}</div>
+      ) : (
+        <div aria-hidden="true" />
+      )}
+      <span className="flex h-5 shrink-0 items-center justify-center px-1 font-display text-xs font-bold tabular-nums text-fg-muted">
+        {kick.order}
+      </span>
+      {isHome ? (
+        <div aria-hidden="true" />
+      ) : (
+        <div className="flex min-w-0 justify-start text-left">{content}</div>
+      )}
+    </div>
+  );
 }
 
 /** STATISTIK-PANELEN: en jämförelse-stapel per nyckeltal (hemma | etikett | borta). */

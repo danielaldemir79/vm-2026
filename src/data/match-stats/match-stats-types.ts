@@ -63,6 +63,31 @@ export interface MatchGoal {
   isOwnGoal: boolean;
 }
 
+/**
+ * En straffläggnings-spark (efter oavgjord ordinarie + förlängning i slutspel), match-
+ * agnostisk. SKILJD från MatchGoal MED FLIT: en straffserie-spark RÄKNAS INTE som mål (varken
+ * i ställningen, skytteligan eller en mål-notis , FIFA: straffserien avgör bara vinnaren), och
+ * en MISSAD spark finns med här men är aldrig ett mål. Därför är detta en egen typ, inte en
+ * MatchGoal med en flagga, så ingen konsument råkar räkna en straffserie-spark som ett mål.
+ *
+ * KÄLLHÄNVISAT (fixture-aet-pen.json, gissas aldrig): API-Football levererar varje spark som
+ * ett event med comments "Penalty Shootout", minut 120 och `extra` = sparkens ORDNING (1,2,3...).
+ * En satt spark har detail "Penalty", en missad har detail "Missed Penalty" (bägge type "Goal").
+ */
+export interface ShootoutKick {
+  /** Sparkens ordning i serien (API:ts event.time.extra: 1,2,3...). Driver kronologin. */
+  order: number;
+  /** API:ts lag-id sparken är attribuerad till (bevarat, ej omtolkat). */
+  teamApiId: number;
+  teamName: string;
+  /** Skyttens API-spelar-id, null när API:t saknade det. */
+  playerId: number | null;
+  /** Skyttens namn (städat), null när API:t saknade det (gissa aldrig en spelare). */
+  playerName: string | null;
+  /** true = satt straff (detail "Penalty"), false = missad (detail "Missed Penalty"). */
+  scored: boolean;
+}
+
 /** Ett kort (gult/rött), match-agnostiskt (T88 aggregerar kort per lag över alla matcher). */
 export interface MatchCardEvent {
   minute: number;

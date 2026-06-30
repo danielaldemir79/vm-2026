@@ -99,6 +99,14 @@ export interface LiveEvent {
   assistName: string | null;
   /** Kortfärg, satt bara för kind 'card' (annars null). */
   cardColor: CardColor | null;
+  /**
+   * API:ts fria kommentar-fält (event.comments), bevarat oförändrat. KÄLLHÄNVISAD
+   * användning (gissas aldrig): en STRAFFLÄGGNINGS-spark bär comments "Penalty Shootout"
+   * (fixture-aet-pen.json), medan en vanlig straff i matchen har comments null. Det är
+   * den ENDA tillförlitliga markören som skiljer en straffserie-spark (räknas inte som
+   * mål, avgör bara vinnaren) från ett riktigt straffmål, så fältet bärs vidare hit.
+   */
+  comments: string | null;
 }
 
 /** Ett normaliserat statistik-nyckeltal för ETT lag. */

@@ -23,6 +23,7 @@ function ev(over: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: null,
+    comments: null,
     ...over,
   };
 }
@@ -86,6 +87,34 @@ describe('buildTimeline', () => {
     const tl = buildTimeline([ev({ kind: 'var', rawType: 'Var', detail: 'VAR' })], HOME);
     expect(tl[0].entryKind).toBe('other');
     expect(tl[0].entryKind === 'other' && tl[0].kind).toBe('var');
+  });
+
+  it('EXKLUDERAR straffläggnings-sparkar ur tidslinjen (de är inte mål i förloppet)', () => {
+    // REGRESSION (Daniels feedback): en straffserie-spark (comments "Penalty Shootout") räknas
+    // INTE som mål och ska därför aldrig dyka upp i den kronologiska tidslinjen , den ritas i en
+    // egen straffsektion i stället. En MISSAD spark (detail "Missed Penalty") ska inte heller in.
+    const tl = buildTimeline(
+      [
+        ev({ kind: 'goal', minute: 72, playerName: 'Riktigt mål' }),
+        ev({
+          minute: 120,
+          extra: 1,
+          detail: 'Penalty',
+          playerName: 'Seriestraff',
+          comments: 'Penalty Shootout',
+        }),
+        ev({
+          minute: 120,
+          extra: 2,
+          detail: 'Missed Penalty',
+          playerName: 'Missad seriestraff',
+          comments: 'Penalty Shootout',
+        }),
+      ],
+      HOME
+    );
+    expect(tl).toHaveLength(1);
+    expect(tl[0].entryKind === 'goal' && tl[0].scorerName).toBe('Riktigt mål');
   });
 
   it('bevarar typ-specifika fält per post (mål: scorer, byte: in/ut)', () => {

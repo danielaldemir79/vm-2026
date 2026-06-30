@@ -32,6 +32,7 @@ function goal(over: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: null,
+    comments: null,
     ...over,
   };
 }
@@ -51,6 +52,7 @@ function card(over: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: 'yellow',
+    comments: null,
     ...over,
   };
 }

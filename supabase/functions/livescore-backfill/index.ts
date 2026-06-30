@@ -191,17 +191,22 @@ Deno.serve(async (req) => {
       const richEvents = Array.isArray(rich.events) ? rich.events : [];
       const eventCount = richEvents.length;
       // Mål-events räknas EXAKT som appens skytteliga räknar dem (en sanning, PRINCIPLES §4):
-      // ett mål är ett event vars `type` normaliseras till 'goal'. Vi speglar
-      // normalizeEventKind (parse-live.ts:151) , `rawType.toLowerCase() === 'goal'` , i
-      // stället för en parallell regel. KÄLLHÄNVISNING (gissas aldrig): ett MISSAT straff är
-      // INTE ett mål-event i API-Football v3, det är ett "Var"/"Missed Penalty"-event, så det
-      // faller bort redan på type-filtret (precis som extractGoals i match-stats.ts:59-61,
-      // vars doc rad 33-40 källhänvisar just den regeln). Egenmål ÄR ett 'goal'-event och
+      // ett RIKTIGT mål, samma regel som isRealGoalEvent (match-stats.ts). KÄLLHÄNVISNING
+      // (gissas aldrig, KORRIGERAD mot riktig data fixture-aet-pen.json): ett MISSAT straff
+      // är type "Goal" med detail "Missed Penalty" (INTE ett "Var"-event, det tidigare
+      // antagandet stämde inte), och en STRAFFLÄGGNINGS-spark är type "Goal" med comments
+      // "Penalty Shootout". Bägge måste exkluderas , annars överräknas en AET+PEN-match (en
+      // straffserie lägger till ~8-10 "Goal"-events som inte är mål i ställningen), så
+      // goalEventsMatchScore blir permanent falskt. Egenmål ÄR ett riktigt 'goal'-event och
       // räknas mot ställningen (skytteligan filtrerar bort dem ur SKYTT-tallyn, inte ur
       // måltotalen). Se docs/decisions.md T101.
-      const goalEventCount = richEvents.filter(
-        (e) => ((e as { type?: string })?.type ?? '').toLowerCase() === 'goal'
-      ).length;
+      const goalEventCount = richEvents.filter((e) => {
+        const ev = e as { type?: string; detail?: string; comments?: string | null };
+        const isGoalType = (ev.type ?? '').toLowerCase() === 'goal';
+        const isShootoutKick = ev.comments != null && /penalty shootout/i.test(ev.comments);
+        const isMissedPenalty = /missed penalty/i.test(ev.detail ?? '');
+        return isGoalType && !isShootoutKick && !isMissedPenalty;
+      }).length;
 
       const apiHome = rich.goals?.home;
       const apiAway = rich.goals?.away;

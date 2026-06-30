@@ -37,6 +37,7 @@ function ev(over: Partial<LiveEvent> = {}): LiveEvent {
     assistId: null,
     assistName: null,
     cardColor: null,
+    comments: null,
     ...over,
   };
 }
@@ -155,6 +156,18 @@ describe('diffNewGoals (G1: nya mål mot redan kända)', () => {
 
   it('tom NYA lista ger inga mål (matchen hade inga events än)', () => {
     expect(diffNewGoals([ev()], [], 'g-A-1')).toEqual([]);
+  });
+
+  it('STRAFFLÄGGNING ropar aldrig "MÅL": serie-sparkar + missar detekteras INTE som mål', () => {
+    // REGRESSION (Daniels feedback): en straffläggnings-spark (comments "Penalty Shootout") är
+    // type "Goal" i API:t, och en MISSAD spark också (detail "Missed Penalty"). Utan den delade
+    // isRealGoalEvent-regeln skulle push:en ropa "MÅL" för varje spark, inklusive missarna.
+    const old: LiveEvent[] = [];
+    const next: LiveEvent[] = [
+      ev({ minute: 120, extra: 1, detail: 'Penalty', comments: 'Penalty Shootout' }),
+      ev({ minute: 120, extra: 2, detail: 'Missed Penalty', comments: 'Penalty Shootout' }),
+    ];
+    expect(diffNewGoals(old, next, 'g-A-1')).toEqual([]);
   });
 });
 
