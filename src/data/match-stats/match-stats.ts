@@ -41,7 +41,7 @@ function isPenaltyGoal(detail: string): boolean {
 /**
  * Är detta en STRAFFLÄGGNINGS-spark (straffserie efter oavgjort slutspel), inte ett mål?
  *
- * KÄLLHÄNVISAT (fixture-aet-pen.json, KORRIGERAD mot riktig data , den tidigare antagandet
+ * KÄLLHÄNVISAT (fixture-aet-pen.json, KORRIGERAD mot riktig data , det tidigare antagandet
  * "ett missat straff är type Var" stämde INTE): varje straffserie-spark anländer som type
  * "Goal" (alltså kind 'goal') med comments "Penalty Shootout". En vanlig straff i matchen har
  * comments null. comments är därför den ENDA tillförlitliga markören som skiljer en serie-

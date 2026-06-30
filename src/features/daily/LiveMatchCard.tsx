@@ -211,7 +211,12 @@ export function LiveMatchCard({ data, homeName, awayName, homeApiId, now }: Live
           sektion , aldrig sammanblandad med målen ovan. Visar slutresultatet stort +
           varje spark satt/missad, så man direkt ser vilka som satte och vilka som missade. */}
       {shootout ? (
-        <ShootoutBlock shootout={shootout} homeName={homeName} awayName={awayName} />
+        <ShootoutBlock
+          shootout={shootout}
+          homeName={homeName}
+          awayName={awayName}
+          decided={finished}
+        />
       ) : null}
 
       {/* "VISA MER": återbrukar den delade ExpandToggle (aria-expanded/-controls,
@@ -450,10 +455,13 @@ function ShootoutBlock({
   shootout,
   homeName,
   awayName,
+  decided,
 }: {
   shootout: ShootoutModel;
   homeName: string;
   awayName: string;
+  /** true när matchen är AVGJORD (status finished). Styr om "vann"-etiketten får visas. */
+  decided: boolean;
 }) {
   const winnerName =
     shootout.winner === 'home' ? homeName : shootout.winner === 'away' ? awayName : null;
@@ -465,7 +473,9 @@ function ShootoutBlock({
       <h4 className="font-display text-xs font-bold uppercase tracking-[0.14em] text-fg-muted">
         Straffläggning
       </h4>
-      {/* RESULTAT-RUBRIKEN: slutsiffran stor + vinnaren (om serien är avgjord). */}
+      {/* RESULTAT-RUBRIKEN: slutsiffran stor + vinnaren. "Vann"-etiketten visas BARA när
+          serien är AVGJORD (decided) , annars (en pågående serie) är ledningen inte ett
+          facit, så vi visar "pågår" i stället för att felaktigt utropa en vinnare. */}
       <p
         data-live-shootout-result=""
         className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-0.5 text-center"
@@ -478,8 +488,12 @@ function ShootoutBlock({
           <span className="px-1 text-fg-muted">-</span>
           {shootout.awayScore}
         </span>
-        {winnerName !== null ? (
+        {decided && winnerName !== null ? (
           <span className="text-sm font-semibold">{winnerName} vann straffläggningen</span>
+        ) : !decided ? (
+          <span data-live-shootout-ongoing="" className="text-sm font-semibold text-fg-muted">
+            pågår
+          </span>
         ) : null}
       </p>
       {/* SPARKARNA: speglade (hemma vänster | borta höger), ✓/✗ innerst, namn intill,
@@ -490,7 +504,7 @@ function ShootoutBlock({
             key={`${k.side}-${k.order}-${i}`}
             data-live-shootout-kick=""
             data-live-shootout-outcome={k.scored ? 'scored' : 'missed'}
-            data-live-event-side={k.side}
+            data-live-shootout-side={k.side}
           >
             <MirroredEventRow
               side={k.side}

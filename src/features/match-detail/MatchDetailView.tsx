@@ -274,7 +274,12 @@ function LiveSections({
       {/* STRAFFLÄGGNING: en EGEN sektion (när matchen avgjordes på straffar), tydligt skild
           från tidslinjen ovan , straffserie-sparkarna räknas aldrig som mål i förloppet. */}
       {shootout ? (
-        <ShootoutSection shootout={shootout} homeName={homeName} awayName={awayName} />
+        <ShootoutSection
+          shootout={shootout}
+          homeName={homeName}
+          awayName={awayName}
+          decided={live.status === 'finished'}
+        />
       ) : null}
       {statRows.length > 0 ? (
         <StatsSection rows={statRows} homeName={homeName} awayName={awayName} />
@@ -458,10 +463,13 @@ function ShootoutSection({
   shootout,
   homeName,
   awayName,
+  decided,
 }: {
   shootout: ShootoutModel;
   homeName: string;
   awayName: string;
+  /** true när matchen är AVGJORD (status finished). Styr om "vann"-etiketten får visas. */
+  decided: boolean;
 }) {
   const headingId = useId();
   const winnerName =
@@ -472,7 +480,14 @@ function ShootoutSection({
       data-match-detail-shootout=""
       className="flex flex-col gap-3"
     >
-      <SectionHeading id={headingId}>Straffläggning</SectionHeading>
+      <SectionHeading id={headingId}>
+        Straffläggning
+        {/* Samma dolda sid-karta som tidslinje-rubriken (hemma vänster | borta höger), så en
+            skärmläsare vet vilket lag varje spark tillhör (sidan bär laget visuellt). */}
+        <span className="sr-only">
+          , {homeName} till vänster, {awayName} till höger
+        </span>
+      </SectionHeading>
       <p
         data-shootout-result=""
         className="flex flex-wrap items-baseline justify-center gap-x-2 gap-y-0.5 text-center"
@@ -485,8 +500,13 @@ function ShootoutSection({
           <span className="px-1 text-fg-muted">-</span>
           {shootout.awayScore}
         </span>
-        {winnerName !== null ? (
+        {/* "Vann" BARA när serien är avgjord, annars är ledningen inte ett facit (visa "pågår"). */}
+        {decided && winnerName !== null ? (
           <span className="text-sm font-semibold">{winnerName} vann straffläggningen</span>
+        ) : !decided ? (
+          <span data-shootout-ongoing="" className="text-sm font-semibold text-fg-muted">
+            pågår
+          </span>
         ) : null}
       </p>
       <ol className="m-0 flex list-none flex-col gap-2 p-0">
@@ -495,7 +515,7 @@ function ShootoutSection({
             key={`${k.side}-${k.order}-${i}`}
             data-shootout-kick=""
             data-shootout-outcome={k.scored ? 'scored' : 'missed'}
-            data-timeline-side={k.side}
+            data-shootout-side={k.side}
           >
             <ShootoutRow kick={k} />
           </li>

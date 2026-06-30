@@ -57,6 +57,7 @@ export {
   fixtureLiveLineups,
   fixtureLiveSnapshots,
   fixtureLiveStatistics,
+  fixtureShootoutEvents,
 } from './fixtures';
 
 // Bit 3a: klient-läs-lager (DB-rad -> klient-modell, gate-medveten + fixtures-först).

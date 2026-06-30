@@ -118,10 +118,12 @@ describe('selectShootout', () => {
     // Hemma sätter 1, missar 1 (1 satt). Borta sätter 2 (2 satta). Borta vinner.
     const model = selectShootout(
       [
+        // GLOBAL sparkordning (extra 1..4 unika, alternerande lag), precis som API:t (inte
+        // per-runda dubbletter): hemma sätter 1, missar 1; borta sätter 2 -> borta vinner.
         kick(1, true, { teamApiId: HOME, playerName: 'H1' }),
-        kick(1, true, { teamApiId: AWAY, playerName: 'B1' }),
-        kick(2, false, { teamApiId: HOME, playerName: 'H2' }),
-        kick(2, true, { teamApiId: AWAY, playerName: 'B2' }),
+        kick(2, true, { teamApiId: AWAY, playerName: 'B1' }),
+        kick(3, false, { teamApiId: HOME, playerName: 'H2' }),
+        kick(4, true, { teamApiId: AWAY, playerName: 'B2' }),
       ],
       HOME
     );
@@ -136,6 +138,27 @@ describe('selectShootout', () => {
       'home:H2:false',
       'away:B2:true',
     ]);
+  });
+
+  it('lika satta straffar -> winner null (ledaren är inte utsedd), men sektionen finns', () => {
+    // En jämn ställning mitt i serien: modellen utser INGEN vinnare (winner null). Vyn avgör
+    // sedan på matchstatus om en "vann"-etikett får visas (en pågående serie ska inte det).
+    const model = selectShootout(
+      [
+        kick(1, true, { teamApiId: HOME, playerName: 'H1' }),
+        kick(2, true, { teamApiId: AWAY, playerName: 'B1' }),
+      ],
+      HOME
+    );
+    expect(model).not.toBeNull();
+    expect(model?.homeScore).toBe(1);
+    expect(model?.awayScore).toBe(1);
+    expect(model?.winner).toBeNull();
+  });
+
+  it('homeApiId null -> alla sparkar blir away (ingen falsk hemma-roll utan känt id)', () => {
+    const model = selectShootout([kick(1, true, { teamApiId: HOME })], null);
+    expect(model?.kicks[0].side).toBe('away');
   });
 
   it('ingen straffläggning -> null (sektionen ska inte renderas)', () => {

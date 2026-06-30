@@ -26,6 +26,7 @@ import {
   fixtureLiveEvents,
   fixtureLiveLineups,
   fixtureLiveStatistics,
+  fixtureShootoutEvents,
   parseEvents,
 } from '../livescore';
 import type { LiveEvent, LiveLineup, LiveTeamStatistics } from '../livescore';
@@ -185,6 +186,20 @@ describe('extractShootout', () => {
 
   it('tom events-lista -> tom lista', () => {
     expect(extractShootout([])).toEqual([]);
+  });
+
+  it('SKARVEN mot RIKTIG straffläggning (Argentina-Frankrike 2022): 8 sparkar, 2 missade, 4-2', () => {
+    // Kör extractShootout över de RIKTIGA parsade shootout-event:en (inte handgjorda literaler),
+    // så straff-regeln bevisas mot verklig data. Facit: Argentina (26) satte 4, Frankrike (2)
+    // satte 2 (Coman + Tchouaméni missade), straffresultat 4-2, sparkordning extra 1..8.
+    const kicks = extractShootout(fixtureShootoutEvents);
+    const ARGENTINA = 26;
+    const FRANCE = 2;
+    expect(kicks).toHaveLength(8);
+    expect(kicks.filter((k) => !k.scored)).toHaveLength(2);
+    expect(kicks.filter((k) => k.teamApiId === ARGENTINA && k.scored)).toHaveLength(4);
+    expect(kicks.filter((k) => k.teamApiId === FRANCE && k.scored)).toHaveLength(2);
+    expect(kicks.map((k) => k.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]); // sorterat på ordning
   });
 });
 

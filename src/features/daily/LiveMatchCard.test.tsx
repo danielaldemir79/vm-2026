@@ -678,7 +678,8 @@ describe('LiveMatchCard, straffläggning (avgjord på straffar)', () => {
     });
   }
 
-  /** Avgjord 1-1, borta vinner straffarna 3-2 (hemma missar sin 3:e). */
+  /** Avgjord 1-1, borta vinner straffarna 2-3 (hemma missar sin 3:e). GLOBAL sparkordning
+   *  (extra 1..6 unika, alternerande lag), precis som API:t levererar den. */
   function penaltyMatch(): Partial<LiveData> {
     return {
       status: 'finished',
@@ -688,11 +689,11 @@ describe('LiveMatchCard, straffläggning (avgjord på straffar)', () => {
         goalEvent({ minute: 72, playerName: 'Gakpo', teamApiId: HOME }),
         goalEvent({ minute: 90, playerName: 'Diop', teamApiId: AWAY, assistName: null }),
         kick(1, true, { teamApiId: HOME, playerName: 'Koopmeiners' }),
-        kick(1, true, { teamApiId: AWAY, playerName: 'El Aynaoui' }),
-        kick(2, true, { teamApiId: HOME, playerName: 'Kluivert' }),
-        kick(2, true, { teamApiId: AWAY, playerName: 'Rahimi' }),
-        kick(3, false, { teamApiId: HOME, playerName: 'Weghorst' }),
-        kick(3, true, { teamApiId: AWAY, playerName: 'Talbi' }),
+        kick(2, true, { teamApiId: AWAY, playerName: 'El Aynaoui' }),
+        kick(3, true, { teamApiId: HOME, playerName: 'Kluivert' }),
+        kick(4, true, { teamApiId: AWAY, playerName: 'Rahimi' }),
+        kick(5, false, { teamApiId: HOME, playerName: 'Weghorst' }),
+        kick(6, true, { teamApiId: AWAY, playerName: 'Talbi' }),
       ],
     };
   }
@@ -705,6 +706,24 @@ describe('LiveMatchCard, straffläggning (avgjord på straffar)', () => {
     expect(block.querySelector('[data-live-shootout-score]')?.textContent).toContain('2');
     expect(block.querySelector('[data-live-shootout-score]')?.textContent).toContain('3');
     expect(within(block).getByText(/Japan vann straffläggningen/)).toBeInTheDocument();
+  });
+
+  it('PÅGÅENDE serie (ej avgjord) visar "pågår", aldrig en felaktig "vann"-etikett', () => {
+    // Status 'paused' (P = straffläggning pågår). Hemma leder 1-0 i serien, men serien är inte
+    // avgjord , då får INGEN "vann"-etikett visas (en tillfällig ledning är inget facit).
+    renderCard({
+      status: 'paused',
+      homeGoals: 1,
+      awayGoals: 1,
+      events: [
+        kick(1, true, { teamApiId: HOME, playerName: 'Koopmeiners' }),
+        kick(2, false, { teamApiId: AWAY, playerName: 'El Aynaoui' }),
+      ],
+    });
+    const block = screen.getByRole('region').querySelector('[data-live-shootout]') as HTMLElement;
+    expect(block).not.toBeNull();
+    expect(within(block).queryByText(/vann straffläggningen/)).toBeNull();
+    expect(block.querySelector('[data-live-shootout-ongoing]')?.textContent).toBe('pågår');
   });
 
   it('EXKLUDERAR straffsparkarna ur mål-listan (ser inte ut som riktiga mål)', () => {

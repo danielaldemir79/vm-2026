@@ -127,7 +127,12 @@ export interface ShootoutModel {
   homeScore: number;
   /** Antal SATTA straffar för bortalaget. */
   awayScore: number;
-  /** Sidan som satte flest straffar (vinnaren), null vid lika (oavgjord/pågående serie). */
+  /**
+   * Sidan som satt FLEST straffar hittills (ledaren), null vid lika. Detta är "vem leder",
+   * INTE "vem vann" , modellen vet inte om serien är avgjord (den ser bara sparkarna). Vyn
+   * avgör om matchen är AVGJORD (status finished) innan den visar en "vann"-etikett, så en
+   * pågående serie aldrig felaktigt utropar en vinnare på en tillfällig ledning.
+   */
   winner: MatchSide | null;
 }
 

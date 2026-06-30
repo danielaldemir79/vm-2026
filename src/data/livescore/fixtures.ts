@@ -58,6 +58,23 @@ export const finishedResponse = parseRaw<RawFixtureResponse>(finishedRaw);
  */
 export const aetPenResponse = parseRaw<RawFixtureResponse>(aetPenRaw);
 
+/**
+ * De parsade matchhändelserna ur det straffavgjorda slutspelssvaret (Argentina-Frankrike
+ * 2022), inklusive 8 straffläggnings-sparkar (comments "Penalty Shootout"), varav 2 MISSADE
+ * (detail "Missed Penalty"), straffresultat 4-2. KÄLLHÄNVISAD seam-data för straff-extraktionen
+ * (extractShootout/selectShootout): kör den RIKTIGA parsern över de RIKTIGA shootout-event:en,
+ * så straff-regeln bevisas mot verklig data, inte mot handgjorda literaler. Svaret är ett
+ * fixtures?id-svar (event:en ligger i response[0].events), så vi sveper dem i ett events-kuvert
+ * och kör parseEvents , samma form parsern producerar live.
+ */
+const aetPenRawEvents = (aetPenResponse.response[0] as unknown as { events: RawEvent[] }).events;
+export const fixtureShootoutEvents: LiveEvent[] = parseEvents({
+  get: 'fixtures/events',
+  results: aetPenRawEvents.length,
+  errors: [],
+  response: aetPenRawEvents,
+} as RawApiResponse<RawEvent>);
+
 /** Live-ögonblicksbilder för fixtures-läget (Nederländerna-Japan, en pågående VM-match). */
 export const fixtureLiveSnapshots: LiveMatchSnapshot[] = parseLiveFixtures(liveAllResponse);
 
