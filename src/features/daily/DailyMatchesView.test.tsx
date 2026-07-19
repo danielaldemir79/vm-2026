@@ -150,10 +150,21 @@ describe('DailyMatchesView, tillgänglig struktur + happy path (fixtures)', () =
     await waitSettled();
     await waitFor(() => expect(screen.getAllByRole('article').length).toBeGreaterThan(0));
 
-    const nextButton = () =>
-      within(screen.getByRole('navigation', { name: /datumnavigering/i })).getAllByRole(
-        'button'
-      )[1];
+    const navButtons = () =>
+      within(screen.getByRole('navigation', { name: /datumnavigering/i })).getAllByRole('button');
+    const prevButton = () => navButtons()[0];
+    const nextButton = () => navButtons()[1];
+
+    // DATUM-OBEROENDE: "idag" (initialDayIndex) beror på nuvarande datum. EFTER VM
+    // (efter 19 juli) landar vyn på sista speldagen, då är "nästa" disablad direkt
+    // och ingen vilodag finns framåt. Gå därför FÖRST till turneringens första dag
+    // (bakåt tills "föregående" är disablad), och leta sedan framåt , så är testet
+    // oberoende av vilken dag det körs (vilodagen ligger alltid i spannet).
+    for (let step = 0; step < 60; step += 1) {
+      const btn = prevButton();
+      if ((btn as HTMLButtonElement).disabled) break; // nått första dagen
+      fireEvent.click(btn);
+    }
 
     // Spannet är 11 juni-19 juli (< 45 dagar). En gräns skyddar mot oändlig loop
     // om navigeringen skulle gå sönder; vilodagen ska nås långt innan dess.
