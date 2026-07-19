@@ -17,8 +17,6 @@ export function championTeamIdFromBracket(bracket: BracketState | null): string 
   if (!finalMatch || finalMatch.winnerSlotId === null) {
     return null;
   }
-  const champ = [finalMatch.home, finalMatch.away].find(
-    (s) => s.id === finalMatch.winnerSlotId
-  );
+  const champ = [finalMatch.home, finalMatch.away].find((s) => s.id === finalMatch.winnerSlotId);
   return champ?.teamId ?? null;
 }

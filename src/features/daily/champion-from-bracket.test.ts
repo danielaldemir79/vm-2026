@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  BracketMatchState,
-  BracketSlotState,
-  BracketState,
-} from '../bracket/derive-bracket';
+import type { BracketMatchState, BracketSlotState, BracketState } from '../bracket/derive-bracket';
 import { championTeamIdFromBracket } from './champion-from-bracket';
 
 // Minimala fixturer: bara fälten härledningen läser (id/teamId på slotarna,
@@ -71,6 +67,8 @@ describe('championTeamIdFromBracket', () => {
 
   it('null när vinnar-sloten pekar på ett obestämt lag (teamId null)', () => {
     // Fail-safe: winnerSlotId satt men slotens teamId saknas -> ingen gissad mästare.
-    expect(championTeamIdFromBracket(bracketWith([finalMatch(null, 'arg', 'M104-home')]))).toBeNull();
+    expect(
+      championTeamIdFromBracket(bracketWith([finalMatch(null, 'arg', 'M104-home')]))
+    ).toBeNull();
   });
 });
