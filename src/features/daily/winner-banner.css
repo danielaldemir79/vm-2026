@@ -1,0 +1,37 @@
+/* TOPPLISTE-VINNAR-NOTISEN (WinnerBanner): varm gyllene hyllning till tips-mästaren.
+   Samma guld-familj som ChampionBanner/vm-bracket-champion (konsekvent mästar-signal),
+   men krona-motiv (person, inte pokal). Guld-token --vm-gold + AA-mätt mörk ink på fylld
+   guld (--vm-coupon-ink), samma par som tips-kupongens .vm-coupon-mine. */
+
+.vm-winner-banner {
+  border-color: color-mix(in srgb, var(--vm-gold) 55%, var(--color-border));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vm-gold) 16%, var(--color-surface-raised)),
+    var(--color-surface-raised) 70%
+  );
+  box-shadow:
+    var(--vm-shadow-raised),
+    0 0 0 1px color-mix(in srgb, var(--vm-gold) 30%, transparent),
+    0 8px 32px color-mix(in srgb, var(--vm-gold) 22%, transparent);
+}
+
+/* Krona-discen: gyllene platta med pokal-guld-ikon (samma som trädets champion). */
+.vm-winner-banner-crown {
+  background-color: color-mix(in srgb, var(--vm-gold) 24%, transparent);
+  color: var(--color-warning);
+}
+
+/* Kickern "Vinnare av VM-tipset": fylld guld-bricka med AA-mätt mörk ink. */
+.vm-winner-banner-kicker {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+}
+
+/* Rubriken (namnet) i hög-kontrast fg, brödraden i muted för lugn läsbarhet. */
+.vm-winner-banner-headline {
+  color: var(--color-fg);
+}
+.vm-winner-banner-body {
+  color: var(--color-fg-muted);
+}
