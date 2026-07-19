@@ -25,7 +25,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
 import { Surface } from './components/Surface';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DailyMatchesView, SlutspelReminder } from './features/daily';
+import { DailyMatchesView, SlutspelReminder, ChampionBanner } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { ResultsProvider } from './features/results';
@@ -305,6 +305,15 @@ function AppShell() {
                         scrolla till #tips-slutspel). Dismissbar, får ligga genom hela slutspelet. */}
                         <Slide direction="up">
                           <SlutspelReminder onTip={openBracketTips} />
+                        </Slide>
+
+                        {/* VÄRLDSMÄSTAR-NOTIS (VM-slutet): gyllene firande-banner när
+                        finalen är avgjord , "Grattis <lag> till VM-segern". Härleder
+                        mästaren ur trädet (datadriven, gissar aldrig), gatar sig själv
+                        på live-läge + korad mästare. Tar vid där SlutspelReminder
+                        slocknar (ingen kommande runda kvar efter finalen). */}
+                        <Slide direction="up">
+                          <ChampionBanner />
                         </Slide>
 
                         {/* Daglig matchvy (T7) , Idag-flikens hjärta: dagens matcher +

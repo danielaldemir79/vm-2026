@@ -1,0 +1,39 @@
+/* VÄRLDSMÄSTAR-NOTISEN (ChampionBanner): en gyllene firande-banner på Idag när
+   finalen är avgjord. Guld-estetiken speglar trädets vm-bracket-champion-ruta
+   (bracket.css) så mästar-signalen är konsekvent över appen, men något rikare
+   (startsidan, en gång per VM). Guld-token --vm-gold + AA-mätt mörk ink på fylld
+   guld (--vm-coupon-ink), samma par som tips-kupongens .vm-coupon-mine. */
+
+.vm-champion-banner {
+  border-color: color-mix(in srgb, var(--vm-gold) 55%, var(--color-border));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--vm-gold) 16%, var(--color-surface-raised)),
+    var(--color-surface-raised) 70%
+  );
+  box-shadow:
+    var(--vm-shadow-raised),
+    0 0 0 1px color-mix(in srgb, var(--vm-gold) 30%, transparent),
+    0 8px 32px color-mix(in srgb, var(--vm-gold) 22%, transparent);
+}
+
+/* Pokal-discen: gyllene platta med pokal-guld-ikon (samma som trädets champion). */
+.vm-champion-banner-trophy {
+  background-color: color-mix(in srgb, var(--vm-gold) 24%, transparent);
+  color: var(--color-warning);
+}
+
+/* Kickern "Världsmästare": fylld guld-bricka med den AA-mätta mörka inken (vit
+   text faller under AA på guld , "guld-på-ljus-fällan", se tokens.css). */
+.vm-champion-banner-kicker {
+  background-color: var(--vm-gold);
+  color: var(--vm-coupon-ink);
+}
+
+/* Grattis-raden i vanlig fg (hög kontrast mot ytan i båda teman). */
+.vm-champion-banner-line {
+  color: var(--color-fg);
+}
+
+/* Reducerad rörelse respekteras redan (ingen egen animation här). En diskret
+   "pop"-in via appens Fade/Slide-wrapper i App.tsx, ingen extra rörelse i notisen. */
