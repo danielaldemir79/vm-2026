@@ -4,6 +4,7 @@
 export { DailyMatchesView } from './DailyMatchesView';
 export { SlutspelReminder } from './SlutspelReminder';
 export { ChampionBanner } from './ChampionBanner';
+export { WinnerBanner } from './WinnerBanner';
 export { MatchCard } from './MatchCard';
 export type { MatchCardProps } from './MatchCard';
 export { LiveMatchCard } from './LiveMatchCard';

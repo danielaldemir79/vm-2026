@@ -25,7 +25,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { Wordmark } from './components/Wordmark';
 import { Surface } from './components/Surface';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DailyMatchesView, SlutspelReminder, ChampionBanner } from './features/daily';
+import { DailyMatchesView, SlutspelReminder, ChampionBanner, WinnerBanner } from './features/daily';
 import { GroupStageView } from './features/groups';
 import { BracketView } from './features/bracket';
 import { ResultsProvider } from './features/results';
@@ -314,6 +314,15 @@ function AppShell() {
                         slocknar (ingen kommande runda kvar efter finalen). */}
                         <Slide direction="up">
                           <ChampionBanner />
+                        </Slide>
+
+                        {/* TIPS-VINNAR-NOTIS (VM-slutet): varm gyllene hyllning till den
+                        som vann hela VM-tipset (globala topplistans etta), med namn +
+                        poäng. Syskon till ChampionBanner (fotbolls-mästaren); denna firar
+                        TIPS-mästaren. Datadriven ur topplistan, live-läge only, visas bara
+                        när VM är avgjort. */}
+                        <Slide direction="up">
+                          <WinnerBanner />
                         </Slide>
 
                         {/* Daglig matchvy (T7) , Idag-flikens hjärta: dagens matcher +
